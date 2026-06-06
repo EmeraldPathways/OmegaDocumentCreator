@@ -1,0 +1,17 @@
+.env
+.env.local
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+node_modules/
+dist/
+coverage/
+storage/clients/*
+!storage/clients/.gitkeep
+storage/backups/*
+!storage/backups/.gitkeep
+apps/api/.pytest_cache/
+apps/frontend/.vite/
+apps/frontend/dist/
