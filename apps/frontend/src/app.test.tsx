@@ -6,6 +6,7 @@ import { App } from "./App";
 
 afterEach(() => {
   window.sessionStorage.clear();
+  window.localStorage.clear();
   cleanup();
 });
 
@@ -25,7 +26,8 @@ describe("App routes", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
-    expect(screen.getAllByText("Open workflow")).toHaveLength(2);
+    expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/).length).toBeGreaterThan(1);
+    expect(screen.getByRole("link", { name: "Add Client" })).toBeInTheDocument();
   });
 
   it("renders the clients page for the clients route", () => {
@@ -40,7 +42,7 @@ describe("App routes", () => {
     expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
   });
 
-  it("renders the top-level Income Protection workspace route", () => {
+  it("redirects the top-level Income Protection route into a client workflow", () => {
     render(
       <MemoryRouter initialEntries={["/income-protection"]}>
         <App />
@@ -48,24 +50,24 @@ describe("App routes", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
-    expect(screen.getAllByText("Open workflow")).toHaveLength(2);
-    expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
+    expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/).length).toBeGreaterThan(1);
+    expect(screen.getByLabelText("Search workflow clients")).toBeInTheDocument();
+    expect(screen.getByLabelText("Select workflow client")).toBeInTheDocument();
   });
 
-  it("renders the Documents route with generated document history", () => {
+  it("redirects the Documents route to Clients", () => {
     render(
       <MemoryRouter initialEntries={["/documents"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Clients" })).toBeInTheDocument();
     expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
     expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
-    expect(screen.getAllByText("Open folder")).toHaveLength(2);
   });
 
-  it("renders a client documents folder with files and generated documents", () => {
+  it("redirects a document folder route to the client record with files and generated documents", () => {
     render(
       <MemoryRouter initialEntries={["/documents/CLI-2026-0002"]}>
         <App />
@@ -76,9 +78,9 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Generated Documents" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
     expect(
-      screen.getAllByText("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf").length,
+      screen.getAllByDisplayValue("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf").length,
     ).toBeGreaterThan(1);
-    expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("jamie-murphy-passport.pdf")).toBeInTheDocument();
   });
 
   it("renders the Files route with tracked client uploads", () => {
@@ -105,6 +107,22 @@ describe("App routes", () => {
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
     expect(screen.getByText("0870000002")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Income Protection" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Documents" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Generated Documents" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
+  });
+
+  it("opens a generated document from the client file", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open" })[0]);
+
+    expect(screen.getByRole("heading", { name: "Document Preview" })).toBeInTheDocument();
+    expect(screen.getAllByText("Statement of Suitability").length).toBeGreaterThan(0);
   });
 
   it("renders the create client form route", () => {
@@ -203,6 +221,7 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "AI Readiness" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Core App Settings" })).toBeInTheDocument();
     expect(screen.getByText("Version 1 AI status")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
     expect(screen.getByText("Ollama-ready")).toBeInTheDocument();
@@ -229,7 +248,8 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getAllByText("Jamie Murphy").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Jamie Murphy\s+\(CLI-2026-0002\)/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Jamie Murphy\s+\(CLI-2026-0002\)/).length).toBeGreaterThan(1);
+    expect(screen.getByRole("link", { name: "Add Client" })).toBeInTheDocument();
   });
 
   it("renders the Stage 4 tab labels", () => {
@@ -450,7 +470,7 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Upload File" }));
 
-    expect(screen.getByText("Upload status: Upload placeholder queued")).toBeInTheDocument();
+    expect(screen.getByText("Upload status: File saved")).toBeInTheDocument();
   });
 
   it("renders the Generated Documents tab with seeded history", () => {
@@ -466,6 +486,20 @@ describe("App routes", () => {
     expect(screen.getByText("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf")).toBeInTheDocument();
     expect(screen.getAllByText("Version 1")).toHaveLength(2);
     expect(screen.getAllByText("PDF ready")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Download" }).length).toBeGreaterThan(0);
+  });
+
+  it("downloads an individual generated document from the Generated Documents tab", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Download" })[0]);
+
+    expect(screen.getByText(/Download status: Downloaded /)).toBeInTheDocument();
   });
 
   it("updates the document pack download placeholder status", () => {
@@ -481,6 +515,48 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Download Document Pack" }));
 
-    expect(screen.getByText("Pack status: Pack placeholder queued")).toBeInTheDocument();
+    expect(screen.getByText("Pack status: Document pack queued")).toBeInTheDocument();
+  });
+
+  it("persists client details after saving and reopening the workflow", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Occupation"), { target: { value: "Senior Analyst" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Client Details" }));
+
+    cleanup();
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByDisplayValue("Senior Analyst")).toBeInTheDocument();
+  });
+
+  it("persists settings after saving and reopening the page", () => {
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("App URL"), { target: { value: "http://omega-office.local" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Settings" }));
+
+    cleanup();
+
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByDisplayValue("http://omega-office.local")).toBeInTheDocument();
   });
 });

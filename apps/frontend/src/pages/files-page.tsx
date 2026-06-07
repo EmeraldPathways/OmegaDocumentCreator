@@ -1,9 +1,16 @@
 import { Link } from "react-router-dom";
 
-import { listSeededClientFiles } from "../data/seeded-clients";
+import { useClientData } from "../data/client-data-context";
 
 export function FilesPage() {
-  const files = listSeededClientFiles();
+  const { listClients } = useClientData();
+  const files = listClients().flatMap((client) =>
+    client.files.map((file) => ({
+      ...file,
+      clientReference: client.clientReference,
+      clientName: client.fullName,
+    })),
+  );
 
   return (
     <div className="page-stack">

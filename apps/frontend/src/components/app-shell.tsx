@@ -6,7 +6,6 @@ import { useAuth } from "../auth/auth-context";
 const navItems = [
   { label: "Clients", to: "/clients" },
   { label: "Income Protection", to: "/income-protection" },
-  { label: "Documents", to: "/documents" },
   { label: "Settings", to: "/settings" },
 ];
 

@@ -17,8 +17,8 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Clients")).toBeInTheDocument();
     expect(screen.getByText("Income Protection")).toBeInTheDocument();
-    expect(screen.getByText("Documents")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.queryByText("Documents")).not.toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("Admin")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search clients")).toBeInTheDocument();

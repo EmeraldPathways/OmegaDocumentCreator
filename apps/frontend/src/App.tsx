@@ -1,15 +1,14 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./auth/auth-context";
 import { AppShell } from "./components/app-shell";
+import { ClientDataProvider } from "./data/client-data-context";
+import { useClientData } from "./data/client-data-context";
 import { AdminPage } from "./pages/admin-page";
-import { ClientDocumentsPage } from "./pages/client-documents-page";
 import { ClientFormPage } from "./pages/client-form-page";
 import { ClientProfilePage } from "./pages/client-profile-page";
 import { ClientsPage } from "./pages/clients-page";
-import { DocumentsPage } from "./pages/documents-page";
 import { FilesPage } from "./pages/files-page";
-import { IncomeProtectionHubPage } from "./pages/income-protection-hub-page";
 import { IncomeProtectionPage } from "./pages/income-protection-page";
 import { LoginPage } from "./pages/login-page";
 import { SettingsPage } from "./pages/settings-page";
@@ -24,6 +23,25 @@ function RequireAdmin({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function RedirectDocumentFolder() {
+  const { clientReference = "" } = useParams();
+  return <Navigate replace to={`/clients/${clientReference}`} />;
+}
+
+function RedirectIncomeProtectionHome() {
+  return <IncomeProtectionPage />;
+}
+
+function RedirectIncomeProtectionClient() {
+  const { clientReference = "" } = useParams();
+
+  if (typeof window !== "undefined" && clientReference) {
+    window.localStorage.setItem("omega-selected-income-protection-client", clientReference);
+  }
+
+  return <Navigate replace to="/income-protection" />;
+}
+
 function AppRoutes() {
   return (
     <AppShell>
@@ -31,13 +49,13 @@ function AppRoutes() {
         <Route path="/" element={<Navigate replace to="/income-protection" />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/income-protection" element={<IncomeProtectionHubPage />} />
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/documents/:clientReference" element={<ClientDocumentsPage />} />
+        <Route path="/income-protection" element={<RedirectIncomeProtectionHome />} />
+        <Route path="/documents" element={<Navigate replace to="/clients" />} />
+        <Route path="/documents/:clientReference" element={<RedirectDocumentFolder />} />
         <Route path="/files" element={<FilesPage />} />
         <Route path="/clients/new" element={<ClientFormPage />} />
         <Route path="/clients/:clientReference" element={<ClientProfilePage />} />
-        <Route path="/clients/:clientReference/income-protection" element={<IncomeProtectionPage />} />
+        <Route path="/clients/:clientReference/income-protection" element={<RedirectIncomeProtectionClient />} />
         <Route path="/clients/:clientReference/edit" element={<ClientFormPage />} />
         <Route
           path="/admin"
@@ -56,7 +74,9 @@ function AppRoutes() {
 export function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <ClientDataProvider>
+        <AppRoutes />
+      </ClientDataProvider>
     </AuthProvider>
   );
 }

@@ -1,12 +1,21 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { getSeededClientProfile } from "../data/seeded-clients";
+import { useClientData } from "../data/client-data-context";
+import type { SeededClientProfile } from "../data/seeded-clients";
 
 export function ClientDocumentsPage() {
   const { clientReference = "" } = useParams();
-  const client = getSeededClientProfile(clientReference);
+  const { getClient, saveClient } = useClientData();
+  const client = getClient(clientReference);
+  const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
+  const [saveStatus, setSaveStatus] = useState("Not saved yet");
 
-  if (!client) {
+  useEffect(() => {
+    setDraft(client ?? null);
+  }, [client]);
+
+  if (!client || !draft) {
     return (
       <section className="panel">
         <h1>Client Folder Not Found</h1>
@@ -14,7 +23,40 @@ export function ClientDocumentsPage() {
     );
   }
 
-  const folderName = `client-${client.clientReference.toLowerCase()}-${client.fullName.toLowerCase().replaceAll(" ", "-")}`;
+  const folderName = `client-${draft.clientReference.toLowerCase()}-${draft.fullName.toLowerCase().replaceAll(" ", "-")}`;
+
+  function updateDocument(documentId: string, field: "documentName" | "documentType" | "status", value: string) {
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        generatedDocuments: currentDraft.generatedDocuments.map((document) =>
+          document.id === documentId ? { ...document, [field]: value } : document,
+        ),
+      };
+    });
+  }
+
+  function updateFile(fileId: string, field: "originalFilename" | "category" | "status", value: string) {
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        files: currentDraft.files.map((file) => (file.id === fileId ? { ...file, [field]: value } : file)),
+      };
+    });
+  }
+
+  function saveFolder() {
+    saveClient(draft);
+    setSaveStatus("Saved just now");
+  }
 
   return (
     <div className="page-stack">
@@ -22,16 +64,20 @@ export function ClientDocumentsPage() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">Client folder</p>
-            <h1>{client.fullName}</h1>
+            <h1>{draft.fullName}</h1>
             <p className="module-subtitle">{folderName}</p>
           </div>
           <div className="module-actions">
             <Link className="primary-action action-link secondary-action" to="/documents">
               Back to Documents
             </Link>
-            <Link className="primary-action action-link" to={`/clients/${client.clientReference}/income-protection`}>
+            <Link className="primary-action action-link" to={`/clients/${draft.clientReference}/income-protection`}>
               Open Income Protection
             </Link>
+            <button className="primary-action" onClick={saveFolder} type="button">
+              Save Folder Changes
+            </button>
+            <span className="draft-status">Save status: {saveStatus}</span>
           </div>
         </div>
 
@@ -52,12 +98,26 @@ export function ClientDocumentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {client.generatedDocuments.map((document) => (
+                {draft.generatedDocuments.map((document) => (
                   <tr key={document.id}>
-                    <td>{document.documentName}</td>
-                    <td>{document.documentType}</td>
+                    <td>
+                      <input
+                        onChange={(event) => updateDocument(document.id, "documentName", event.target.value)}
+                        type="text"
+                        value={document.documentName}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        onChange={(event) => updateDocument(document.id, "documentType", event.target.value)}
+                        type="text"
+                        value={document.documentType}
+                      />
+                    </td>
                     <td>{document.version}</td>
-                    <td>{document.status}</td>
+                    <td>
+                      <input onChange={(event) => updateDocument(document.id, "status", event.target.value)} type="text" value={document.status} />
+                    </td>
                     <td>{document.generatedAt}</td>
                   </tr>
                 ))}
@@ -83,11 +143,21 @@ export function ClientDocumentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {client.files.map((file) => (
+                {draft.files.map((file) => (
                   <tr key={file.id}>
-                    <td>{file.originalFilename}</td>
-                    <td>{file.category}</td>
-                    <td>{file.status}</td>
+                    <td>
+                      <input
+                        onChange={(event) => updateFile(file.id, "originalFilename", event.target.value)}
+                        type="text"
+                        value={file.originalFilename}
+                      />
+                    </td>
+                    <td>
+                      <input onChange={(event) => updateFile(file.id, "category", event.target.value)} type="text" value={file.category} />
+                    </td>
+                    <td>
+                      <input onChange={(event) => updateFile(file.id, "status", event.target.value)} type="text" value={file.status} />
+                    </td>
                     <td>{file.uploadedBy}</td>
                     <td>{file.uploadedAt}</td>
                   </tr>

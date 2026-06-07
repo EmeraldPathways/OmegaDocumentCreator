@@ -51,10 +51,39 @@ export type SeededClientProfile = {
   advisorName: string;
   termsVersion: string;
   termsDeliveryMethod: string;
+  termsIssuedBy: string;
+  termsClientReceived: string;
+  termsClientReviewed: string;
+  termsNotes: string;
   statementType: string;
   productType: string;
   letterDate: string;
   netMonthlyCost: string;
+  mortgageProtection: string;
+  personalInsurance: string;
+  keymanInsurance: string;
+  partnershipInsurance: string;
+  selfLifeInsuranceAmount: string;
+  partnerSeriousIllnessAmount: string;
+  personalCircumstances: string;
+  financialSituation: string;
+  needsObjectives: string;
+  executionOnlyConfirmation: string;
+  termsReviewedReceived: string;
+  contactByPhone: string;
+  contactBySms: string;
+  contactByEmail: string;
+  contactByPost: string;
+  pepConfirmation: string;
+  pepRelatedConfirmation: string;
+  businessSource: string;
+  clientSignature1: string;
+  clientSignature1Date: string;
+  clientSignature2: string;
+  financialAdvisorSignature: string;
+  requestCompanyName: string;
+  requestPolicies: string;
+  requestLetterDate: string;
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
 };
@@ -89,10 +118,39 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     advisorName: "",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Post",
+    termsIssuedBy: "Omega Admin",
+    termsClientReceived: "Pending confirmation",
+    termsClientReviewed: "Pending confirmation",
+    termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "Personal Income Protection",
     productType: "",
     letterDate: "2026-01-15",
     netMonthlyCost: "116",
+    mortgageProtection: "No",
+    personalInsurance: "No",
+    keymanInsurance: "No",
+    partnershipInsurance: "No",
+    selfLifeInsuranceAmount: "",
+    partnerSeriousIllnessAmount: "",
+    personalCircumstances: "Partner noted: Taylor Client",
+    financialSituation: "Annual income currently recorded as 52000.",
+    needsObjectives: "Income Protection cover review requested.",
+    executionOnlyConfirmation: "Pending",
+    termsReviewedReceived: "Pending",
+    contactByPhone: "No preference recorded",
+    contactBySms: "No preference recorded",
+    contactByEmail: "No",
+    contactByPost: "No preference recorded",
+    pepConfirmation: "Not confirmed",
+    pepRelatedConfirmation: "Not confirmed",
+    businessSource: "Existing client referral",
+    clientSignature1: "Pending",
+    clientSignature1Date: "",
+    clientSignature2: "Pending",
+    financialAdvisorSignature: "",
+    requestCompanyName: "",
+    requestPolicies: "Income Protection",
+    requestLetterDate: "2026-01-15",
     files: [
       {
         id: "FILE-0001",
@@ -143,10 +201,39 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     advisorName: "Office Staff",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Email",
+    termsIssuedBy: "Office Staff",
+    termsClientReceived: "Pending confirmation",
+    termsClientReviewed: "Pending confirmation",
+    termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "Personal Income Protection",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
     netMonthlyCost: "132",
+    mortgageProtection: "No",
+    personalInsurance: "No",
+    keymanInsurance: "No",
+    partnershipInsurance: "No",
+    selfLifeInsuranceAmount: "",
+    partnerSeriousIllnessAmount: "",
+    personalCircumstances: "",
+    financialSituation: "Annual income currently recorded as 60000.",
+    needsObjectives: "Income Protection cover review requested.",
+    executionOnlyConfirmation: "Pending",
+    termsReviewedReceived: "Pending",
+    contactByPhone: "No preference recorded",
+    contactBySms: "No preference recorded",
+    contactByEmail: "Yes",
+    contactByPost: "No preference recorded",
+    pepConfirmation: "Not confirmed",
+    pepRelatedConfirmation: "Not confirmed",
+    businessSource: "Existing client referral",
+    clientSignature1: "Pending",
+    clientSignature1Date: "",
+    clientSignature2: "Pending",
+    financialAdvisorSignature: "Office Staff",
+    requestCompanyName: "Zurich Life",
+    requestPolicies: "Income Protection",
+    requestLetterDate: "2026-06-06",
     files: [
       {
         id: "FILE-0002",
@@ -185,6 +272,10 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     ],
   },
 };
+
+export function createSeededClientProfiles() {
+  return JSON.parse(JSON.stringify(seededClientProfiles)) as Record<string, SeededClientProfile>;
+}
 
 export function getSeededClientProfile(clientReference: string) {
   return seededClientProfiles[clientReference];

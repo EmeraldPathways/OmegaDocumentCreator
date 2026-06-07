@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 
-import { listSeededClientProfiles } from "../data/seeded-clients";
+import { useClientData } from "../data/client-data-context";
 
 export function DocumentsPage() {
-  const clients = listSeededClientProfiles();
+  const { listClients } = useClientData();
+  const clients = listClients();
 
   return (
     <div className="page-stack">
