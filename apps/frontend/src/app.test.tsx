@@ -5,23 +5,27 @@ import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 
 afterEach(() => {
+  window.sessionStorage.clear();
   cleanup();
 });
 
 describe("App routes", () => {
-  it("renders the dashboard with current and future module actions", () => {
+  function signInAsAdmin() {
+    window.sessionStorage.setItem(
+      "omega-session-user",
+      JSON.stringify({ email: "admin@omega.local", role: "admin" }),
+    );
+  }
+
+  it("redirects the root route to Income Protection", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Internal document workflows" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Income Protection module" })).toBeInTheDocument();
-    expect(screen.getByText("Pensions")).toBeInTheDocument();
-    expect(screen.getByText("V2")).toBeInTheDocument();
-    expect(screen.getByText("Investments")).toBeInTheDocument();
-    expect(screen.getByText("V3")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
+    expect(screen.getAllByText("Open workflow")).toHaveLength(2);
   });
 
   it("renders the clients page for the clients route", () => {
@@ -34,6 +38,59 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Clients" })).toBeInTheDocument();
     expect(screen.getByText("CLI-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
+  });
+
+  it("renders the top-level Income Protection workspace route", () => {
+    render(
+      <MemoryRouter initialEntries={["/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
+    expect(screen.getAllByText("Open workflow")).toHaveLength(2);
+    expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
+  });
+
+  it("renders the Documents route with generated document history", () => {
+    render(
+      <MemoryRouter initialEntries={["/documents"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
+    expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
+    expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
+    expect(screen.getAllByText("Open folder")).toHaveLength(2);
+  });
+
+  it("renders a client documents folder with files and generated documents", () => {
+    render(
+      <MemoryRouter initialEntries={["/documents/CLI-2026-0002"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Jamie Murphy" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Generated Documents" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf").length,
+    ).toBeGreaterThan(1);
+    expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
+  });
+
+  it("renders the Files route with tracked client uploads", () => {
+    render(
+      <MemoryRouter initialEntries={["/files"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
+    expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Proof of Age")).toBeInTheDocument();
   });
 
   it("renders the client profile page for an individual client route", () => {
@@ -64,6 +121,8 @@ describe("App routes", () => {
   });
 
   it("renders the Admin page with seeded audit logs", () => {
+    signInAsAdmin();
+
     render(
       <MemoryRouter initialEntries={["/admin"]}>
         <App />
@@ -77,6 +136,8 @@ describe("App routes", () => {
   });
 
   it("renders the Admin page with backup status and trigger action", () => {
+    signInAsAdmin();
+
     render(
       <MemoryRouter initialEntries={["/admin"]}>
         <App />
@@ -94,6 +155,8 @@ describe("App routes", () => {
   });
 
   it("renders the Admin page with the Stage 14 security guidance", () => {
+    signInAsAdmin();
+
     render(
       <MemoryRouter initialEntries={["/admin"]}>
         <App />
@@ -105,6 +168,30 @@ describe("App routes", () => {
     expect(screen.getByText("Cloudflare Tunnel with Cloudflare Access")).toBeInTheDocument();
     expect(screen.getByText("Public port exposure")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("shows the Admin tab only when signed in as admin", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
+
+    cleanup();
+    window.sessionStorage.setItem(
+      "omega-session-user",
+      JSON.stringify({ email: "admin@omega.local", role: "admin" }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
   });
 
   it("renders the Settings page with Stage 16 AI readiness guidance", () => {
@@ -170,11 +257,13 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
     expect(screen.getByRole("heading", { name: "Fact Find Draft" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Jamie Murphy")).toBeInTheDocument();
+    expect(screen.getAllByDisplayValue("Jamie Murphy").length).toBeGreaterThan(1);
     expect(screen.getByDisplayValue("jamie.murphy@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Employed")).toBeInTheDocument();
     expect(screen.getByDisplayValue("60000")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Zurich Life")).toBeInTheDocument();
+    expect(screen.getAllByDisplayValue("Zurich Life").length).toBeGreaterThan(1);
+    expect(screen.getByRole("heading", { name: "Life Insurance & Serious Illness" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Request for Information" })).toBeInTheDocument();
   });
 
   it("updates the draft save status inside the Fact Find tab", () => {
@@ -214,6 +303,24 @@ describe("App routes", () => {
     expect(screen.getByText("Last saved: Saved just now")).toBeInTheDocument();
   });
 
+  it("adds a Fact Find DOCX record to generated documents when generation succeeds", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate DOCX" }));
+
+    expect(screen.getByText("Generation status: DOCX generated")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
+
+    expect(screen.getByText("Jamie_Murphy_Fact_Find_2026-06-06.docx")).toBeInTheDocument();
+    expect(screen.getByText("DOCX ready")).toBeInTheDocument();
+  });
+
   it("renders the Terms of Business draft fields and issue actions", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -244,6 +351,23 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mark as Issued" }));
 
     expect(screen.getByText("Issue status: Issued today")).toBeInTheDocument();
+  });
+
+  it("adds a Terms of Business PDF record when generation is requested", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Terms PDF" }));
+
+    expect(screen.getByText("Issue status: PDF generated")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
+
+    expect(screen.getAllByText("Jamie_Murphy_Terms_of_Business_2026-06-06.pdf").length).toBeGreaterThan(1);
   });
 
   it("renders the Statement of Suitability draft fields and generation actions", () => {

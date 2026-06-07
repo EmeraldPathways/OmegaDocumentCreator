@@ -189,3 +189,27 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
 export function getSeededClientProfile(clientReference: string) {
   return seededClientProfiles[clientReference];
 }
+
+export function listSeededClientProfiles() {
+  return Object.values(seededClientProfiles);
+}
+
+export function listSeededGeneratedDocuments() {
+  return listSeededClientProfiles().flatMap((client) =>
+    client.generatedDocuments.map((document) => ({
+      ...document,
+      clientReference: client.clientReference,
+      clientName: client.fullName,
+    })),
+  );
+}
+
+export function listSeededClientFiles() {
+  return listSeededClientProfiles().flatMap((client) =>
+    client.files.map((file) => ({
+      ...file,
+      clientReference: client.clientReference,
+      clientName: client.fullName,
+    })),
+  );
+}

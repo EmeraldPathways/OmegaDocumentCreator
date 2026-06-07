@@ -26,44 +26,69 @@ body {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 280px 1fr;
   min-height: 100vh;
 }
 
-.sidebar {
-  padding: 32px 24px;
-  background: linear-gradient(180deg, var(--omega-burgundy) 0%, var(--omega-burgundy-dark) 100%);
-  color: #fff7f8;
+.app-header {
+  display: grid;
+  gap: 18px;
+  padding: 24px 32px 0;
 }
 
 .brand {
   display: grid;
   gap: 4px;
-  margin-bottom: 32px;
 }
 
 .brand-mark {
   font-size: 1.6rem;
   font-weight: 700;
+  color: var(--omega-burgundy);
 }
 
 .brand-subtitle {
   font-size: 0.95rem;
-  color: rgba(255, 247, 248, 0.8);
+  color: var(--omega-grey);
 }
 
-.nav {
-  display: grid;
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .nav-link {
   padding: 12px 14px;
-  border-radius: 14px;
-  color: inherit;
+  border-radius: 999px;
+  color: #261d1f;
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(111, 23, 49, 0.08);
+  font-weight: 600;
+}
+
+.nav-link.active {
+  background: var(--omega-burgundy);
+  color: #fff7f8;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.session-label {
+  color: var(--omega-grey);
+  font-size: 0.95rem;
 }
 
 .content {
@@ -370,6 +395,14 @@ body {
   border: 1px solid var(--omega-border);
 }
 
+.client-form-grid textarea {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--omega-border);
+  resize: vertical;
+  font: inherit;
+}
+
 .login-panel {
   max-width: 520px;
 }
@@ -398,14 +431,11 @@ body {
 }
 
 @media (max-width: 900px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
 
+  .header-row,
   .topbar {
     flex-direction: column;
     align-items: stretch;

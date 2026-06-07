@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import type { SeededGeneratedDocument } from "../data/seeded-clients";
 import { getSeededClientProfile } from "../data/seeded-clients";
 
 const moduleTabs = [
@@ -56,6 +57,7 @@ export function IncomeProtectionPage() {
   const [showStatementValidation, setShowStatementValidation] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Waiting for upload");
   const [documentPackStatus, setDocumentPackStatus] = useState("Waiting for request");
+  const [generatedDocuments, setGeneratedDocuments] = useState<SeededGeneratedDocument[]>(client.generatedDocuments);
 
   if (!client) {
     return (
@@ -66,16 +68,6 @@ export function IncomeProtectionPage() {
   }
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
-  const remainingFactFindSections = [
-    "Life Insurance & Serious Illness",
-    "Additional Relevant Information",
-    "Client Declarations",
-    "Data Protection & Marketing Preferences",
-    "PEP Confirmation",
-    "Business Source",
-    "Signatures",
-    "Request for Information",
-  ];
   const factFindMissingFields = [
     !hasValue(client.fullName) ? "Client name" : null,
     !hasValue(`${client.townCity} ${client.county}`.trim()) ? "Address" : null,
@@ -99,6 +91,26 @@ export function IncomeProtectionPage() {
     !hasValue(client.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
 
+  function buildGeneratedDocument(documentType: string, extension: "docx" | "pdf") {
+    const generatedAt = client.letterDate || "2026-06-06";
+    const baseName = `${client.firstName}_${client.surname}`;
+    const normalizedType = documentType.replaceAll(" ", "_");
+
+    return {
+      id: `DOC-${generatedDocuments.length + 1}-${normalizedType}-${extension}`,
+      documentType,
+      documentName: `${baseName}_${normalizedType}_${generatedAt}.${extension}`,
+      version: `Version ${generatedDocuments.length + 1}`,
+      status: extension === "pdf" ? "PDF ready" : "DOCX ready",
+      generatedAt,
+    };
+  }
+
+  function appendGeneratedDocument(documentType: string, extension: "docx" | "pdf") {
+    const nextDocument = buildGeneratedDocument(documentType, extension);
+    setGeneratedDocuments((currentDocuments) => [nextDocument, ...currentDocuments]);
+  }
+
   function handleFactFindGenerate(format: "DOCX" | "PDF") {
     if (factFindMissingFields.length > 0) {
       setShowFactFindValidation(true);
@@ -108,6 +120,7 @@ export function IncomeProtectionPage() {
 
     setShowFactFindValidation(false);
     setFactFindGenerationStatus(`${format} generated`);
+    appendGeneratedDocument("Fact Find", format.toLowerCase() as "docx" | "pdf");
   }
 
   function handleStatementGenerate(format: "DOCX" | "PDF") {
@@ -119,6 +132,12 @@ export function IncomeProtectionPage() {
 
     setShowStatementValidation(false);
     setStatementDocumentStatus(`${format} generated`);
+    appendGeneratedDocument("Statement of Suitability", format.toLowerCase() as "docx" | "pdf");
+  }
+
+  function handleTermsGenerate() {
+    setTermsIssueStatus("PDF generated");
+    appendGeneratedDocument("Terms of Business", "pdf");
   }
 
   function renderTabPanel() {
@@ -235,16 +254,186 @@ export function IncomeProtectionPage() {
 
           <section className="fact-find-section">
             <div className="fact-find-section-header">
-              <p className="eyebrow">Remaining sections</p>
-              <h3>Queued for the next Stage 5 slices</h3>
+              <p className="eyebrow">Section 4</p>
+              <h3>Life Insurance & Serious Illness</h3>
             </div>
-            <ul className="card-list">
-              {remainingFactFindSections.map((sectionName) => (
-                <li className="mini-card" key={sectionName}>
-                  <strong>{sectionName}</strong>
-                </li>
-              ))}
-            </ul>
+            <form className="client-form-grid">
+              <label>
+                Mortgage protection
+                <input defaultValue="No" type="text" />
+              </label>
+              <label>
+                Personal insurance
+                <input defaultValue="No" type="text" />
+              </label>
+              <label>
+                Keyman insurance
+                <input defaultValue="No" type="text" />
+              </label>
+              <label>
+                Partnership insurance
+                <input defaultValue="No" type="text" />
+              </label>
+              <label>
+                Self life insurance amount
+                <input defaultValue="" type="text" />
+              </label>
+              <label>
+                Partner serious illness amount
+                <input defaultValue="" type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 5</p>
+              <h3>Additional Relevant Information</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Personal circumstances
+                <textarea defaultValue={client.partnerName ? `Partner noted: ${client.partnerName}` : ""} rows={4} />
+              </label>
+              <label>
+                Financial situation
+                <textarea defaultValue={`Annual income currently recorded as ${client.income}.`} rows={4} />
+              </label>
+              <label>
+                Needs and objectives
+                <textarea defaultValue="Income Protection cover review requested." rows={4} />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 6</p>
+              <h3>Client Declarations</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Execution-only confirmation
+                <input defaultValue="Pending" type="text" />
+              </label>
+              <label>
+                Terms of Business reviewed and copy received
+                <input defaultValue="Pending" type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 7</p>
+              <h3>Data Protection & Marketing Preferences</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Contact by phone
+                <input defaultValue="No preference recorded" type="text" />
+              </label>
+              <label>
+                Contact by SMS
+                <input defaultValue="No preference recorded" type="text" />
+              </label>
+              <label>
+                Contact by email
+                <input defaultValue={client.email ? "Yes" : "No"} type="text" />
+              </label>
+              <label>
+                Contact by post
+                <input defaultValue="No preference recorded" type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 8</p>
+              <h3>PEP Confirmation</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Politically Exposed Person confirmation
+                <input defaultValue="Not confirmed" type="text" />
+              </label>
+              <label>
+                Related to a PEP
+                <input defaultValue="Not confirmed" type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 9</p>
+              <h3>Business Source</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                How did you hear about Omega?
+                <input defaultValue="Existing client referral" type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 10</p>
+              <h3>Signatures</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Client signature 1
+                <input defaultValue="Pending" type="text" />
+              </label>
+              <label>
+                Client signature 1 date
+                <input defaultValue="" type="text" />
+              </label>
+              <label>
+                Client signature 2
+                <input defaultValue="Pending" type="text" />
+              </label>
+              <label>
+                Financial advisor signature
+                <input defaultValue={client.advisorName || "Pending"} type="text" />
+              </label>
+            </form>
+          </section>
+
+          <section className="fact-find-section">
+            <div className="fact-find-section-header">
+              <p className="eyebrow">Section 11</p>
+              <h3>Request for Information</h3>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Client name(s)
+                <input defaultValue={client.fullName} type="text" />
+              </label>
+              <label>
+                Address
+                <input defaultValue={`${client.townCity}, ${client.county}`} type="text" />
+              </label>
+              <label>
+                Date of birth
+                <input defaultValue={client.dateOfBirth} type="text" />
+              </label>
+              <label>
+                Company/provider name
+                <input defaultValue={client.provider} type="text" />
+              </label>
+              <label>
+                Policies
+                <input defaultValue="Income Protection" type="text" />
+              </label>
+              <label>
+                Request letter date
+                <input defaultValue={client.letterDate} type="text" />
+              </label>
+            </form>
           </section>
 
           {showFactFindValidation ? (
@@ -276,7 +465,7 @@ export function IncomeProtectionPage() {
               <p>Record the current issue version, delivery details, and issuance state for this client.</p>
             </div>
             <div className="module-actions">
-              <button className="primary-action" type="button">
+              <button className="primary-action" onClick={handleTermsGenerate} type="button">
                 Generate Terms PDF
               </button>
               <button className="primary-action secondary-action" onClick={() => setTermsIssueStatus("Issued today")} type="button">
@@ -529,7 +718,7 @@ export function IncomeProtectionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {client.generatedDocuments.map((document) => (
+                  {generatedDocuments.map((document) => (
                     <tr key={document.id}>
                       <td>{document.documentType}</td>
                       <td>{document.documentName}</td>
