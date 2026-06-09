@@ -15,3 +15,5 @@ storage/backups/*
 apps/api/.pytest_cache/
 apps/frontend/.vite/
 apps/frontend/dist/
+.playwright-mcp/
+apps/api/*.log

@@ -1,157 +1,239 @@
-# Stage 4 Handoff
+# Omega Frontend/Workflow Handoff
 
 ## Goal
 
-Start `Stage 4` by building the first Income Protection module shell on top of the current Stage 3 scaffold.
+The next agent should stop treating the app as a shell-only prototype and start wiring the current frontend workflow into real application behavior.
 
-The next agent should deliver:
+The immediate objective is:
 
-- an Income Protection area bound to a selected client
-- tab navigation for:
-  - Client Details
-  - Fact Find
-  - Terms of Business
-  - Statement of Suitability
-  - Files
-  - Generated Documents
-- shared client summary data visible in the module shell
-- backend placeholder endpoints for the Stage 4 module shape if needed
+- keep the current frontend navigation and workflow shape intact
+- preserve `/income-protection` as the stable workflow route
+- preserve the client-owned case-file model
+- move the app from browser-only localStorage persistence toward real backend/file/document behavior
 
-Do not jump ahead into full Fact Find, Terms of Business, or Statement of Suitability implementation yet.
+## What Exists Now
 
-## Current State
+### Frontend model
 
-### Stage 1
+The app is no longer at Stage 4 shell state.
 
-Scaffold exists for:
+Current frontend behavior already includes:
 
-- React frontend
-- FastAPI backend
-- Docker Compose
-- env template
-- local storage folders
-- initial migration stub
+- top navigation only
+- no dashboard-first workflow
+- no top-level Documents navigation
+- `Admin` visible only when signed in as admin
+- `/income-protection` as the main module route
+- client selection inside the Income Protection page using:
+  - search field
+  - dropdown
+  - `Add Client`
+- client documents and files managed inside the client record page
+- local persisted client/session/settings state using browser storage
 
-### Stage 2
+### Current route shape
 
-Current in-memory scaffold supports:
+- `/`
+  - redirects to `/income-protection`
+- `/login`
+- `/clients`
+- `/clients/new`
+- `/clients/:clientReference`
+- `/clients/:clientReference/edit`
+- `/clients/:clientReference/income-protection`
+  - stores selected client for the workflow, then redirects to `/income-protection`
+- `/income-protection`
+  - the real workflow route
+- `/files`
+- `/settings`
+- `/admin`
+  - admin-only
+- `/documents`
+  - redirects to `/clients`
+- `/documents/:clientReference`
+  - redirects to `/clients/:clientReference`
 
-- login/logout/current user endpoints
-- password hashing with PBKDF2
-- session timeout checks
-- admin create/update/disable user flows
+### Current frontend persistence
 
-Important limitation:
+Persistence is currently browser-local only:
 
-- users and sessions are still in-memory, not PostgreSQL-backed
+- session data in `sessionStorage`
+- client records in `localStorage`
+- selected Income Protection client in `localStorage`
+- app settings in `localStorage`
 
-### Stage 3
+This is useful for UI behavior, but it is not production persistence.
 
-Current in-memory scaffold now supports:
+### Current workflow coverage
 
-- list clients
-- get client detail
-- create client
-- update client
-- archive client
-- client list page
-- client profile page
-- client create page
-- client edit page
+The Income Protection workflow already has:
 
-Current client profile fields in the scaffold include:
+- `Client Details`
+- `Fact Find`
+- `Terms of Business`
+- `Statement of Suitability`
+- `Files`
+- `Generated Documents`
 
-- name and client reference
-- title
-- status
-- created_by and updated_by
-- created_at and updated_at
-- email
-- mobile_number
-- work_phone
-- date_of_birth
-- marital_status
-- address basics
-- partner basics
-- general notes
+Current actions already exist in the UI:
+
+- save client details
+- save fact find draft
+- generate fact find DOCX/PDF placeholder records
+- save terms draft
+- generate terms PDF placeholder records
+- mark terms issued
+- save statement draft
+- generate statement DOCX/PDF placeholder records
+- upload file placeholder record
+- download individual generated document placeholder file
+- download document pack placeholder status
+
+### Current client record behavior
+
+The client page is now the case file.
+
+It contains:
+
+- client summary
 - dependants
+- editable generated document rows
+- editable file rows
+- row-level `Open` buttons
+- inline preview panel for the selected document/file
 
-Important limitation:
+## What Is Still Missing
 
-- Stage 3 is still scaffold-level and in-memory
-- the full production client schema from the spec is not complete yet
+The biggest gap is no longer tab layout. It is real persistence and document/file execution.
 
-## Relevant Files
+Still missing:
 
-Backend:
+- backend-backed client persistence
+- backend-backed Income Protection workflow persistence
+- PostgreSQL repositories/models wired to runtime
+- real file upload endpoints and filesystem writes
+- real client folder creation/management
+- real document generation pipeline
+- real generated-document download files
+- real document pack ZIP generation
+- real audit logging on workflow actions
+- real settings persistence on the backend
+- real authentication/authorization integration in the frontend
 
-- `apps/api/app/main.py`
-- `apps/api/app/store.py`
-- `apps/api/app/domain/clients.py`
-- `apps/api/tests/test_api.py`
+## Recommended Next Slice
 
-Frontend:
+The next agent should implement the smallest end-to-end production-shaped vertical slice, not another UI-only scaffold.
 
-- `apps/frontend/src/App.tsx`
-- `apps/frontend/src/components/app-shell.tsx`
-- `apps/frontend/src/pages/clients-page.tsx`
-- `apps/frontend/src/pages/client-profile-page.tsx`
-- `apps/frontend/src/pages/client-form-page.tsx`
-- `apps/frontend/src/styles.css`
-- `apps/frontend/src/app.test.tsx`
+### Recommended order
 
-Project docs:
+1. Wire client persistence to the backend
 
-- `PROJECT.md`
-- `AGENTS.md`
+- replace browser-only client storage with API-backed load/save
+- keep the current frontend screens and fields
+- preserve client reference based routing and client-owned document model
 
-## Recommended Stage 4 Slice
+2. Add real file/document backend models around the existing client file structure
 
-Implement Stage 4 as a shell only.
+- use the Stage 10 schema as the basis
+- create runtime repositories for:
+  - clients
+  - files
+  - documents
+- do not redesign the frontend first
 
-Suggested sequence:
+3. Implement a real first document action
 
-1. Add an Income Protection route under a client context, for example:
-   - `/clients/:clientReference/income-protection`
+Recommended first real generation target:
 
-2. Build an Income Protection page that shows:
-   - client heading
-   - client status badge
-   - top summary card with shared client details
-   - tab bar for the six required sections
+- Statement of Suitability PDF or DOCX
 
-3. Start with tab content placeholders only:
-   - short panel per tab
-   - each panel should clearly indicate the next stage that will fill it
+Why:
 
-4. Add small frontend tests for:
-   - route renders
-   - tab labels render
-   - selected client context appears
+- the UI already has the shape
+- the document naming convention is defined
+- it exercises client data reuse, document history, file linkage, and download flow in one slice
 
-5. If backend support is needed for cleaner UI state, add minimal placeholder endpoints only.
+4. Wire client-page document/file actions to the real backend
+
+- `Open`
+- `Download`
+- generated history
+- client folder linkage
+
+## Concrete Scope For The Next Agent
+
+If choosing one contained slice, the recommended slice is:
+
+### Slice: Real generated document persistence for one workflow
+
+Implement:
+
+- backend document record creation
+- filesystem save into client folder
+- client page reflects saved generated documents from backend
+- Generated Documents tab downloads a real file from backend
+- audit log entry for generation/download
+
+Suggested first target:
+
+- Statement of Suitability PDF or DOCX
 
 ## Non-Goals For The Next Agent
 
-Do not implement yet:
+Do not do all of these at once:
 
-- full Fact Find form
-- autosave
-- Terms of Business workflow
-- Statement of Suitability workflow
-- file upload handling
-- document generation
-- audit logs
-- PostgreSQL persistence rewrite
+- complete every document workflow end to end
+- redesign navigation again
+- add AI features
+- rewrite the whole frontend state model in one pass
+- replace all local UI persistence at once without a narrow backend slice
+- build Cloudflare or remote infrastructure
 
-## Verification
+## Architectural Decisions To Preserve
 
-Backend:
+- `Income Protection` stays on `/income-protection`
+- client selection happens inside the page, not in the workflow URL
+- the client record is the primary case-file surface
+- documents/files belong inside the client record
+- no top-level Documents navigation
+- `Admin` only appears for admin session state
+- keep the current burgundy/grey/white office UI direction
+- avoid broad rewrites; keep changes surgical
 
-```powershell
-cd "D:\GOOGLE DRIVE\EMERALD PATHWAYS\WEB WORK\AI CODING\VS CODE\work\Omega Document Creator\apps\api"
-.\.venv\Scripts\python -m unittest discover -s tests
-```
+## Relevant Files
+
+### Frontend
+
+- `apps/frontend/src/App.tsx`
+- `apps/frontend/src/components/app-shell.tsx`
+- `apps/frontend/src/auth/auth-context.tsx`
+- `apps/frontend/src/data/client-data-context.tsx`
+- `apps/frontend/src/data/seeded-clients.ts`
+- `apps/frontend/src/pages/clients-page.tsx`
+- `apps/frontend/src/pages/client-form-page.tsx`
+- `apps/frontend/src/pages/client-profile-page.tsx`
+- `apps/frontend/src/pages/income-protection-page.tsx`
+- `apps/frontend/src/pages/settings-page.tsx`
+- `apps/frontend/src/styles.css`
+- `apps/frontend/src/app.test.tsx`
+
+### Backend
+
+- `apps/api/app/main.py`
+- `apps/api/app/store.py`
+- `apps/api/app/config.py`
+- `apps/api/app/security.py`
+- `apps/api/migrations/0001_initial.sql`
+- `apps/api/tests/test_api.py`
+- `apps/api/tests/test_migration_schema.py`
+
+### Project docs
+
+- `PROJECT.md`
+- `AGENTS.md`
+- `STAGE4_HANDOFF.md`
+
+## Suggested Verification
 
 Frontend:
 
@@ -160,11 +242,13 @@ cd "D:\GOOGLE DRIVE\EMERALD PATHWAYS\WEB WORK\AI CODING\VS CODE\work\Omega Docum
 npm.cmd test
 ```
 
+Backend:
+
+```powershell
+cd "D:\GOOGLE DRIVE\EMERALD PATHWAYS\WEB WORK\AI CODING\VS CODE\work\Omega Document Creator\apps\api"
+.\.venv\Scripts\python -m unittest discover -s tests
+```
+
 ## Expected Outcome
 
-After the next Stage 4 pass, the repo should have a usable Income Protection module shell that:
-
-- fits the app navigation
-- is tied to a specific client
-- establishes the tab structure for the later document workflows
-- does not yet overbuild Stage 5 and beyond
+After the next agent pass, the repo should have at least one real backend-backed document/file workflow slice that uses the current frontend shape rather than replacing it.

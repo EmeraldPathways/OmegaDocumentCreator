@@ -37,6 +37,10 @@ export function AppShell({ children }: PropsWithChildren) {
             })}
           </nav>
 
+          <div className="header-search">
+            <input aria-label="Search clients" placeholder="Search clients" type="search" />
+          </div>
+
           <div className="session-actions">
             <span className="session-label">{isSignedIn ? user?.email : "Not signed in"}</span>
             {isSignedIn ? (
@@ -55,14 +59,6 @@ export function AppShell({ children }: PropsWithChildren) {
                 Sign In
               </button>
             )}
-          </div>
-        </div>
-
-        <div className="topbar">
-          <input aria-label="Search clients" placeholder="Search clients" type="search" />
-          <div className="status-card">
-            <span className="status-label">Role</span>
-            <strong>{user?.role ?? "guest"}</strong>
           </div>
         </div>
       </header>

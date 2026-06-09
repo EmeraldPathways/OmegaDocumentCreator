@@ -869,7 +869,7 @@ export function IncomeProtectionPage() {
             <ul className="folder-grid">
               {folderLayout.map((folder) => (
                 <li className="folder-item" key={folder}>
-                  <FolderOpen size={18} color="var(--omega-burgundy)" />
+                  <FolderOpen size={18} color="var(--omega-gold)" />
                   {folder}
                 </li>
               ))}
