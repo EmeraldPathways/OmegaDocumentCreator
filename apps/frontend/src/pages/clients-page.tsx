@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
 import { useClientData } from "../data/client-data-context";
 
@@ -11,13 +12,9 @@ export function ClientsPage() {
   return (
     <div className="page-stack">
       <section className="panel">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">Client records</p>
-            <h1>Clients</h1>
-            <p className="module-subtitle">Open a client file, review status, and jump straight into active Income Protection work.</p>
-          </div>
-          <Link className="primary-action action-link" to="/clients/new">
+        <div className="page-heading page-heading-compact">
+          <h1>Clients</h1>
+          <Link className="primary-action action-link icon-btn" to="/clients/new">
             Create Client
           </Link>
         </div>
@@ -26,17 +23,14 @@ export function ClientsPage() {
           <div className="hero-stat-card">
             <span className="status-label">Total clients</span>
             <strong>{clients.length}</strong>
-            <span>All records currently available in the office system.</span>
           </div>
           <div className="hero-stat-card">
             <span className="status-label">Active files</span>
             <strong>{activeClients}</strong>
-            <span>Client records ready for review, advice, or document updates.</span>
           </div>
           <div className="hero-stat-card">
             <span className="status-label">Drafts</span>
             <strong>{draftClients}</strong>
-            <span>Records still being completed before client output is finalised.</span>
           </div>
         </div>
 
@@ -66,12 +60,15 @@ export function ClientsPage() {
                     </div>
                   </td>
                   <td>
-                    <span className="table-status-pill">{client.status}</span>
+                    <span className={`table-status-pill ${client.status === "Active" ? "is-active" : "is-draft"}`}>
+                      {client.status}
+                    </span>
                   </td>
                   <td>{client.updatedBy}</td>
                   <td>
-                    <Link className="table-action-link" to={`/clients/${client.clientReference}`}>
-                      Open file
+                    <Link className="table-action-link icon-btn" to={`/clients/${client.clientReference}`}>
+                      <ArrowRight size={16} />
+                      Open
                     </Link>
                   </td>
                 </tr>

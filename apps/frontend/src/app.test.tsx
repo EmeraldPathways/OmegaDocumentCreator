@@ -295,11 +295,11 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
-    expect(screen.getByText("Last saved: Not saved yet")).toBeInTheDocument();
+    expect(screen.getByText("Not saved yet")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(screen.getByText("Last saved: Saved just now")).toBeInTheDocument();
+    expect(screen.getByText("Saved just now")).toBeInTheDocument();
   });
 
   it("shows the Fact Find missing-field checklist before final generation without blocking draft save", () => {
@@ -310,17 +310,17 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
 
-    expect(screen.getByText("Generation status: Blocked by missing required fields")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Missing required fields" })).toBeInTheDocument();
-    expect(screen.getAllByText("Occupation").length).toBeGreaterThan(1);
-    expect(screen.getByText("Email or phone")).toBeInTheDocument();
-    expect(screen.getAllByText("Advisor name").length).toBeGreaterThan(1);
+    expect(screen.getByText("Generation: Blocked by missing required fields")).toBeInTheDocument();
+    expect(screen.getByText(/Missing required fields/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Occupation/).length).toBeGreaterThan(1);
+    expect(screen.getByText(/Email or phone/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Advisor name/).length).toBeGreaterThan(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(screen.getByText("Last saved: Saved just now")).toBeInTheDocument();
+    expect(screen.getByText("Saved just now")).toBeInTheDocument();
   });
 
   it("adds a Fact Find DOCX record to generated documents when generation succeeds", () => {
@@ -331,9 +331,9 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate DOCX" }));
+    fireEvent.click(screen.getByRole("button", { name: "DOCX" }));
 
-    expect(screen.getByText("Generation status: DOCX generated")).toBeInTheDocument();
+    expect(screen.getByText("Generation: DOCX generated")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
@@ -353,8 +353,8 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Terms of Business Draft" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("January 2026")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Email")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate Terms PDF" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark as Issued" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark Issued" })).toBeInTheDocument();
   });
 
   it("updates the Terms of Business issue status", () => {
@@ -366,11 +366,11 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
 
-    expect(screen.getByText("Issue status: Draft")).toBeInTheDocument();
+    expect(screen.getByText("Issue: Draft")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark as Issued" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark Issued" }));
 
-    expect(screen.getByText("Issue status: Issued today")).toBeInTheDocument();
+    expect(screen.getByText("Issue: Issued today")).toBeInTheDocument();
   });
 
   it("adds a Terms of Business PDF record when generation is requested", () => {
@@ -381,9 +381,9 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate Terms PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
 
-    expect(screen.getByText("Issue status: PDF generated")).toBeInTheDocument();
+    expect(screen.getByText("Issue: PDF generated")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
@@ -403,8 +403,8 @@ describe("App routes", () => {
     expect(screen.getByDisplayValue("Personal Income Protection")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Zurich Life")).toBeInTheDocument();
     expect(screen.getByDisplayValue("30000")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate DOCX" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "DOCX" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PDF" })).toBeInTheDocument();
   });
 
   it("updates the Statement of Suitability generation status", () => {
@@ -416,11 +416,11 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
-    expect(screen.getByText("Document status: Draft")).toBeInTheDocument();
+    expect(screen.getByText("Document: Draft")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
 
-    expect(screen.getByText("Document status: PDF generated")).toBeInTheDocument();
+    expect(screen.getByText("Document: PDF generated")).toBeInTheDocument();
   });
 
   it("blocks Statement of Suitability final generation when essential fields are missing", () => {
@@ -431,13 +431,13 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate PDF" }));
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
 
-    expect(screen.getByText("Document status: Blocked by missing required fields")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Missing required fields" })).toBeInTheDocument();
-    expect(screen.getByText("Provider recommended")).toBeInTheDocument();
-    expect(screen.getByText("Product recommended")).toBeInTheDocument();
-    expect(screen.getAllByText("Advisor name").length).toBeGreaterThan(1);
+    expect(screen.getByText("Document: Blocked by missing required fields")).toBeInTheDocument();
+    expect(screen.getByText(/Missing required fields/)).toBeInTheDocument();
+    expect(screen.getByText(/Provider recommended/)).toBeInTheDocument();
+    expect(screen.getByText(/Product recommended/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Advisor name/).length).toBeGreaterThan(1);
   });
 
   it("renders the Files tab with client folder layout and seeded file metadata", () => {
@@ -466,11 +466,11 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
 
-    expect(screen.getByText("Upload status: Waiting for upload")).toBeInTheDocument();
+    expect(screen.getByText("Upload: Waiting for upload")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Upload File" }));
 
-    expect(screen.getByText("Upload status: File saved")).toBeInTheDocument();
+    expect(screen.getByText("Upload: File saved")).toBeInTheDocument();
   });
 
   it("renders the Generated Documents tab with seeded history", () => {
@@ -499,7 +499,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Download" })[0]);
 
-    expect(screen.getByText(/Download status: Downloaded /)).toBeInTheDocument();
+    expect(screen.getByText(/Download: Downloaded/)).toBeInTheDocument();
   });
 
   it("updates the document pack download placeholder status", () => {
@@ -511,11 +511,11 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
-    expect(screen.getByText("Pack status: Waiting for request")).toBeInTheDocument();
+    expect(screen.getByText("Pack: Waiting for request")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Download Document Pack" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Pack" }));
 
-    expect(screen.getByText("Pack status: Document pack queued")).toBeInTheDocument();
+    expect(screen.getByText("Pack: Document pack queued")).toBeInTheDocument();
   });
 
   it("persists client details after saving and reopening the workflow", () => {
@@ -526,7 +526,7 @@ describe("App routes", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Occupation"), { target: { value: "Senior Analyst" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save Client Details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     cleanup();
 

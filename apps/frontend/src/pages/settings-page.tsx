@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Save, Cpu } from "lucide-react";
 
 type AppSettings = {
   adminEmail: string;
@@ -52,77 +53,78 @@ export function SettingsPage() {
     setSaveStatus("Saved just now");
   }
 
+  const isSaved = saveStatus === "Saved just now";
+
   return (
     <div className="page-stack">
       <section className="panel">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">Application settings</p>
-            <h1>Settings</h1>
-          </div>
-          <div className="module-actions">
-            <button className="primary-action" onClick={saveSettings} type="button">
+        <div className="page-heading page-heading-compact">
+          <h1>Settings</h1>
+          <div className="action-toolbar">
+            <button className="primary-action icon-btn" onClick={saveSettings} type="button">
+              <Save size={18} />
               Save Settings
             </button>
-            <span className="draft-status">Save status: {saveStatus}</span>
+            <span className="compact-badge">
+              <span className={`status-dot ${isSaved ? "status-dot-green" : "status-dot-grey"}`} />
+              {saveStatus}
+            </span>
           </div>
         </div>
 
-        <section className="fact-find-section">
-          <div className="fact-find-section-header">
-            <p className="eyebrow">Office configuration</p>
-            <h2>Core App Settings</h2>
-          </div>
-          <form className="client-form-grid">
-            <label>
-              Admin email
-              <input onChange={(event) => updateField("adminEmail", event.target.value)} type="email" value={settings.adminEmail} />
-            </label>
-            <label>
-              App URL
-              <input onChange={(event) => updateField("appUrl", event.target.value)} type="text" value={settings.appUrl} />
-            </label>
-            <label>
-              File storage path
-              <input onChange={(event) => updateField("fileStoragePath", event.target.value)} type="text" value={settings.fileStoragePath} />
-            </label>
-            <label>
-              Backup path
-              <input onChange={(event) => updateField("backupPath", event.target.value)} type="text" value={settings.backupPath} />
-            </label>
-            <label>
-              Remote access mode
-              <input onChange={(event) => updateField("remoteAccessMode", event.target.value)} type="text" value={settings.remoteAccessMode} />
-            </label>
-            <label>
-              Session timeout minutes
-              <input
-                onChange={(event) => updateField("sessionTimeoutMinutes", event.target.value)}
-                type="text"
-                value={settings.sessionTimeoutMinutes}
-              />
-            </label>
-          </form>
-        </section>
+        <div className="page-stack">
+          <section className="settings-card">
+            <div className="fact-find-section-header">
+              <h2>Core App Settings</h2>
+            </div>
+            <form className="client-form-grid">
+              <label>
+                Admin email
+                <input onChange={(event) => updateField("adminEmail", event.target.value)} type="email" value={settings.adminEmail} />
+              </label>
+              <label>
+                App URL
+                <input onChange={(event) => updateField("appUrl", event.target.value)} type="text" value={settings.appUrl} />
+              </label>
+              <label>
+                File storage path
+                <input onChange={(event) => updateField("fileStoragePath", event.target.value)} type="text" value={settings.fileStoragePath} />
+              </label>
+              <label>
+                Backup path
+                <input onChange={(event) => updateField("backupPath", event.target.value)} type="text" value={settings.backupPath} />
+              </label>
+              <label>
+                Remote access mode
+                <input onChange={(event) => updateField("remoteAccessMode", event.target.value)} type="text" value={settings.remoteAccessMode} />
+              </label>
+              <label>
+                Session timeout minutes
+                <input
+                  onChange={(event) => updateField("sessionTimeoutMinutes", event.target.value)}
+                  type="text"
+                  value={settings.sessionTimeoutMinutes}
+                />
+              </label>
+            </form>
+          </section>
 
-        <section className="fact-find-section">
-          <div className="fact-find-section-header">
-            <p className="eyebrow">Future local AI</p>
-            <h2>AI Readiness</h2>
-          </div>
-          <ul className="card-list">
-            <li className="mini-card">
-              <span className="status-label">Version 1 AI status</span>
+          <section className="settings-card">
+            <div className="fact-find-section-header">
+              <h2>AI Readiness</h2>
+            </div>
+            <div className="status-row">
+              <Cpu size={18} color="var(--omega-grey)" />
+              <span>Version 1 AI status</span>
               <strong>Disabled</strong>
-              <span>No AI assistance is enabled in the current production scope.</span>
-            </li>
-            <li className="mini-card">
-              <span className="status-label">Future local model runner</span>
+            </div>
+            <div className="status-row">
+              <Cpu size={18} color="var(--omega-grey)" />
+              <span>Future local model runner</span>
               <strong>Ollama-ready</strong>
-              <span>Reserved for local-only model execution on the office server in a later stage.</span>
-            </li>
-          </ul>
-        </section>
+            </div>
+          </section>
+        </div>
       </section>
     </div>
   );

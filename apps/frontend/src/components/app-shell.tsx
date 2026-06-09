@@ -1,19 +1,20 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import type { PropsWithChildren } from "react";
+import { Users, Shield, Settings, Lock } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 
 const navItems = [
-  { label: "Clients", to: "/clients" },
-  { label: "Income Protection", to: "/income-protection" },
-  { label: "Settings", to: "/settings" },
+  { label: "Clients", to: "/clients", icon: Users },
+  { label: "Income Protection", to: "/income-protection", icon: Shield },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate();
   const { isAdmin, isSignedIn, signOut, user } = useAuth();
 
-  const visibleNavItems = isAdmin ? [...navItems, { label: "Admin", to: "/admin" }] : navItems;
+  const visibleNavItems = isAdmin ? [...navItems, { label: "Admin", to: "/admin", icon: Lock }] : navItems;
 
   return (
     <div className="app-shell">
@@ -25,11 +26,15 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
 
           <nav className="top-nav">
-            {visibleNavItems.map((item) => (
-              <NavLink key={item.label} className="nav-link" to={item.to}>
-                {item.label}
-              </NavLink>
-            ))}
+            {visibleNavItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink key={item.label} className="nav-link" to={item.to}>
+                  <Icon size={18} />
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </nav>
 
           <div className="session-actions">
