@@ -11,12 +11,13 @@ import {
   FileDown,
   Upload,
   AlertTriangle,
-  ChevronRight,
 } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
+import { exportGeneratedDocument } from "../documents/export-generated-document";
+import type { WorkflowDocumentType } from "../documents/workflow-document-builders";
 
 const moduleTabs = [
   { id: "client-details", label: "Client Details", icon: User },
@@ -184,7 +185,7 @@ export function IncomeProtectionPage() {
     } satisfies SeededClientFile;
   }
 
-  function appendGeneratedDocument(documentType: string, extension: "docx" | "pdf") {
+  function appendGeneratedDocument(documentType: WorkflowDocumentType, extension: "docx" | "pdf") {
     const nextDocument = buildGeneratedDocument(documentType, extension);
     const nextFile = buildGeneratedFile(nextDocument);
     persistDraft({
@@ -192,6 +193,7 @@ export function IncomeProtectionPage() {
       generatedDocuments: [nextDocument, ...draft.generatedDocuments],
       files: [nextFile, ...draft.files.filter((file) => file.originalFilename !== nextFile.originalFilename)],
     });
+    return nextDocument;
   }
 
   function saveClientDetails() {
@@ -204,7 +206,7 @@ export function IncomeProtectionPage() {
     setFactFindDraftSavedLabel("Saved just now");
   }
 
-  function handleFactFindGenerate(format: "DOCX" | "PDF") {
+  async function handleFactFindGenerate(format: "DOCX" | "PDF") {
     if (factFindMissingFields.length > 0) {
       setShowFactFindValidation(true);
       setFactFindGenerationStatus("Generation: Blocked by missing required fields");
@@ -214,7 +216,12 @@ export function IncomeProtectionPage() {
     setShowFactFindValidation(false);
     saveFactFindDraft();
     setFactFindGenerationStatus(`Generation: ${format} generated`);
-    appendGeneratedDocument("Fact Find", format.toLowerCase() as "docx" | "pdf");
+    try {
+      const nextDocument = appendGeneratedDocument("Fact Find", format.toLowerCase() as "docx" | "pdf");
+      await exportGeneratedDocument(draft, "Fact Find", format.toLowerCase() as "docx" | "pdf", nextDocument.documentName);
+    } catch {
+      setFactFindGenerationStatus(`Generation: ${format} failed`);
+    }
   }
 
   function saveTermsDraft() {
@@ -222,10 +229,15 @@ export function IncomeProtectionPage() {
     setTermsSaveStatus("Saved just now");
   }
 
-  function handleTermsGenerate() {
+  async function handleTermsGenerate() {
     saveTermsDraft();
     setTermsIssueStatus("Issue: PDF generated");
-    appendGeneratedDocument("Terms of Business", "pdf");
+    try {
+      const nextDocument = appendGeneratedDocument("Terms of Business", "pdf");
+      await exportGeneratedDocument(draft, "Terms of Business", "pdf", nextDocument.documentName);
+    } catch {
+      setTermsIssueStatus("Issue: PDF failed");
+    }
   }
 
   function markTermsIssued() {
@@ -242,7 +254,7 @@ export function IncomeProtectionPage() {
     setStatementSaveStatus("Saved just now");
   }
 
-  function handleStatementGenerate(format: "DOCX" | "PDF") {
+  async function handleStatementGenerate(format: "DOCX" | "PDF") {
     if (statementMissingFields.length > 0) {
       setShowStatementValidation(true);
       setStatementDocumentStatus("Document: Blocked by missing required fields");
@@ -252,7 +264,17 @@ export function IncomeProtectionPage() {
     setShowStatementValidation(false);
     saveStatementDraft();
     setStatementDocumentStatus(`Document: ${format} generated`);
-    appendGeneratedDocument("Statement of Suitability", format.toLowerCase() as "docx" | "pdf");
+    try {
+      const nextDocument = appendGeneratedDocument("Statement of Suitability", format.toLowerCase() as "docx" | "pdf");
+      await exportGeneratedDocument(
+        draft,
+        "Statement of Suitability",
+        format.toLowerCase() as "docx" | "pdf",
+        nextDocument.documentName,
+      );
+    } catch {
+      setStatementDocumentStatus(`Document: ${format} failed`);
+    }
   }
 
   function handleUploadFile() {
@@ -272,31 +294,15 @@ export function IncomeProtectionPage() {
     setFileUploadStatus("Upload: File saved");
   }
 
-  function handleDownloadDocument(document: SeededGeneratedDocument) {
-    const fileContents = [
-      `Omega Financial Management`,
-      `Client: ${draft.fullName}`,
-      `Client reference: ${draft.clientReference}`,
-      `Document type: ${document.documentType}`,
-      `Document name: ${document.documentName}`,
-      `Version: ${document.version}`,
-      `Status: ${document.status}`,
-      `Generated at: ${document.generatedAt}`,
-    ].join("\n");
-
-    if (typeof window !== "undefined" && typeof window.URL?.createObjectURL === "function") {
-      const fileBlob = new Blob([fileContents], { type: "text/plain;charset=utf-8" });
-      const fileUrl = window.URL.createObjectURL(fileBlob);
-      const downloadLink = window.document.createElement("a");
-      downloadLink.href = fileUrl;
-      downloadLink.download = document.documentName;
-      window.document.body.append(downloadLink);
-      downloadLink.click();
-      downloadLink.remove();
-      window.URL.revokeObjectURL(fileUrl);
-    }
+  async function handleDownloadDocument(document: SeededGeneratedDocument) {
+    const extension = document.documentName.toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
 
     setDocumentDownloadStatus(`Download: Downloaded ${document.documentName}`);
+    try {
+      await exportGeneratedDocument(draft, document.documentType as WorkflowDocumentType, extension, document.documentName);
+    } catch {
+      setDocumentDownloadStatus(`Download: Failed ${document.documentName}`);
+    }
   }
 
   function renderTabPanel() {
@@ -975,77 +981,44 @@ export function IncomeProtectionPage() {
         <div className="page-heading page-heading-compact">
           <div>
             <h1>Income Protection</h1>
-            <p className="module-subtitle">
-              {draft.fullName} ({draft.clientReference})
-            </p>
           </div>
           <div className="module-actions">
             <span className="module-status-badge">{draft.status}</span>
-            <Link className="primary-action action-link icon-btn" to={`/clients/${draft.clientReference}`}>
-              View Client Record
-              <ChevronRight size={18} />
-            </Link>
-          </div>
-        </div>
-
-        <div className="client-selector-compact">
-          <label className="client-switcher-field">
-            Search clients
-            <input
-              aria-label="Search workflow clients"
-              onChange={(event) => setClientSearch(event.target.value)}
-              placeholder="Search by name or reference"
-              type="search"
-              value={clientSearch}
-            />
-          </label>
-          <label className="client-switcher-field">
-            Select client
-            <select
-              aria-label="Select workflow client"
-              onChange={(event) => {
-                if (event.target.value) {
-                  setSelectedClientReference(event.target.value);
-                  window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
-                }
-              }}
-              value={draft.clientReference}
-            >
-              {filteredClients.map((entry) => (
-                <option key={entry.clientReference} value={entry.clientReference}>
-                  {entry.fullName} ({entry.clientReference})
-                </option>
-              ))}
-            </select>
-          </label>
-          <Link className="primary-action action-link secondary-action icon-btn" to="/clients/new">
-            Add Client
-          </Link>
-        </div>
-
-        <div className="profile-bar">
-          <div className="profile-avatar">
-            {draft.firstName.charAt(0)}
-            {draft.surname.charAt(0)}
-          </div>
-          <div>
-            <strong style={{ fontSize: "1.1rem" }}>{draft.fullName}</strong>
-            <div className="profile-meta">
-              <span>
-                <strong>{draft.clientReference}</strong>
-              </span>
-              <span>DOB {draft.dateOfBirth}</span>
-              <span>
-                {draft.townCity}
-                {draft.county ? `, ${draft.county}` : ""}
-              </span>
-              <span>{draft.updatedBy}</span>
+            <div className="client-selector-compact client-selector-compact-inline">
+              <label className="client-switcher-field">
+                Search clients
+                <input
+                  aria-label="Search workflow clients"
+                  onChange={(event) => setClientSearch(event.target.value)}
+                  placeholder="Search by name or reference"
+                  type="search"
+                  value={clientSearch}
+                />
+              </label>
+              <label className="client-switcher-field">
+                Select client
+                <select
+                  aria-label="Select workflow client"
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      setSelectedClientReference(event.target.value);
+                      window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
+                    }
+                  }}
+                  value={draft.clientReference}
+                >
+                  {filteredClients.map((entry) => (
+                    <option key={entry.clientReference} value={entry.clientReference}>
+                      {entry.fullName} ({entry.clientReference})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Link className="primary-action action-link secondary-action icon-btn" to="/clients/new">
+                Add Client
+              </Link>
             </div>
           </div>
-          <Link className="table-action-link icon-btn" to={`/clients/${draft.clientReference}`} style={{ marginLeft: "auto" }}>
-            View Record
-            <ChevronRight size={16} />
-          </Link>
         </div>
 
         <div aria-label="Income Protection sections" className="module-tab-list module-tab-list-framed" role="tablist">
