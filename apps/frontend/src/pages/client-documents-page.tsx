@@ -23,7 +23,8 @@ export function ClientDocumentsPage() {
     );
   }
 
-  const folderName = `client-${draft.clientReference.toLowerCase()}-${draft.fullName.toLowerCase().replaceAll(" ", "-")}`;
+  const resolvedDraft = draft;
+  const folderName = `client-${resolvedDraft.clientReference.toLowerCase()}-${resolvedDraft.fullName.toLowerCase().replace(/ /g, "-")}`;
 
   function updateDocument(documentId: string, field: "documentName" | "documentType" | "status", value: string) {
     setDraft((currentDraft) => {
@@ -54,7 +55,7 @@ export function ClientDocumentsPage() {
   }
 
   function saveFolder() {
-    saveClient(draft);
+    saveClient(resolvedDraft);
     setSaveStatus("Saved just now");
   }
 
@@ -64,14 +65,14 @@ export function ClientDocumentsPage() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">Client folder</p>
-            <h1>{draft.fullName}</h1>
+            <h1>{resolvedDraft.fullName}</h1>
             <p className="module-subtitle">{folderName}</p>
           </div>
           <div className="module-actions">
             <Link className="primary-action action-link secondary-action" to="/documents">
               Back to Documents
             </Link>
-            <Link className="primary-action action-link" to={`/clients/${draft.clientReference}/income-protection`}>
+            <Link className="primary-action action-link" to={`/clients/${resolvedDraft.clientReference}/income-protection`}>
               Open Income Protection
             </Link>
             <button className="primary-action" onClick={saveFolder} type="button">
@@ -98,7 +99,7 @@ export function ClientDocumentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {draft.generatedDocuments.map((document) => (
+                {resolvedDraft.generatedDocuments.map((document) => (
                   <tr key={document.id}>
                     <td>
                       <input
@@ -143,7 +144,7 @@ export function ClientDocumentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {draft.files.map((file) => (
+                {resolvedDraft.files.map((file) => (
                   <tr key={file.id}>
                     <td>
                       <input

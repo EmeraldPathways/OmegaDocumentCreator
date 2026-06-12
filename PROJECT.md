@@ -29,10 +29,8 @@ The first core module is:
 
 ### Main navigation
 
-- Dashboard
 - Clients
 - Income Protection
-- Documents
 - Files
 - Admin
 - Settings
@@ -74,7 +72,7 @@ The first core module is:
 ### Design direction
 
 - Omega-style burgundy, grey, and white
-- left sidebar navigation
+- top navigation
 - top client search
 - clear page headings
 - large action buttons
@@ -111,7 +109,6 @@ Implemented in scaffold form:
 - env template
 - migration stub
 - seed data
-- dashboard page
 - client list page
 - client profile page
 
@@ -158,75 +155,79 @@ Important note:
 
 ### Stage 4
 
-Implemented in the current frontend scaffold:
+Implemented in the current frontend workflow:
 
-- client-bound Income Protection route
-- Income Protection module shell page
-- shared seeded client summary data reused across module views
-- tab structure for:
+- `/income-protection` is the live workflow route
+- selected workflow client is managed inside the page, not in the route
+- client-bound Income Protection workflow tabs exist for:
   - Client Details
   - Fact Find
   - Terms of Business
   - Statement of Suitability
   - Files
   - Generated Documents
-- placeholder tab panels for later workflow stages
+- shared client data is reused across workflow sections
+- current workflow client can be changed using:
+  - search field
+  - dropdown selector
+  - `Add Client`
 
 Important note:
 
-- Stage 4 is currently frontend-only scaffold work.
-- Fact Find, Terms of Business, Statement of Suitability, files, and generated documents are still placeholders at this stage.
+- Stage 4 is complete as a frontend workflow shell.
+- the remaining gap is backend/file/document execution, not route/tab scaffolding.
 
 ### Stages 5 to 17
 
-Stage 5 has now started in scaffold form:
+Stage 5 has now started in persisted frontend form:
 
-- Fact Find tab renders a first draft UI inside the Income Protection module
-- shared client values prefill the first Personal Details, Employment Details, and Income Protection fields
-- in-session Save Draft status is visible in the Fact Find view
-- remaining Fact Find sections are listed for later Stage 5 slices
+- Fact Find renders all major sections
+- draft save is available from the tab
+- missing-field validation blocks final generation when essential fields are missing
+- draft values persist in browser storage through the shared client data store
 
 Important note:
 
-- Stage 5 is only partially started in the frontend scaffold.
-- autosave, validation, persistence, document generation, and full section coverage are not implemented yet.
+- Stage 5 is still frontend/browser-persistence only.
+- backend persistence, autosave timers, and real generated files are not implemented yet.
 
-Stage 6 has now started in scaffold form:
+Stage 6 has now started in persisted frontend form:
 
 - Terms of Business tab renders a draft tracking view
 - seeded values cover version, issued-by, delivery method, and notes
-- local issue status can be toggled in-session
-- Terms PDF generation is still a placeholder action
+- local issue status can be saved through the shared client data store
+- Terms PDF generation currently creates placeholder generated-document records only
 
-Stage 7 has now started in scaffold form:
+Stage 7 has now started in persisted frontend form:
 
 - Statement of Suitability tab renders a draft recommendation view
 - seeded values cover statement type, provider, product type, cover summary, and letter date
-- local document status can be toggled for DOCX and PDF actions
-- generated files and persistence are still placeholder-only
+- local document status can be saved through the shared client data store
+- generated files are still placeholder download records, not backend files
 
 Important note:
 
 - Stages 6 and 7 are also frontend-only scaffold work.
 - real generation, file linkage, persistence, and validation are not implemented yet.
 
-Stage 8 has now started in scaffold form:
+Stage 8 has now started in persisted frontend form:
 
 - Files tab renders a client-files view inside the Income Protection module
 - seeded client folder layout is shown for the expected local storage structure
 - seeded file metadata is listed in a tracked files table
-- Upload File is currently a local placeholder action with in-session status only
+- Upload File currently creates a placeholder saved file record in browser storage
 
 Important note:
 
 - Stage 8 is currently frontend-only scaffold work.
 - real uploads, local filesystem writes, folder creation, and backend file metadata persistence are not implemented yet.
 
-Stage 9 has now started in scaffold form:
+Stage 9 has now started in persisted frontend form:
 
 - Generated Documents tab renders a generated-history view inside the Income Protection module
-- seeded generated document records are listed with type, filename, version, status, and generated date
-- Download Document Pack is currently a local placeholder action with in-session status only
+- generated document records are listed with type, filename, version, status, and generated date
+- individual generated documents now have row-level download actions
+- Download Document Pack is still a placeholder status action
 
 Important note:
 
@@ -379,20 +380,26 @@ Not yet implemented:
 - `/clients`
 - `/clients/new`
 - `/clients/:clientReference`
-- `/clients/:clientReference/income-protection`
 - `/clients/:clientReference/edit`
+- `/clients/:clientReference/income-protection`
+  - redirect helper into `/income-protection`
+- `/income-protection`
+- `/documents`
+  - redirects to `/clients`
+- `/documents/:clientReference`
+  - redirects to `/clients/:clientReference`
+- `/files`
+- `/settings`
 - `/admin`
 
 ### Current frontend pages
 
-- dashboard page
-- dashboard module roadmap with `Income Protection`, `Pensions`, and `Investments`
 - login page
-- settings page with Stage 16 AI readiness guidance
+- settings page with editable saved app settings plus Stage 16 AI readiness guidance
 - clients page
-- client profile page
-- Income Protection module page
-- Fact Find draft view inside the Income Protection module
+- client profile page with client-owned documents/files area
+- Income Protection workflow page on `/income-protection`
+- Fact Find workflow draft view inside the Income Protection module
 - Terms of Business draft view inside the Income Protection module
 - Statement of Suitability draft view inside the Income Protection module
 - Client Files draft view inside the Income Protection module
@@ -403,14 +410,13 @@ Not yet implemented:
 
 ### Not yet implemented
 
-- authenticated route guards in frontend state
 - API client integration
-- autosave forms
-- full Fact Find workflow UI
-- full Terms of Business workflow UI
-- full Statement of Suitability workflow UI
-- full files/documents UI
-- backup UI
+- backend-backed persistence for the workflow/client state
+- autosave timers
+- real file upload/download APIs
+- real generated document APIs
+- real document pack ZIP download
+- backend-backed settings persistence
 
 ## Testing
 
@@ -436,6 +442,33 @@ cd "apps/frontend"
 npm.cmd test
 ```
 
+Frontend run command for this repo:
+
+```powershell
+cd "apps/frontend"
+.\run-frontend.cmd
+```
+
+This starts the Omega frontend with:
+
+- `apps/frontend/vite.run.config.ts`
+- host `127.0.0.1`
+- port `3001`
+- cache dir `.vite-run-cache`
+
+Important note:
+
+- port `3000` may already be in use by a different local app on this machine
+- use `http://127.0.0.1:3001` for Omega Document Creator
+- `run-frontend.cmd` is the preferred local run path because it avoids the Vite cache/port confusion seen during setup
+
+Memory-first workflow note:
+
+- before broad repo reads, prefer stored project context from `.ai-codex`, Agentmemory, and Token Savior
+- saved Token Savior entries currently cover:
+  - the Omega frontend run path on `127.0.0.1:3001`
+  - the PDF/DOCX export integration boundary in the frontend document utilities and Income Protection page
+
 ### Current known warnings
 
 Backend:
@@ -453,7 +486,7 @@ These are not blocking the current scaffold.
 The biggest remaining gaps are:
 
 - PostgreSQL persistence is not wired into the running app
-- migrations are only a stub
+- migrations are defined for the MVP schema but not wired into runtime repositories
 - no SQLAlchemy models or repositories yet
 - no persisted audit logs
 - no file uploads
@@ -471,10 +504,10 @@ The biggest remaining gaps are:
 
 The correct next implementation order is:
 
-1. Finish Stage 3 persistence and richer client data shape
-2. Build Fact Find workflow
-3. Add real file uploads and client folder workflow
-4. Add real generated documents and audit logging
+1. Replace browser-only client/workflow persistence with backend persistence
+2. Add real file uploads and client folder workflow
+3. Add real generated documents and download endpoints
+4. Add audit logging on workflow/file/document actions
 5. Add backups
 
 ## Constraints
@@ -523,12 +556,16 @@ Frontend:
 
 - `apps/frontend/src/App.tsx`
 - `apps/frontend/src/components/app-shell.tsx`
+- `apps/frontend/src/auth/auth-context.tsx`
+- `apps/frontend/src/data/client-data-context.tsx`
 - `apps/frontend/src/data/seeded-clients.ts`
 - `apps/frontend/src/pages/clients-page.tsx`
 - `apps/frontend/src/pages/client-profile-page.tsx`
+- `apps/frontend/src/pages/client-form-page.tsx`
 - `apps/frontend/src/pages/income-protection-page.tsx`
 - `apps/frontend/src/pages/admin-page.tsx`
 - `apps/frontend/src/pages/login-page.tsx`
+- `apps/frontend/src/pages/settings-page.tsx`
 - `apps/frontend/src/styles.css`
 - `apps/frontend/src/app.test.tsx`
 
@@ -536,13 +573,13 @@ Frontend:
 
 - Stage 1: scaffolded
 - Stage 2: functionally scaffolded, not persistent
-- Stage 3: partially scaffolded, not persistent
-- Stage 4: scaffolded in frontend shell form
-- Stage 5: partially scaffolded in frontend draft form
-- Stage 6: partially scaffolded in frontend draft form
-- Stage 7: partially scaffolded in frontend draft form
-- Stage 8: partially scaffolded in frontend draft form
-- Stage 9: partially scaffolded in frontend draft form
+- Stage 3: frontend/browser-persistent, not backend-persistent
+- Stage 4: complete as a frontend workflow shell
+- Stage 5: partially implemented in frontend/browser-persistent draft form
+- Stage 6: partially implemented in frontend/browser-persistent draft form
+- Stage 7: partially implemented in frontend/browser-persistent draft form
+- Stage 8: partially implemented in frontend/browser-persistent draft form
+- Stage 9: partially implemented in frontend/browser-persistent draft form
 - Stage 10: schema defined, not wired into runtime persistence
 - Stage 11: partially scaffolded in frontend validation form
 - Stage 12: partially scaffolded with seeded audit logs

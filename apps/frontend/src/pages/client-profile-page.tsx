@@ -28,6 +28,8 @@ export function ClientProfilePage() {
     );
   }
 
+  const resolvedDraft = draft;
+
   function updateDocument(documentId: string, field: "documentName" | "documentType" | "status", value: string) {
     setDraft((currentDraft) => {
       if (!currentDraft) {
@@ -57,7 +59,7 @@ export function ClientProfilePage() {
   }
 
   function saveClientFolder() {
-    saveClient(draft);
+    saveClient(resolvedDraft);
     setSaveStatus("Saved just now");
   }
 

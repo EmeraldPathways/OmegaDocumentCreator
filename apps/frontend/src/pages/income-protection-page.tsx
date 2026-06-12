@@ -45,6 +45,10 @@ function buildFullName(firstName: string, surname: string) {
   return `${firstName} ${surname}`.trim();
 }
 
+function replaceSpaces(value: string, replacement: string) {
+  return value.replace(/ /g, replacement);
+}
+
 export function IncomeProtectionPage() {
   const { user } = useAuth();
   const actorLabel = resolveActorLabel(user?.role);
@@ -93,6 +97,8 @@ export function IncomeProtectionPage() {
     );
   }
 
+  const resolvedDraft = draft;
+
   const filteredClients = clients.filter((entry) => {
     const query = clientSearch.trim().toLowerCase();
     if (query.length === 0) {
@@ -104,26 +110,26 @@ export function IncomeProtectionPage() {
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
   const factFindMissingFields = [
-    !hasValue(draft.fullName) ? "Client name" : null,
-    !hasValue(`${draft.townCity} ${draft.county}`.trim()) ? "Address" : null,
-    !hasValue(draft.dateOfBirth) ? "Date of birth" : null,
-    !hasValue(draft.occupation) ? "Occupation" : null,
-    !hasValue(draft.income) ? "Income / salary" : null,
-    !hasValue(draft.email) && !hasValue(draft.mobileNumber) ? "Email or phone" : null,
-    !hasValue(draft.advisorName) ? "Advisor name" : null,
+    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
+    !hasValue(`${resolvedDraft.townCity} ${resolvedDraft.county}`.trim()) ? "Address" : null,
+    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
+    !hasValue(resolvedDraft.occupation) ? "Occupation" : null,
+    !hasValue(resolvedDraft.income) ? "Income / salary" : null,
+    !hasValue(resolvedDraft.email) && !hasValue(resolvedDraft.mobileNumber) ? "Email or phone" : null,
+    !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
   ].filter(isPresent);
   const statementMissingFields = [
-    !hasValue(draft.fullName) ? "Client name" : null,
-    !hasValue(`${draft.townCity} ${draft.county}`.trim()) ? "Address" : null,
-    !hasValue(draft.statementType) ? "Statement type" : null,
-    !hasValue(draft.provider) ? "Provider recommended" : null,
-    !hasValue(draft.productType) ? "Product recommended" : null,
-    !hasValue(draft.recommendedCover) ? "Recommended cover" : null,
-    !hasValue(draft.deferredPeriod) ? "Deferred period" : null,
-    !hasValue(draft.coverAge) ? "Cover to age" : null,
-    !hasValue(draft.premium) ? "Gross monthly premium" : null,
-    !hasValue(draft.advisorName) ? "Advisor name" : null,
-    !hasValue(draft.letterDate) ? "Letter date" : null,
+    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
+    !hasValue(`${resolvedDraft.townCity} ${resolvedDraft.county}`.trim()) ? "Address" : null,
+    !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
+    !hasValue(resolvedDraft.provider) ? "Provider recommended" : null,
+    !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
+    !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
+    !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
+    !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
+    !hasValue(resolvedDraft.premium) ? "Gross monthly premium" : null,
+    !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
+    !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
 
   function persistDraft(nextDraft: SeededClientProfile) {
@@ -160,15 +166,15 @@ export function IncomeProtectionPage() {
   }
 
   function buildGeneratedDocument(documentType: string, extension: "docx" | "pdf") {
-    const generatedAt = draft.letterDate || new Date().toISOString().slice(0, 10);
-    const baseName = `${draft.firstName}_${draft.surname}` || draft.clientReference;
-    const normalizedType = documentType.replaceAll(" ", "_");
+    const generatedAt = resolvedDraft.letterDate || new Date().toISOString().slice(0, 10);
+    const baseName = `${resolvedDraft.firstName}_${resolvedDraft.surname}` || resolvedDraft.clientReference;
+    const normalizedType = replaceSpaces(documentType, "_");
 
     return {
       id: `DOC-${Date.now()}-${normalizedType}-${extension}`,
       documentType,
       documentName: `${baseName}_${normalizedType}_${generatedAt}.${extension}`,
-      version: `Version ${draft.generatedDocuments.length + 1}`,
+      version: `Version ${resolvedDraft.generatedDocuments.length + 1}`,
       status: extension === "pdf" ? "PDF ready" : "DOCX ready",
       generatedAt,
     } satisfies SeededGeneratedDocument;
@@ -176,7 +182,7 @@ export function IncomeProtectionPage() {
 
   function buildGeneratedFile(document: SeededGeneratedDocument) {
     return {
-      id: `FILE-${Date.now()}-${document.documentType.replaceAll(" ", "-")}`,
+      id: `FILE-${Date.now()}-${replaceSpaces(document.documentType, "-")}`,
       category: "Generated Documents",
       originalFilename: document.documentName,
       status: "Approved",
@@ -189,20 +195,20 @@ export function IncomeProtectionPage() {
     const nextDocument = buildGeneratedDocument(documentType, extension);
     const nextFile = buildGeneratedFile(nextDocument);
     persistDraft({
-      ...draft,
-      generatedDocuments: [nextDocument, ...draft.generatedDocuments],
-      files: [nextFile, ...draft.files.filter((file) => file.originalFilename !== nextFile.originalFilename)],
+      ...resolvedDraft,
+      generatedDocuments: [nextDocument, ...resolvedDraft.generatedDocuments],
+      files: [nextFile, ...resolvedDraft.files.filter((file) => file.originalFilename !== nextFile.originalFilename)],
     });
     return nextDocument;
   }
 
   function saveClientDetails() {
-    persistDraft(draft);
+    persistDraft(resolvedDraft);
     setClientDetailsStatus("Saved just now");
   }
 
   function saveFactFindDraft() {
-    persistDraft(draft);
+    persistDraft(resolvedDraft);
     setFactFindDraftSavedLabel("Saved just now");
   }
 
@@ -218,14 +224,14 @@ export function IncomeProtectionPage() {
     setFactFindGenerationStatus(`Generation: ${format} generated`);
     try {
       const nextDocument = appendGeneratedDocument("Fact Find", format.toLowerCase() as "docx" | "pdf");
-      await exportGeneratedDocument(draft, "Fact Find", format.toLowerCase() as "docx" | "pdf", nextDocument.documentName);
+      await exportGeneratedDocument(resolvedDraft, "Fact Find", format.toLowerCase() as "docx" | "pdf", nextDocument.documentName);
     } catch {
       setFactFindGenerationStatus(`Generation: ${format} failed`);
     }
   }
 
   function saveTermsDraft() {
-    persistDraft(draft);
+    persistDraft(resolvedDraft);
     setTermsSaveStatus("Saved just now");
   }
 
@@ -234,7 +240,7 @@ export function IncomeProtectionPage() {
     setTermsIssueStatus("Issue: PDF generated");
     try {
       const nextDocument = appendGeneratedDocument("Terms of Business", "pdf");
-      await exportGeneratedDocument(draft, "Terms of Business", "pdf", nextDocument.documentName);
+      await exportGeneratedDocument(resolvedDraft, "Terms of Business", "pdf", nextDocument.documentName);
     } catch {
       setTermsIssueStatus("Issue: PDF failed");
     }
@@ -242,15 +248,15 @@ export function IncomeProtectionPage() {
 
   function markTermsIssued() {
     persistDraft({
-      ...draft,
+      ...resolvedDraft,
       termsIssuedBy: actorLabel,
-      termsClientReceived: draft.termsClientReceived || "Received",
+      termsClientReceived: resolvedDraft.termsClientReceived || "Received",
     });
     setTermsIssueStatus("Issue: Issued today");
   }
 
   function saveStatementDraft() {
-    persistDraft(draft);
+    persistDraft(resolvedDraft);
     setStatementSaveStatus("Saved just now");
   }
 
@@ -267,7 +273,7 @@ export function IncomeProtectionPage() {
     try {
       const nextDocument = appendGeneratedDocument("Statement of Suitability", format.toLowerCase() as "docx" | "pdf");
       await exportGeneratedDocument(
-        draft,
+        resolvedDraft,
         "Statement of Suitability",
         format.toLowerCase() as "docx" | "pdf",
         nextDocument.documentName,
@@ -281,15 +287,15 @@ export function IncomeProtectionPage() {
     const nextFile = {
       id: `FILE-${Date.now()}`,
       category: "Other",
-      originalFilename: `${draft.surname || "Client"}_${draft.firstName || "Record"}_uploaded_note.txt`,
+      originalFilename: `${resolvedDraft.surname || "Client"}_${resolvedDraft.firstName || "Record"}_uploaded_note.txt`,
       status: "Pending review",
       uploadedBy: actorLabel,
       uploadedAt: new Date().toISOString().slice(0, 10),
     } satisfies SeededClientFile;
 
     persistDraft({
-      ...draft,
-      files: [nextFile, ...draft.files],
+      ...resolvedDraft,
+      files: [nextFile, ...resolvedDraft.files],
     });
     setFileUploadStatus("Upload: File saved");
   }
@@ -299,7 +305,7 @@ export function IncomeProtectionPage() {
 
     setDocumentDownloadStatus(`Download: Downloaded ${document.documentName}`);
     try {
-      await exportGeneratedDocument(draft, document.documentType as WorkflowDocumentType, extension, document.documentName);
+      await exportGeneratedDocument(resolvedDraft, document.documentType as WorkflowDocumentType, extension, document.documentName);
     } catch {
       setDocumentDownloadStatus(`Download: Failed ${document.documentName}`);
     }
@@ -330,51 +336,51 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 First name
-                <input onChange={(event) => updateField("firstName", event.target.value)} type="text" value={draft.firstName} />
+                <input onChange={(event) => updateField("firstName", event.target.value)} type="text" value={resolvedDraft.firstName} />
               </label>
               <label>
                 Surname
-                <input onChange={(event) => updateField("surname", event.target.value)} type="text" value={draft.surname} />
+                <input onChange={(event) => updateField("surname", event.target.value)} type="text" value={resolvedDraft.surname} />
               </label>
               <label>
                 Email
-                <input onChange={(event) => updateField("email", event.target.value)} type="email" value={draft.email} />
+                <input onChange={(event) => updateField("email", event.target.value)} type="email" value={resolvedDraft.email} />
               </label>
               <label>
                 Phone
-                <input onChange={(event) => updateField("mobileNumber", event.target.value)} type="text" value={draft.mobileNumber} />
+                <input onChange={(event) => updateField("mobileNumber", event.target.value)} type="text" value={resolvedDraft.mobileNumber} />
               </label>
               <label>
                 Date of birth
-                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={draft.dateOfBirth} />
+                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={resolvedDraft.dateOfBirth} />
               </label>
               <label>
                 Town / City
-                <input onChange={(event) => updateField("townCity", event.target.value)} type="text" value={draft.townCity} />
+                <input onChange={(event) => updateField("townCity", event.target.value)} type="text" value={resolvedDraft.townCity} />
               </label>
               <label>
                 County
-                <input onChange={(event) => updateField("county", event.target.value)} type="text" value={draft.county} />
+                <input onChange={(event) => updateField("county", event.target.value)} type="text" value={resolvedDraft.county} />
               </label>
               <label>
                 Occupation
-                <input onChange={(event) => updateField("occupation", event.target.value)} type="text" value={draft.occupation} />
+                <input onChange={(event) => updateField("occupation", event.target.value)} type="text" value={resolvedDraft.occupation} />
               </label>
               <label>
                 Employment status
-                <input onChange={(event) => updateField("employmentStatus", event.target.value)} type="text" value={draft.employmentStatus} />
+                <input onChange={(event) => updateField("employmentStatus", event.target.value)} type="text" value={resolvedDraft.employmentStatus} />
               </label>
               <label>
                 Income
-                <input onChange={(event) => updateField("income", event.target.value)} type="text" value={draft.income} />
+                <input onChange={(event) => updateField("income", event.target.value)} type="text" value={resolvedDraft.income} />
               </label>
               <label>
                 Provider
-                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={draft.provider} />
+                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={resolvedDraft.provider} />
               </label>
               <label>
                 Advisor name
-                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={draft.advisorName} />
+                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={resolvedDraft.advisorName} />
               </label>
             </form>
           </section>
@@ -425,27 +431,27 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Client name
-                <input onChange={(event) => updateField("fullName", event.target.value)} type="text" value={draft.fullName} />
+                <input onChange={(event) => updateField("fullName", event.target.value)} type="text" value={resolvedDraft.fullName} />
               </label>
               <label>
                 Marital status
-                <input onChange={(event) => updateField("maritalStatus", event.target.value)} type="text" value={draft.maritalStatus} />
+                <input onChange={(event) => updateField("maritalStatus", event.target.value)} type="text" value={resolvedDraft.maritalStatus} />
               </label>
               <label>
                 Date of birth
-                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={draft.dateOfBirth} />
+                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={resolvedDraft.dateOfBirth} />
               </label>
               <label>
                 Email
-                <input onChange={(event) => updateField("email", event.target.value)} type="email" value={draft.email} />
+                <input onChange={(event) => updateField("email", event.target.value)} type="email" value={resolvedDraft.email} />
               </label>
               <label>
                 Home / mobile
-                <input onChange={(event) => updateField("mobileNumber", event.target.value)} type="text" value={draft.mobileNumber} />
+                <input onChange={(event) => updateField("mobileNumber", event.target.value)} type="text" value={resolvedDraft.mobileNumber} />
               </label>
               <label>
                 Partner name
-                <input onChange={(event) => updateField("partnerName", event.target.value)} type="text" value={draft.partnerName} />
+                <input onChange={(event) => updateField("partnerName", event.target.value)} type="text" value={resolvedDraft.partnerName} />
               </label>
             </form>
           </section>
@@ -457,19 +463,19 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Occupation
-                <input onChange={(event) => updateField("occupation", event.target.value)} type="text" value={draft.occupation} />
+                <input onChange={(event) => updateField("occupation", event.target.value)} type="text" value={resolvedDraft.occupation} />
               </label>
               <label>
                 Employment status
-                <input onChange={(event) => updateField("employmentStatus", event.target.value)} type="text" value={draft.employmentStatus} />
+                <input onChange={(event) => updateField("employmentStatus", event.target.value)} type="text" value={resolvedDraft.employmentStatus} />
               </label>
               <label>
                 Income / salary
-                <input onChange={(event) => updateField("income", event.target.value)} type="text" value={draft.income} />
+                <input onChange={(event) => updateField("income", event.target.value)} type="text" value={resolvedDraft.income} />
               </label>
               <label>
                 Advisor name
-                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={draft.advisorName} />
+                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={resolvedDraft.advisorName} />
               </label>
             </form>
           </section>
@@ -481,23 +487,23 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Provider
-                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={draft.provider} />
+                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={resolvedDraft.provider} />
               </label>
               <label>
                 Recommended cover
-                <input onChange={(event) => updateField("recommendedCover", event.target.value)} type="text" value={draft.recommendedCover} />
+                <input onChange={(event) => updateField("recommendedCover", event.target.value)} type="text" value={resolvedDraft.recommendedCover} />
               </label>
               <label>
                 Monthly premium
-                <input onChange={(event) => updateField("premium", event.target.value)} type="text" value={draft.premium} />
+                <input onChange={(event) => updateField("premium", event.target.value)} type="text" value={resolvedDraft.premium} />
               </label>
               <label>
                 Deferred period
-                <input onChange={(event) => updateField("deferredPeriod", event.target.value)} type="text" value={draft.deferredPeriod} />
+                <input onChange={(event) => updateField("deferredPeriod", event.target.value)} type="text" value={resolvedDraft.deferredPeriod} />
               </label>
               <label>
                 Cover to age
-                <input onChange={(event) => updateField("coverAge", event.target.value)} type="text" value={draft.coverAge} />
+                <input onChange={(event) => updateField("coverAge", event.target.value)} type="text" value={resolvedDraft.coverAge} />
               </label>
             </form>
           </section>
@@ -509,27 +515,27 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Mortgage protection
-                <input onChange={(event) => updateField("mortgageProtection", event.target.value)} type="text" value={draft.mortgageProtection} />
+                <input onChange={(event) => updateField("mortgageProtection", event.target.value)} type="text" value={resolvedDraft.mortgageProtection} />
               </label>
               <label>
                 Personal insurance
-                <input onChange={(event) => updateField("personalInsurance", event.target.value)} type="text" value={draft.personalInsurance} />
+                <input onChange={(event) => updateField("personalInsurance", event.target.value)} type="text" value={resolvedDraft.personalInsurance} />
               </label>
               <label>
                 Keyman insurance
-                <input onChange={(event) => updateField("keymanInsurance", event.target.value)} type="text" value={draft.keymanInsurance} />
+                <input onChange={(event) => updateField("keymanInsurance", event.target.value)} type="text" value={resolvedDraft.keymanInsurance} />
               </label>
               <label>
                 Partnership insurance
-                <input onChange={(event) => updateField("partnershipInsurance", event.target.value)} type="text" value={draft.partnershipInsurance} />
+                <input onChange={(event) => updateField("partnershipInsurance", event.target.value)} type="text" value={resolvedDraft.partnershipInsurance} />
               </label>
               <label>
                 Self life insurance amount
-                <input onChange={(event) => updateField("selfLifeInsuranceAmount", event.target.value)} type="text" value={draft.selfLifeInsuranceAmount} />
+                <input onChange={(event) => updateField("selfLifeInsuranceAmount", event.target.value)} type="text" value={resolvedDraft.selfLifeInsuranceAmount} />
               </label>
               <label>
                 Partner serious illness amount
-                <input onChange={(event) => updateField("partnerSeriousIllnessAmount", event.target.value)} type="text" value={draft.partnerSeriousIllnessAmount} />
+                <input onChange={(event) => updateField("partnerSeriousIllnessAmount", event.target.value)} type="text" value={resolvedDraft.partnerSeriousIllnessAmount} />
               </label>
             </form>
           </section>
@@ -541,15 +547,15 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Personal circumstances
-                <textarea onChange={(event) => updateField("personalCircumstances", event.target.value)} rows={4} value={draft.personalCircumstances} />
+                <textarea onChange={(event) => updateField("personalCircumstances", event.target.value)} rows={4} value={resolvedDraft.personalCircumstances} />
               </label>
               <label>
                 Financial situation
-                <textarea onChange={(event) => updateField("financialSituation", event.target.value)} rows={4} value={draft.financialSituation} />
+                <textarea onChange={(event) => updateField("financialSituation", event.target.value)} rows={4} value={resolvedDraft.financialSituation} />
               </label>
               <label>
                 Needs and objectives
-                <textarea onChange={(event) => updateField("needsObjectives", event.target.value)} rows={4} value={draft.needsObjectives} />
+                <textarea onChange={(event) => updateField("needsObjectives", event.target.value)} rows={4} value={resolvedDraft.needsObjectives} />
               </label>
             </form>
           </section>
@@ -561,11 +567,11 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Execution-only confirmation
-                <input onChange={(event) => updateField("executionOnlyConfirmation", event.target.value)} type="text" value={draft.executionOnlyConfirmation} />
+                <input onChange={(event) => updateField("executionOnlyConfirmation", event.target.value)} type="text" value={resolvedDraft.executionOnlyConfirmation} />
               </label>
               <label>
                 Terms of Business reviewed and copy received
-                <input onChange={(event) => updateField("termsReviewedReceived", event.target.value)} type="text" value={draft.termsReviewedReceived} />
+                <input onChange={(event) => updateField("termsReviewedReceived", event.target.value)} type="text" value={resolvedDraft.termsReviewedReceived} />
               </label>
             </form>
           </section>
@@ -577,19 +583,19 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Contact by phone
-                <input onChange={(event) => updateField("contactByPhone", event.target.value)} type="text" value={draft.contactByPhone} />
+                <input onChange={(event) => updateField("contactByPhone", event.target.value)} type="text" value={resolvedDraft.contactByPhone} />
               </label>
               <label>
                 Contact by SMS
-                <input onChange={(event) => updateField("contactBySms", event.target.value)} type="text" value={draft.contactBySms} />
+                <input onChange={(event) => updateField("contactBySms", event.target.value)} type="text" value={resolvedDraft.contactBySms} />
               </label>
               <label>
                 Contact by email
-                <input onChange={(event) => updateField("contactByEmail", event.target.value)} type="text" value={draft.contactByEmail} />
+                <input onChange={(event) => updateField("contactByEmail", event.target.value)} type="text" value={resolvedDraft.contactByEmail} />
               </label>
               <label>
                 Contact by post
-                <input onChange={(event) => updateField("contactByPost", event.target.value)} type="text" value={draft.contactByPost} />
+                <input onChange={(event) => updateField("contactByPost", event.target.value)} type="text" value={resolvedDraft.contactByPost} />
               </label>
             </form>
           </section>
@@ -601,11 +607,11 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Politically Exposed Person confirmation
-                <input onChange={(event) => updateField("pepConfirmation", event.target.value)} type="text" value={draft.pepConfirmation} />
+                <input onChange={(event) => updateField("pepConfirmation", event.target.value)} type="text" value={resolvedDraft.pepConfirmation} />
               </label>
               <label>
                 Related to a PEP
-                <input onChange={(event) => updateField("pepRelatedConfirmation", event.target.value)} type="text" value={draft.pepRelatedConfirmation} />
+                <input onChange={(event) => updateField("pepRelatedConfirmation", event.target.value)} type="text" value={resolvedDraft.pepRelatedConfirmation} />
               </label>
             </form>
           </section>
@@ -617,7 +623,7 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 How did you hear about Omega?
-                <input onChange={(event) => updateField("businessSource", event.target.value)} type="text" value={draft.businessSource} />
+                <input onChange={(event) => updateField("businessSource", event.target.value)} type="text" value={resolvedDraft.businessSource} />
               </label>
             </form>
           </section>
@@ -629,19 +635,19 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Client signature 1
-                <input onChange={(event) => updateField("clientSignature1", event.target.value)} type="text" value={draft.clientSignature1} />
+                <input onChange={(event) => updateField("clientSignature1", event.target.value)} type="text" value={resolvedDraft.clientSignature1} />
               </label>
               <label>
                 Client signature 1 date
-                <input onChange={(event) => updateField("clientSignature1Date", event.target.value)} type="text" value={draft.clientSignature1Date} />
+                <input onChange={(event) => updateField("clientSignature1Date", event.target.value)} type="text" value={resolvedDraft.clientSignature1Date} />
               </label>
               <label>
                 Client signature 2
-                <input onChange={(event) => updateField("clientSignature2", event.target.value)} type="text" value={draft.clientSignature2} />
+                <input onChange={(event) => updateField("clientSignature2", event.target.value)} type="text" value={resolvedDraft.clientSignature2} />
               </label>
               <label>
                 Financial advisor signature
-                <input onChange={(event) => updateField("financialAdvisorSignature", event.target.value)} type="text" value={draft.financialAdvisorSignature} />
+                <input onChange={(event) => updateField("financialAdvisorSignature", event.target.value)} type="text" value={resolvedDraft.financialAdvisorSignature} />
               </label>
             </form>
           </section>
@@ -653,27 +659,27 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Client name(s)
-                <input onChange={(event) => updateField("fullName", event.target.value)} type="text" value={draft.fullName} />
+                <input onChange={(event) => updateField("fullName", event.target.value)} type="text" value={resolvedDraft.fullName} />
               </label>
               <label>
                 Address
-                <input onChange={(event) => updateField("townCity", event.target.value)} type="text" value={`${draft.townCity}, ${draft.county}`.replace(/^,\s*/, "")} />
+                <input onChange={(event) => updateField("townCity", event.target.value)} type="text" value={`${resolvedDraft.townCity}, ${resolvedDraft.county}`.replace(/^,\s*/, "")} />
               </label>
               <label>
                 Date of birth
-                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={draft.dateOfBirth} />
+                <input onChange={(event) => updateField("dateOfBirth", event.target.value)} type="text" value={resolvedDraft.dateOfBirth} />
               </label>
               <label>
                 Company/provider name
-                <input onChange={(event) => updateField("requestCompanyName", event.target.value)} type="text" value={draft.requestCompanyName} />
+                <input onChange={(event) => updateField("requestCompanyName", event.target.value)} type="text" value={resolvedDraft.requestCompanyName} />
               </label>
               <label>
                 Policies
-                <input onChange={(event) => updateField("requestPolicies", event.target.value)} type="text" value={draft.requestPolicies} />
+                <input onChange={(event) => updateField("requestPolicies", event.target.value)} type="text" value={resolvedDraft.requestPolicies} />
               </label>
               <label>
                 Request letter date
-                <input onChange={(event) => updateField("requestLetterDate", event.target.value)} type="text" value={draft.requestLetterDate} />
+                <input onChange={(event) => updateField("requestLetterDate", event.target.value)} type="text" value={resolvedDraft.requestLetterDate} />
               </label>
             </form>
           </section>
@@ -717,27 +723,27 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Terms version
-                <input onChange={(event) => updateField("termsVersion", event.target.value)} type="text" value={draft.termsVersion} />
+                <input onChange={(event) => updateField("termsVersion", event.target.value)} type="text" value={resolvedDraft.termsVersion} />
               </label>
               <label>
                 Issued by
-                <input onChange={(event) => updateField("termsIssuedBy", event.target.value)} type="text" value={draft.termsIssuedBy} />
+                <input onChange={(event) => updateField("termsIssuedBy", event.target.value)} type="text" value={resolvedDraft.termsIssuedBy} />
               </label>
               <label>
                 Delivery method
-                <input onChange={(event) => updateField("termsDeliveryMethod", event.target.value)} type="text" value={draft.termsDeliveryMethod} />
+                <input onChange={(event) => updateField("termsDeliveryMethod", event.target.value)} type="text" value={resolvedDraft.termsDeliveryMethod} />
               </label>
               <label>
                 Client received terms
-                <input onChange={(event) => updateField("termsClientReceived", event.target.value)} type="text" value={draft.termsClientReceived} />
+                <input onChange={(event) => updateField("termsClientReceived", event.target.value)} type="text" value={resolvedDraft.termsClientReceived} />
               </label>
               <label>
                 Client reviewed terms
-                <input onChange={(event) => updateField("termsClientReviewed", event.target.value)} type="text" value={draft.termsClientReviewed} />
+                <input onChange={(event) => updateField("termsClientReviewed", event.target.value)} type="text" value={resolvedDraft.termsClientReviewed} />
               </label>
               <label>
                 Notes
-                <input onChange={(event) => updateField("termsNotes", event.target.value)} type="text" value={draft.termsNotes} />
+                <input onChange={(event) => updateField("termsNotes", event.target.value)} type="text" value={resolvedDraft.termsNotes} />
               </label>
             </form>
           </section>
@@ -788,23 +794,23 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Letter date
-                <input onChange={(event) => updateField("letterDate", event.target.value)} type="text" value={draft.letterDate} />
+                <input onChange={(event) => updateField("letterDate", event.target.value)} type="text" value={resolvedDraft.letterDate} />
               </label>
               <label>
                 Statement type
-                <input onChange={(event) => updateField("statementType", event.target.value)} type="text" value={draft.statementType} />
+                <input onChange={(event) => updateField("statementType", event.target.value)} type="text" value={resolvedDraft.statementType} />
               </label>
               <label>
                 Provider name
-                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={draft.provider} />
+                <input onChange={(event) => updateField("provider", event.target.value)} type="text" value={resolvedDraft.provider} />
               </label>
               <label>
                 Product type
-                <input onChange={(event) => updateField("productType", event.target.value)} type="text" value={draft.productType} />
+                <input onChange={(event) => updateField("productType", event.target.value)} type="text" value={resolvedDraft.productType} />
               </label>
               <label>
                 Advisor name
-                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={draft.advisorName} />
+                <input onChange={(event) => updateField("advisorName", event.target.value)} type="text" value={resolvedDraft.advisorName} />
               </label>
             </form>
           </section>
@@ -816,23 +822,23 @@ export function IncomeProtectionPage() {
             <form className="client-form-grid">
               <label>
                 Recommended cover
-                <input onChange={(event) => updateField("recommendedCover", event.target.value)} type="text" value={draft.recommendedCover} />
+                <input onChange={(event) => updateField("recommendedCover", event.target.value)} type="text" value={resolvedDraft.recommendedCover} />
               </label>
               <label>
                 Deferred period
-                <input onChange={(event) => updateField("deferredPeriod", event.target.value)} type="text" value={draft.deferredPeriod} />
+                <input onChange={(event) => updateField("deferredPeriod", event.target.value)} type="text" value={resolvedDraft.deferredPeriod} />
               </label>
               <label>
                 Cover to age
-                <input onChange={(event) => updateField("coverAge", event.target.value)} type="text" value={draft.coverAge} />
+                <input onChange={(event) => updateField("coverAge", event.target.value)} type="text" value={resolvedDraft.coverAge} />
               </label>
               <label>
                 Gross monthly premium
-                <input onChange={(event) => updateField("premium", event.target.value)} type="text" value={draft.premium} />
+                <input onChange={(event) => updateField("premium", event.target.value)} type="text" value={resolvedDraft.premium} />
               </label>
               <label>
                 Net monthly cost
-                <input onChange={(event) => updateField("netMonthlyCost", event.target.value)} type="text" value={draft.netMonthlyCost} />
+                <input onChange={(event) => updateField("netMonthlyCost", event.target.value)} type="text" value={resolvedDraft.netMonthlyCost} />
               </label>
             </form>
           </section>
@@ -841,7 +847,7 @@ export function IncomeProtectionPage() {
     }
 
     if (activeTab.id === "files") {
-      const folderName = `client-${draft.clientReference.toLowerCase()}-${draft.fullName.toLowerCase().replaceAll(" ", "-")}`;
+      const folderName = `client-${resolvedDraft.clientReference.toLowerCase()}-${replaceSpaces(resolvedDraft.fullName.toLowerCase(), "-")}`;
       const folderLayout = [
         "fact-find/",
         "terms-of-business/",
@@ -898,7 +904,7 @@ export function IncomeProtectionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {draft.files.map((file) => (
+                  {resolvedDraft.files.map((file) => (
                     <tr key={file.id}>
                       <td>{file.category}</td>
                       <td>{file.originalFilename}</td>
@@ -952,7 +958,7 @@ export function IncomeProtectionPage() {
                 </tr>
               </thead>
               <tbody>
-                {draft.generatedDocuments.map((document) => (
+                {resolvedDraft.generatedDocuments.map((document) => (
                   <tr key={document.id}>
                     <td>{document.documentType}</td>
                     <td>{document.documentName}</td>
@@ -983,7 +989,7 @@ export function IncomeProtectionPage() {
             <h1>Income Protection</h1>
           </div>
           <div className="module-actions">
-            <span className="module-status-badge">{draft.status}</span>
+            <span className="module-status-badge">{resolvedDraft.status}</span>
             <div className="client-selector-compact client-selector-compact-inline">
               <label className="client-switcher-field">
                 Search clients
@@ -1005,7 +1011,7 @@ export function IncomeProtectionPage() {
                       window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
                     }
                   }}
-                  value={draft.clientReference}
+                  value={resolvedDraft.clientReference}
                 >
                   {filteredClients.map((entry) => (
                     <option key={entry.clientReference} value={entry.clientReference}>

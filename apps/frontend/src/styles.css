@@ -770,6 +770,11 @@ body {
   align-items: end;
 }
 
+.client-selector-compact-inline {
+  min-width: min(100%, 760px);
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+}
+
 .status-row {
   display: flex;
   align-items: center;
