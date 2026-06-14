@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   User,
@@ -16,7 +16,12 @@ import {
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
-import { exportGeneratedDocument } from "../documents/export-generated-document";
+import { generateDocument, sanitizeGeneratedHtml } from "../documents/document-api";
+import { buildGeneratedPreviewHtml, DocumentPreview } from "../documents/document-preview";
+import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
+import { builtInDocumentTemplates } from "../documents/document-templates";
+import { TemplatePicker } from "../documents/template-picker";
+import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
 import type { WorkflowDocumentType } from "../documents/workflow-document-builders";
 
 const moduleTabs = [
@@ -49,11 +54,63 @@ function replaceSpaces(value: string, replacement: string) {
   return value.replace(/ /g, replacement);
 }
 
+function buildExportFilename(
+  profile: SeededClientProfile,
+  documentType: SupportedDocumentType,
+  extension: "docx" | "pdf",
+  versionNumber?: number,
+) {
+  const exportDate = profile.letterDate || new Date().toISOString().slice(0, 10);
+  const versionSuffix = versionNumber && versionNumber > 1 ? `_v${versionNumber}` : "";
+  return `${profile.firstName}_${profile.surname}_${replaceSpaces(documentType, "_")}_${exportDate}${versionSuffix}.${extension}`;
+}
+
+function getGeneratedDraftStatusLabel(status: GeneratedDocumentDraft["generationStatus"]) {
+  switch (status) {
+    case "generating":
+      return "Generating";
+    case "completed":
+      return "Ready to review";
+    case "failed":
+      return "Generation failed";
+    default:
+      return "Draft not generated";
+  }
+}
+
+function getGenerationHeaderStatus(prefix: "Generation" | "Issue" | "Document", status: GeneratedDocumentDraft["generationStatus"]) {
+  switch (status) {
+    case "generating":
+      return `${prefix}: Generating draft`;
+    case "completed":
+      return `${prefix}: Draft generated`;
+    case "failed":
+      return `${prefix}: Draft generation failed`;
+    default:
+      return `${prefix}: Draft`;
+  }
+}
+
+function getDraftStatusDotClass(status: GeneratedDocumentDraft["generationStatus"]) {
+  switch (status) {
+    case "generating":
+      return "status-dot-amber";
+    case "completed":
+      return "status-dot-green";
+    case "failed":
+      return "status-dot-grey";
+    default:
+      return "status-dot-grey";
+  }
+}
+
 export function IncomeProtectionPage() {
   const { user } = useAuth();
   const actorLabel = resolveActorLabel(user?.role);
-  const { getClient, listClients, saveClient } = useClientData();
+  const { getClient, listClients, saveClient, saveGeneratedDraft, updateSelectedTemplate, upsertGeneratedDocument, upsertFile } =
+    useClientData();
   const clients = listClients();
+  const pendingGeneratedDocumentVersionsRef = useRef<Record<string, Set<number>>>({});
   const [selectedClientReference, setSelectedClientReference] = useState(() => {
     if (typeof window === "undefined") {
       return clients[0]?.clientReference ?? "";
@@ -81,6 +138,20 @@ export function IncomeProtectionPage() {
   useEffect(() => {
     setDraft(client ?? null);
   }, [client]);
+
+  useEffect(() => {
+    if (!client) {
+      return;
+    }
+
+    setFactFindGenerationStatus(getGenerationHeaderStatus("Generation", client.documentDrafts["Fact Find"].generationStatus));
+    setTermsIssueStatus(getGenerationHeaderStatus("Issue", client.documentDrafts["Terms of Business"].generationStatus));
+    setStatementDocumentStatus(
+      getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
+    );
+    setShowFactFindValidation(false);
+    setShowStatementValidation(false);
+  }, [selectedClientReference]);
 
   useEffect(() => {
     if (!selectedClientReference && clients[0]?.clientReference) {
@@ -132,6 +203,10 @@ export function IncomeProtectionPage() {
     !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
 
+  function getDocumentDraft(documentType: SupportedDocumentType) {
+    return resolvedDraft.documentDrafts[documentType];
+  }
+
   function persistDraft(nextDraft: SeededClientProfile) {
     const normalizedDraft = {
       ...nextDraft,
@@ -165,41 +240,21 @@ export function IncomeProtectionPage() {
     });
   }
 
-  function buildGeneratedDocument(documentType: string, extension: "docx" | "pdf") {
-    const generatedAt = resolvedDraft.letterDate || new Date().toISOString().slice(0, 10);
-    const baseName = `${resolvedDraft.firstName}_${resolvedDraft.surname}` || resolvedDraft.clientReference;
-    const normalizedType = replaceSpaces(documentType, "_");
+  function updateRequestInformationAddress(value: string) {
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
 
-    return {
-      id: `DOC-${Date.now()}-${normalizedType}-${extension}`,
-      documentType,
-      documentName: `${baseName}_${normalizedType}_${generatedAt}.${extension}`,
-      version: `Version ${resolvedDraft.generatedDocuments.length + 1}`,
-      status: extension === "pdf" ? "PDF ready" : "DOCX ready",
-      generatedAt,
-    } satisfies SeededGeneratedDocument;
-  }
+      const [nextTownCity, ...countyParts] = value.split(",");
+      const nextCounty = countyParts.join(",").trim();
 
-  function buildGeneratedFile(document: SeededGeneratedDocument) {
-    return {
-      id: `FILE-${Date.now()}-${replaceSpaces(document.documentType, "-")}`,
-      category: "Generated Documents",
-      originalFilename: document.documentName,
-      status: "Approved",
-      uploadedBy: actorLabel,
-      uploadedAt: document.generatedAt,
-    } satisfies SeededClientFile;
-  }
-
-  function appendGeneratedDocument(documentType: WorkflowDocumentType, extension: "docx" | "pdf") {
-    const nextDocument = buildGeneratedDocument(documentType, extension);
-    const nextFile = buildGeneratedFile(nextDocument);
-    persistDraft({
-      ...resolvedDraft,
-      generatedDocuments: [nextDocument, ...resolvedDraft.generatedDocuments],
-      files: [nextFile, ...resolvedDraft.files.filter((file) => file.originalFilename !== nextFile.originalFilename)],
+      return {
+        ...currentDraft,
+        townCity: nextTownCity.trim(),
+        county: countyParts.length > 0 ? nextCounty : "",
+      };
     });
-    return nextDocument;
   }
 
   function saveClientDetails() {
@@ -212,7 +267,81 @@ export function IncomeProtectionPage() {
     setFactFindDraftSavedLabel("Saved just now");
   }
 
-  async function handleFactFindGenerate(format: "DOCX" | "PDF") {
+  function getGeneratedDocumentReservationKey(clientReference: string, documentType: SupportedDocumentType) {
+    return `${clientReference}::${documentType}`;
+  }
+
+  function getHighestGeneratedDocumentVersion(documentType: SupportedDocumentType) {
+    const latestClient = getClient(resolvedDraft.clientReference) ?? resolvedDraft;
+
+    return latestClient.generatedDocuments
+      .filter((document) => document.documentType === documentType)
+      .reduce((highestVersion, document) => {
+        const parsedVersion = Number.parseInt(document.version.replace(/^Version\s+/i, ""), 10);
+        return Number.isNaN(parsedVersion) ? highestVersion : Math.max(highestVersion, parsedVersion);
+      }, 0);
+  }
+
+  function reserveGeneratedDocumentVersion(documentType: SupportedDocumentType) {
+    const reservationKey = getGeneratedDocumentReservationKey(resolvedDraft.clientReference, documentType);
+    const reservedVersions = pendingGeneratedDocumentVersionsRef.current[reservationKey] ?? new Set<number>();
+    const highestReservedVersion = reservedVersions.size > 0 ? Math.max(...reservedVersions) : 0;
+    const nextVersion = Math.max(getHighestGeneratedDocumentVersion(documentType), highestReservedVersion) + 1;
+
+    reservedVersions.add(nextVersion);
+    pendingGeneratedDocumentVersionsRef.current[reservationKey] = reservedVersions;
+    return nextVersion;
+  }
+
+  function releaseGeneratedDocumentVersion(documentType: SupportedDocumentType, versionNumber: number) {
+    const reservationKey = getGeneratedDocumentReservationKey(resolvedDraft.clientReference, documentType);
+    const reservedVersions = pendingGeneratedDocumentVersionsRef.current[reservationKey];
+
+    if (!reservedVersions) {
+      return;
+    }
+
+    reservedVersions.delete(versionNumber);
+
+    if (reservedVersions.size === 0) {
+      delete pendingGeneratedDocumentVersionsRef.current[reservationKey];
+    }
+  }
+
+  function buildGeneratedDocumentRecord(
+    documentType: SupportedDocumentType,
+    extension: "docx" | "pdf",
+    previewArtifact: { html: string; title: string },
+    versionNumber: number,
+  ) {
+    const latestClient = getClient(resolvedDraft.clientReference) ?? resolvedDraft;
+    const generatedAt = latestClient.letterDate || new Date().toISOString().slice(0, 10);
+    const documentName = buildExportFilename(latestClient, documentType, extension, versionNumber);
+
+    return {
+      id: `DOC-${replaceSpaces(documentType, "-").toLowerCase()}-${extension}-${versionNumber}-${Date.now()}`,
+      documentType,
+      documentName,
+      version: `Version ${versionNumber}`,
+      status: extension === "pdf" ? "PDF ready" : "DOCX ready",
+      generatedAt,
+      previewHtml: previewArtifact.html,
+      previewTitle: previewArtifact.title,
+    } satisfies SeededGeneratedDocument;
+  }
+
+  function buildGeneratedFileRecord(document: SeededGeneratedDocument) {
+    return {
+      id: `FILE-${document.id}`,
+      category: "Generated Documents",
+      originalFilename: document.documentName,
+      status: "Approved",
+      uploadedBy: actorLabel,
+      uploadedAt: document.generatedAt,
+    } satisfies SeededClientFile;
+  }
+
+  async function handleFactFindGenerate() {
     if (factFindMissingFields.length > 0) {
       setShowFactFindValidation(true);
       setFactFindGenerationStatus("Generation: Blocked by missing required fields");
@@ -221,12 +350,28 @@ export function IncomeProtectionPage() {
 
     setShowFactFindValidation(false);
     saveFactFindDraft();
-    setFactFindGenerationStatus(`Generation: ${format} generated`);
+    setFactFindGenerationStatus("Generation: Generating");
+    saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", {
+      generationStatus: "generating",
+    });
     try {
-      const nextDocument = appendGeneratedDocument("Fact Find", format.toLowerCase() as "docx" | "pdf");
-      await exportGeneratedDocument(resolvedDraft, "Fact Find", format.toLowerCase() as "docx" | "pdf", nextDocument.documentName);
+      const generatedDocument = await generateDocument({
+        clientReference: resolvedDraft.clientReference,
+        documentType: "Fact Find",
+        templateId: getDocumentDraft("Fact Find").selectedTemplateId,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
+      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+      });
+      setFactFindGenerationStatus("Generation: Draft generated");
     } catch {
-      setFactFindGenerationStatus(`Generation: ${format} failed`);
+      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", {
+        generationStatus: "failed",
+      });
+      setFactFindGenerationStatus("Generation: Draft generation failed");
     }
   }
 
@@ -237,12 +382,28 @@ export function IncomeProtectionPage() {
 
   async function handleTermsGenerate() {
     saveTermsDraft();
-    setTermsIssueStatus("Issue: PDF generated");
+    setTermsIssueStatus("Issue: Generating");
+    saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", {
+      generationStatus: "generating",
+    });
     try {
-      const nextDocument = appendGeneratedDocument("Terms of Business", "pdf");
-      await exportGeneratedDocument(resolvedDraft, "Terms of Business", "pdf", nextDocument.documentName);
+      const generatedDocument = await generateDocument({
+        clientReference: resolvedDraft.clientReference,
+        documentType: "Terms of Business",
+        templateId: getDocumentDraft("Terms of Business").selectedTemplateId,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
+      saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+      });
+      setTermsIssueStatus("Issue: Draft generated");
     } catch {
-      setTermsIssueStatus("Issue: PDF failed");
+      saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", {
+        generationStatus: "failed",
+      });
+      setTermsIssueStatus("Issue: Draft generation failed");
     }
   }
 
@@ -260,7 +421,7 @@ export function IncomeProtectionPage() {
     setStatementSaveStatus("Saved just now");
   }
 
-  async function handleStatementGenerate(format: "DOCX" | "PDF") {
+  async function handleStatementGenerate() {
     if (statementMissingFields.length > 0) {
       setShowStatementValidation(true);
       setStatementDocumentStatus("Document: Blocked by missing required fields");
@@ -269,18 +430,88 @@ export function IncomeProtectionPage() {
 
     setShowStatementValidation(false);
     saveStatementDraft();
-    setStatementDocumentStatus(`Document: ${format} generated`);
+    setStatementDocumentStatus("Document: Generating");
+    saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
+      generationStatus: "generating",
+    });
     try {
-      const nextDocument = appendGeneratedDocument("Statement of Suitability", format.toLowerCase() as "docx" | "pdf");
-      await exportGeneratedDocument(
-        resolvedDraft,
-        "Statement of Suitability",
-        format.toLowerCase() as "docx" | "pdf",
-        nextDocument.documentName,
-      );
+      const generatedDocument = await generateDocument({
+        clientReference: resolvedDraft.clientReference,
+        documentType: "Statement of Suitability",
+        templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
+      saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+      });
+      setStatementDocumentStatus("Document: Draft generated");
     } catch {
-      setStatementDocumentStatus(`Document: ${format} failed`);
+      saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
+        generationStatus: "failed",
+      });
+      setStatementDocumentStatus("Document: Draft generation failed");
     }
+  }
+
+  function renderGeneratedDraftSnapshot(documentType: SupportedDocumentType) {
+    const draftState = getDocumentDraft(documentType);
+    const selectedTemplate = builtInDocumentTemplates.find((template) => template.id === draftState.selectedTemplateId);
+    const selectedTemplateLabel = selectedTemplate?.title ?? draftState.selectedTemplateId ?? "Template not selected";
+    const previewHtml = buildGeneratedPreviewHtml(draftState.lastGeneratedSections, draftState.lastGeneratedHtml);
+
+    function handleSectionChange(sectionId: string, nextBodyHtml: string) {
+      const nextSections = draftState.lastGeneratedSections.map((section) =>
+        section.id === sectionId ? { ...section, bodyHtml: sanitizeGeneratedHtml(nextBodyHtml) } : section,
+      );
+
+      saveGeneratedDraft(resolvedDraft.clientReference, documentType, {
+        generationStatus: draftState.generationStatus,
+        lastGeneratedSections: nextSections,
+        lastGeneratedHtml: buildGeneratedPreviewHtml(nextSections, draftState.lastGeneratedHtml),
+      });
+    }
+
+    async function handlePreviewExport(extension: "docx" | "pdf") {
+      if (!previewHtml) {
+        return;
+      }
+
+      const previewArtifact = buildExportDocumentArtifact(resolvedDraft, documentType, {
+        html: previewHtml,
+        title: documentType,
+      });
+      const versionNumber = reserveGeneratedDocumentVersion(documentType);
+      const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
+
+      try {
+        await exportGeneratedDocument(
+          resolvedDraft,
+          documentType,
+          extension,
+          nextDocument.documentName,
+          previewArtifact,
+        );
+        upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
+        upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
+      } catch {
+        return;
+      } finally {
+        releaseGeneratedDocumentVersion(documentType, versionNumber);
+      }
+    }
+
+    return (
+      <DocumentPreview
+        draft={draftState}
+        onExportDocx={() => void handlePreviewExport("docx")}
+        onExportPdf={() => void handlePreviewExport("pdf")}
+        onSectionChange={handleSectionChange}
+        statusLabel={getGeneratedDraftStatusLabel(draftState.generationStatus)}
+        templateLabel={selectedTemplateLabel}
+      />
+    );
   }
 
   function handleUploadFile() {
@@ -302,10 +533,24 @@ export function IncomeProtectionPage() {
 
   async function handleDownloadDocument(document: SeededGeneratedDocument) {
     const extension = document.documentName.toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
+    const exportOverride =
+      document.previewHtml
+        ? {
+            html: document.previewHtml,
+            title: document.previewTitle ?? document.documentType,
+          }
+        : undefined;
 
-    setDocumentDownloadStatus(`Download: Downloaded ${document.documentName}`);
+    setDocumentDownloadStatus(`Download: Downloading ${document.documentName}`);
     try {
-      await exportGeneratedDocument(resolvedDraft, document.documentType as WorkflowDocumentType, extension, document.documentName);
+      await exportGeneratedDocument(
+        resolvedDraft,
+        document.documentType as WorkflowDocumentType,
+        extension,
+        document.documentName,
+        exportOverride,
+      );
+      setDocumentDownloadStatus(`Download: Downloaded ${document.documentName}`);
     } catch {
       setDocumentDownloadStatus(`Download: Failed ${document.documentName}`);
     }
@@ -394,24 +639,28 @@ export function IncomeProtectionPage() {
           <div className="fact-find-header">
             <h2>Fact Find Draft</h2>
             <div className="action-toolbar">
+              <TemplatePicker
+                documentType="Fact Find"
+                onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Fact Find", templateId)}
+                selectedTemplateId={getDocumentDraft("Fact Find").selectedTemplateId}
+              />
               <button className="primary-action icon-btn" onClick={saveFactFindDraft} type="button">
                 <Save size={18} />
                 Save
               </button>
-              <button className="primary-action secondary-action icon-btn" onClick={() => handleFactFindGenerate("DOCX")} type="button">
+              <button className="primary-action icon-btn" onClick={handleFactFindGenerate} type="button">
                 <FileDown size={18} />
-                DOCX
-              </button>
-              <button className="primary-action icon-btn" onClick={() => handleFactFindGenerate("PDF")} type="button">
-                <FileDown size={18} />
-                PDF
+                Generate Draft
               </button>
               <span className="compact-badge">
                 <span className={`status-dot ${factFindDraftSavedLabel === "Saved just now" ? "status-dot-green" : "status-dot-grey"}`} />
                 <span>{factFindDraftSavedLabel}</span>
               </span>
               <span className="compact-badge">
-                <span className={`status-dot ${factFindGenerationStatus.includes("Generation: ") && factFindGenerationStatus !== "Generation: Draft" && !factFindGenerationStatus.includes("Blocked") ? "status-dot-green" : "status-dot-grey"}`} />
+                <span
+                  className={`status-dot ${getDraftStatusDotClass(getDocumentDraft("Fact Find").generationStatus)}`}
+                  data-testid="fact-find-generation-status-dot"
+                />
                 <span>{factFindGenerationStatus}</span>
               </span>
             </div>
@@ -423,6 +672,8 @@ export function IncomeProtectionPage() {
               <span>Missing required fields: {factFindMissingFields.join(", ")}</span>
             </div>
           ) : null}
+
+          {renderGeneratedDraftSnapshot("Fact Find")}
 
           <section className="fact-find-section">
             <div className="fact-find-section-header">
@@ -663,7 +914,11 @@ export function IncomeProtectionPage() {
               </label>
               <label>
                 Address
-                <input onChange={(event) => updateField("townCity", event.target.value)} type="text" value={`${resolvedDraft.townCity}, ${resolvedDraft.county}`.replace(/^,\s*/, "")} />
+                <input
+                  onChange={(event) => updateRequestInformationAddress(event.target.value)}
+                  type="text"
+                  value={`${resolvedDraft.townCity}, ${resolvedDraft.county}`.replace(/^,\s*/, "")}
+                />
               </label>
               <label>
                 Date of birth
@@ -693,13 +948,18 @@ export function IncomeProtectionPage() {
           <div className="fact-find-header">
             <h2>Terms of Business Draft</h2>
             <div className="action-toolbar">
+              <TemplatePicker
+                documentType="Terms of Business"
+                onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Terms of Business", templateId)}
+                selectedTemplateId={getDocumentDraft("Terms of Business").selectedTemplateId}
+              />
               <button className="primary-action icon-btn" onClick={saveTermsDraft} type="button">
                 <Save size={18} />
                 Save
               </button>
-              <button className="primary-action secondary-action icon-btn" onClick={handleTermsGenerate} type="button">
+              <button className="primary-action icon-btn" onClick={handleTermsGenerate} type="button">
                 <FileDown size={18} />
-                PDF
+                Generate Draft
               </button>
               <button className="primary-action secondary-action icon-btn" onClick={markTermsIssued} type="button">
                 <CheckCircle size={18} />
@@ -710,11 +970,13 @@ export function IncomeProtectionPage() {
                 <span>{termsSaveStatus}</span>
               </span>
               <span className="compact-badge">
-                <span className={`status-dot ${termsIssueStatus !== "Issue: Draft" ? "status-dot-green" : "status-dot-grey"}`} />
+                <span className={`status-dot ${getDraftStatusDotClass(getDocumentDraft("Terms of Business").generationStatus)}`} />
                 <span>{termsIssueStatus}</span>
               </span>
             </div>
           </div>
+
+          {renderGeneratedDraftSnapshot("Terms of Business")}
 
           <section className="fact-find-section">
             <div className="fact-find-section-header">
@@ -757,24 +1019,25 @@ export function IncomeProtectionPage() {
           <div className="fact-find-header">
             <h2>Statement of Suitability Draft</h2>
             <div className="action-toolbar">
+              <TemplatePicker
+                documentType="Statement of Suitability"
+                onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Statement of Suitability", templateId)}
+                selectedTemplateId={getDocumentDraft("Statement of Suitability").selectedTemplateId}
+              />
               <button className="primary-action icon-btn" onClick={saveStatementDraft} type="button">
                 <Save size={18} />
                 Save
               </button>
-              <button className="primary-action secondary-action icon-btn" onClick={() => handleStatementGenerate("DOCX")} type="button">
+              <button className="primary-action icon-btn" onClick={handleStatementGenerate} type="button">
                 <FileDown size={18} />
-                DOCX
-              </button>
-              <button className="primary-action icon-btn" onClick={() => handleStatementGenerate("PDF")} type="button">
-                <FileDown size={18} />
-                PDF
+                Generate Draft
               </button>
               <span className="compact-badge">
                 <span className={`status-dot ${statementSaveStatus === "Saved just now" ? "status-dot-green" : "status-dot-grey"}`} />
                 <span>{statementSaveStatus}</span>
               </span>
               <span className="compact-badge">
-                <span className={`status-dot ${statementDocumentStatus.includes("Document: ") && statementDocumentStatus !== "Document: Draft" && !statementDocumentStatus.includes("Blocked") ? "status-dot-green" : "status-dot-grey"}`} />
+                <span className={`status-dot ${getDraftStatusDotClass(getDocumentDraft("Statement of Suitability").generationStatus)}`} />
                 <span>{statementDocumentStatus}</span>
               </span>
             </div>
@@ -786,6 +1049,8 @@ export function IncomeProtectionPage() {
               <span>Missing required fields: {statementMissingFields.join(", ")}</span>
             </div>
           ) : null}
+
+          {renderGeneratedDraftSnapshot("Statement of Suitability")}
 
           <section className="fact-find-section">
             <div className="fact-find-section-header">
@@ -935,7 +1200,10 @@ export function IncomeProtectionPage() {
               <span>{documentPackStatus}</span>
             </span>
             <span className="compact-badge">
-              <span className={`status-dot ${documentDownloadStatus.startsWith("Download:") ? "status-dot-green" : "status-dot-grey"}`} />
+              <span
+                className={`status-dot ${documentDownloadStatus !== "Download: No document downloaded yet" ? "status-dot-green" : "status-dot-grey"}`}
+                data-testid="generated-documents-download-status-dot"
+              />
               <span>{documentDownloadStatus}</span>
             </span>
           </div>

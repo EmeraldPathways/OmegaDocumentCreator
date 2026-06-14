@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import { createSeededClientProfiles, type SeededClientProfile } from "../data/seeded-clients";
+import { createDefaultDocumentDrafts } from "../documents/document-templates";
 
 function createBlankClient(nextReference: string, updatedBy: string): SeededClientProfile {
   return {
@@ -38,6 +39,7 @@ function createBlankClient(nextReference: string, updatedBy: string): SeededClie
     productType: "",
     letterDate: "",
     netMonthlyCost: "",
+    documentDrafts: createDefaultDocumentDrafts(),
     files: [],
     generatedDocuments: [],
   };

@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createDefaultDocumentDrafts } from "../documents/document-templates";
+import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
 
 import {
   createSeededClientProfiles,
@@ -14,10 +16,54 @@ type ClientDataContextValue = {
   saveClient: (client: SeededClientProfile) => void;
   upsertFile: (clientReference: string, file: SeededClientFile) => void;
   upsertGeneratedDocument: (clientReference: string, document: SeededGeneratedDocument) => void;
+  updateSelectedTemplate: (clientReference: string, documentType: SupportedDocumentType, templateId: string) => void;
+  saveGeneratedDraft: (
+    clientReference: string,
+    documentType: SupportedDocumentType,
+    draft: Partial<Omit<GeneratedDocumentDraft, "selectedTemplateId">>,
+  ) => void;
 };
 
 const STORAGE_KEY = "omega-client-records";
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
+
+function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>) {
+  const defaultDrafts = createDefaultDocumentDrafts();
+
+  return {
+    "Fact Find": {
+      ...defaultDrafts["Fact Find"],
+      ...documentDrafts?.["Fact Find"],
+      lastGeneratedSections: documentDrafts?.["Fact Find"]?.lastGeneratedSections ?? defaultDrafts["Fact Find"].lastGeneratedSections,
+    },
+    "Terms of Business": {
+      ...defaultDrafts["Terms of Business"],
+      ...documentDrafts?.["Terms of Business"],
+      lastGeneratedSections:
+        documentDrafts?.["Terms of Business"]?.lastGeneratedSections ?? defaultDrafts["Terms of Business"].lastGeneratedSections,
+    },
+    "Statement of Suitability": {
+      ...defaultDrafts["Statement of Suitability"],
+      ...documentDrafts?.["Statement of Suitability"],
+      lastGeneratedSections:
+        documentDrafts?.["Statement of Suitability"]?.lastGeneratedSections ??
+        defaultDrafts["Statement of Suitability"].lastGeneratedSections,
+    },
+  };
+}
+
+function normalizeClient(client: SeededClientProfile): SeededClientProfile {
+  return {
+    ...client,
+    documentDrafts: normalizeDocumentDrafts(client.documentDrafts),
+  };
+}
+
+function normalizeClients(clients: Record<string, SeededClientProfile>) {
+  return Object.fromEntries(
+    Object.entries(clients).map(([clientReference, client]) => [clientReference, normalizeClient(client)]),
+  ) as Record<string, SeededClientProfile>;
+}
 
 function readStoredClients() {
   if (typeof window === "undefined") {
@@ -31,7 +77,7 @@ function readStoredClients() {
 
   try {
     const parsedValue = JSON.parse(storedValue) as Record<string, SeededClientProfile>;
-    return Object.keys(parsedValue).length > 0 ? parsedValue : createSeededClientProfiles();
+    return Object.keys(parsedValue).length > 0 ? normalizeClients(parsedValue) : createSeededClientProfiles();
   } catch {
     return createSeededClientProfiles();
   }
@@ -47,7 +93,7 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
   function saveClient(client: SeededClientProfile) {
     setClients((currentClients) => ({
       ...currentClients,
-      [client.clientReference]: client,
+      [client.clientReference]: normalizeClient(client),
     }));
   }
 
@@ -85,6 +131,56 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
     });
   }
 
+  function updateSelectedTemplate(clientReference: string, documentType: SupportedDocumentType, templateId: string) {
+    setClients((currentClients) => {
+      const client = currentClients[clientReference];
+      if (!client) {
+        return currentClients;
+      }
+
+      return {
+        ...currentClients,
+        [clientReference]: {
+          ...normalizeClient(client),
+          documentDrafts: {
+            ...normalizeDocumentDrafts(client.documentDrafts),
+            [documentType]: {
+              ...normalizeDocumentDrafts(client.documentDrafts)[documentType],
+              selectedTemplateId: templateId,
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function saveGeneratedDraft(
+    clientReference: string,
+    documentType: SupportedDocumentType,
+    draft: Partial<Omit<GeneratedDocumentDraft, "selectedTemplateId">>,
+  ) {
+    setClients((currentClients) => {
+      const client = currentClients[clientReference];
+      if (!client) {
+        return currentClients;
+      }
+
+      return {
+        ...currentClients,
+        [clientReference]: {
+          ...normalizeClient(client),
+          documentDrafts: {
+            ...normalizeDocumentDrafts(client.documentDrafts),
+            [documentType]: {
+              ...normalizeDocumentDrafts(client.documentDrafts)[documentType],
+              ...draft,
+            },
+          },
+        },
+      };
+    });
+  }
+
   const value = useMemo<ClientDataContextValue>(
     () => ({
       clients,
@@ -93,6 +189,8 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
       saveClient,
       upsertFile,
       upsertGeneratedDocument,
+      updateSelectedTemplate,
+      saveGeneratedDraft,
     }),
     [clients],
   );

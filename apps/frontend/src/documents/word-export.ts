@@ -1,169 +1,232 @@
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 
-function parseHtmlToDocx(html: string): Paragraph[] {
+export type WordExportBlock =
+  | { kind: "eyebrow"; text: string }
+  | { kind: "heading1"; text: string }
+  | { kind: "subtitle"; text: string }
+  | { kind: "gridHeading"; text: string }
+  | { kind: "gridItem"; label: string; value: string }
+  | { kind: "sectionHeading"; text: string }
+  | { kind: "calloutHeading"; text: string }
+  | { kind: "footerHeading"; text: string }
+  | { kind: "paragraph"; text: string }
+  | { kind: "bullet"; text: string }
+  | { kind: "spacer" };
+
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function textFromElement(element: Element | null | undefined) {
+  return normalizeText(element?.textContent);
+}
+
+function buildFallbackBlocks(html: string): WordExportBlock[] {
+  return [{ kind: "paragraph", text: normalizeText(html.replace(/<[^>]+>/g, " ")) || "No content" }];
+}
+
+function appendNestedContent(element: Element, blocks: WordExportBlock[]) {
+  const tagName = element.tagName.toLowerCase();
+
+  if (tagName === "p") {
+    const text = textFromElement(element);
+    if (text) {
+      blocks.push({ kind: "paragraph", text });
+    }
+    return;
+  }
+
+  if (tagName === "ul" || tagName === "ol") {
+    Array.from(element.children).forEach((item) => {
+      if (item.tagName.toLowerCase() !== "li") {
+        return;
+      }
+      const text = textFromElement(item);
+      if (text) {
+        blocks.push({ kind: "bullet", text });
+      }
+    });
+    return;
+  }
+
+  if (/^h[1-3]$/.test(tagName)) {
+    return;
+  }
+
+  Array.from(element.children).forEach((child) => appendNestedContent(child, blocks));
+}
+
+function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
+  const tagName = element.tagName.toLowerCase();
+  const classList = element.classList;
+
+  if (tagName === "article") {
+    Array.from(element.children).forEach((child) => extractBlocksFromElement(child, blocks));
+    return;
+  }
+
+  if (tagName === "header" && classList.contains("document-banner")) {
+    const eyebrow = textFromElement(element.querySelector(".document-eyebrow"));
+    const title = textFromElement(element.querySelector("h1"));
+    const subtitle = textFromElement(element.querySelector(".document-subtitle"));
+
+    if (eyebrow) {
+      blocks.push({ kind: "eyebrow", text: eyebrow });
+    }
+    if (title) {
+      blocks.push({ kind: "heading1", text: title });
+    }
+    if (subtitle) {
+      blocks.push({ kind: "subtitle", text: subtitle });
+    }
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
+  if (tagName === "section" && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
+    const heading = textFromElement(element.querySelector("h2"));
+    if (heading) {
+      blocks.push({ kind: "gridHeading", text: heading });
+    }
+
+    Array.from(element.querySelectorAll(".grid-item")).forEach((gridItem) => {
+      const label = textFromElement(gridItem.querySelector(".grid-label"));
+      const value = textFromElement(gridItem.querySelector("strong")) || normalizeText(gridItem.textContent);
+      if (label || value) {
+        blocks.push({
+          kind: "gridItem",
+          label: label || "Item",
+          value: value || "Not recorded",
+        });
+      }
+    });
+
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
+  if (tagName === "section" && classList.contains("document-section")) {
+    const heading = textFromElement(element.querySelector("h2"));
+    if (heading) {
+      blocks.push({ kind: "sectionHeading", text: heading });
+    }
+    Array.from(element.children).forEach((child) => appendNestedContent(child, blocks));
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
+  if (tagName === "aside" && classList.contains("document-callout")) {
+    const heading = textFromElement(element.querySelector("h2"));
+    if (heading) {
+      blocks.push({ kind: "calloutHeading", text: heading });
+    }
+    Array.from(element.children).forEach((child) => appendNestedContent(child, blocks));
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
+  if (tagName === "footer" && classList.contains("signatures-footer")) {
+    const heading = textFromElement(element.querySelector("h2"));
+    if (heading) {
+      blocks.push({ kind: "footerHeading", text: heading });
+    }
+    Array.from(element.children).forEach((child) => appendNestedContent(child, blocks));
+    return;
+  }
+
+  if (tagName === "p") {
+    const text = textFromElement(element);
+    if (text) {
+      blocks.push({ kind: "paragraph", text });
+    }
+    return;
+  }
+
+  if (tagName === "ul" || tagName === "ol") {
+    Array.from(element.children).forEach((item) => {
+      if (item.tagName.toLowerCase() !== "li") {
+        return;
+      }
+      const text = textFromElement(item);
+      if (text) {
+        blocks.push({ kind: "bullet", text });
+      }
+    });
+  }
+}
+
+export function extractWordExportBlocks(html: string): WordExportBlock[] {
   if (typeof DOMParser === "undefined") {
-    return [
-      new Paragraph({
-        children: [new TextRun(html.replace(/<[^>]+>/g, " "))],
-        spacing: { after: 120 },
-      }),
-    ];
+    return buildFallbackBlocks(html);
   }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
-  const body = doc.body;
-  const paragraphs: Paragraph[] = [];
+  const blocks: WordExportBlock[] = [];
 
-  const processNode = (node: Node, isBold = false): Array<TextRun | string> => {
-    const children: Array<TextRun | string> = [];
+  Array.from(doc.body.children).forEach((element) => extractBlocksFromElement(element, blocks));
 
-    node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        const text = child.textContent ?? "";
-        if (text) {
-          children.push(isBold ? new TextRun({ text, bold: true }) : text);
-        }
-        return;
-      }
+  return blocks.length > 0 ? blocks : buildFallbackBlocks(html);
+}
 
-      if (child.nodeType !== Node.ELEMENT_NODE) {
-        return;
-      }
-
-      const element = child as Element;
-      switch (element.tagName.toLowerCase()) {
-        case "strong":
-        case "b":
-          children.push(...processNode(element, true));
-          break;
-        case "em":
-        case "i":
-          children.push(new TextRun({ text: element.textContent ?? "", bold: isBold, italics: true }));
-          break;
-        case "u":
-          children.push(
-            new TextRun({
-              text: element.textContent ?? "",
-              bold: isBold,
-              underline: { type: "single" },
-            }),
-          );
-          break;
-        case "br":
-          children.push("\n");
-          break;
-        default:
-          children.push(...processNode(element, isBold));
-      }
-    });
-
-    return children;
-  };
-
-  const createTextRuns = (children: Array<TextRun | string>): TextRun[] => {
-    const textRuns: TextRun[] = [];
-    let currentText = "";
-
-    children.forEach((child) => {
-      if (typeof child === "string") {
-        currentText += child;
-        return;
-      }
-
-      if (currentText) {
-        textRuns.push(new TextRun(currentText));
-        currentText = "";
-      }
-      textRuns.push(child);
-    });
-
-    if (currentText) {
-      textRuns.push(new TextRun(currentText));
-    }
-
-    return textRuns;
-  };
-
-  Array.from(body.children).forEach((element) => {
-    const tagName = element.tagName.toLowerCase();
-    const textRuns = createTextRuns(processNode(element));
-
-    if (textRuns.length === 0) {
-      return;
-    }
-
-    switch (tagName) {
-      case "h1":
-        paragraphs.push(
-          new Paragraph({
-            children: textRuns,
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.LEFT,
-            spacing: { before: 240, after: 120 },
-          }),
-        );
-        break;
-      case "h2":
-        paragraphs.push(
-          new Paragraph({
-            children: textRuns,
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 200, after: 100 },
-          }),
-        );
-        break;
-      case "h3":
-        paragraphs.push(
-          new Paragraph({
-            children: textRuns,
-            heading: HeadingLevel.HEADING_3,
-            spacing: { before: 160, after: 80 },
-          }),
-        );
-        break;
-      case "ul":
-      case "ol":
-        Array.from(element.children).forEach((li) => {
-          if (li.tagName.toLowerCase() !== "li") {
-            return;
-          }
-
-          const liRuns = createTextRuns(processNode(li));
-          if (liRuns.length === 0) {
-            return;
-          }
-
-          paragraphs.push(
-            new Paragraph({
-              children: liRuns,
-              bullet: { level: 0 },
-              indent: { left: 360 },
-              spacing: { after: 80 },
-            }),
-          );
+function createParagraphs(blocks: WordExportBlock[]) {
+  return blocks.map((block) => {
+    switch (block.kind) {
+      case "eyebrow":
+        return new Paragraph({
+          children: [new TextRun({ text: block.text.toUpperCase(), bold: true, color: "7C4B2A", size: 20 })],
+          spacing: { after: 60 },
         });
-        break;
+      case "heading1":
+        return new Paragraph({
+          children: [new TextRun({ text: block.text, bold: true })],
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 120 },
+        });
+      case "subtitle":
+        return new Paragraph({
+          children: [new TextRun({ text: block.text, italics: true, color: "666666" })],
+          spacing: { after: 180 },
+        });
+      case "gridHeading":
+      case "sectionHeading":
+      case "calloutHeading":
+      case "footerHeading":
+        return new Paragraph({
+          children: [new TextRun({ text: block.text, bold: true, color: block.kind === "calloutHeading" ? "8A5A00" : "5B2230" })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 120, after: 80 },
+        });
+      case "gridItem":
+        return new Paragraph({
+          children: [
+            new TextRun({ text: `${block.label}: `, bold: true }),
+            new TextRun({ text: block.value }),
+          ],
+          spacing: { after: 80 },
+        });
+      case "bullet":
+        return new Paragraph({
+          children: [new TextRun({ text: block.text })],
+          bullet: { level: 0 },
+          indent: { left: 360 },
+          spacing: { after: 60 },
+        });
+      case "spacer":
+        return new Paragraph({
+          children: [new TextRun("")],
+          spacing: { after: 120 },
+        });
+      case "paragraph":
       default:
-        paragraphs.push(
-          new Paragraph({
-            children: textRuns,
-            spacing: { after: 120 },
-          }),
-        );
+        return new Paragraph({
+          children: [new TextRun({ text: block.text })],
+          spacing: { after: 120 },
+        });
     }
   });
-
-  if (paragraphs.length === 0) {
-    paragraphs.push(
-      new Paragraph({
-        children: [new TextRun(body.textContent ?? "No content")],
-      }),
-    );
-  }
-
-  return paragraphs;
 }
 
 export async function exportHtmlToWord(
@@ -178,7 +241,7 @@ export async function exportHtmlToWord(
     sections: [
       {
         properties: {},
-        children: parseHtmlToDocx(html),
+        children: createParagraphs(extractWordExportBlocks(html)),
       },
     ],
   });

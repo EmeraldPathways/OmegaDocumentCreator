@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
+from app.document_generation import generate_document
 from app.domain.users import UserRole, UserStatus
 from app.security import is_session_expired, verify_password
 from app.store import (
@@ -82,6 +83,13 @@ class ClientUpdateRequest(BaseModel):
     town_city: str | None = None
     county: str | None = None
     dependants: list[dict[str, str]] | None = None
+
+
+class DocumentGenerationRequest(BaseModel):
+    client_reference: str
+    document_type: str
+    template_id: str
+    workflow_snapshot: dict[str, object]
 
 
 def _current_user(request: Request) -> dict[str, str]:
@@ -206,6 +214,21 @@ def archive_client_record(client_reference: str, request: Request) -> dict[str, 
     item = archive_client(client_reference, user["email"])
     if not item:
         raise HTTPException(status_code=404, detail="Client not found")
+    return {"item": item}
+
+
+@app.post("/documents/generate")
+def generate_document_record(
+    payload: DocumentGenerationRequest, request: Request
+) -> dict[str, dict[str, object] | list[dict[str, str]]]:
+    _current_user(request)
+    item = generate_document(
+        settings=settings,
+        client_reference=payload.client_reference,
+        document_type=payload.document_type,
+        template_id=payload.template_id,
+        workflow_snapshot=payload.workflow_snapshot,
+    )
     return {"item": item}
 
 

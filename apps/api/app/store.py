@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import UTC, datetime
 
 from app.domain.clients import ClientStatus
 from app.domain.users import UserRecord, UserRole, UserStatus
@@ -81,6 +82,7 @@ CLIENT_TEMPLATES = [
 
 SEEDED_USERS: dict[str, UserRecord] = {}
 SEEDED_CLIENTS: list[dict[str, object]] = []
+SUPPORTED_DOCUMENT_TYPES = ("Fact Find", "Terms of Business", "Statement of Suitability")
 AUDIT_LOG_TEMPLATES = [
     {
         "id": "AUD-0003",
@@ -135,6 +137,36 @@ SECURITY_SUMMARY_TEMPLATE = {
     "remote_access_notes": "Use Cloudflare Tunnel with Cloudflare Access or VPN before enabling offsite access.",
     "file_storage_visibility": "private_server_storage",
 }
+
+
+def _default_generated_document_drafts() -> dict[str, dict[str, object]]:
+    return {
+        document_type: {
+            "document_type": document_type,
+            "template_id": "",
+            "title": "",
+            "summary": "",
+            "sections": [],
+            "warnings": [],
+            "generated_html": "",
+            "generation_status": "idle",
+        }
+        for document_type in SUPPORTED_DOCUMENT_TYPES
+    }
+
+
+def _ensure_generated_document_state(client: dict[str, object]) -> None:
+    if "document_drafts" not in client:
+        client["document_drafts"] = _default_generated_document_drafts()
+    if "generated_documents" not in client:
+        client["generated_documents"] = []
+
+
+def _build_generated_document_name(full_name: str, document_type: str, generated_at: str, version: int) -> str:
+    sanitized_name = full_name.replace(" ", "_")
+    sanitized_document_type = document_type.replace(" ", "_")
+    version_suffix = "" if version == 1 else f"_v{version}"
+    return f"{sanitized_name}_{sanitized_document_type}_{generated_at}{version_suffix}.pdf"
 
 
 def reset_store() -> None:
@@ -286,9 +318,10 @@ def get_security_summary() -> dict[str, str]:
     return deepcopy(SECURITY_SUMMARY_TEMPLATE)
 
 
-def get_client(client_reference: str) -> dict[str, str] | None:
+def get_client(client_reference: str) -> dict[str, object] | None:
     for client in SEEDED_CLIENTS:
         if client["client_reference"] == client_reference:
+            _ensure_generated_document_state(client)
             return {
                 "client_reference": client["client_reference"],
                 "first_name": client["first_name"],
@@ -314,7 +347,73 @@ def get_client(client_reference: str) -> dict[str, str] | None:
                 "partner_address": client["partner_address"],
                 "general_notes": client["general_notes"],
                 "dependants": deepcopy(client["dependants"]),
+                "document_drafts": deepcopy(client["document_drafts"]),
+                "generated_documents": deepcopy(client["generated_documents"]),
             }
+    return None
+
+
+def get_client_generated_document_draft(client_reference: str, document_type: str) -> dict[str, object] | None:
+    for client in SEEDED_CLIENTS:
+        if client["client_reference"] != client_reference:
+            continue
+        _ensure_generated_document_state(client)
+        draft = client["document_drafts"].get(document_type)
+        return deepcopy(draft) if draft else None
+    return None
+
+
+def save_generated_document_draft(
+    *,
+    client_reference: str,
+    document_type: str,
+    template_id: str,
+    title: str,
+    summary: str,
+    sections: list[dict[str, object]],
+    warnings: list[str],
+    generated_html: str,
+) -> dict[str, object] | None:
+    for client in SEEDED_CLIENTS:
+        if client["client_reference"] != client_reference:
+            continue
+
+        _ensure_generated_document_state(client)
+        generated_at = datetime.now(UTC).date().isoformat()
+        draft = {
+            "document_type": document_type,
+            "template_id": template_id,
+            "title": title,
+            "summary": summary,
+            "sections": deepcopy(sections),
+            "warnings": deepcopy(warnings),
+            "generated_html": generated_html,
+            "generation_status": "completed",
+        }
+        client["document_drafts"][document_type] = draft
+
+        generated_documents = client["generated_documents"]
+        next_version = sum(1 for item in generated_documents if item.get("document_type") == document_type) + 1
+        generated_documents.insert(
+            0,
+            {
+                "id": f"DOC-{len(generated_documents) + 1:04d}",
+                "document_type": document_type,
+                "document_name": _build_generated_document_name(
+                    str(client["full_name"]),
+                    document_type,
+                    generated_at,
+                    next_version,
+                ),
+                "version": f"Version {next_version}",
+                "status": "Preview saved",
+                "generated_at": generated_at,
+                "preview_title": title,
+                "preview_html": generated_html,
+            },
+        )
+        return deepcopy(draft)
+
     return None
 
 
@@ -358,6 +457,8 @@ def create_client(
         "partner_address": "",
         "general_notes": "",
         "dependants": deepcopy(dependants),
+        "document_drafts": _default_generated_document_drafts(),
+        "generated_documents": [],
     }
     SEEDED_CLIENTS.append(item)
     return get_client(client_reference) or {}

@@ -12,6 +12,26 @@ class ApiTests(unittest.TestCase):
         reset_store()
         self.client = TestClient(app)
 
+    def _login_as_staff(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+
+    def _document_generation_payload(self) -> dict[str, object]:
+        return {
+            "client_reference": "CLI-2026-0002",
+            "document_type": "Statement of Suitability",
+            "template_id": "income-protection-statement",
+            "workflow_snapshot": {
+                "full_name": "Jamie Murphy",
+                "provider": "Aviva",
+                "product_type": "Income Protection",
+                "recommended_cover": "EUR2,500 monthly",
+                "needs_objectives": "Protect monthly income during illness.",
+            },
+        }
+
     def test_login_returns_seeded_user_profile(self) -> None:
         response = self.client.post(
             "/auth/login",
@@ -274,3 +294,93 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["item"]["status"], "archived")
+
+    def test_document_generation_requires_login(self) -> None:
+        response = self.client.post(
+            "/documents/generate",
+            json={
+                "client_reference": "CLI-2026-0002",
+                "document_type": "Statement of Suitability",
+                "template_id": "income-protection-statement",
+                "workflow_snapshot": {
+                    "full_name": "Jamie Murphy",
+                    "provider": "Aviva",
+                    "recommended_cover": "EUR2,500 monthly",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_logged_in_user_can_generate_document_with_seeded_ai_fallback(self) -> None:
+        self._login_as_staff()
+
+        response = self.client.post("/documents/generate", json=self._document_generation_payload())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["client_reference"], "CLI-2026-0002")
+        self.assertEqual(payload["document_type"], "Statement of Suitability")
+        self.assertEqual(payload["template_id"], "income-protection-statement")
+        self.assertEqual(payload["title"], "Statement of Suitability for Jamie Murphy")
+        self.assertIn("summary", payload)
+        self.assertGreater(len(payload["sections"]), 1)
+        self.assertGreaterEqual(len(payload["warnings"]), 1)
+        self.assertEqual(payload["sections"][0]["title"], "Client overview")
+        self.assertIn("bodyHtml", payload["sections"][0])
+        self.assertIn("<h1>", payload["generated_html"])
+        self.assertIn("Jamie Murphy", payload["generated_html"])
+        self.assertIn("Seeded fallback content", payload["warnings"][0])
+
+    def test_document_generation_persists_generated_draft_in_seeded_store(self) -> None:
+        from app.store import get_client, get_client_generated_document_draft
+
+        self._login_as_staff()
+
+        response = self.client.post("/documents/generate", json=self._document_generation_payload())
+
+        self.assertEqual(response.status_code, 200)
+        saved_draft = get_client_generated_document_draft("CLI-2026-0002", "Statement of Suitability")
+        self.assertIsNotNone(saved_draft)
+        self.assertEqual(saved_draft["template_id"], "income-protection-statement")
+        self.assertEqual(saved_draft["title"], "Statement of Suitability for Jamie Murphy")
+        self.assertEqual(saved_draft["generation_status"], "completed")
+        self.assertEqual(saved_draft["sections"][0]["title"], "Client overview")
+        self.assertIn("bodyHtml", saved_draft["sections"][0])
+        self.assertIn("Jamie Murphy", saved_draft["generated_html"])
+        client = get_client("CLI-2026-0002")
+        self.assertIsNotNone(client)
+        self.assertEqual(client["generated_documents"][0]["document_type"], "Statement of Suitability")
+        self.assertEqual(
+            client["generated_documents"][0]["preview_title"],
+            "Statement of Suitability for Jamie Murphy",
+        )
+        self.assertIn("Jamie Murphy", client["generated_documents"][0]["preview_html"])
+
+    def test_logged_in_user_still_gets_seeded_fallback_when_ai_is_configured_without_provider_impl(self) -> None:
+        from app.main import settings
+
+        self._login_as_staff()
+
+        original_ai_enabled = settings.ai_enabled
+        original_ai_provider = settings.ai_provider
+        original_ai_api_key = settings.ai_api_key
+        original_ai_model = settings.ai_model
+
+        settings.ai_enabled = True
+        settings.ai_provider = "gemini"
+        settings.ai_api_key = "test-key"
+        settings.ai_model = "gemini-1.5-flash"
+
+        try:
+            response = self.client.post("/documents/generate", json=self._document_generation_payload())
+        finally:
+            settings.ai_enabled = original_ai_enabled
+            settings.ai_provider = original_ai_provider
+            settings.ai_api_key = original_ai_api_key
+            settings.ai_model = original_ai_model
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertIn("Seeded fallback content", payload["warnings"][0])
+        self.assertIn("Jamie Murphy", payload["generated_html"])

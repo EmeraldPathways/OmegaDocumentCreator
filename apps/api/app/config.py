@@ -22,6 +22,10 @@ class AppSettings:
     local_ai_provider: str = "disabled"
     local_ai_model: str = ""
     local_ai_embedding_model: str = ""
+    ai_enabled: bool = False
+    ai_provider: str = "disabled"
+    ai_api_key: str = ""
+    ai_model: str = ""
 
     def __post_init__(self) -> None:
         self.file_storage_path = Path(self.file_storage_path)
@@ -35,6 +39,7 @@ def ensure_storage_directories(settings: AppSettings) -> None:
 
 def get_settings(**overrides: str) -> AppSettings:
     local_ai_enabled_value = overrides.get("LOCAL_AI_ENABLED") or os.getenv("LOCAL_AI_ENABLED", "false")
+    ai_enabled_value = overrides.get("AI_ENABLED") or os.getenv("AI_ENABLED", "false")
     values = {
         "database_url": overrides.get("DATABASE_URL") or os.getenv("DATABASE_URL", "postgresql://placeholder"),
         "file_storage_path": overrides.get("FILE_STORAGE_PATH") or os.getenv("FILE_STORAGE_PATH", "storage/clients"),
@@ -54,6 +59,10 @@ def get_settings(**overrides: str) -> AppSettings:
         "local_ai_model": overrides.get("LOCAL_AI_MODEL") or os.getenv("LOCAL_AI_MODEL", ""),
         "local_ai_embedding_model": overrides.get("LOCAL_AI_EMBEDDING_MODEL")
         or os.getenv("LOCAL_AI_EMBEDDING_MODEL", ""),
+        "ai_enabled": ai_enabled_value.lower() == "true",
+        "ai_provider": overrides.get("AI_PROVIDER") or os.getenv("AI_PROVIDER", "disabled"),
+        "ai_api_key": overrides.get("AI_API_KEY") or os.getenv("AI_API_KEY", ""),
+        "ai_model": overrides.get("AI_MODEL") or os.getenv("AI_MODEL", ""),
     }
     settings = AppSettings(**values)
     ensure_storage_directories(settings)

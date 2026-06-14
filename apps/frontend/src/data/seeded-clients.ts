@@ -1,3 +1,6 @@
+import { createDefaultDocumentDrafts } from "../documents/document-templates";
+import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
+
 export type SeededDependant = {
   name: string;
   dateOfBirth: string;
@@ -20,6 +23,8 @@ export type SeededGeneratedDocument = {
   version: string;
   status: string;
   generatedAt: string;
+  previewHtml?: string;
+  previewTitle?: string;
 };
 
 export type SeededClientProfile = {
@@ -84,6 +89,7 @@ export type SeededClientProfile = {
   requestCompanyName: string;
   requestPolicies: string;
   requestLetterDate: string;
+  documentDrafts: Record<SupportedDocumentType, GeneratedDocumentDraft>;
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
 };
@@ -151,6 +157,21 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-01-15",
+    documentDrafts: {
+      ...createDefaultDocumentDrafts(),
+      "Fact Find": {
+        ...createDefaultDocumentDrafts()["Fact Find"],
+        generationStatus: "completed",
+        lastGeneratedHtml: "<p>Income protection fact find draft generated for Test Client.</p>",
+        lastGeneratedSections: [
+          {
+            id: "summary",
+            title: "Summary",
+            bodyHtml: "<p>Income protection fact find draft generated for Test Client.</p>",
+          },
+        ],
+      },
+    },
     files: [
       {
         id: "FILE-0001",
@@ -162,14 +183,17 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
       },
     ],
     generatedDocuments: [
-      {
-        id: "DOC-0001",
-        documentType: "Fact Find",
-        documentName: "Client_Fact_Find_Draft.docx",
-        version: "Version 1",
-        status: "DOCX ready",
-        generatedAt: "2026-01-15",
-      },
+        {
+          id: "DOC-0001",
+          documentType: "Fact Find",
+          documentName: "Client_Fact_Find_Draft.docx",
+          version: "Version 1",
+          status: "DOCX ready",
+          generatedAt: "2026-01-15",
+          previewHtml:
+            '<article class="workflow-document workflow-document-fact-find"><header class="document-banner"><p class="document-eyebrow">Fact Find</p><h1>Income Protection Fact Find</h1><p class="document-subtitle">Test Client (CLI-2026-0001)</p></header><section class="document-section"><h2>Summary</h2><p>Income protection fact find draft generated for Test Client.</p></section><footer class="signatures-footer"><h2>Signatures and Record</h2><p><strong>Advisor:</strong> Omega Advisor</p><p><strong>Client signature:</strong> Pending</p></footer></article>',
+          previewTitle: "Fact Find",
+        },
     ],
   },
   "CLI-2026-0002": {
@@ -234,6 +258,33 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "Zurich Life",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-06-06",
+    documentDrafts: {
+      ...createDefaultDocumentDrafts(),
+      "Terms of Business": {
+        ...createDefaultDocumentDrafts()["Terms of Business"],
+        generationStatus: "completed",
+        lastGeneratedHtml: "<p>Terms of Business issued to Jamie Murphy.</p>",
+        lastGeneratedSections: [
+          {
+            id: "issue-details",
+            title: "Issue Details",
+            bodyHtml: "<p>Terms of Business issued to Jamie Murphy.</p>",
+          },
+        ],
+      },
+      "Statement of Suitability": {
+        ...createDefaultDocumentDrafts()["Statement of Suitability"],
+        generationStatus: "completed",
+        lastGeneratedHtml: "<p>Statement of Suitability prepared for Jamie Murphy.</p>",
+        lastGeneratedSections: [
+          {
+            id: "recommendation",
+            title: "Recommendation",
+            bodyHtml: "<p>Statement of Suitability prepared for Jamie Murphy.</p>",
+          },
+        ],
+      },
+    },
     files: [
       {
         id: "FILE-0002",
@@ -253,22 +304,28 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
       },
     ],
     generatedDocuments: [
-      {
-        id: "DOC-0002",
-        documentType: "Statement of Suitability",
-        documentName: "Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf",
-        version: "Version 1",
-        status: "PDF ready",
-        generatedAt: "2026-06-06",
-      },
-      {
-        id: "DOC-0003",
-        documentType: "Terms of Business",
-        documentName: "Jamie_Murphy_Terms_of_Business_2026-06-06.pdf",
-        version: "Version 1",
-        status: "PDF ready",
-        generatedAt: "2026-06-06",
-      },
+        {
+          id: "DOC-0002",
+          documentType: "Statement of Suitability",
+          documentName: "Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf",
+          version: "Version 1",
+          status: "PDF ready",
+          generatedAt: "2026-06-06",
+          previewHtml:
+            '<article class="workflow-document workflow-document-statement-of-suitability"><header class="document-banner"><p class="document-eyebrow">Statement of Suitability</p><h1>Statement of Suitability</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></header><section class="document-section"><h2>Recommendation</h2><p>Statement of Suitability prepared for Jamie Murphy.</p></section><footer class="signatures-footer"><h2>Signatures and Record</h2><p><strong>Advisor:</strong> Office Staff</p><p><strong>Client signature:</strong> Pending</p></footer></article>',
+          previewTitle: "Statement of Suitability",
+        },
+        {
+          id: "DOC-0003",
+          documentType: "Terms of Business",
+          documentName: "Jamie_Murphy_Terms_of_Business_2026-06-06.pdf",
+          version: "Version 1",
+          status: "PDF ready",
+          generatedAt: "2026-06-06",
+          previewHtml:
+            '<article class="workflow-document workflow-document-terms-of-business"><header class="document-banner"><p class="document-eyebrow">Terms of Business</p><h1>Terms of Business</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></header><section class="document-section"><h2>Issue Details</h2><p>Terms of Business issued to Jamie Murphy.</p></section><footer class="signatures-footer"><h2>Signatures and Record</h2><p><strong>Advisor:</strong> Office Staff</p><p><strong>Client signature:</strong> Pending</p></footer></article>',
+          previewTitle: "Terms of Business",
+        },
     ],
   },
 };
