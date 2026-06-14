@@ -6,7 +6,6 @@ type DocumentPreviewProps = {
   emptyMessage?: string;
   onExportDocx?: () => void;
   onExportPdf?: () => void;
-  onSectionChange?: (sectionId: string, nextBodyHtml: string) => void;
   statusLabel: string;
   templateLabel: string;
 };
@@ -37,7 +36,6 @@ export function DocumentPreview({
   emptyMessage = "No generated preview yet.",
   onExportDocx,
   onExportPdf,
-  onSectionChange,
   statusLabel,
   templateLabel,
 }: DocumentPreviewProps) {
@@ -68,20 +66,6 @@ export function DocumentPreview({
           <p>{statusLabel}</p>
         </div>
       </div>
-      {draft.lastGeneratedSections.length > 0 && onSectionChange ? (
-        <div className="client-form-grid">
-          {draft.lastGeneratedSections.map((section) => (
-            <label key={section.id}>
-              {section.title} content
-              <textarea
-                onChange={(event) => onSectionChange(section.id, event.target.value)}
-                rows={6}
-                value={sanitizeGeneratedHtml(section.bodyHtml)}
-              />
-            </label>
-          ))}
-        </div>
-      ) : null}
       {previewHtml ? <div className="fact-find-section" dangerouslySetInnerHTML={{ __html: previewHtml }} /> : <p>{emptyMessage}</p>}
     </section>
   );

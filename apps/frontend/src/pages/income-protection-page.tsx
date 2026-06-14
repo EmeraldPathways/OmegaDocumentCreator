@@ -25,7 +25,7 @@ import {
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
-import { generateDocument, sanitizeGeneratedHtml } from "../documents/document-api";
+import { generateDocument } from "../documents/document-api";
 import { buildGeneratedPreviewHtml, DocumentPreview } from "../documents/document-preview";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { builtInDocumentTemplates } from "../documents/document-templates";
@@ -595,17 +595,6 @@ export function IncomeProtectionPage() {
     const selectedTemplateLabel = selectedTemplate?.title ?? draftState.selectedTemplateId ?? "Template not selected";
     const previewHtml = buildGeneratedPreviewHtml(draftState.lastGeneratedSections, draftState.lastGeneratedHtml);
 
-    function handleSectionChange(sectionId: string, nextBodyHtml: string) {
-      const nextSections = draftState.lastGeneratedSections.map((section) =>
-        section.id === sectionId ? { ...section, bodyHtml: sanitizeGeneratedHtml(nextBodyHtml) } : section,
-      );
-      saveGeneratedDraft(resolvedDraft.clientReference, documentType, {
-        generationStatus: draftState.generationStatus,
-        lastGeneratedSections: nextSections,
-        lastGeneratedHtml: buildGeneratedPreviewHtml(nextSections, draftState.lastGeneratedHtml),
-      });
-    }
-
     async function handlePreviewExport(extension: "docx" | "pdf") {
       if (!previewHtml) {
         return;
@@ -633,7 +622,6 @@ export function IncomeProtectionPage() {
         draft={draftState}
         onExportDocx={() => void handlePreviewExport("docx")}
         onExportPdf={() => void handlePreviewExport("pdf")}
-        onSectionChange={handleSectionChange}
         statusLabel={getGeneratedDraftStatusLabel(draftState.generationStatus)}
         templateLabel={selectedTemplateLabel}
       />
