@@ -99,8 +99,13 @@ const coverAgeOptions = [
   { value: "70", label: "70" },
 ];
 
-function hasValue(value: string) {
-  return value.trim().length > 0;
+function hasValue(value: unknown) {
+  if (value == null) return false;
+  return String(value).trim().length > 0;
+}
+
+function toLower(value: unknown) {
+  return String(value ?? "").toLowerCase();
 }
 
 function isPresent(value: string | null): value is string {
@@ -111,8 +116,8 @@ function resolveActorLabel(role: string | null | undefined) {
   return role === "admin" ? "Omega Admin" : "Office Staff";
 }
 
-function buildFullName(firstName: string, surname: string) {
-  return `${firstName} ${surname}`.trim();
+function buildFullName(firstName: unknown, surname: unknown) {
+  return `${firstName ?? ""} ${surname ?? ""}`.trim();
 }
 
 function replaceSpaces(value: string, replacement: string) {
@@ -128,8 +133,8 @@ function formatCurrency(value: string) {
   return parsed.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function getDocumentStatusVariant(status: string): Parameters<typeof Badge>[0]["variant"] {
-  const lower = status.toLowerCase();
+function getDocumentStatusVariant(status: string | undefined): Parameters<typeof Badge>[0]["variant"] {
+  const lower = (status ?? "").toLowerCase();
   if (lower.includes("draft")) {
     return "draft";
   }
@@ -159,7 +164,7 @@ function getDraftStatusDotClass(status: GeneratedDocumentDraft["generationStatus
 }
 
 function getFileIcon(filename: string) {
-  const lower = filename.toLowerCase();
+  const lower = toLower(filename);
   if (lower.endsWith(".pdf")) {
     return <FileType2 size={20} />;
   }
@@ -170,7 +175,7 @@ function getFileIcon(filename: string) {
 }
 
 function getFileCategoryClass(category: string) {
-  const lower = category.toLowerCase();
+  const lower = toLower(category);
   if (lower.includes("fact")) {
     return "category-fact-find";
   }
@@ -319,14 +324,14 @@ export function IncomeProtectionPage() {
     if (query.length === 0) {
       return true;
     }
-    return entry.fullName.toLowerCase().includes(query) || entry.clientReference.toLowerCase().includes(query);
+    return toLower(entry.fullName).includes(query) || toLower(entry.clientReference).includes(query);
   });
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
 
   const factFindMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-    !hasValue(`${resolvedDraft.townCity} ${resolvedDraft.county}`.trim()) ? "Address" : null,
+    !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
     !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
     !hasValue(resolvedDraft.occupation) ? "Occupation" : null,
     !hasValue(resolvedDraft.income) ? "Income / salary" : null,
@@ -336,7 +341,7 @@ export function IncomeProtectionPage() {
 
   const statementMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-    !hasValue(`${resolvedDraft.townCity} ${resolvedDraft.county}`.trim()) ? "Address" : null,
+    !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
     !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
     !hasValue(resolvedDraft.provider) ? "Provider recommended" : null,
     !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
@@ -452,7 +457,7 @@ export function IncomeProtectionPage() {
     const generatedAt = latestClient.letterDate || new Date().toISOString().slice(0, 10);
     const documentName = buildExportFilename(latestClient, documentType, extension, versionNumber);
     return {
-      id: `DOC-${replaceSpaces(documentType, "-").toLowerCase()}-${extension}-${versionNumber}-${Date.now()}`,
+      id: `DOC-${toLower(replaceSpaces(documentType, "-"))}-${extension}-${versionNumber}-${Date.now()}`,
       documentType,
       documentName,
       version: `Version ${versionNumber}`,
@@ -667,7 +672,7 @@ export function IncomeProtectionPage() {
   }
 
   function handleDownloadDocument(document: SeededGeneratedDocument) {
-    const extension = document.documentName.toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
+    const extension = toLower(document.documentName).endsWith(".pdf") ? "pdf" : "docx";
     const exportOverride = document.previewHtml
       ? { html: document.previewHtml, title: document.previewTitle ?? document.documentType }
       : undefined;
@@ -717,7 +722,7 @@ export function IncomeProtectionPage() {
   }
 
   const filteredFiles = resolvedDraft.files.filter((file) =>
-    file.originalFilename.toLowerCase().includes(fileFilter.toLowerCase()),
+    toLower(file.originalFilename).includes(fileFilter.toLowerCase()),
   );
 
   const isTermsIssued = hasValue(resolvedDraft.termsIssuedDate);
@@ -769,22 +774,24 @@ export function IncomeProtectionPage() {
   function renderTabPanel() {
     if (activeTab.id === "client-details") {
       return (
-        <div className="fact-find-stack">
-          <div className="fact-find-header">
-            <h2>Client Details</h2>
-            <div className="action-toolbar">
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Client Details</h2>
+            </div>
+            <div className="page-actions">
               <Button isLoading={clientDetailsStatus === "saving"} onClick={saveClientDetails} variant="primary">
                 <Save size={18} />
                 Save
               </Button>
-              <span className="text-muted" style={{ fontSize: "var(--font-size-small)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <span className="text-muted text-small flex items-center gap-2">
                 {clientDetailsStatus === "saved" ? <Check size={14} className="text-success" /> : null}
                 {clientDetailsStatus === "saved" ? "Saved" : "Unsaved changes"}
               </span>
             </div>
           </div>
 
-          <section className="card">
+          <section className="form-section">
             <h3 className="form-section-title">Reusable client information</h3>
             <div className="form-grid">
               <Input
@@ -887,10 +894,12 @@ export function IncomeProtectionPage() {
       const isGenerated = factFindDraft.generationStatus === "completed";
 
       return (
-        <div className="fact-find-stack">
-          <div className="fact-find-header">
-            <h2>Fact Find Draft</h2>
-            <div className="action-toolbar">
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Fact Find Draft</h2>
+            </div>
+            <div className="page-actions">
               <TemplatePicker
                 documentType="Fact Find"
                 onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Fact Find", templateId)}
@@ -900,7 +909,7 @@ export function IncomeProtectionPage() {
                 <Save size={18} />
                 Save
               </Button>
-              <span className="text-muted" style={{ fontSize: "var(--font-size-small)" }}>
+              <span className="text-muted text-small">
                 {factFindDraftSavedLabel}
               </span>
               <Button
@@ -1205,25 +1214,25 @@ export function IncomeProtectionPage() {
             >
               <div className="form-grid">
                 <Toggle
-                  checked={resolvedDraft.contactByPhone.toLowerCase().startsWith("y")}
+                  checked={toLower(resolvedDraft.contactByPhone).startsWith("y")}
                   id="ff-contactByPhone"
                   label="Contact by phone"
                   onChange={(event) => updateField("contactByPhone", event.target.checked ? "Yes" : "No")}
                 />
                 <Toggle
-                  checked={resolvedDraft.contactBySms.toLowerCase().startsWith("y")}
+                  checked={toLower(resolvedDraft.contactBySms).startsWith("y")}
                   id="ff-contactBySms"
                   label="Contact by SMS"
                   onChange={(event) => updateField("contactBySms", event.target.checked ? "Yes" : "No")}
                 />
                 <Toggle
-                  checked={resolvedDraft.contactByEmail.toLowerCase().startsWith("y")}
+                  checked={toLower(resolvedDraft.contactByEmail).startsWith("y")}
                   id="ff-contactByEmail"
                   label="Contact by email"
                   onChange={(event) => updateField("contactByEmail", event.target.checked ? "Yes" : "No")}
                 />
                 <Toggle
-                  checked={resolvedDraft.contactByPost.toLowerCase().startsWith("y")}
+                  checked={toLower(resolvedDraft.contactByPost).startsWith("y")}
                   id="ff-contactByPost"
                   label="Contact by post"
                   onChange={(event) => updateField("contactByPost", event.target.checked ? "Yes" : "No")}
@@ -1283,7 +1292,7 @@ export function IncomeProtectionPage() {
               onToggle={() => factFindAccordion.toggle("signatures")}
               title="Signatures"
             >
-              <div className="card" style={{ border: "1px solid var(--color-border)", marginBottom: "var(--space-4)" }}>
+              <div className="card mb-4">
                 <div className="form-grid">
                   <Input
                     id="ff-clientSignature1"
@@ -1386,10 +1395,12 @@ export function IncomeProtectionPage() {
       const isGenerated = termsDraft.generationStatus === "completed";
 
       return (
-        <div className="fact-find-stack">
-          <div className="fact-find-header">
-            <h2>Terms of Business Draft</h2>
-            <div className="action-toolbar">
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Terms of Business Draft</h2>
+            </div>
+            <div className="page-actions">
               <TemplatePicker
                 documentType="Terms of Business"
                 onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Terms of Business", templateId)}
@@ -1399,7 +1410,7 @@ export function IncomeProtectionPage() {
                 <Save size={18} />
                 Save
               </Button>
-              <span className="text-muted" style={{ fontSize: "var(--font-size-small)" }}>
+              <span className="text-muted text-small">
                 {termsSaveStatus}
               </span>
               <Button onClick={handleTermsGenerate} variant="primary">
@@ -1418,7 +1429,7 @@ export function IncomeProtectionPage() {
 
           {renderGeneratedDraftSnapshot("Terms of Business")}
 
-          <section className="card">
+          <section className="form-section">
             <h3 className="form-section-title">Terms of Business</h3>
             <div className="form-grid">
               <Input
@@ -1450,13 +1461,13 @@ export function IncomeProtectionPage() {
                 value={resolvedDraft.termsIssuedDate}
               />
               <Toggle
-                checked={resolvedDraft.termsClientReceived.toLowerCase().startsWith("y") || resolvedDraft.termsClientReceived.toLowerCase() === "received"}
+                checked={toLower(resolvedDraft.termsClientReceived).startsWith("y") || toLower(resolvedDraft.termsClientReceived) === "received"}
                 id="tob-termsClientReceived"
                 label="Client received terms"
                 onChange={(event) => updateField("termsClientReceived", event.target.checked ? "Received" : "Pending confirmation")}
               />
               <Toggle
-                checked={resolvedDraft.termsClientReviewed.toLowerCase().startsWith("y")}
+                checked={toLower(resolvedDraft.termsClientReviewed).startsWith("y")}
                 id="tob-termsClientReviewed"
                 label="Client reviewed terms"
                 onChange={(event) => updateField("termsClientReviewed", event.target.checked ? "Reviewed" : "Pending confirmation")}
@@ -1501,10 +1512,12 @@ export function IncomeProtectionPage() {
       const isGenerated = statementDraft.generationStatus === "completed";
 
       return (
-        <div className="fact-find-stack">
-          <div className="fact-find-header">
-            <h2>Statement of Suitability Draft</h2>
-            <div className="action-toolbar">
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Statement of Suitability Draft</h2>
+            </div>
+            <div className="page-actions">
               <TemplatePicker
                 documentType="Statement of Suitability"
                 onChange={(templateId) =>
@@ -1516,7 +1529,7 @@ export function IncomeProtectionPage() {
                 <Save size={18} />
                 Save
               </Button>
-              <span className="text-muted" style={{ fontSize: "var(--font-size-small)" }}>
+              <span className="text-muted text-small">
                 {statementSaveStatus}
               </span>
               <Button
@@ -1542,7 +1555,7 @@ export function IncomeProtectionPage() {
 
           {renderGeneratedDraftSnapshot("Statement of Suitability")}
 
-          <section className="card">
+          <section className="form-section">
             <h3 className="form-section-title">Recommendation basics</h3>
             <div className="form-grid">
               <Input
@@ -1583,7 +1596,7 @@ export function IncomeProtectionPage() {
             </div>
           </section>
 
-          <section className="card">
+          <section className="form-section">
             <h3 className="form-section-title">Cover summary</h3>
             <div className="form-grid">
               <Input
@@ -1646,10 +1659,12 @@ export function IncomeProtectionPage() {
 
     if (activeTab.id === "files") {
       return (
-        <div className="fact-find-stack">
-          <div className="fact-find-header">
-            <h2>Client Files</h2>
-            <div className="action-toolbar">
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Client Files</h2>
+            </div>
+            <div className="page-actions">
               <Button onClick={handleUploadFile} variant="primary">
                 <Upload size={18} />
                 Upload File
@@ -1685,8 +1700,8 @@ export function IncomeProtectionPage() {
           </div>
 
           <section className="card">
-            <div className="section-header">
-              <h3 className="form-section-title">Tracked client files</h3>
+            <div className="card-header">
+              <h3 className="card-title">Tracked client files</h3>
               <div style={{ maxWidth: "260px", width: "100%" }}>
                 <div className="field-input-wrap">
                   <Search size={16} style={{ marginLeft: "12px", color: "var(--color-text-muted)" }} />
@@ -1727,8 +1742,8 @@ export function IncomeProtectionPage() {
                         {file.category} · {formatFileSize(file.originalFilename.length * 1024)} · {file.uploadedBy}
                       </div>
                     </div>
-                    <Badge variant={file.status.toLowerCase().includes("approved") ? "approved" : "draft"}>
-                      {file.status}
+                    <Badge variant={toLower(file.status).includes("approved") ? "approved" : "draft"}>
+                      {file.status ?? "Uploaded"}
                     </Badge>
                     <div className="file-actions">
                       <Button className="btn-sm" onClick={() => handleDownloadDocument(file as unknown as SeededGeneratedDocument)} variant="secondary">
@@ -1752,10 +1767,12 @@ export function IncomeProtectionPage() {
 
     // Generated Documents tab
     return (
-      <div className="fact-find-stack">
-        <div className="fact-find-header">
-          <h2>Generated Documents</h2>
-          <div className="action-toolbar">
+      <div className="page-stack">
+        <div className="page-heading page-heading-compact">
+          <div>
+            <h2>Generated Documents</h2>
+          </div>
+          <div className="page-actions">
             <Button
               isLoading={documentPackStatus === "Pack: Preparing pack..."}
               onClick={handleDownloadPack}
@@ -1806,7 +1823,7 @@ export function IncomeProtectionPage() {
                     <td className="font-medium">{document.documentName}</td>
                     <td>{document.version}</td>
                     <td>
-                      <Badge variant={getDocumentStatusVariant(document.status)}>{document.status}</Badge>
+                      <Badge variant={getDocumentStatusVariant(document.status)}>{document.status ?? "Draft"}</Badge>
                     </td>
                     <td>{document.generatedAt}</td>
                     <td>
@@ -1860,9 +1877,9 @@ export function IncomeProtectionPage() {
     <div className="page-stack">
       <section className="card">
         <div className="page-heading page-heading-compact">
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div className="flex items-center gap-3">
             <h1>Income Protection</h1>
-            <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status}</Badge>
+            <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
           </div>
           <div className="client-selector">
             <div className="client-selector-field">
@@ -1946,12 +1963,12 @@ export function IncomeProtectionPage() {
 }
 
 function getSectionProgress(fields: string[]) {
-  const completed = fields.filter((field) => hasValue(field.replace(/,/g, "").trim())).length;
+  const completed = fields.filter((field) => hasValue(String(field ?? "").replace(/,/g, "").trim())).length;
   const total = fields.length;
   if (completed === total) {
     return <Check size={16} className="text-success" />;
   }
-  return <span className="text-muted" style={{ fontSize: "var(--font-size-small)" }}>{`${completed}/${total}`}</span>;
+  return <span className="text-muted text-small">{`${completed}/${total}`}</span>;
 }
 
 function formatFileSize(bytes: number) {

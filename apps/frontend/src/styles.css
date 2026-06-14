@@ -1722,6 +1722,10 @@ button {
   margin-bottom: var(--space-4);
 }
 
+.text-small {
+  font-size: var(--font-size-small);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .metric-grid {

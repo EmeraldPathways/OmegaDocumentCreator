@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./auth/auth-context";
 import { AppShell } from "./components/app-shell";
+import { ErrorBoundary } from "./components/error-boundary";
 import { ToastProvider } from "./components/ui";
 import { ClientDataProvider } from "./data/client-data-context";
 import { useClientData } from "./data/client-data-context";
@@ -46,7 +47,8 @@ function RedirectIncomeProtectionClient() {
 function AppRoutes() {
   return (
     <AppShell>
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         <Route path="/" element={<Navigate replace to="/income-protection" />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/clients" element={<ClientsPage />} />
@@ -68,6 +70,7 @@ function AppRoutes() {
         />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
+      </ErrorBoundary>
     </AppShell>
   );
 }

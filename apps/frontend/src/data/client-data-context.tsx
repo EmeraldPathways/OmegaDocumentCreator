@@ -57,6 +57,9 @@ function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocume
 function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   return {
     ...client,
+    status: client.status ?? "Draft",
+    files: client.files ?? [],
+    generatedDocuments: client.generatedDocuments ?? [],
     documentDrafts: normalizeDocumentDrafts(client.documentDrafts),
   };
 }
