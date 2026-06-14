@@ -12,12 +12,12 @@ Version 1 is an internal office workflow tool for:
 - staff/admin role separation
 - client record management
 - Income Protection workflows
-- document generation
+- AI-assisted document generation
 - local file storage
 - audit logging
 - backups
 
-AI is explicitly out of scope for version 1.
+Version 1 now includes AI-backed draft generation for Income Protection documents with a seeded fallback when live AI is unavailable.
 
 ## Product Scope
 
@@ -53,7 +53,9 @@ The first core module is:
 - create and edit client records
 - complete Income Protection forms
 - upload client files
-- generate Word and PDF documents
+- generate AI-backed draft documents
+- review and edit generated document content
+- export Word and PDF documents from the generated preview
 - view client records and files they are permitted to access
 
 ## Technical Direction
@@ -65,8 +67,10 @@ The first core module is:
 - Database: PostgreSQL
 - File storage: local server filesystem
 - Auth: server-side cookie session auth
-- Document generation: DOCX template based
-- PDF generation: server-side DOCX-to-PDF
+- AI generation: Google Gemini (`gemini-2.0-flash`, `temperature=0.3`) with seeded fallback
+- Document composition: styled HTML preview reused for review and export
+- PDF generation: frontend HTML-to-PDF export
+- DOCX generation: frontend structured DOCX export
 - Deployment: Docker Compose
 
 ### Design direction
@@ -155,7 +159,7 @@ Important note:
 
 ### Stage 4
 
-Implemented in the current frontend workflow:
+Implemented in the live workflow:
 
 - `/income-protection` is the live workflow route
 - selected workflow client is managed inside the page, not in the route
@@ -174,41 +178,43 @@ Implemented in the current frontend workflow:
 
 Important note:
 
-- Stage 4 is complete as a frontend workflow shell.
-- the remaining gap is backend/file/document execution, not route/tab scaffolding.
+- Stage 4 is complete and now tied into real document-generation actions.
 
 ### Stages 5 to 17
 
-Stage 5 has now started in persisted frontend form:
+Stage 5 is implemented in persisted frontend form:
 
 - Fact Find renders all major sections
 - draft save is available from the tab
 - missing-field validation blocks final generation when essential fields are missing
 - draft values persist in browser storage through the shared client data store
+- AI-generated Fact Find drafts are saved back into client draft state
+- generated preview content can be edited inline before export
 
 Important note:
 
-- Stage 5 is still frontend/browser-persistence only.
-- backend persistence, autosave timers, and real generated files are not implemented yet.
+- draft persistence is still browser-backed, not database-backed.
 
-Stage 6 has now started in persisted frontend form:
+Stage 6 is implemented in persisted frontend form:
 
 - Terms of Business tab renders a draft tracking view
 - seeded values cover version, issued-by, delivery method, and notes
 - local issue status can be saved through the shared client data store
-- Terms PDF generation currently creates placeholder generated-document records only
+- Terms of Business AI generation now produces a styled preview
+- preview export creates generated-document history rows and files metadata
 
-Stage 7 has now started in persisted frontend form:
+Stage 7 is implemented in persisted frontend form:
 
 - Statement of Suitability tab renders a draft recommendation view
 - seeded values cover statement type, provider, product type, cover summary, and letter date
 - local document status can be saved through the shared client data store
-- generated files are still placeholder download records, not backend files
+- Statement of Suitability AI generation now produces a styled preview
+- preview export creates generated-document history rows and files metadata
 
 Important note:
 
-- Stages 6 and 7 are also frontend-only scaffold work.
-- real generation, file linkage, persistence, and validation are not implemented yet.
+- live draft generation exists through the backend `/documents/generate` endpoint.
+- generated history is still backed by seeded/browser data, not a database or filesystem store.
 
 Stage 8 has now started in persisted frontend form:
 
@@ -222,17 +228,17 @@ Important note:
 - Stage 8 is currently frontend-only scaffold work.
 - real uploads, local filesystem writes, folder creation, and backend file metadata persistence are not implemented yet.
 
-Stage 9 has now started in persisted frontend form:
+Stage 9 is implemented in persisted frontend form:
 
 - Generated Documents tab renders a generated-history view inside the Income Protection module
 - generated document records are listed with type, filename, version, status, and generated date
-- individual generated documents now have row-level download actions
+- individual generated documents have row-level download actions
+- history rows preserve the frozen preview HTML used for export
 - Download Document Pack is still a placeholder status action
 
 Important note:
 
-- Stage 9 is currently frontend-only scaffold work.
-- real DOCX/PDF generation, ZIP export, filesystem saves, backend document persistence, and audit logging are not implemented yet.
+- ZIP pack export, filesystem saves, and database-backed document persistence are not implemented yet.
 
 Stage 10 has now started in backend schema form:
 
@@ -302,16 +308,25 @@ Important note:
 - Stage 15 is currently a dashboard and module-entry UI slice only.
 - full UX refinement across long forms, progress indicators, autosave affordances, and broader responsive polish are not implemented yet.
 
-Stage 16 has now started in local-AI-readiness form:
+Stage 16 is implemented in live-AI configuration form:
 
 - frontend now has a real `Settings` page instead of sending `Settings` navigation back to `Login`
-- Settings now documents the approved future local-AI path with AI explicitly disabled in version 1
-- backend config and `.env.example` now reserve local-only AI settings for a later Ollama-based stage without enabling any AI runtime behavior
+- backend config now supports live AI generation settings
+- Gemini is the active provider path for document generation
+- frontend login now creates a real backend session cookie instead of only local browser state
 
 Important note:
 
-- Stage 16 does not enable AI features in version 1.
-- no model runner integration, embeddings pipeline, RAG indexing, or AI-assisted workflow actions are implemented.
+- local model runners, embeddings, RAG indexing, and broader AI assistants are still not implemented.
+
+Stage 17 is implemented in AI document generation form:
+
+- backend exposes `POST /documents/generate`
+- generation service builds prompts from workflow data and client context
+- Gemini-backed generation returns structured `title`, `summary`, `sections`, `warnings`, and `generated_html`
+- seeded fallback content is returned when AI is disabled, missing, or fails
+- generated drafts are saved into seeded client records so the latest version can be reopened
+- frontend preview/export flow reuses the composed styled document instead of plain field dumps
 
 ## Backend Details
 
@@ -362,14 +377,15 @@ Implemented now:
 - `POST /admin/users`
 - `PATCH /admin/users/{email}`
 - `PATCH /admin/users/{email}/disable`
+- `POST /documents/generate`
 
 Not yet implemented:
 
 - persistent DB-backed repositories
 - files endpoints
-- documents endpoints
+- documents download/save endpoints beyond generation
 - backup endpoints
-- Income Protection endpoints
+- dedicated Income Protection persistence endpoints
 
 ## Frontend Details
 
@@ -395,26 +411,25 @@ Not yet implemented:
 ### Current frontend pages
 
 - login page
-- settings page with editable saved app settings plus Stage 16 AI readiness guidance
+- settings page
 - clients page
 - client profile page with client-owned documents/files area
 - Income Protection workflow page on `/income-protection`
-- Fact Find workflow draft view inside the Income Protection module
-- Terms of Business draft view inside the Income Protection module
-- Statement of Suitability draft view inside the Income Protection module
+- Fact Find workflow draft view with AI generation, preview, edit, and export
+- Terms of Business draft view with AI generation, preview, edit, and export
+- Statement of Suitability draft view with AI generation, preview, edit, and export
 - Client Files draft view inside the Income Protection module
-- Generated Documents draft view inside the Income Protection module
+- Generated Documents history view with reopenable preview exports
 - client create page
 - client edit page
 - admin page
 
 ### Not yet implemented
 
-- API client integration
 - backend-backed persistence for the workflow/client state
 - autosave timers
 - real file upload/download APIs
-- real generated document APIs
+- real generated document storage/download APIs
 - real document pack ZIP download
 - backend-backed settings persistence
 
@@ -449,6 +464,19 @@ cd "apps/frontend"
 .\run-frontend.cmd
 ```
 
+Backend run command for this repo:
+
+```powershell
+cd "apps/api"
+.\run-api.cmd
+```
+
+Combined startup command from repo root:
+
+```powershell
+.\run-omega.cmd
+```
+
 This starts the Omega frontend with:
 
 - `apps/frontend/vite.run.config.ts`
@@ -461,6 +489,8 @@ Important note:
 - port `3000` may already be in use by a different local app on this machine
 - use `http://127.0.0.1:3001` for Omega Document Creator
 - `run-frontend.cmd` is the preferred local run path because it avoids the Vite cache/port confusion seen during setup
+- `run-api.cmd` is the preferred backend run path on `127.0.0.1:8000`
+- `run-omega.cmd` starts both frontend and backend in separate Windows shells
 
 Memory-first workflow note:
 
@@ -495,9 +525,9 @@ The biggest remaining gaps are:
 - no persisted Terms of Business workflow
 - no persisted Statement of Suitability workflow
 - no persisted file upload workflow
-- no document generation
+- no durable filesystem/database storage for generated documents
 - no real backups
-- no persisted generated-document history
+- generated-document history is not database-backed
 - no live remote-access infrastructure wiring
 
 ## Immediate Priorities
@@ -505,8 +535,8 @@ The biggest remaining gaps are:
 The correct next implementation order is:
 
 1. Replace browser-only client/workflow persistence with backend persistence
-2. Add real file uploads and client folder workflow
-3. Add real generated documents and download endpoints
+2. Add real generated-document storage and download endpoints
+3. Add real file uploads and client folder workflow
 4. Add audit logging on workflow/file/document actions
 5. Add backups
 
@@ -514,7 +544,6 @@ The correct next implementation order is:
 
 - Keep changes small and surgical
 - Match `AGENTS.md`
-- Do not introduce AI features in version 1
 - Prefer production-shaped code over demo shortcuts where feasible
 - Use the smallest relevant verification command after each slice
 - Use `apply_patch` for manual edits
@@ -539,12 +568,20 @@ Important variables:
 - `STAFF_EMAIL`
 - `STAFF_PASSWORD`
 - `PDF_CONVERTER_BIN`
+- `AI_ENABLED`
+- `AI_PROVIDER`
+- `AI_API_KEY`
+- `GEMINI_API_KEY`
+- `AI_MODEL`
+- `AI_TEMPERATURE`
 
 ## Important Files
 
 Backend:
 
 - `apps/api/app/main.py`
+- `apps/api/app/ai.py`
+- `apps/api/app/document_generation.py`
 - `apps/api/app/store.py`
 - `apps/api/app/security.py`
 - `apps/api/app/config.py`
@@ -559,6 +596,15 @@ Frontend:
 - `apps/frontend/src/auth/auth-context.tsx`
 - `apps/frontend/src/data/client-data-context.tsx`
 - `apps/frontend/src/data/seeded-clients.ts`
+- `apps/frontend/src/documents/document-api.ts`
+- `apps/frontend/src/documents/document-composer.ts`
+- `apps/frontend/src/documents/document-preview.tsx`
+- `apps/frontend/src/documents/document-templates.ts`
+- `apps/frontend/src/documents/document-types.ts`
+- `apps/frontend/src/documents/export-generated-document.ts`
+- `apps/frontend/src/documents/pdf-export.ts`
+- `apps/frontend/src/documents/template-picker.tsx`
+- `apps/frontend/src/documents/word-export.ts`
 - `apps/frontend/src/pages/clients-page.tsx`
 - `apps/frontend/src/pages/client-profile-page.tsx`
 - `apps/frontend/src/pages/client-form-page.tsx`
@@ -586,8 +632,9 @@ Frontend:
 - Stage 13: partially scaffolded with seeded backups
 - Stage 14: partially scaffolded with seeded security guidance
 - Stage 15: partially scaffolded in frontend dashboard/UI form
-- Stage 16: partially scaffolded in local-AI-readiness form
-- Stage 17+: not implemented
+- Stage 16: implemented with live Gemini-backed generation plus seeded fallback
+- Stage 17: implemented for AI document generation, preview, edit, and export flow
+- Later stages: not implemented
 
 ## Handoff
 
