@@ -8,10 +8,18 @@ export function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("admin@omega.local");
   const [password, setPassword] = useState("ChangeMe123!");
+  const [error, setError] = useState("");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    signIn(email);
+    setError("");
+
+    const didSignIn = await signIn(email, password);
+    if (!didSignIn) {
+      setError("Sign in failed");
+      return;
+    }
+
     navigate("/income-protection");
   }
 
@@ -32,6 +40,7 @@ export function LoginPage() {
           <button className="primary-action" type="submit">
             Sign In
           </button>
+          {error ? <p>{error}</p> : null}
         </form>
       </section>
     </div>

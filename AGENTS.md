@@ -123,3 +123,15 @@ Persist anything likely to save future time.
 - When the user says push to main, perform a one-pass workflow: stage only the task files, commit once with a clear message, and push HEAD to origin/main.
 - Leave unrelated local changes alone.
 - Include `PROJECT.md` only when the user explicitly asks for it.
+
+---
+
+## Local startup memory
+
+- Preferred local startup command: `run-omega.cmd` from the repo root.
+- This launches:
+  - frontend on `127.0.0.1:3001`
+  - backend on `127.0.0.1:8000`
+- Direct fallback commands:
+  - frontend: `apps\frontend\run-frontend.cmd`
+  - backend: `apps\api\run-api.cmd`

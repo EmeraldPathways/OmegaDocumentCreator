@@ -23,9 +23,10 @@ class AppSettings:
     local_ai_model: str = ""
     local_ai_embedding_model: str = ""
     ai_enabled: bool = False
-    ai_provider: str = "disabled"
+    ai_provider: str = "gemini"
     ai_api_key: str = ""
-    ai_model: str = ""
+    ai_model: str = "gemini-2.0-flash"
+    ai_temperature: float = 0.3
 
     def __post_init__(self) -> None:
         self.file_storage_path = Path(self.file_storage_path)
@@ -60,9 +61,10 @@ def get_settings(**overrides: str) -> AppSettings:
         "local_ai_embedding_model": overrides.get("LOCAL_AI_EMBEDDING_MODEL")
         or os.getenv("LOCAL_AI_EMBEDDING_MODEL", ""),
         "ai_enabled": ai_enabled_value.lower() == "true",
-        "ai_provider": overrides.get("AI_PROVIDER") or os.getenv("AI_PROVIDER", "disabled"),
-        "ai_api_key": overrides.get("AI_API_KEY") or os.getenv("AI_API_KEY", ""),
-        "ai_model": overrides.get("AI_MODEL") or os.getenv("AI_MODEL", ""),
+        "ai_provider": overrides.get("AI_PROVIDER") or os.getenv("AI_PROVIDER", "gemini"),
+        "ai_api_key": overrides.get("AI_API_KEY") or os.getenv("AI_API_KEY", os.getenv("GEMINI_API_KEY", "")),
+        "ai_model": overrides.get("AI_MODEL") or os.getenv("AI_MODEL", "gemini-2.0-flash"),
+        "ai_temperature": float(overrides.get("AI_TEMPERATURE") or os.getenv("AI_TEMPERATURE", "0.3")),
     }
     settings = AppSettings(**values)
     ensure_storage_directories(settings)

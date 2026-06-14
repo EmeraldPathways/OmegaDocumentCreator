@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -357,7 +358,7 @@ class ApiTests(unittest.TestCase):
         )
         self.assertIn("Jamie Murphy", client["generated_documents"][0]["preview_html"])
 
-    def test_logged_in_user_still_gets_seeded_fallback_when_ai_is_configured_without_provider_impl(self) -> None:
+    def test_logged_in_user_still_gets_seeded_fallback_when_ai_provider_is_unsupported(self) -> None:
         from app.main import settings
 
         self._login_as_staff()
@@ -368,9 +369,9 @@ class ApiTests(unittest.TestCase):
         original_ai_model = settings.ai_model
 
         settings.ai_enabled = True
-        settings.ai_provider = "gemini"
+        settings.ai_provider = "openai"
         settings.ai_api_key = "test-key"
-        settings.ai_model = "gemini-1.5-flash"
+        settings.ai_model = "gpt-5.5"
 
         try:
             response = self.client.post("/documents/generate", json=self._document_generation_payload())
@@ -384,3 +385,49 @@ class ApiTests(unittest.TestCase):
         payload = response.json()["item"]
         self.assertIn("Seeded fallback content", payload["warnings"][0])
         self.assertIn("Jamie Murphy", payload["generated_html"])
+
+    def test_logged_in_user_can_generate_document_via_gemini_provider(self) -> None:
+        from app.main import settings
+
+        self._login_as_staff()
+
+        original_ai_enabled = settings.ai_enabled
+        original_ai_provider = settings.ai_provider
+        original_ai_api_key = settings.ai_api_key
+        original_ai_model = settings.ai_model
+
+        settings.ai_enabled = True
+        settings.ai_provider = "gemini"
+        settings.ai_api_key = "test-key"
+        settings.ai_model = "gemini-2.0-flash"
+
+        parsed_response = Mock(
+            parsed={
+                "title": "Statement of Suitability for Jamie Murphy",
+                "summary": "AI-generated summary.",
+                "sections": [
+                    {"title": "Recommendation", "body": "Recommended cover is EUR2,500 monthly."},
+                    {"title": "Needs and objectives", "body": "Protect monthly income during illness."},
+                ],
+                "warnings": ["Check underwriting limits."],
+            }
+        )
+        mock_client = Mock()
+        mock_client.models.generate_content.return_value = parsed_response
+
+        try:
+            with patch("app.ai._create_gemini_client", return_value=mock_client):
+                response = self.client.post("/documents/generate", json=self._document_generation_payload())
+        finally:
+            settings.ai_enabled = original_ai_enabled
+            settings.ai_provider = original_ai_provider
+            settings.ai_api_key = original_ai_api_key
+            settings.ai_model = original_ai_model
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["summary"], "AI-generated summary.")
+        self.assertEqual(payload["sections"][0]["title"], "Recommendation")
+        self.assertIn("EUR2,500 monthly", payload["sections"][0]["bodyHtml"])
+        self.assertIn("Statement of Suitability for Jamie Murphy", payload["generated_html"])
+        self.assertEqual(payload["warnings"], ["Check underwriting limits."])

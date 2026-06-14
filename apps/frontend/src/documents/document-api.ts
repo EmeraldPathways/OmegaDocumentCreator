@@ -7,6 +7,9 @@ type GenerateDocumentRequest = {
   workflowSnapshot: Record<string, unknown>;
 };
 
+const DEMO_PASSWORD = "ChangeMe123!";
+const SESSION_STORAGE_KEY = "omega-session-user";
+
 type GenerateDocumentResponseItem = {
   title: string;
   summary: string;
@@ -109,7 +112,7 @@ export async function generateDocument({
   templateId,
   workflowSnapshot,
 }: GenerateDocumentRequest): Promise<GenerateDocumentResponseItem> {
-  const response = await fetch("/documents/generate", {
+  const requestInit: RequestInit = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -120,7 +123,16 @@ export async function generateDocument({
       template_id: templateId,
       workflow_snapshot: workflowSnapshot,
     }),
-  });
+  };
+
+  let response = await fetch("/documents/generate", requestInit);
+
+  if (response.status === 401) {
+    const reauthenticated = await tryRestoreApiSession();
+    if (reauthenticated) {
+      response = await fetch("/documents/generate", requestInit);
+    }
+  }
 
   if (!response.ok) {
     throw new Error(`Document generation failed with status ${response.status}`);
@@ -138,4 +150,37 @@ export async function generateDocument({
     warnings: payload.item.warnings ?? [],
     generatedHtml: sanitizeGeneratedHtml(payload.item.generated_html ?? ""),
   };
+}
+
+async function tryRestoreApiSession() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const storedValue = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (!storedValue) {
+    return false;
+  }
+
+  try {
+    const sessionUser = JSON.parse(storedValue) as { email?: string };
+    if (!sessionUser.email) {
+      return false;
+    }
+
+    const response = await fetch("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: sessionUser.email,
+        password: DEMO_PASSWORD,
+      }),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

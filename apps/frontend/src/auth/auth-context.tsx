@@ -1,5 +1,6 @@
 import {
   createContext,
+  useEffect,
   useContext,
   useMemo,
   useState,
@@ -16,7 +17,7 @@ type SessionUser = {
 type AuthContextValue = {
   isAdmin: boolean;
   isSignedIn: boolean;
-  signIn: (email: string) => void;
+  signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => void;
   user: SessionUser | null;
 };
@@ -64,21 +65,57 @@ function readStoredUser(): SessionUser | null {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
 
-  function signIn(email: string) {
+  async function signIn(email: string, password: string) {
     const role = resolveRole(email);
     if (!role) {
-      return;
+      return false;
+    }
+
+    const response = await fetch("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: normalizeEmail(email),
+        password,
+      }),
+    });
+
+    if (!response.ok) {
+      return false;
     }
 
     const nextUser = { email: normalizeEmail(email), role };
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
+    return true;
   }
 
   function signOut() {
+    void fetch("/auth/logout", {
+      method: "POST",
+    }).catch(() => undefined);
     window.sessionStorage.removeItem(STORAGE_KEY);
     setUser(null);
   }
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    void fetch("/auth/me").then((response) => {
+      if (response.ok) {
+        return;
+      }
+
+      if (response.status === 401) {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        setUser(null);
+      }
+    }).catch(() => undefined);
+  }, [user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
