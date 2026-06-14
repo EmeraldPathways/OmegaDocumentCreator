@@ -40,7 +40,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Omega Financial");
     expect(document.html).toContain("Recommended cover");
     expect(document.html).toContain("30000");
-    expect(document.html).toContain("Personal Income Protection");
+    expect(document.html).toContain("Income Protection Plan");
     expect(document.html).toContain("132");
     expect(document.html).toContain("2026-06-06");
     expect(document.html).toContain("Not confirmed");

@@ -43,7 +43,12 @@ export type SeededClientProfile = {
   updatedBy: string;
   townCity: string;
   county: string;
+  homeAddressLine1: string;
+  homeAddressLine2: string;
+  eircode: string;
+  generalNotes: string;
   partnerName: string;
+  partnerAddress: string;
   dependants: SeededDependant[];
   occupation: string;
   employmentStatus: string;
@@ -59,11 +64,13 @@ export type SeededClientProfile = {
   termsIssuedBy: string;
   termsClientReceived: string;
   termsClientReviewed: string;
+  termsIssuedDate: string;
   termsNotes: string;
   statementType: string;
   productType: string;
   letterDate: string;
   netMonthlyCost: string;
+  coverSummary: string;
   mortgageProtection: string;
   personalInsurance: string;
   keymanInsurance: string;
@@ -111,7 +118,12 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     updatedBy: "Omega Admin",
     townCity: "Dublin",
     county: "Dublin",
+    homeAddressLine1: "1 Main Street",
+    homeAddressLine2: "",
+    eircode: "D01 AB12",
+    generalNotes: "",
     partnerName: "Taylor Client",
+    partnerAddress: "",
     dependants: [],
     occupation: "",
     employmentStatus: "Employed",
@@ -127,11 +139,13 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsIssuedBy: "Omega Admin",
     termsClientReceived: "Pending confirmation",
     termsClientReviewed: "Pending confirmation",
+    termsIssuedDate: "",
     termsNotes: "Issue with Income Protection recommendation pack.",
-    statementType: "Personal Income Protection",
+    statementType: "",
     productType: "",
     letterDate: "2026-01-15",
     netMonthlyCost: "116",
+    coverSummary: "",
     mortgageProtection: "No",
     personalInsurance: "No",
     keymanInsurance: "No",
@@ -212,7 +226,12 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     updatedBy: "Office Staff",
     townCity: "Galway",
     county: "Galway",
+    homeAddressLine1: "15 Sea Road",
+    homeAddressLine2: "",
+    eircode: "H91 CD34",
+    generalNotes: "",
     partnerName: "",
+    partnerAddress: "",
     dependants: [{ name: "Ella Murphy", dateOfBirth: "2017-06-20", notes: "Child" }],
     occupation: "Project Analyst",
     employmentStatus: "Employed",
@@ -228,11 +247,13 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsIssuedBy: "Office Staff",
     termsClientReceived: "Pending confirmation",
     termsClientReviewed: "Pending confirmation",
+    termsIssuedDate: "2026-06-06",
     termsNotes: "Issue with Income Protection recommendation pack.",
-    statementType: "Personal Income Protection",
+    statementType: "Full Advice",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
     netMonthlyCost: "132",
+    coverSummary: "",
     mortgageProtection: "No",
     personalInsurance: "No",
     keymanInsurance: "No",

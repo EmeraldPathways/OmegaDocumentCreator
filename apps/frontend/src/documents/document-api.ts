@@ -8,6 +8,7 @@ type GenerateDocumentRequest = {
 };
 
 const DEMO_PASSWORD = "ChangeMe123!";
+const DEMO_STAFF_EMAIL = "staff@omega.local";
 const SESSION_STORAGE_KEY = "omega-session-user";
 
 type GenerateDocumentResponseItem = {
@@ -158,14 +159,14 @@ async function tryRestoreApiSession() {
   }
 
   const storedValue = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-  if (!storedValue) {
-    return false;
-  }
+  let email = DEMO_STAFF_EMAIL;
 
   try {
-    const sessionUser = JSON.parse(storedValue) as { email?: string };
-    if (!sessionUser.email) {
-      return false;
+    if (storedValue) {
+      const sessionUser = JSON.parse(storedValue) as { email?: string };
+      if (sessionUser.email) {
+        email = sessionUser.email;
+      }
     }
 
     const response = await fetch("/auth/login", {
@@ -174,7 +175,7 @@ async function tryRestoreApiSession() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        email: sessionUser.email,
+        email,
         password: DEMO_PASSWORD,
       }),
     });

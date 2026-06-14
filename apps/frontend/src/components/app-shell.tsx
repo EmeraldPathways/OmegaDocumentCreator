@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { PropsWithChildren } from "react";
-import { Users, Shield, Settings, Lock } from "lucide-react";
+import { Users, Shield, Settings, Lock, User, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 
@@ -13,52 +14,133 @@ const navItems = [
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate();
   const { isAdmin, isSignedIn, signOut, user } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const visibleNavItems = isAdmin ? [...navItems, { label: "Admin", to: "/admin", icon: Lock }] : navItems;
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/clients?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  }
+
+  const userInitial = user?.email?.[0]?.toUpperCase() ?? "?";
+  const userName = user?.email ?? "Guest";
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="header-row">
-          <div className="brand">
-            <span className="brand-mark">Omega</span>
-            <span className="brand-subtitle">Document Creator</span>
-          </div>
+          <NavLink className="brand" to="/">
+            <span className="brand-mark">Ω</span>
+            <span className="brand-text">
+              <span className="brand-title">Omega</span>
+              <span className="brand-subtitle">Document Creator</span>
+            </span>
+          </NavLink>
 
           <nav className="top-nav">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               return (
-                <NavLink key={item.label} className="nav-link" to={item.to}>
+                <NavLink
+                  key={item.label}
+                  className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+                  to={item.to}
+                >
                   <Icon size={18} />
-                  {item.label}
+                  <span>{item.label}</span>
                 </NavLink>
               );
             })}
           </nav>
 
-          <div className="header-search">
-            <input aria-label="Search clients" placeholder="Search clients" type="search" />
-          </div>
+          <form className="header-search" onSubmit={handleSearch}>
+            <input
+              aria-label="Search clients"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search clients"
+              type="search"
+              value={searchQuery}
+            />
+          </form>
 
           <div className="session-actions">
-            <span className="session-label">{isSignedIn ? user?.email : "Not signed in"}</span>
-            {isSignedIn ? (
+            <div className="user-menu" ref={userMenuRef}>
               <button
-                className="primary-action secondary-action"
-                onClick={() => {
-                  signOut();
-                  navigate("/income-protection");
-                }}
+                aria-expanded={isUserMenuOpen}
+                aria-haspopup="true"
+                className="user-menu-button"
+                onClick={() => setIsUserMenuOpen((open) => !open)}
                 type="button"
               >
-                Sign Out
+                <span className="user-avatar" aria-hidden="true">
+                  {userInitial}
+                </span>
+                <span className="hidden-mobile">{userName}</span>
+                <ChevronDown size={16} />
               </button>
-            ) : (
-              <button className="primary-action secondary-action" onClick={() => navigate("/login")} type="button">
-                Sign In
-              </button>
-            )}
+              {isUserMenuOpen ? (
+                <div className="user-menu-dropdown">
+                  <div className="user-menu-item" style={{ cursor: "default" }}>
+                    <User size={16} />
+                    <span>{userName}</span>
+                  </div>
+                  <div className="user-menu-divider" />
+                  <button
+                    className="user-menu-item"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      navigate("/settings");
+                    }}
+                    type="button"
+                  >
+                    <Settings size={16} />
+                    Settings
+                  </button>
+                  {isSignedIn ? (
+                    <button
+                      className="user-menu-item"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        signOut();
+                        navigate("/income-protection");
+                      }}
+                      type="button"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  ) : (
+                    <button
+                      className="user-menu-item"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        navigate("/login");
+                      }}
+                      type="button"
+                    >
+                      <LogOut size={16} />
+                      Sign In
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </header>

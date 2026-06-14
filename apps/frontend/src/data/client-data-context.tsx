@@ -25,6 +25,8 @@ type ClientDataContextValue = {
 };
 
 const STORAGE_KEY = "omega-client-records";
+const STORAGE_VERSION_KEY = "omega-client-records-version";
+const STORAGE_VERSION = "2";
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
 
 function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>) {
@@ -70,6 +72,13 @@ function readStoredClients() {
     return createSeededClientProfiles();
   }
 
+  const storedVersion = window.localStorage.getItem(STORAGE_VERSION_KEY);
+  if (storedVersion !== STORAGE_VERSION) {
+    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
+    return createSeededClientProfiles();
+  }
+
   const storedValue = window.localStorage.getItem(STORAGE_KEY);
   if (!storedValue) {
     return createSeededClientProfiles();
@@ -87,6 +96,7 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
   const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() => readStoredClients());
 
   useEffect(() => {
+    window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
   }, [clients]);
 

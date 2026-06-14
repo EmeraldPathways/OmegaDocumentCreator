@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./auth/auth-context";
 import { AppShell } from "./components/app-shell";
+import { ToastProvider } from "./components/ui";
 import { ClientDataProvider } from "./data/client-data-context";
 import { useClientData } from "./data/client-data-context";
 import { AdminPage } from "./pages/admin-page";
@@ -75,7 +76,9 @@ export function App() {
   return (
     <AuthProvider>
       <ClientDataProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </ClientDataProvider>
     </AuthProvider>
   );

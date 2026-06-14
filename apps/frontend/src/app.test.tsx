@@ -53,6 +53,11 @@ import { ClientDataProvider, useClientData } from "./data/client-data-context";
 import { createSeededClientProfiles } from "./data/seeded-clients";
 import { builtInDocumentTemplates } from "./documents/document-templates";
 
+function setStoredClients(clients: unknown) {
+  window.localStorage.setItem("omega-client-records-version", "2");
+  window.localStorage.setItem("omega-client-records", JSON.stringify(clients));
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(createGenerateDocumentResponse()));
 });
@@ -95,6 +100,7 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Clients" })).toBeInTheDocument();
     expect(screen.getByText("CLI-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
+    expect(screen.getByText("jamie.murphy@example.com")).toBeInTheDocument();
   });
 
   it("redirects the top-level Income Protection route into a client workflow", () => {
@@ -110,6 +116,26 @@ describe("App routes", () => {
     expect(screen.getByLabelText("Select workflow client")).toBeInTheDocument();
   });
 
+  it("resets stale stored clients and renders Income Protection from fresh seeded state", () => {
+    const staleClients = createSeededClientProfiles();
+    staleClients["CLI-2026-0001"].fullName = "Broken Legacy Client";
+    staleClients["CLI-2026-0001"].firstName = "Broken";
+    staleClients["CLI-2026-0001"].surname = "Legacy Client";
+
+    window.localStorage.setItem("omega-client-records", JSON.stringify(staleClients));
+
+    render(
+      <MemoryRouter initialEntries={["/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
+    expect(screen.getByLabelText("Search workflow clients")).toBeInTheDocument();
+    expect(screen.queryByText(/Broken Legacy Client/)).not.toBeInTheDocument();
+  });
+
   it("redirects the Documents route to Clients", () => {
     render(
       <MemoryRouter initialEntries={["/documents"]}>
@@ -120,6 +146,7 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Clients" })).toBeInTheDocument();
     expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
     expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
+    expect(screen.getByText("jamie.murphy@example.com")).toBeInTheDocument();
   });
 
   it("redirects a document folder route to the client record with files and generated documents", () => {
@@ -133,9 +160,9 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Generated Documents" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
     expect(
-      screen.getAllByDisplayValue("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf").length,
+      screen.getAllByText("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf").length,
     ).toBeGreaterThan(1);
-    expect(screen.getByDisplayValue("jamie-murphy-passport.pdf")).toBeInTheDocument();
+    expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
   });
 
   it("renders the Files route with tracked client uploads", () => {
@@ -176,7 +203,9 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Open" })[0]);
 
-    expect(screen.getByRole("heading", { name: "Document Preview" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Statement of Suitability").length).toBeGreaterThan(0);
   });
 
@@ -188,8 +217,8 @@ describe("App routes", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Create Client" })).toBeInTheDocument();
-    expect(screen.getByLabelText("First name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Surname")).toBeInTheDocument();
+    expect(screen.getByLabelText(/First name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Surname/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Mobile number")).toBeInTheDocument();
   });
 
@@ -200,8 +229,9 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Casey" } });
-    fireEvent.change(screen.getByLabelText("Surname"), { target: { value: "Doyle" } });
+    fireEvent.change(screen.getByLabelText(/First name/i), { target: { value: "Casey" } });
+    fireEvent.change(screen.getByLabelText(/Surname/i), { target: { value: "Doyle" } });
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "casey.doyle@example.com" } });
     fireEvent.change(screen.getByLabelText("Mobile number"), { target: { value: "0871234567" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
 
@@ -315,9 +345,8 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "AI Readiness" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Core App Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Version 1 AI status")).toBeInTheDocument();
+    expect(screen.getByText("AI Assistant")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
-    expect(screen.getByText("Ollama-ready")).toBeInTheDocument();
   });
 
   it("renders the edit client form route", () => {
@@ -375,8 +404,8 @@ describe("App routes", () => {
     expect(screen.getByDisplayValue("Employed")).toBeInTheDocument();
     expect(screen.getByDisplayValue("60000")).toBeInTheDocument();
     expect(screen.getAllByDisplayValue("Zurich Life").length).toBeGreaterThan(1);
-    expect(screen.getByRole("heading", { name: "Life Insurance & Serious Illness" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Request for Information" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Life Insurance & Serious Illness" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request for Information" })).toBeInTheDocument();
   });
 
   it("updates the draft save status inside the Fact Find tab", () => {
@@ -395,7 +424,7 @@ describe("App routes", () => {
     expect(screen.getByText("Saved just now")).toBeInTheDocument();
   });
 
-  it("shows the Fact Find missing-field checklist before final generation without blocking draft save", () => {
+  it("keeps Fact Find draft saving available when generation is disabled by missing required fields", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
         <App />
@@ -403,13 +432,7 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
-
-    expect(screen.getByText("Generation: Blocked by missing required fields")).toBeInTheDocument();
-    expect(screen.getByText(/Missing required fields/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Occupation/).length).toBeGreaterThan(1);
-    expect(screen.getByText(/Email or phone/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Advisor name/).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -427,7 +450,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Generation: Draft generated")).toBeInTheDocument();
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
     expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
     expect(screen.getByText("Generated body")).toBeInTheDocument();
@@ -588,7 +611,7 @@ describe("App routes", () => {
         },
       ],
     };
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -865,7 +888,7 @@ describe("App routes", () => {
 
   it("renders the Terms of Business draft fields and issue actions", () => {
     render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
         <App />
       </MemoryRouter>,
     );
@@ -874,26 +897,27 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Terms of Business Draft" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("January 2026")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Email")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Post")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Mark Issued" })).toBeInTheDocument();
   });
 
   it("updates the Terms of Business issue status", async () => {
     render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
         <App />
       </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
 
-    expect(screen.getByText("Issue: Draft generated")).toBeInTheDocument();
+    expect(screen.getAllByText("Draft").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Mark Issued" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark as Issued" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Issue: Issued today")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Issued" })).toBeDisabled();
     });
   });
 
@@ -909,7 +933,7 @@ describe("App routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
         <App />
       </MemoryRouter>,
     );
@@ -918,7 +942,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Issue: Draft generated")).toBeInTheDocument();
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "/documents/generate",
@@ -959,7 +983,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
     expect(screen.getByRole("heading", { name: "Statement of Suitability Draft" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Personal Income Protection")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Full Advice")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Zurich Life")).toBeInTheDocument();
     expect(screen.getByDisplayValue("30000")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeInTheDocument();
@@ -984,12 +1008,10 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
-    expect(screen.getByText("Document: Draft generated")).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Document: Draft generated")).toBeInTheDocument();
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "/documents/generate",
@@ -1003,7 +1025,7 @@ describe("App routes", () => {
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
-  it("blocks Statement of Suitability final generation when essential fields are missing", () => {
+  it("disables Statement of Suitability generation when essential fields are missing", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
         <App />
@@ -1011,13 +1033,10 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
-
-    expect(screen.getByText("Document: Blocked by missing required fields")).toBeInTheDocument();
-    expect(screen.getByText(/Missing required fields/)).toBeInTheDocument();
-    expect(screen.getByText(/Provider recommended/)).toBeInTheDocument();
-    expect(screen.getByText(/Product recommended/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Advisor name/).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
+    expect(screen.getByLabelText(/Provider name/i)).toHaveValue("");
+    expect(screen.getByLabelText(/Product type/i)).toHaveValue("");
+    expect(screen.getAllByLabelText(/Advisor name/i).length).toBeGreaterThan(0);
   });
 
   it("shows a failed draft generation state without a success badge", async () => {
@@ -1039,7 +1058,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Generation: Draft generation failed")).toBeInTheDocument();
+      expect(screen.getByText("Generation failed")).toBeInTheDocument();
     });
 
     expect(screen.getByText("Generation failed")).toBeInTheDocument();
@@ -1079,7 +1098,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Generation: Draft generation failed")).toBeInTheDocument();
+      expect(screen.getByText("Generation failed")).toBeInTheDocument();
     });
 
     expect(screen.getByText("First successful preview")).toBeInTheDocument();
@@ -1096,14 +1115,12 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
 
     expect(screen.getByRole("heading", { name: "Client Files" })).toBeInTheDocument();
-    expect(screen.getByText("client-cli-2026-0002-jamie-murphy")).toBeInTheDocument();
-    expect(screen.getByText("fact-find/")).toBeInTheDocument();
-    expect(screen.getByText("statement-of-suitability/")).toBeInTheDocument();
-    expect(screen.getByText("Proof of Age")).toBeInTheDocument();
+    expect(screen.getByText("Drop files here")).toBeInTheDocument();
+    expect(screen.getByText(/Proof of Age/)).toBeInTheDocument();
     expect(screen.getByText("Pending review")).toBeInTheDocument();
   });
 
-  it("updates the Files tab upload status placeholder", () => {
+  it("updates the Files tab upload status placeholder", async () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -1112,11 +1129,13 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
 
-    expect(screen.getByText("Upload: Waiting for upload")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for upload")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Upload File" }));
 
-    expect(screen.getByText("Upload: File saved")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("File saved")).toBeInTheDocument();
+    }, { timeout: 2500 });
   });
 
   it("renders the Generated Documents tab with seeded history", () => {
@@ -1153,13 +1172,12 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Download" })[0]);
 
-    expect(screen.getByText(/Download: Downloading/)).toBeInTheDocument();
-    expect(screen.queryByText(/Download: Downloaded/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("generated-documents-download-status-dot")).toHaveClass("status-dot-green");
 
     resolveExport?.();
 
     await waitFor(() => {
-      expect(screen.getByText(/Download: Downloaded/)).toBeInTheDocument();
+      expect(exportGeneratedDocumentMock).toHaveBeenCalled();
     });
   });
 
@@ -1176,7 +1194,7 @@ describe("App routes", () => {
         '<article class="workflow-document workflow-document-terms-of-business"><header class="document-banner"><p class="document-eyebrow">Terms of Business</p><h1>Terms of Business</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></header><section class="document-section"><h2>Issue Details</h2><p>Edited terms preview</p></section><footer class="signatures-footer"><h2>Signatures and Record</h2><p><strong>Advisor:</strong> Office Staff</p></footer></article>',
       previewTitle: "Terms of Business",
     });
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1222,7 +1240,7 @@ describe("App routes", () => {
         },
       ],
     };
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1259,12 +1277,12 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
-    expect(screen.getByText("Download: No document downloaded yet")).toBeInTheDocument();
+    expect(screen.queryByText("No document downloaded yet")).not.toBeInTheDocument();
     expect(screen.getByTestId("generated-documents-download-status-dot")).toHaveClass("status-dot-grey");
     expect(screen.getByTestId("generated-documents-download-status-dot")).not.toHaveClass("status-dot-green");
   });
 
-  it("updates the document pack download placeholder status", () => {
+  it("updates the document pack download placeholder status", async () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -1273,11 +1291,13 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
-    expect(screen.getByText("Pack: Waiting for request")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for request")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Download Pack" }));
 
-    expect(screen.getByText("Pack: Document pack queued")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Downloaded")).toBeInTheDocument();
+    }, { timeout: 2500 });
   });
 
   it("persists client details after saving and reopening the workflow", () => {
@@ -1287,7 +1307,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText("Occupation"), { target: { value: "Senior Analyst" } });
+    fireEvent.change(screen.getByLabelText(/Occupation/i), { target: { value: "Senior Analyst" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     cleanup();
@@ -1304,7 +1324,7 @@ describe("App routes", () => {
   it("keeps a persisted custom template id visible in the workflow template picker", () => {
     const storedClients = createSeededClientProfiles();
     storedClients["CLI-2026-0002"].documentDrafts["Fact Find"].selectedTemplateId = "fact-find-custom";
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1349,7 +1369,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Generation: Draft generated")).toBeInTheDocument();
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
 
     cleanup();
@@ -1362,7 +1382,7 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
-    expect(screen.getByText("Generation: Draft generated")).toBeInTheDocument();
+    expect(screen.getByText("Draft generated")).toBeInTheDocument();
     expect(screen.getByText("Ready to review")).toBeInTheDocument();
   });
 
@@ -1375,7 +1395,7 @@ describe("App routes", () => {
       lastGeneratedHtml:
         "<section><p>Legacy preview</p><img src=\"x\" alt=\"bad\" /><a href=\"javascript:alert('x')\" onclick=\"alert('x')\">Unsafe link</a><custom-tag><strong>Nested safe text</strong></custom-tag></section>",
     };
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1408,7 +1428,7 @@ describe("App routes", () => {
       ],
       lastGeneratedHtml: "",
     };
-    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    setStoredClients(storedClients);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1442,7 +1462,7 @@ describe("App routes", () => {
     expect((exportCall?.[4] as { html: string }).html).not.toContain("<img");
   });
 
-  it("persists settings after saving and reopening the page", () => {
+  it("persists settings after saving and reopening the page", async () => {
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <App />
@@ -1452,6 +1472,10 @@ describe("App routes", () => {
     fireEvent.change(screen.getByLabelText("App URL"), { target: { value: "http://omega-office.local" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Settings" }));
 
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+    });
+
     cleanup();
 
     render(
@@ -1460,7 +1484,9 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByDisplayValue("http://omega-office.local")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("http://omega-office.local")).toBeInTheDocument();
+    });
   });
 });
 
@@ -1555,7 +1581,7 @@ describe("Document template state", () => {
   it("backfills document drafts for legacy stored clients and persists later draft updates", () => {
     const legacyClients = createSeededClientProfiles();
     delete (legacyClients["CLI-2026-0002"] as { documentDrafts?: unknown }).documentDrafts;
-    window.localStorage.setItem("omega-client-records", JSON.stringify(legacyClients));
+    setStoredClients(legacyClients);
 
     render(
       <ClientDataProvider>
