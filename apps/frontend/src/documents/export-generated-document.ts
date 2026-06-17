@@ -3,6 +3,7 @@ import { sanitizeGeneratedHtml } from "./document-api";
 import { exportHtmlToPdf } from "./pdf-export";
 import { exportHtmlToWord } from "./word-export";
 import { buildWorkflowDocument, type WorkflowDocumentType } from "./workflow-document-builders";
+import { resolveDraftPreviewHtml } from "./document-preview";
 
 type ExportDocumentOverride = {
   html: string;
@@ -96,24 +97,37 @@ function resolveExportDocument(
   documentType: WorkflowDocumentType,
   override?: ExportDocumentArtifact,
 ) {
+  const sanitizedDraft = {
+    ...profile.documentDrafts[documentType],
+    lastGeneratedHtml: sanitizeGeneratedHtml(profile.documentDrafts[documentType]?.lastGeneratedHtml ?? ""),
+    lastGeneratedSections: (profile.documentDrafts[documentType]?.lastGeneratedSections ?? []).map((section) => ({
+      ...section,
+      bodyHtml: sanitizeGeneratedHtml(section.bodyHtml),
+    })),
+    editedHtml: sanitizeGeneratedHtml(profile.documentDrafts[documentType]?.editedHtml ?? ""),
+  };
   const sanitizedProfile = {
     ...profile,
     documentDrafts: {
       ...profile.documentDrafts,
-      [documentType]: {
-        ...profile.documentDrafts[documentType],
-        lastGeneratedHtml: sanitizeGeneratedHtml(profile.documentDrafts[documentType]?.lastGeneratedHtml ?? ""),
-        lastGeneratedSections: (profile.documentDrafts[documentType]?.lastGeneratedSections ?? []).map((section) => ({
-          ...section,
-          bodyHtml: sanitizeGeneratedHtml(section.bodyHtml),
-        })),
-      },
+      [documentType]: sanitizedDraft,
     },
   } satisfies SeededClientProfile;
   const composedDocument = buildWorkflowDocument(sanitizedProfile, documentType);
 
   if (!override) {
-    return composedDocument;
+    const draftPreviewHtml = resolveDraftPreviewHtml(sanitizedDraft);
+    if (!draftPreviewHtml) {
+      return composedDocument;
+    }
+
+    return {
+      title: documentType,
+      html:
+        draftPreviewHtml.includes("workflow-document") || !hasStructuredPreviewSections(draftPreviewHtml)
+          ? draftPreviewHtml
+          : mergePreviewSectionsIntoComposedHtml(composedDocument.html, draftPreviewHtml),
+    };
   }
 
   const sanitizedOverrideHtml = sanitizeGeneratedHtml(override.html);

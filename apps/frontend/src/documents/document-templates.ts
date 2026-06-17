@@ -43,18 +43,21 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      editedHtml: "",
     },
     "Terms of Business": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Terms of Business"],
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      editedHtml: "",
     },
     "Statement of Suitability": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Statement of Suitability"],
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      editedHtml: "",
     },
   };
 }

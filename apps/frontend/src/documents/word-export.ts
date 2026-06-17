@@ -1,4 +1,4 @@
-import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 
 export type WordExportBlock =
@@ -12,6 +12,7 @@ export type WordExportBlock =
   | { kind: "footerHeading"; text: string }
   | { kind: "paragraph"; text: string }
   | { kind: "bullet"; text: string }
+  | { kind: "image"; src: string; alt: string; width?: string }
   | { kind: "spacer" };
 
 function normalizeText(value: string | null | undefined) {
@@ -24,6 +25,83 @@ function textFromElement(element: Element | null | undefined) {
 
 function buildFallbackBlocks(html: string): WordExportBlock[] {
   return [{ kind: "paragraph", text: normalizeText(html.replace(/<[^>]+>/g, " ")) || "No content" }];
+}
+
+function normalizeImageWidth(width: string | null | undefined) {
+  const value = normalizeText(width);
+  if (!value) {
+    return 480;
+  }
+
+  if (value.endsWith("%")) {
+    const percent = Number.parseFloat(value);
+    if (!Number.isNaN(percent)) {
+      return Math.max(180, Math.min(520, Math.round((percent / 100) * 520)));
+    }
+  }
+
+  if (value.endsWith("px")) {
+    const pixels = Number.parseFloat(value);
+    if (!Number.isNaN(pixels)) {
+      return Math.max(180, Math.min(520, Math.round(pixels)));
+    }
+  }
+
+  const numeric = Number.parseFloat(value);
+  if (Number.isNaN(numeric)) {
+    return 480;
+  }
+
+  return Math.max(180, Math.min(520, Math.round(numeric)));
+}
+
+function parseDataUrlImage(src: string) {
+  const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const decoded = atob(match[2]);
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) {
+    bytes[index] = decoded.charCodeAt(index);
+  }
+
+  return {
+    data: bytes,
+    mimeType: match[1],
+  };
+}
+
+function buildImageParagraph(block: Extract<WordExportBlock, { kind: "image" }>) {
+  const parsedImage = parseDataUrlImage(block.src);
+  if (!parsedImage) {
+    return new Paragraph({
+      children: [new TextRun({ text: block.alt || "Embedded image omitted from export." })],
+      spacing: { after: 120 },
+    });
+  }
+
+  const width = normalizeImageWidth(block.width);
+  return new Paragraph({
+    children: [
+      new ImageRun({
+        data: parsedImage.data,
+        type: parsedImage.mimeType,
+        transformation: {
+          width,
+          height: Math.round(width * 0.6),
+        },
+        altText: {
+          title: block.alt,
+          description: block.alt,
+          name: block.alt || "Embedded image",
+        },
+      }),
+    ],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 160 },
+  });
 }
 
 function appendNestedContent(element: Element, blocks: WordExportBlock[]) {
@@ -47,6 +125,19 @@ function appendNestedContent(element: Element, blocks: WordExportBlock[]) {
         blocks.push({ kind: "bullet", text });
       }
     });
+    return;
+  }
+
+  if (tagName === "img") {
+    const src = element.getAttribute("src") ?? "";
+    if (src) {
+      blocks.push({
+        kind: "image",
+        src,
+        alt: element.getAttribute("alt") ?? "",
+        width: element.getAttribute("width") ?? element.getAttribute("style") ?? "",
+      });
+    }
     return;
   }
 
@@ -214,6 +305,8 @@ function createParagraphs(blocks: WordExportBlock[]) {
           indent: { left: 360 },
           spacing: { after: 60 },
         });
+      case "image":
+        return buildImageParagraph(block);
       case "spacer":
         return new Paragraph({
           children: [new TextRun("")],

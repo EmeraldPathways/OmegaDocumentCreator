@@ -37,12 +37,14 @@ function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocume
       ...defaultDrafts["Fact Find"],
       ...documentDrafts?.["Fact Find"],
       lastGeneratedSections: documentDrafts?.["Fact Find"]?.lastGeneratedSections ?? defaultDrafts["Fact Find"].lastGeneratedSections,
+      editedHtml: documentDrafts?.["Fact Find"]?.editedHtml ?? defaultDrafts["Fact Find"].editedHtml,
     },
     "Terms of Business": {
       ...defaultDrafts["Terms of Business"],
       ...documentDrafts?.["Terms of Business"],
       lastGeneratedSections:
         documentDrafts?.["Terms of Business"]?.lastGeneratedSections ?? defaultDrafts["Terms of Business"].lastGeneratedSections,
+      editedHtml: documentDrafts?.["Terms of Business"]?.editedHtml ?? defaultDrafts["Terms of Business"].editedHtml,
     },
     "Statement of Suitability": {
       ...defaultDrafts["Statement of Suitability"],
@@ -50,6 +52,7 @@ function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocume
       lastGeneratedSections:
         documentDrafts?.["Statement of Suitability"]?.lastGeneratedSections ??
         defaultDrafts["Statement of Suitability"].lastGeneratedSections,
+      editedHtml: documentDrafts?.["Statement of Suitability"]?.editedHtml ?? defaultDrafts["Statement of Suitability"].editedHtml,
     },
   };
 }

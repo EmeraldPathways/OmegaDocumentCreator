@@ -31,6 +31,15 @@ export function buildGeneratedPreviewHtml(sections: GeneratedDocumentSection[], 
     .join("");
 }
 
+export function resolveDraftPreviewHtml(draft: GeneratedDocumentDraft) {
+  const editedHtml = sanitizeGeneratedHtml(draft.editedHtml);
+  if (editedHtml) {
+    return editedHtml;
+  }
+
+  return buildGeneratedPreviewHtml(draft.lastGeneratedSections, draft.lastGeneratedHtml);
+}
+
 export function DocumentPreview({
   draft,
   emptyMessage = "No generated preview yet.",
@@ -39,7 +48,7 @@ export function DocumentPreview({
   statusLabel,
   templateLabel,
 }: DocumentPreviewProps) {
-  const previewHtml = buildGeneratedPreviewHtml(draft.lastGeneratedSections, draft.lastGeneratedHtml);
+  const previewHtml = resolveDraftPreviewHtml(draft);
 
   return (
     <section className="fact-find-section">

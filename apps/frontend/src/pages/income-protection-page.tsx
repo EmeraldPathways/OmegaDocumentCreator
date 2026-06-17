@@ -11,10 +11,10 @@ import {
   Upload,
   AlertTriangle,
   Check,
-  Search,
   Plus,
   Eye,
   RefreshCw,
+  Search,
   Send,
   Trash2,
   File,
@@ -25,8 +25,9 @@ import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
 import { generateDocument } from "../documents/document-api";
-import { buildGeneratedPreviewHtml, DocumentPreview } from "../documents/document-preview";
+import { buildGeneratedPreviewHtml } from "../documents/document-preview";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
+import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { builtInDocumentTemplates } from "../documents/document-templates";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
@@ -62,14 +63,6 @@ const employmentStatusOptions = [
   { value: "Student", label: "Student" },
   { value: "Homemaker", label: "Homemaker" },
   { value: "Other", label: "Other" },
-];
-
-const deliveryMethodOptions = [
-  { value: "", label: "Select delivery method" },
-  { value: "Email", label: "Email" },
-  { value: "Post", label: "Post" },
-  { value: "In-person", label: "In-person" },
-  { value: "Portal", label: "Portal" },
 ];
 
 const statementTypeOptions = [
@@ -274,13 +267,9 @@ export function IncomeProtectionPage() {
   const client = getClient(selectedClientReference);
   const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(moduleTabs[0].id);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
-  const [clientDetailsStatus, setClientDetailsStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [factFindDraftSavedLabel, setFactFindDraftSavedLabel] = useState("Not saved yet");
   const [factFindGenerationStatus, setFactFindGenerationStatus] = useState("Generation: Draft");
   const [showFactFindValidation, setShowFactFindValidation] = useState(false);
-  const [termsSaveStatus, setTermsSaveStatus] = useState("Not saved yet");
-  const [termsIssueStatus, setTermsIssueStatus] = useState("Issue: Draft");
-  const [showTermsIssueModal, setShowTermsIssueModal] = useState(false);
   const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
@@ -290,7 +279,9 @@ export function IncomeProtectionPage() {
   const [documentDownloadStatus, setDocumentDownloadStatus] = useState("Download: No document downloaded yet");
   const [fileFilter, setFileFilter] = useState("");
   const [previewDocument, setPreviewDocument] = useState<SeededGeneratedDocument | null>(null);
+  const factFindWorkspaceAccordion = useAccordionState(["fact-find-form"]);
   const factFindAccordion = useAccordionState(["personal-details"]);
+  const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
 
   useEffect(() => {
     setDraft(client ?? null);
@@ -301,7 +292,6 @@ export function IncomeProtectionPage() {
       return;
     }
     setFactFindGenerationStatus(getGenerationHeaderStatus("Generation", client.documentDrafts["Fact Find"].generationStatus));
-    setTermsIssueStatus(getGenerationHeaderStatus("Issue", client.documentDrafts["Terms of Business"].generationStatus));
     setStatementDocumentStatus(
       getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
     );
@@ -398,14 +388,6 @@ export function IncomeProtectionPage() {
     });
   }
 
-  async function saveClientDetails() {
-    setClientDetailsStatus("saving");
-    persistDraft(resolvedDraft);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setClientDetailsStatus("saved");
-    setTimeout(() => setClientDetailsStatus("idle"), 2000);
-  }
-
   function saveFactFindDraft() {
     persistDraft(resolvedDraft);
     setFactFindDraftSavedLabel("Saved just now");
@@ -479,6 +461,47 @@ export function IncomeProtectionPage() {
     } satisfies SeededClientFile;
   }
 
+  function updateGeneratedOutput(documentType: SupportedDocumentType, html: string) {
+    const nextHtml = html.trim();
+    saveGeneratedDraft(resolvedDraft.clientReference, documentType, { editedHtml: nextHtml });
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        documentDrafts: {
+          ...currentDraft.documentDrafts,
+          [documentType]: {
+            ...currentDraft.documentDrafts[documentType],
+            editedHtml: nextHtml,
+          },
+        },
+      };
+    });
+  }
+
+  async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
+    const previewArtifact = buildExportDocumentArtifact(resolvedDraft, documentType);
+    if (!previewArtifact.html) {
+      return;
+    }
+
+    const versionNumber = reserveGeneratedDocumentVersion(documentType);
+    const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
+    try {
+      await exportGeneratedDocument(resolvedDraft, documentType, extension, nextDocument.documentName, previewArtifact);
+      upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
+      upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
+      addToast(`${documentType} exported`, "success");
+    } catch {
+      addToast(`Failed to export ${documentType}`, "error");
+    } finally {
+      releaseGeneratedDocumentVersion(documentType, versionNumber);
+    }
+  }
+
   async function handleFactFindGenerate() {
     if (factFindMissingFields.length > 0) {
       setShowFactFindValidation(true);
@@ -500,6 +523,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
+        editedHtml: buildGeneratedPreviewHtml(generatedDocument.sections, generatedDocument.generatedHtml),
       });
       setFactFindGenerationStatus("Generation: Draft generated");
       addToast("Fact Find draft generated", "success");
@@ -508,49 +532,6 @@ export function IncomeProtectionPage() {
       setFactFindGenerationStatus("Generation: Draft generation failed");
       addToast("Failed to generate Fact Find draft", "error");
     }
-  }
-
-  function saveTermsDraft() {
-    persistDraft(resolvedDraft);
-    setTermsSaveStatus("Saved just now");
-  }
-
-  async function handleTermsGenerate() {
-    saveTermsDraft();
-    setTermsIssueStatus("Issue: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", { generationStatus: "generating" });
-    try {
-      const generatedDocument = await generateDocument({
-        clientReference: resolvedDraft.clientReference,
-        documentType: "Terms of Business",
-        templateId: getDocumentDraft("Terms of Business").selectedTemplateId,
-        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
-      });
-      saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", {
-        generationStatus: "completed",
-        lastGeneratedHtml: generatedDocument.generatedHtml,
-        lastGeneratedSections: generatedDocument.sections,
-      });
-      setTermsIssueStatus("Issue: Draft generated");
-      addToast("Terms of Business draft generated", "success");
-    } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, "Terms of Business", { generationStatus: "failed" });
-      setTermsIssueStatus("Issue: Draft generation failed");
-      addToast("Failed to generate Terms of Business draft", "error");
-    }
-  }
-
-  function markTermsIssued() {
-    const issuedDate = new Date().toISOString().slice(0, 10);
-    persistDraft({
-      ...resolvedDraft,
-      termsIssuedBy: actorLabel,
-      termsClientReceived: resolvedDraft.termsClientReceived || "Received",
-      termsIssuedDate: issuedDate,
-    });
-    setTermsIssueStatus("Issue: Issued today");
-    setShowTermsIssueModal(false);
-    addToast("Terms of Business marked as issued", "success");
   }
 
   function saveStatementDraft() {
@@ -579,6 +560,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
+        editedHtml: buildGeneratedPreviewHtml(generatedDocument.sections, generatedDocument.generatedHtml),
       });
       setStatementDocumentStatus("Document: Draft generated");
       addToast("Statement of Suitability draft generated", "success");
@@ -587,45 +569,6 @@ export function IncomeProtectionPage() {
       setStatementDocumentStatus("Document: Draft generation failed");
       addToast("Failed to generate Statement of Suitability draft", "error");
     }
-  }
-
-  function renderGeneratedDraftSnapshot(documentType: SupportedDocumentType) {
-    const draftState = getDocumentDraft(documentType);
-    const selectedTemplate = builtInDocumentTemplates.find((template) => template.id === draftState.selectedTemplateId);
-    const selectedTemplateLabel = selectedTemplate?.title ?? draftState.selectedTemplateId ?? "Template not selected";
-    const previewHtml = buildGeneratedPreviewHtml(draftState.lastGeneratedSections, draftState.lastGeneratedHtml);
-
-    async function handlePreviewExport(extension: "docx" | "pdf") {
-      if (!previewHtml) {
-        return;
-      }
-      const previewArtifact = buildExportDocumentArtifact(resolvedDraft, documentType, {
-        html: previewHtml,
-        title: documentType,
-      });
-      const versionNumber = reserveGeneratedDocumentVersion(documentType);
-      const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
-      try {
-        await exportGeneratedDocument(resolvedDraft, documentType, extension, nextDocument.documentName, previewArtifact);
-        upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
-        upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
-        addToast(`${documentType} exported`, "success");
-      } catch {
-        addToast(`Failed to export ${documentType}`, "error");
-      } finally {
-        releaseGeneratedDocumentVersion(documentType, versionNumber);
-      }
-    }
-
-    return (
-      <DocumentPreview
-        draft={draftState}
-        onExportDocx={() => void handlePreviewExport("docx")}
-        onExportPdf={() => void handlePreviewExport("pdf")}
-        statusLabel={getGeneratedDraftStatusLabel(draftState.generationStatus)}
-        templateLabel={selectedTemplateLabel}
-      />
-    );
   }
 
   async function handleUploadFile() {
@@ -711,7 +654,6 @@ export function IncomeProtectionPage() {
     toLower(file.originalFilename).includes(fileFilter.toLowerCase()),
   );
 
-  const isTermsIssued = hasValue(resolvedDraft.termsIssuedDate);
   const summaryContact = resolvedDraft.email || resolvedDraft.mobileNumber || "Not recorded";
 
   // Progress indicators per tab
@@ -746,161 +688,14 @@ export function IncomeProtectionPage() {
   }
 
   function renderTabPanel() {
-    if (activeTab.id === "client-details") {
-      return (
-        <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Client Details</h2>
-            </div>
-            <div className="page-actions">
-              <Button isLoading={clientDetailsStatus === "saving"} onClick={saveClientDetails} variant="primary">
-                <Save size={18} />
-                Save
-              </Button>
-              <span className="text-muted text-small flex items-center gap-2">
-                {clientDetailsStatus === "saved" ? <Check size={14} className="text-success" /> : null}
-                {clientDetailsStatus === "saved" ? "Saved" : "Unsaved changes"}
-              </span>
-            </div>
-          </div>
-
-          <section className="form-section">
-            <h3 className="form-section-title">Reusable client information</h3>
-            <div className="form-grid">
-              <Input
-                id="cd-firstName"
-                label={requiredLabel("First name")}
-                onChange={(event) => updateField("firstName", event.target.value)}
-                type="text"
-                value={resolvedDraft.firstName}
-              />
-              <Input
-                id="cd-surname"
-                label={requiredLabel("Surname")}
-                onChange={(event) => updateField("surname", event.target.value)}
-                type="text"
-                value={resolvedDraft.surname}
-              />
-              <Input
-                id="cd-email"
-                label={requiredLabel("Email")}
-                onChange={(event) => updateField("email", event.target.value)}
-                type="email"
-                value={resolvedDraft.email}
-              />
-              <Input
-                hint="Mobile or landline"
-                id="cd-phone"
-                label={requiredLabel("Phone")}
-                onChange={(event) => updateField("mobileNumber", event.target.value)}
-                type="tel"
-                value={resolvedDraft.mobileNumber}
-              />
-              <Input
-                id="cd-dob"
-                label={requiredLabel("Date of birth")}
-                onChange={(event) => updateField("dateOfBirth", event.target.value)}
-                type="date"
-                value={resolvedDraft.dateOfBirth}
-              />
-              <Input
-                id="cd-townCity"
-                label={requiredLabel("Town / City")}
-                onChange={(event) => updateField("townCity", event.target.value)}
-                type="text"
-                value={resolvedDraft.townCity}
-              />
-              <Input
-                id="cd-county"
-                label={requiredLabel("County")}
-                onChange={(event) => updateField("county", event.target.value)}
-                type="text"
-                value={resolvedDraft.county}
-              />
-              <Input
-                id="cd-occupation"
-                label={requiredLabel("Occupation")}
-                onChange={(event) => updateField("occupation", event.target.value)}
-                type="text"
-                value={resolvedDraft.occupation}
-              />
-              <Select
-                id="cd-employmentStatus"
-                label={requiredLabel("Employment status")}
-                onChange={(event) => updateField("employmentStatus", event.target.value)}
-                options={employmentStatusOptions}
-                value={resolvedDraft.employmentStatus}
-              />
-              <Input
-                hint="Annual gross income"
-                id="cd-income"
-                label={requiredLabel("Income")}
-                onBlur={(event) => updateField("income", formatCurrency(event.target.value))}
-                onChange={(event) => updateField("income", event.target.value)}
-                prefix="£"
-                step="0.01"
-                type="number"
-                value={resolvedDraft.income}
-              />
-              <Input
-                id="cd-provider"
-                label="Provider"
-                onChange={(event) => updateField("provider", event.target.value)}
-                type="text"
-                value={resolvedDraft.provider}
-              />
-              <Input
-                id="cd-advisorName"
-                label={requiredLabel("Advisor name")}
-                onChange={(event) => updateField("advisorName", event.target.value)}
-                type="text"
-                value={resolvedDraft.advisorName}
-              />
-            </div>
-          </section>
-        </div>
-      );
-    }
-
     if (activeTab.id === "fact-find") {
       const factFindDraft = getDocumentDraft("Fact Find");
-      const isGenerated = factFindDraft.generationStatus === "completed";
 
       return (
         <div className="page-stack">
           <div className="page-heading page-heading-compact">
             <div>
               <h2>Fact Find Draft</h2>
-            </div>
-            <div className="page-actions">
-              <TemplatePicker
-                documentType="Fact Find"
-                onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Fact Find", templateId)}
-                selectedTemplateId={factFindDraft.selectedTemplateId}
-              />
-              <Button onClick={saveFactFindDraft} variant="secondary">
-                <Save size={18} />
-                Save
-              </Button>
-              <span className="text-muted text-small">
-                {factFindDraftSavedLabel}
-              </span>
-              <Button
-                disabled={factFindMissingFields.length > 0}
-                onClick={handleFactFindGenerate}
-                variant="primary"
-              >
-                <FileDown size={18} />
-                Generate Draft
-              </Button>
-              <span
-                className={`status-dot ${getDraftStatusDotClass(factFindDraft.generationStatus)}`}
-                data-testid="fact-find-generation-status-dot"
-              />
-              <Badge variant={isGenerated ? "saved" : "draft"}>
-                {isGenerated ? "Draft generated" : "Draft not generated"}
-              </Badge>
             </div>
           </div>
 
@@ -911,9 +706,21 @@ export function IncomeProtectionPage() {
             </div>
           ) : null}
 
-          {renderGeneratedDraftSnapshot("Fact Find")}
-
           <Accordion>
+            <AccordionItem
+              indicator={tabProgress["fact-find"]}
+              isOpen={factFindWorkspaceAccordion.isOpen("fact-find-form")}
+              onToggle={() => factFindWorkspaceAccordion.toggle("fact-find-form")}
+              title="Fact Find Form"
+            >
+              <div className="generated-output-section-heading">
+                <Button onClick={saveFactFindDraft} variant="secondary">
+                  <Save size={16} />
+                  Save
+                </Button>
+                <span className="text-muted text-small">{factFindDraftSavedLabel}</span>
+              </div>
+              <Accordion>
             <AccordionItem
               indicator={getSectionProgress([resolvedDraft.fullName, resolvedDraft.dateOfBirth, resolvedDraft.email, resolvedDraft.mobileNumber, resolvedDraft.maritalStatus])}
               isOpen={factFindAccordion.isOpen("personal-details")}
@@ -1358,165 +1165,47 @@ export function IncomeProtectionPage() {
                 />
               </div>
             </AccordionItem>
+              </Accordion>
+            </AccordionItem>
+            <AccordionItem
+              indicator={getGeneratedDraftStatusLabel(factFindDraft.generationStatus)}
+              isOpen={factFindWorkspaceAccordion.isOpen("fact-find-output")}
+              onToggle={() => factFindWorkspaceAccordion.toggle("fact-find-output")}
+              title="Generated Output"
+            >
+              <GeneratedOutputWorkspace
+                draft={factFindDraft}
+                generateDisabled={factFindMissingFields.length > 0}
+                onContentChange={(html) => updateGeneratedOutput("Fact Find", html)}
+                onExportDocx={() => void handleGeneratedOutputExport("Fact Find", "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport("Fact Find", "pdf")}
+                onGenerate={() => void handleFactFindGenerate()}
+                statusDotClass={getDraftStatusDotClass(factFindDraft.generationStatus)}
+                statusDotTestId="fact-find-generation-status-dot"
+                statusLabel={factFindGenerationStatus.replace("Generation: ", "")}
+                templatePicker={
+                  <TemplatePicker
+                    documentType="Fact Find"
+                    onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Fact Find", templateId)}
+                    selectedTemplateId={factFindDraft.selectedTemplateId}
+                  />
+                }
+              />
+            </AccordionItem>
           </Accordion>
         </div>
       );
     }
 
 
-    if (activeTab.id === "terms-of-business") {
-      const termsDraft = getDocumentDraft("Terms of Business");
-      const isGenerated = termsDraft.generationStatus === "completed";
-
-      return (
-        <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Terms of Business Draft</h2>
-            </div>
-            <div className="page-actions">
-              <TemplatePicker
-                documentType="Terms of Business"
-                onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Terms of Business", templateId)}
-                selectedTemplateId={termsDraft.selectedTemplateId}
-              />
-              <Button onClick={saveTermsDraft} variant="secondary">
-                <Save size={18} />
-                Save
-              </Button>
-              <span className="text-muted text-small">
-                {termsSaveStatus}
-              </span>
-              <Button onClick={handleTermsGenerate} variant="primary">
-                <FileDown size={18} />
-                Generate Draft
-              </Button>
-              <Button disabled={isTermsIssued} onClick={() => setShowTermsIssueModal(true)} variant="secondary">
-                <Check size={18} />
-                {isTermsIssued ? "Issued" : "Mark Issued"}
-              </Button>
-              <Badge variant={isGenerated ? "saved" : "draft"}>
-                {termsIssueStatus.replace("Issue: ", "")}
-              </Badge>
-            </div>
-          </div>
-
-          {renderGeneratedDraftSnapshot("Terms of Business")}
-
-          <section className="form-section">
-            <h3 className="form-section-title">Terms of Business</h3>
-            <div className="form-grid">
-              <Input
-                id="tob-termsVersion"
-                label="Terms version"
-                onChange={(event) => updateField("termsVersion", event.target.value)}
-                type="text"
-                value={resolvedDraft.termsVersion}
-              />
-              <Input
-                id="tob-termsIssuedBy"
-                label="Issued by"
-                onChange={(event) => updateField("termsIssuedBy", event.target.value)}
-                type="text"
-                value={resolvedDraft.termsIssuedBy}
-              />
-              <Select
-                id="tob-termsDeliveryMethod"
-                label="Delivery method"
-                onChange={(event) => updateField("termsDeliveryMethod", event.target.value)}
-                options={deliveryMethodOptions}
-                value={resolvedDraft.termsDeliveryMethod}
-              />
-              <Input
-                id="tob-termsIssuedDate"
-                label="Issued date"
-                onChange={(event) => updateField("termsIssuedDate", event.target.value)}
-                type="date"
-                value={resolvedDraft.termsIssuedDate}
-              />
-              <Toggle
-                checked={toLower(resolvedDraft.termsClientReceived).startsWith("y") || toLower(resolvedDraft.termsClientReceived) === "received"}
-                id="tob-termsClientReceived"
-                label="Client received terms"
-                onChange={(event) => updateField("termsClientReceived", event.target.checked ? "Received" : "Pending confirmation")}
-              />
-              <Toggle
-                checked={toLower(resolvedDraft.termsClientReviewed).startsWith("y")}
-                id="tob-termsClientReviewed"
-                label="Client reviewed terms"
-                onChange={(event) => updateField("termsClientReviewed", event.target.checked ? "Reviewed" : "Pending confirmation")}
-              />
-              <Textarea
-                className="form-grid-full"
-                id="tob-termsNotes"
-                label="Notes"
-                onChange={(event) => updateField("termsNotes", event.target.value)}
-                rows={4}
-                value={resolvedDraft.termsNotes}
-              />
-            </div>
-          </section>
-
-          <Modal
-            footer={
-              <>
-                <Button onClick={() => setShowTermsIssueModal(false)} variant="secondary">
-                  Cancel
-                </Button>
-                <Button onClick={markTermsIssued} variant="primary">
-                  Mark as Issued
-                </Button>
-              </>
-            }
-            isOpen={showTermsIssueModal}
-            onClose={() => setShowTermsIssueModal(false)}
-            title="Mark Terms of Business as Issued"
-          >
-            <p>Mark this Terms of Business as issued to the client?</p>
-            <p className="text-muted" style={{ marginTop: "var(--space-3)" }}>
-              This will record today&apos;s date and cannot be undone.
-            </p>
-          </Modal>
-        </div>
-      );
-    }
-
     if (activeTab.id === "statement-of-suitability") {
       const statementDraft = getDocumentDraft("Statement of Suitability");
-      const isGenerated = statementDraft.generationStatus === "completed";
 
       return (
         <div className="page-stack">
           <div className="page-heading page-heading-compact">
             <div>
               <h2>Statement of Suitability Draft</h2>
-            </div>
-            <div className="page-actions">
-              <TemplatePicker
-                documentType="Statement of Suitability"
-                onChange={(templateId) =>
-                  updateSelectedTemplate(resolvedDraft.clientReference, "Statement of Suitability", templateId)
-                }
-                selectedTemplateId={statementDraft.selectedTemplateId}
-              />
-              <Button onClick={saveStatementDraft} variant="secondary">
-                <Save size={18} />
-                Save
-              </Button>
-              <span className="text-muted text-small">
-                {statementSaveStatus}
-              </span>
-              <Button
-                disabled={statementMissingFields.length > 0}
-                onClick={handleStatementGenerate}
-                variant="primary"
-              >
-                <FileDown size={18} />
-                Generate Draft
-              </Button>
-              <Badge variant={isGenerated ? "saved" : "draft"}>
-                {statementDocumentStatus.replace("Document: ", "")}
-              </Badge>
             </div>
           </div>
 
@@ -1527,11 +1216,23 @@ export function IncomeProtectionPage() {
             </div>
           ) : null}
 
-          {renderGeneratedDraftSnapshot("Statement of Suitability")}
-
-          <section className="form-section">
-            <h3 className="form-section-title">Recommendation basics</h3>
-            <div className="form-grid">
+          <Accordion>
+            <AccordionItem
+              indicator={tabProgress["statement-of-suitability"]}
+              isOpen={statementWorkspaceAccordion.isOpen("statement-form")}
+              onToggle={() => statementWorkspaceAccordion.toggle("statement-form")}
+              title="Statement Form"
+            >
+              <div className="generated-output-section-heading">
+                <Button onClick={saveStatementDraft} variant="secondary">
+                  <Save size={16} />
+                  Save
+                </Button>
+                <span className="text-muted text-small">{statementSaveStatus}</span>
+              </div>
+              <section className="form-section">
+                <h3 className="form-section-title">Recommendation basics</h3>
+                <div className="form-grid">
               <Input
                 id="sos-letterDate"
                 label={requiredLabel("Letter date")}
@@ -1627,6 +1328,33 @@ export function IncomeProtectionPage() {
               />
             </div>
           </section>
+            </AccordionItem>
+            <AccordionItem
+              indicator={getGeneratedDraftStatusLabel(statementDraft.generationStatus)}
+              isOpen={statementWorkspaceAccordion.isOpen("statement-output")}
+              onToggle={() => statementWorkspaceAccordion.toggle("statement-output")}
+              title="Generated Output"
+            >
+              <GeneratedOutputWorkspace
+                draft={statementDraft}
+                generateDisabled={statementMissingFields.length > 0}
+                onContentChange={(html) => updateGeneratedOutput("Statement of Suitability", html)}
+                onExportDocx={() => void handleGeneratedOutputExport("Statement of Suitability", "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport("Statement of Suitability", "pdf")}
+                onGenerate={() => void handleStatementGenerate()}
+                statusLabel={statementDocumentStatus.replace("Document: ", "")}
+                templatePicker={
+                  <TemplatePicker
+                    documentType="Statement of Suitability"
+                    onChange={(templateId) =>
+                      updateSelectedTemplate(resolvedDraft.clientReference, "Statement of Suitability", templateId)
+                    }
+                    selectedTemplateId={statementDraft.selectedTemplateId}
+                  />
+                }
+              />
+            </AccordionItem>
+          </Accordion>
         </div>
       );
     }
@@ -1860,28 +1588,31 @@ export function IncomeProtectionPage() {
                 <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
               </div>
             </div>
+          </div>
+
+          <div className="workflow-header-grid">
             <div className="workflow-header-actions">
               <div className="workflow-client-field">
-              <label className="field-label" htmlFor="client-select">
-                Select workflow client
-              </label>
-              <select
-                className="field-input field-select"
-                id="client-select"
-                onChange={(event) => {
-                  if (event.target.value) {
-                    setSelectedClientReference(event.target.value);
-                    window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
-                  }
-                }}
-                value={resolvedDraft.clientReference}
-              >
-                {clients.map((entry) => (
-                  <option key={entry.clientReference} value={entry.clientReference}>
-                    {entry.fullName} ({entry.clientReference})
-                  </option>
-                ))}
-              </select>
+                <label className="field-label" htmlFor="client-select">
+                  Select workflow client
+                </label>
+                <select
+                  className="field-input field-select"
+                  id="client-select"
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      setSelectedClientReference(event.target.value);
+                      window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
+                    }
+                  }}
+                  value={resolvedDraft.clientReference}
+                >
+                  {clients.map((entry) => (
+                    <option key={entry.clientReference} value={entry.clientReference}>
+                      {entry.fullName} ({entry.clientReference})
+                    </option>
+                  ))}
+                </select>
               </div>
               <Link className="btn btn-secondary" to="/clients/new">
                 <Plus size={18} />
@@ -1891,28 +1622,28 @@ export function IncomeProtectionPage() {
                 Edit Client
               </Link>
             </div>
-          </div>
 
-          <div className="workflow-summary-bar">
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Client</span>
-              <strong>{resolvedDraft.fullName}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Reference</span>
-              <strong>{resolvedDraft.clientReference}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">DOB</span>
-              <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Contact</span>
-              <strong>{summaryContact}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Occupation</span>
-              <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
+            <div className="workflow-summary-bar">
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Client</span>
+                <strong>{resolvedDraft.fullName}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Reference</span>
+                <strong>{resolvedDraft.clientReference}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">DOB</span>
+                <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Contact</span>
+                <strong>{summaryContact}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Occupation</span>
+                <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
+              </div>
             </div>
           </div>
         </section>

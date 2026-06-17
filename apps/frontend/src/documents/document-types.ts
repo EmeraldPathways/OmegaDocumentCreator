@@ -22,6 +22,7 @@ export type GeneratedDocumentDraft = {
   generationStatus: GeneratedDocumentDraftStatus;
   lastGeneratedHtml: string;
   lastGeneratedSections: GeneratedDocumentSection[];
+  editedHtml: string;
 };
 
 export type ComposedBlock =

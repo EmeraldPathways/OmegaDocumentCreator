@@ -97,6 +97,10 @@ function elementStyles(sourceElement: Element) {
     return "margin:0 0 10px;line-height:1.6;white-space:pre-wrap";
   }
 
+  if (tagName === "img") {
+    return "display:block;max-width:100%;height:auto;margin:16px auto;border-radius:10px";
+  }
+
   if (tagName === "ul" || tagName === "ol") {
     return "margin:0 0 10px;padding-left:22px";
   }
@@ -132,9 +136,27 @@ function cloneStyledNode(sourceNode: Node, targetDocument: Document, addBlockCla
   const sourceElement = sourceNode as Element;
   const targetElement = targetDocument.createElement(sourceElement.tagName.toLowerCase());
   const styleValue = elementStyles(sourceElement);
+  const className = sourceElement.getAttribute("class");
+  const sourceStyle = sourceElement.getAttribute("style");
+  const sourceAttributes = ["alt", "height", "src", "title", "width"];
+
+  if (className) {
+    targetElement.setAttribute("class", className);
+  }
+
+  sourceAttributes.forEach((attributeName) => {
+    const value = sourceElement.getAttribute(attributeName);
+    if (value) {
+      targetElement.setAttribute(attributeName, value);
+    }
+  });
 
   if (styleValue) {
     targetElement.setAttribute("style", appendStyle(targetElement.getAttribute("style"), styleValue));
+  }
+
+  if (sourceStyle) {
+    targetElement.setAttribute("style", appendStyle(targetElement.getAttribute("style"), sourceStyle));
   }
 
   if (addBlockClass && isPdfBlock(sourceElement)) {

@@ -47,24 +47,31 @@ export function sanitizeGeneratedHtml(html: string) {
   const sanitizedDocument = document.implementation.createHTMLDocument("");
   const allowedTags = new Set([
     "article",
+    "aside",
     "blockquote",
     "br",
     "div",
     "em",
+    "footer",
+    "header",
     "h1",
     "h2",
     "h3",
     "h4",
     "h5",
     "h6",
+    "img",
     "li",
     "ol",
     "p",
     "section",
+    "span",
     "strong",
     "ul",
   ]);
   const blockedTags = new Set(["iframe", "object", "script", "style", "svg", "template"]);
+  const allowedAttributes = new Set(["alt", "class", "height", "src", "style", "title", "width"]);
+  const allowedImageProtocols = ["data:", "blob:", "http:", "https:"];
 
   function appendSanitizedNode(sourceNode: ChildNode, targetNode: Node) {
     if (sourceNode.nodeType === Node.TEXT_NODE) {
@@ -88,7 +95,29 @@ export function sanitizeGeneratedHtml(html: string) {
       return;
     }
 
+    if (tagName === "img") {
+      const sourceValue = sourceElement.getAttribute("src")?.trim() ?? "";
+      if (!allowedImageProtocols.some((protocol) => sourceValue.startsWith(protocol))) {
+        return;
+      }
+    }
+
     const sanitizedElement = sanitizedDocument.createElement(tagName);
+    Array.from(sourceElement.attributes).forEach((attribute) => {
+      const attributeName = attribute.name.toLowerCase();
+      if (!allowedAttributes.has(attributeName)) {
+        return;
+      }
+
+      if (attributeName === "src") {
+        const value = attribute.value.trim();
+        if (!allowedImageProtocols.some((protocol) => value.startsWith(protocol))) {
+          return;
+        }
+      }
+
+      sanitizedElement.setAttribute(attributeName, attribute.value);
+    });
     sourceElement.childNodes.forEach((child) => appendSanitizedNode(child, sanitizedElement));
     targetNode.appendChild(sanitizedElement);
   }

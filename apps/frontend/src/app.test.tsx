@@ -497,14 +497,14 @@ describe("App routes", () => {
     await waitFor(() => {
       expect(screen.getByText("Generated body")).toBeInTheDocument();
     });
-
-    fireEvent.change(screen.getByLabelText("Summary content"), {
-      target: { value: "<p>Edited preview content</p>" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("Edited preview content")).toBeInTheDocument();
-    });
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    storedAfterGenerate["CLI-2026-0002"].documentDrafts!["Fact Find"].editedHtml = "<p>Edited preview content</p>";
+    setStoredClients(storedAfterGenerate);
 
     cleanup();
 
@@ -516,7 +516,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
-    expect(screen.getByDisplayValue("<p>Edited preview content</p>")).toBeInTheDocument();
     expect(screen.getByText("Edited preview content")).toBeInTheDocument();
   });
 
@@ -533,10 +532,23 @@ describe("App routes", () => {
     await waitFor(() => {
       expect(screen.getByText("Generated body")).toBeInTheDocument();
     });
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    storedAfterGenerate["CLI-2026-0002"].documentDrafts!["Fact Find"].editedHtml = "<p>Edited preview export</p>";
+    setStoredClients(storedAfterGenerate);
+    cleanup();
 
-    fireEvent.change(screen.getByLabelText("Summary content"), {
-      target: { value: "<p>Edited preview export</p>" },
-    });
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
     fireEvent.click(screen.getByRole("button", { name: "Export PDF" }));
 
     const exportCall = exportGeneratedDocumentMock.mock.calls[0];
@@ -550,7 +562,7 @@ describe("App routes", () => {
         html: expect.stringContaining("Edited preview export"),
       }),
     );
-    expect((exportCall?.[4] as { html: string }).html).toContain('class="workflow-document workflow-document-fact-find"');
+    expect((exportCall?.[4] as { html: string }).html).toBe("<p>Edited preview export</p>");
   });
 
   it("records generated-document and file history when exporting from the preview panel", async () => {
@@ -878,7 +890,7 @@ describe("App routes", () => {
       expect(screen.getByText("Safe preview")).toBeInTheDocument();
     });
 
-    const preview = screen.getByRole("heading", { name: "Generated preview" }).closest("section");
+    const preview = screen.getByText("Safe preview").closest(".generated-output-editor-frame");
     expect(preview?.querySelector("script")).toBeNull();
     expect(preview?.querySelector("[onclick]")).toBeNull();
     expect(preview?.querySelector("svg")).toBeNull();
@@ -952,6 +964,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+    fireEvent.click(screen.getByRole("button", { name: /Generated Output/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Draft generated")).toBeInTheDocument();
@@ -964,7 +977,7 @@ describe("App routes", () => {
     );
     expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
     expect(screen.getByText("Recommendation")).toBeInTheDocument();
-    expect(screen.getByText("Statement recommendation copy.")).toBeInTheDocument();
+    expect(screen.getByText(/Statement recommendation copy/)).toBeInTheDocument();
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
@@ -1258,7 +1271,7 @@ describe("App routes", () => {
 
     expect(screen.getByLabelText("Fact Find template")).toHaveValue("fact-find-custom");
     expect(screen.getByRole("option", { name: "fact-find-custom" })).toBeInTheDocument();
-    expect(screen.getAllByText("fact-find-custom")).toHaveLength(2);
+    expect(screen.getAllByText("fact-find-custom")).toHaveLength(1);
   });
 
   it("clears county when the request information address is reduced to one part or emptied", () => {
@@ -1631,7 +1644,7 @@ describe("Generated document export", () => {
       true,
     );
 
-    expect(styledHtml).toContain('class="pdf-block"');
+    expect(styledHtml).toContain("pdf-block");
     expect(styledHtml).toContain("grid-template-columns:repeat(2,minmax(0,1fr))");
     expect(styledHtml).toContain("background:#fff6e6");
     expect(styledHtml).toContain("border-top:2px solid #5b2230");
