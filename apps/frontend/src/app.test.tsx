@@ -112,8 +112,8 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
-    expect(screen.getByLabelText("Search workflow clients")).toBeInTheDocument();
     expect(screen.getByLabelText("Select workflow client")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Search workflow clients")).not.toBeInTheDocument();
   });
 
   it("resets stale stored clients and renders Income Protection from fresh seeded state", () => {
@@ -132,8 +132,8 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
-    expect(screen.getByLabelText("Search workflow clients")).toBeInTheDocument();
     expect(screen.queryByText(/Broken Legacy Client/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Search workflow clients")).not.toBeInTheDocument();
   });
 
   it("redirects the Documents route to Clients", () => {
@@ -370,23 +370,39 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add Client" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Search workflow clients")).toBeInTheDocument();
     expect(screen.getByLabelText("Select workflow client")).toHaveValue("CLI-2026-0002");
+    expect(screen.queryByLabelText("Search workflow clients")).not.toBeInTheDocument();
   });
 
-  it("renders the Stage 4 tab labels", () => {
+  it("renders the unified workflow header for the selected client", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("tab", { name: "Client Details" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Selected client summary")).toBeInTheDocument();
+    expect(screen.getByText("Jamie Murphy")).toBeInTheDocument();
+    expect(screen.getByText("CLI-2026-0002")).toBeInTheDocument();
+    expect(screen.getByText("8 Nov 1990")).toBeInTheDocument();
+    expect(screen.getByText("jamie.murphy@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Project Analyst")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit Client" })).toHaveAttribute("href", "/clients/CLI-2026-0002");
+  });
+
+  it("renders the simplified income protection tab labels", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
     expect(screen.getByRole("tab", { name: "Fact Find" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Terms of Business" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Statement of Suitability" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Files" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Generated Documents" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Client Details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Terms of Business" })).not.toBeInTheDocument();
   });
 
   it("renders the first Fact Find draft fields with shared client values", () => {
@@ -886,77 +902,7 @@ describe("App routes", () => {
     expect(storedHtml).not.toContain("style=");
   });
 
-  it("renders the Terms of Business draft fields and issue actions", () => {
-    render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
-
-    expect(screen.getByRole("heading", { name: "Terms of Business Draft" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue("January 2026")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Post")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate Draft" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mark Issued" })).toBeInTheDocument();
-  });
-
-  it("updates the Terms of Business issue status", async () => {
-    render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
-
-    expect(screen.getAllByText("Draft").length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Mark Issued" }));
-    fireEvent.click(screen.getByRole("button", { name: "Mark as Issued" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Issued" })).toBeDisabled();
-    });
-  });
-
-  it("renders the Terms of Business generated preview without exporting or appending history", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      createGenerateDocumentResponse({
-        title: "Terms of Business",
-        sectionTitle: "Issue Details",
-        sectionBodyHtml: "<p>Terms of Business issue copy.</p>",
-        generatedHtml: "<section><h2>Issue Details</h2><p>Terms of Business issue copy.</p></section>",
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Draft generated")).toBeInTheDocument();
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/documents/generate",
-      expect.objectContaining({
-        body: expect.stringContaining('"document_type":"Terms of Business"'),
-      }),
-    );
-    expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
-    expect(screen.getByText("Issue Details")).toBeInTheDocument();
-    expect(screen.getByText("Terms of Business issue copy.")).toBeInTheDocument();
-    expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
-  });
-
-  it("renders template pickers for each supported generated document tab", () => {
+  it("renders template pickers for the remaining editable generated document tabs", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -965,9 +911,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
     expect(screen.getByLabelText("Fact Find template")).toHaveValue("fact-find");
-
-    fireEvent.click(screen.getByRole("tab", { name: "Terms of Business" }));
-    expect(screen.getByLabelText("Terms of Business template")).toHaveValue("terms-of-business");
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
     expect(screen.getByLabelText("Statement of Suitability template")).toHaveValue("statement-of-suitability");
@@ -1298,27 +1241,6 @@ describe("App routes", () => {
     await waitFor(() => {
       expect(screen.getByText("Downloaded")).toBeInTheDocument();
     }, { timeout: 2500 });
-  });
-
-  it("persists client details after saving and reopening the workflow", () => {
-    render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    fireEvent.change(screen.getByLabelText(/Occupation/i), { target: { value: "Senior Analyst" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    cleanup();
-
-    render(
-      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByDisplayValue("Senior Analyst")).toBeInTheDocument();
   });
 
   it("keeps a persisted custom template id visible in the workflow template picker", () => {

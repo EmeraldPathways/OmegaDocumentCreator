@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-  User,
   ClipboardList,
   FileText,
   Shield,
@@ -46,9 +45,7 @@ import {
 } from "../components/ui";
 
 const moduleTabs = [
-  { id: "client-details", label: "Client Details", icon: User },
   { id: "fact-find", label: "Fact Find", icon: ClipboardList },
-  { id: "terms-of-business", label: "Terms of Business", icon: FileText },
   { id: "statement-of-suitability", label: "Statement of Suitability", icon: Shield },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "generated-documents", label: "Generated Documents", icon: Download },
@@ -131,6 +128,19 @@ function formatCurrency(value: string) {
     return "";
   }
   return parsed.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDisplayDate(value: string) {
+  if (!value) {
+    return "Not recorded";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function getDocumentStatusVariant(status: string | undefined): Parameters<typeof Badge>[0]["variant"] {
@@ -251,7 +261,6 @@ export function IncomeProtectionPage() {
   const { user } = useAuth();
   const actorLabel = resolveActorLabel(user?.role);
   const { addToast } = useToast();
-  const navigate = useNavigate();
   const { getClient, listClients, saveClient, saveGeneratedDraft, updateSelectedTemplate, upsertGeneratedDocument, upsertFile } =
     useClientData();
   const clients = listClients();
@@ -265,7 +274,6 @@ export function IncomeProtectionPage() {
   const client = getClient(selectedClientReference);
   const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(moduleTabs[0].id);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
-  const [clientSearch, setClientSearch] = useState("");
   const [clientDetailsStatus, setClientDetailsStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [factFindDraftSavedLabel, setFactFindDraftSavedLabel] = useState("Not saved yet");
   const [factFindGenerationStatus, setFactFindGenerationStatus] = useState("Generation: Draft");
@@ -318,14 +326,6 @@ export function IncomeProtectionPage() {
   }
 
   const resolvedDraft = draft;
-
-  const filteredClients = clients.filter((entry) => {
-    const query = clientSearch.trim().toLowerCase();
-    if (query.length === 0) {
-      return true;
-    }
-    return toLower(entry.fullName).includes(query) || toLower(entry.clientReference).includes(query);
-  });
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
 
@@ -686,8 +686,6 @@ export function IncomeProtectionPage() {
     const type = document.documentType as SupportedDocumentType;
     if (type === "Fact Find") {
       void handleFactFindGenerate();
-    } else if (type === "Terms of Business") {
-      void handleTermsGenerate();
     } else if (type === "Statement of Suitability") {
       void handleStatementGenerate();
     }
@@ -714,19 +712,10 @@ export function IncomeProtectionPage() {
   );
 
   const isTermsIssued = hasValue(resolvedDraft.termsIssuedDate);
+  const summaryContact = resolvedDraft.email || resolvedDraft.mobileNumber || "Not recorded";
 
   // Progress indicators per tab
   const tabProgress = useMemo(() => {
-    const requiredClientDetails = [
-      resolvedDraft.firstName,
-      resolvedDraft.surname,
-      resolvedDraft.email,
-      resolvedDraft.dateOfBirth,
-      resolvedDraft.townCity,
-      resolvedDraft.county,
-    ];
-    const clientDetailsComplete = requiredClientDetails.every(hasValue);
-
     const factFindFields = [
       resolvedDraft.fullName,
       resolvedDraft.dateOfBirth,
@@ -736,15 +725,12 @@ export function IncomeProtectionPage() {
     ];
     const factFindComplete = factFindFields.every(hasValue);
 
-    const termsComplete = hasValue(resolvedDraft.termsVersion) && hasValue(resolvedDraft.termsDeliveryMethod);
     const statementComplete = statementMissingFields.length === 0;
     const filesComplete = resolvedDraft.files.length > 0;
     const generatedComplete = resolvedDraft.generatedDocuments.length > 0;
 
     return {
-      "client-details": clientDetailsComplete ? "complete" : (requiredClientDetails.some(hasValue) ? "partial" : "incomplete"),
       "fact-find": factFindComplete ? "complete" : (factFindFields.some(hasValue) ? "partial" : "incomplete"),
-      "terms-of-business": termsComplete ? "complete" : (hasValue(resolvedDraft.termsVersion) || hasValue(resolvedDraft.termsDeliveryMethod) ? "partial" : "incomplete"),
       "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 11 ? "partial" : "incomplete"),
       "files": filesComplete ? "complete" : "incomplete",
       "generated-documents": generatedComplete ? "complete" : "incomplete",
@@ -1785,7 +1771,7 @@ export function IncomeProtectionPage() {
               <Download size={28} />
             </div>
             <div className="empty-state-title">No documents generated yet</div>
-            <p className="empty-state-description">Generate your first draft from the Fact Find, Terms of Business, or Statement of Suitability tabs.</p>
+            <p className="empty-state-description">Generate your first draft from the Fact Find or Statement of Suitability tabs.</p>
             <Button onClick={() => setActiveTabId("fact-find")} variant="primary">
               <FileDown size={18} />
               Generate your first draft
@@ -1824,10 +1810,12 @@ export function IncomeProtectionPage() {
                           <Download size={14} />
                           Download
                         </Button>
-                        <Button className="btn-sm" onClick={() => handleRegenerateDocument(document)} variant="text">
-                          <RefreshCw size={14} />
-                          Regenerate
-                        </Button>
+                        {document.documentType !== "Terms of Business" ? (
+                          <Button className="btn-sm" onClick={() => handleRegenerateDocument(document)} variant="text">
+                            <RefreshCw size={14} />
+                            Regenerate
+                          </Button>
+                        ) : null}
                         <Button className="btn-sm" onClick={() => handleSendDocument(document)} variant="text">
                           <Send size={14} />
                           Send
@@ -1864,30 +1852,16 @@ export function IncomeProtectionPage() {
   return (
     <div className="page-stack">
       <section className="card">
-        <div className="page-heading page-heading-compact">
-          <div className="flex items-center gap-3">
-            <h1>Income Protection</h1>
-            <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
-          </div>
-          <div className="client-selector">
-            <div className="client-selector-field">
-              <label className="field-label" htmlFor="client-search">
-                Search clients
-              </label>
-              <div className="field-input-wrap">
-                <Search size={16} style={{ marginLeft: "12px", color: "var(--color-text-muted)" }} />
-                <input
-                  aria-label="Search workflow clients"
-                  className="field-input"
-                  id="client-search"
-                  onChange={(event) => setClientSearch(event.target.value)}
-                  placeholder="Search by name or reference"
-                  type="search"
-                  value={clientSearch}
-                />
+        <section className="workflow-header" aria-label="Selected client summary">
+          <div className="workflow-header-top">
+            <div className="workflow-header-title">
+              <div className="flex items-center gap-3">
+                <h1>Income Protection</h1>
+                <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
               </div>
             </div>
-            <div className="client-selector-field">
+            <div className="workflow-header-actions">
+              <div className="workflow-client-field">
               <label className="field-label" htmlFor="client-select">
                 Select workflow client
               </label>
@@ -1902,19 +1876,46 @@ export function IncomeProtectionPage() {
                 }}
                 value={resolvedDraft.clientReference}
               >
-                {filteredClients.map((entry) => (
+                {clients.map((entry) => (
                   <option key={entry.clientReference} value={entry.clientReference}>
                     {entry.fullName} ({entry.clientReference})
                   </option>
                 ))}
               </select>
+              </div>
+              <Link className="btn btn-secondary" to="/clients/new">
+                <Plus size={18} />
+                Add Client
+              </Link>
+              <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
+                Edit Client
+              </Link>
             </div>
-            <Link className="btn btn-secondary" to="/clients/new">
-              <Plus size={18} />
-              Add Client
-            </Link>
           </div>
-        </div>
+
+          <div className="workflow-summary-bar">
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Client</span>
+              <strong>{resolvedDraft.fullName}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Reference</span>
+              <strong>{resolvedDraft.clientReference}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">DOB</span>
+              <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Contact</span>
+              <strong>{summaryContact}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Occupation</span>
+              <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
+            </div>
+          </div>
+        </section>
 
         <div aria-label="Income Protection sections" className="tab-list" role="tablist">
           {moduleTabs.map((tab) => {
