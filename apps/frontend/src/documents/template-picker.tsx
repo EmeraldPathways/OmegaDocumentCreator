@@ -12,9 +12,13 @@ export function TemplatePicker({ documentType, onChange, selectedTemplateId }: T
   const selectedTemplateExists = templates.some((template) => template.id === selectedTemplateId);
 
   return (
-    <label>
-      {documentType} template
-      <select onChange={(event) => onChange(event.target.value)} value={selectedTemplateId}>
+    <label className="generated-output-template-field">
+      <span className="generated-output-template-label">{documentType} template</span>
+      <select
+        className="generated-output-template-select"
+        onChange={(event) => onChange(event.target.value)}
+        value={selectedTemplateId}
+      >
         {!selectedTemplateExists && selectedTemplateId ? (
           <option value={selectedTemplateId}>{selectedTemplateId}</option>
         ) : null}

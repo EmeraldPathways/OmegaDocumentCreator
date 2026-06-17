@@ -25,13 +25,12 @@ import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
 import { generateDocument } from "../documents/document-api";
-import { buildGeneratedPreviewHtml } from "../documents/document-preview";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { builtInDocumentTemplates } from "../documents/document-templates";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
-import type { WorkflowDocumentType } from "../documents/workflow-document-builders";
+import { buildWorkflowDocument, type WorkflowDocumentType } from "../documents/workflow-document-builders";
 import {
   Accordion,
   AccordionItem,
@@ -482,6 +481,26 @@ export function IncomeProtectionPage() {
     });
   }
 
+  function buildGeneratedEditorHtml(
+    documentType: SupportedDocumentType,
+    generatedDocument: { generatedHtml: string; sections: Array<{ id: string; title: string; bodyHtml: string }> },
+  ) {
+    const nextProfile = {
+      ...resolvedDraft,
+      documentDrafts: {
+        ...resolvedDraft.documentDrafts,
+        [documentType]: {
+          ...resolvedDraft.documentDrafts[documentType],
+          lastGeneratedHtml: generatedDocument.generatedHtml,
+          lastGeneratedSections: generatedDocument.sections,
+          editedHtml: "",
+        },
+      },
+    };
+
+    return buildWorkflowDocument(nextProfile, documentType).html;
+  }
+
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
     const previewArtifact = buildExportDocumentArtifact(resolvedDraft, documentType);
     if (!previewArtifact.html) {
@@ -523,7 +542,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        editedHtml: buildGeneratedPreviewHtml(generatedDocument.sections, generatedDocument.generatedHtml),
+        editedHtml: buildGeneratedEditorHtml("Fact Find", generatedDocument),
       });
       setFactFindGenerationStatus("Generation: Draft generated");
       addToast("Fact Find draft generated", "success");
@@ -560,7 +579,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        editedHtml: buildGeneratedPreviewHtml(generatedDocument.sections, generatedDocument.generatedHtml),
+        editedHtml: buildGeneratedEditorHtml("Statement of Suitability", generatedDocument),
       });
       setStatementDocumentStatus("Document: Draft generated");
       addToast("Statement of Suitability draft generated", "success");

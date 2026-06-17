@@ -1,7 +1,4 @@
-import { useEffect, type ReactNode } from "react";
-import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Bold, Image as ImageIcon, Italic, List, ListOrdered, Redo, Type, Undo } from "lucide-react";
 
 type RichDocumentEditorProps = {
@@ -15,13 +12,11 @@ type RichDocumentEditorProps = {
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px"];
 
 function ToolbarButton({
-  active = false,
   children,
   disabled = false,
   label,
   onClick,
 }: {
-  active?: boolean;
   children: ReactNode;
   disabled?: boolean;
   label: string;
@@ -30,7 +25,7 @@ function ToolbarButton({
   return (
     <button
       aria-label={label}
-      className={`generated-output-toolbar-btn${active ? " is-active" : ""}`}
+      className="generated-output-toolbar-btn"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -40,44 +35,6 @@ function ToolbarButton({
   );
 }
 
-function ResizableImage({ node, selected, updateAttributes }: NodeViewProps) {
-  return (
-    <NodeViewWrapper as="figure" className={`generated-output-image${selected ? " is-selected" : ""}`}>
-      <img alt={node.attrs.alt || ""} src={node.attrs.src} style={{ width: node.attrs.width || "60%" }} />
-      <div className="generated-output-image-controls">
-        <button onClick={() => updateAttributes({ width: "40%" })} type="button">
-          Small
-        </button>
-        <button onClick={() => updateAttributes({ width: "60%" })} type="button">
-          Medium
-        </button>
-        <button onClick={() => updateAttributes({ width: "80%" })} type="button">
-          Large
-        </button>
-      </div>
-    </NodeViewWrapper>
-  );
-}
-
-const ResizableImageExtension = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      width: {
-        default: "60%",
-        parseHTML: (element) => element.getAttribute("width") || element.style.width || "60%",
-        renderHTML: (attributes) => ({
-          width: attributes.width,
-          style: `width:${attributes.width};`,
-        }),
-      },
-    };
-  },
-  addNodeView() {
-    return ReactNodeViewRenderer(ResizableImage);
-  },
-});
-
 export function RichDocumentEditor({
   content,
   fontSize,
@@ -85,59 +42,40 @@ export function RichDocumentEditor({
   onContentChange,
   onFontSizeChange,
 }: RichDocumentEditorProps) {
-  const editor = useEditor({
-    content,
-    extensions: [
-      StarterKit.configure({
-        bulletList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
-        orderedList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
-      }),
-      ResizableImageExtension.configure({
-        allowBase64: true,
-        inline: false,
-      }),
-    ],
-    editorProps: {
-      attributes: {
-        class: "generated-output-editor",
-      },
-    },
-    onUpdate: ({ editor: nextEditor }) => {
-      onContentChange(nextEditor.getHTML());
-    },
-  });
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!editor) {
+    const editorElement = editorRef.current;
+    if (!editorElement) {
       return;
     }
 
-    if (content !== editor.getHTML()) {
-      editor.commands.setContent(content, { emitUpdate: false });
+    if (editorElement.innerHTML !== content) {
+      editorElement.innerHTML = content;
     }
-  }, [content, editor]);
+  }, [content]);
 
-  if (!editor) {
-    return null;
+  function focusEditor() {
+    editorRef.current?.focus();
+  }
+
+  function runCommand(command: string, value?: string) {
+    focusEditor();
+    document.execCommand(command, false, value);
+    onContentChange(editorRef.current?.innerHTML ?? "");
+  }
+
+  function handleInput() {
+    onContentChange(editorRef.current?.innerHTML ?? "");
   }
 
   return (
     <div className="generated-output-editor-shell">
       <div className="generated-output-toolbar">
-        <ToolbarButton active={editor.isActive("bold")} label="Bold" onClick={() => editor.chain().focus().toggleBold().run()}>
+        <ToolbarButton label="Bold" onClick={() => runCommand("bold")}>
           <Bold size={16} />
         </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("italic")}
-          label="Italic"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
+        <ToolbarButton label="Italic" onClick={() => runCommand("italic")}>
           <Italic size={16} />
         </ToolbarButton>
         <label className="generated-output-font-size">
@@ -151,32 +89,31 @@ export function RichDocumentEditor({
             ))}
           </select>
         </label>
-        <ToolbarButton
-          active={editor.isActive("bulletList")}
-          label="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
+        <ToolbarButton label="Bullet list" onClick={() => runCommand("insertUnorderedList")}>
           <List size={16} />
         </ToolbarButton>
-        <ToolbarButton
-          active={editor.isActive("orderedList")}
-          label="Numbered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
+        <ToolbarButton label="Numbered list" onClick={() => runCommand("insertOrderedList")}>
           <ListOrdered size={16} />
         </ToolbarButton>
         <ToolbarButton disabled={!onAddImage} label="Add image" onClick={() => onAddImage?.()}>
           <ImageIcon size={16} />
         </ToolbarButton>
-        <ToolbarButton disabled={!editor.can().chain().focus().undo().run()} label="Undo" onClick={() => editor.chain().focus().undo().run()}>
+        <ToolbarButton label="Undo" onClick={() => runCommand("undo")}>
           <Undo size={16} />
         </ToolbarButton>
-        <ToolbarButton disabled={!editor.can().chain().focus().redo().run()} label="Redo" onClick={() => editor.chain().focus().redo().run()}>
+        <ToolbarButton label="Redo" onClick={() => runCommand("redo")}>
           <Redo size={16} />
         </ToolbarButton>
       </div>
       <div className="generated-output-editor-frame" style={{ fontSize }}>
-        <EditorContent editor={editor} />
+        <div
+          className="generated-output-editor"
+          contentEditable
+          onBlur={handleInput}
+          onInput={handleInput}
+          ref={editorRef}
+          suppressContentEditableWarning
+        />
       </div>
     </div>
   );

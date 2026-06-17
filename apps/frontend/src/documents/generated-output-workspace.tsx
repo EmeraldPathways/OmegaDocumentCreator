@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Copy, Edit2, Eye, FileDown, FileText, Image as ImageIcon, RefreshCw } from "lucide-react";
+import { CheckCircle2, Copy, Edit2, Eye, FileDown, FileText, RefreshCw } from "lucide-react";
 
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
@@ -117,55 +117,65 @@ export function GeneratedOutputWorkspace({
         type="file"
       />
       <div className="generated-output-header">
-        <div className="generated-output-heading">
-          <div>
-            <h3>Generated Output</h3>
-            <h4 className="sr-only">Generated preview</h4>
+        <div className="generated-output-topbar">
+          <div className="generated-output-heading">
+            <span className="generated-output-heading-icon" aria-hidden="true">
+              <CheckCircle2 size={16} />
+            </span>
+            <div>
+              <h3>Generated Output</h3>
+              <h4 className="sr-only">Generated preview</h4>
+            </div>
+            <div className="generated-output-view-toggle" role="group" aria-label="Generated output mode">
+              <button
+                aria-pressed={viewMode === "edit"}
+                className={viewMode === "edit" ? "is-active" : ""}
+                onClick={() => setViewMode("edit")}
+                type="button"
+              >
+                <Edit2 size={14} />
+                Edit
+              </button>
+              <button
+                aria-pressed={viewMode === "preview"}
+                className={viewMode === "preview" ? "is-active" : ""}
+                onClick={() => setViewMode("preview")}
+                type="button"
+              >
+                <Eye size={14} />
+                PDF Preview
+              </button>
+            </div>
+          </div>
+          <div className="generated-output-actions">
+            <Button onClick={handleCopy} variant="secondary">
+              <Copy size={16} />
+              {copied ? "Copied" : "Copy Text"}
+            </Button>
+            <Button disabled={!previewHtml} onClick={onExportDocx} variant="secondary">
+              <FileText size={16} />
+              Export DOCX
+            </Button>
+            <Button disabled={!previewHtml} onClick={onExportPdf} variant="secondary">
+              <FileDown size={16} />
+              Export PDF
+            </Button>
+            <Button disabled={generateDisabled} onClick={onGenerate} variant="primary">
+              <RefreshCw size={16} />
+              {generateLabel}
+            </Button>
+          </div>
+        </div>
+
+        <div className="generated-output-meta">
+          <div className="generated-output-meta-copy">
             <p className="generated-output-subtitle">Edit the generated draft, preview the Omega layout, and export the final file.</p>
           </div>
           <div className="generated-output-status">
             {statusDotClass ? <span className={`status-dot ${statusDotClass}`} data-testid={statusDotTestId} /> : null}
             <Badge variant={draft.generationStatus === "completed" ? "saved" : "draft"}>{statusLabel}</Badge>
           </div>
-        </div>
-        <div className="generated-output-actions">
           <div className="generated-output-template-picker">{templatePicker}</div>
-          <div className="generated-output-view-toggle" role="group" aria-label="Generated output mode">
-            <button
-              aria-pressed={viewMode === "edit"}
-              className={viewMode === "edit" ? "is-active" : ""}
-              onClick={() => setViewMode("edit")}
-              type="button"
-            >
-              <Edit2 size={14} />
-              Edit
-            </button>
-            <button
-              aria-pressed={viewMode === "preview"}
-              className={viewMode === "preview" ? "is-active" : ""}
-              onClick={() => setViewMode("preview")}
-              type="button"
-            >
-              <Eye size={14} />
-              PDF Preview
-            </button>
-          </div>
-          <Button onClick={handleCopy} variant="secondary">
-            <Copy size={16} />
-            {copied ? "Copied" : "Copy Text"}
-          </Button>
-          <Button disabled={!previewHtml} onClick={onExportDocx} variant="secondary">
-            <FileText size={16} />
-            Export DOCX
-          </Button>
-          <Button disabled={!previewHtml} onClick={onExportPdf} variant="secondary">
-            <FileDown size={16} />
-            Export PDF
-          </Button>
-          <Button disabled={generateDisabled} onClick={onGenerate} variant="primary">
-            <RefreshCw size={16} />
-            {generateLabel}
-          </Button>
         </div>
       </div>
 
@@ -173,12 +183,6 @@ export function GeneratedOutputWorkspace({
         <div className="generated-output-empty-state">{emptyMessage}</div>
       ) : viewMode === "edit" ? (
         <div className="generated-output-edit-mode">
-          <div className="generated-output-editor-actions">
-            <Button onClick={() => fileInputRef.current?.click()} variant="secondary">
-              <ImageIcon size={16} />
-              Add Image
-            </Button>
-          </div>
           <RichDocumentEditor
             content={previewHtml}
             fontSize={fontSize}

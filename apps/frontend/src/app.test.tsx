@@ -469,8 +469,43 @@ describe("App routes", () => {
       expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
     expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
-    expect(screen.getByText("Generated body")).toBeInTheDocument();
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain("Generated body");
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it("seeds generated output with the formatted workflow document shell after generation", async () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
+    });
+
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
+      'class="workflow-document workflow-document-fact-find"',
+    );
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
+      'class="document-banner"',
+    );
   });
 
   it("allows inline editing of generated preview sections and persists the edited content after reopening", async () => {
@@ -858,7 +893,15 @@ describe("App routes", () => {
       });
     });
 
-    expect(screen.getByText("AI generated fact find summary.")).toBeInTheDocument();
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
+      "AI generated fact find summary.",
+    );
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
@@ -977,7 +1020,15 @@ describe("App routes", () => {
     );
     expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
     expect(screen.getByText("Recommendation")).toBeInTheDocument();
-    expect(screen.getByText(/Statement recommendation copy/)).toBeInTheDocument();
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.editedHtml).toContain(
+      "Statement recommendation copy.",
+    );
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
