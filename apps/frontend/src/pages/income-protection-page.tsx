@@ -19,11 +19,17 @@ import {
   Trash2,
   File,
   FileType2,
+  Edit,
 } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
-import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
+import type {
+  SeededClientFile,
+  SeededClientProfile,
+  SeededGeneratedDocument,
+  SeededSavingsInvestmentRow,
+} from "../data/seeded-clients";
 import { generateDocument } from "../documents/document-api";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
@@ -46,6 +52,7 @@ import {
 
 const moduleTabs = [
   { id: "fact-find", label: "Fact Find", icon: ClipboardList },
+  { id: "fact-find-update", label: "Fact Find Update", icon: FileText },
   { id: "statement-of-suitability", label: "Statement of Suitability", icon: Shield },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "generated-documents", label: "Generated Documents", icon: Download },
@@ -111,6 +118,10 @@ const phiIndexationOptions = [
   { value: "N", label: "N" },
 ];
 
+type SeededClientStringKey = {
+  [Key in keyof SeededClientProfile]: SeededClientProfile[Key] extends string ? Key : never;
+}[keyof SeededClientProfile];
+
 function hasValue(value: unknown) {
   if (value == null) return false;
   return String(value).trim().length > 0;
@@ -143,6 +154,10 @@ function formatCurrency(value: string) {
     return "";
   }
   return parsed.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function isAffirmative(value: string | undefined) {
+  return toLower(value).startsWith("y");
 }
 
 function formatDisplayDate(value: string) {
@@ -292,6 +307,8 @@ export function IncomeProtectionPage() {
   const [factFindDraftSavedLabel, setFactFindDraftSavedLabel] = useState("Not saved yet");
   const [factFindGenerationStatus, setFactFindGenerationStatus] = useState("Generation: Draft");
   const [showFactFindValidation, setShowFactFindValidation] = useState(false);
+  const [factFindUpdateSavedLabel, setFactFindUpdateSavedLabel] = useState("Not saved yet");
+  const [factFindUpdateGenerationStatus, setFactFindUpdateGenerationStatus] = useState("Generation: Draft");
   const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
@@ -303,6 +320,7 @@ export function IncomeProtectionPage() {
   const [previewDocument, setPreviewDocument] = useState<SeededGeneratedDocument | null>(null);
   const factFindWorkspaceAccordion = useAccordionState(["fact-find-form"]);
   const factFindAccordion = useAccordionState(["personal-details"]);
+  const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
 
   useEffect(() => {
@@ -314,6 +332,9 @@ export function IncomeProtectionPage() {
       return;
     }
     setFactFindGenerationStatus(getGenerationHeaderStatus("Generation", client.documentDrafts["Fact Find"].generationStatus));
+    setFactFindUpdateGenerationStatus(
+      getGenerationHeaderStatus("Generation", client.documentDrafts["Fact Find Update"].generationStatus),
+    );
     setStatementDocumentStatus(
       getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
     );
@@ -403,20 +424,257 @@ export function IncomeProtectionPage() {
     });
   }
 
-  function updateRequestInformationAddress(value: string) {
+  function updateSavingsInvestmentRow(index: number, field: keyof SeededSavingsInvestmentRow, value: string) {
     setDraft((currentDraft) => {
       if (!currentDraft) {
         return currentDraft;
       }
-      const [nextTownCity, ...countyParts] = value.split(",");
-      const nextCounty = countyParts.join(",").trim();
-      return { ...currentDraft, townCity: nextTownCity.trim(), county: countyParts.length > 0 ? nextCounty : "" };
+
+      const nextRows = currentDraft.savingsInvestmentRows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      );
+
+      return { ...currentDraft, savingsInvestmentRows: nextRows };
     });
+  }
+
+  function renderToggleField(id: string, label: string, field: SeededClientStringKey) {
+    return (
+      <Toggle
+        checked={isAffirmative(resolvedDraft[field])}
+        id={id}
+        label={label}
+        onChange={(event) => updateField(field, event.target.checked ? "Yes" : "")}
+      />
+    );
+  }
+
+  function renderTextInput(id: string, label: string, field: SeededClientStringKey, type = "text") {
+    return (
+      <Input
+        id={id}
+        label={label}
+        onChange={(event) => updateField(field, event.target.value)}
+        type={type}
+        value={resolvedDraft[field]}
+      />
+    );
+  }
+
+  function renderCurrencyInput(id: string, label: string, field: SeededClientStringKey) {
+    return (
+      <Input
+        id={id}
+        label={label}
+        onBlur={(event) => updateField(field, formatCurrency(event.target.value))}
+        onChange={(event) => updateField(field, event.target.value)}
+        prefix="EUR"
+        step="0.01"
+        type="number"
+        value={resolvedDraft[field]}
+      />
+    );
+  }
+
+  function renderTextarea(id: string, label: string, field: SeededClientStringKey, rows = 4, className?: string) {
+    return (
+      <Textarea
+        className={className}
+        id={id}
+        label={label}
+        onChange={(event) => updateField(field, event.target.value)}
+        rows={rows}
+        value={resolvedDraft[field]}
+      />
+    );
+  }
+
+  function renderYesNoGroup(title: string, yesField: SeededClientStringKey, noField: SeededClientStringKey, prefix: string) {
+    return (
+      <div className="form-section">
+        <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
+          {title}
+        </p>
+        <div className="form-grid">
+          {renderToggleField(`${prefix}-yes`, "Yes", yesField)}
+          {renderToggleField(`${prefix}-no`, "No", noField)}
+        </div>
+      </div>
+    );
   }
 
   function saveFactFindDraft() {
     persistDraft(resolvedDraft);
     setFactFindDraftSavedLabel("Saved just now");
+  }
+
+  function saveFactFindUpdateDraft() {
+    persistDraft(resolvedDraft);
+    setFactFindUpdateSavedLabel("Saved just now");
+  }
+
+  function renderAssetRow(
+    label: string,
+    selfField: SeededClientStringKey,
+    partnerField: SeededClientStringKey,
+    idPrefix: string,
+  ) {
+    return (
+      <tr>
+        <td>{label}</td>
+        <td>{renderCurrencyInput(`${idPrefix}-self`, `${label} self`, selfField)}</td>
+        <td>{renderCurrencyInput(`${idPrefix}-partner`, `${label} partner`, partnerField)}</td>
+      </tr>
+    );
+  }
+
+  function renderLiabilityRow(
+    label: string,
+    amountField: SeededClientStringKey,
+    monthlyField: SeededClientStringKey,
+    providerField: SeededClientStringKey,
+    balanceField: SeededClientStringKey,
+    idPrefix: string,
+  ) {
+    return (
+      <tr>
+        <td>{label}</td>
+        <td>{renderCurrencyInput(`${idPrefix}-amount`, `${label} amount`, amountField)}</td>
+        <td>{renderCurrencyInput(`${idPrefix}-monthly`, `${label} monthly repayments`, monthlyField)}</td>
+        <td>{renderTextInput(`${idPrefix}-provider`, `${label} bank / mortgage provider`, providerField)}</td>
+        <td>{renderCurrencyInput(`${idPrefix}-balance`, `${label} balance outstanding`, balanceField)}</td>
+      </tr>
+    );
+  }
+
+  function renderSavingsInvestmentRow(index: number) {
+    const row = resolvedDraft.savingsInvestmentRows[index];
+    return (
+      <tr key={`savings-row-${index}`}>
+        <td>
+          <Input
+            id={`ff-savings-institution-${index + 1}`}
+            label={`Savings institution ${index + 1}`}
+            onChange={(event) => updateSavingsInvestmentRow(index, "financialInstitution", event.target.value)}
+            type="text"
+            value={row?.financialInstitution ?? ""}
+          />
+        </td>
+        <td>
+          <Input
+            id={`ff-savings-value-${index + 1}`}
+            label={`Savings value ${index + 1}`}
+            onBlur={(event) => updateSavingsInvestmentRow(index, "value", formatCurrency(event.target.value))}
+            onChange={(event) => updateSavingsInvestmentRow(index, "value", event.target.value)}
+            prefix="EUR"
+            step="0.01"
+            type="number"
+            value={row?.value ?? ""}
+          />
+        </td>
+        <td>
+          <Input
+            id={`ff-savings-startDate-${index + 1}`}
+            label={`Savings start date ${index + 1}`}
+            onChange={(event) => updateSavingsInvestmentRow(index, "startDate", event.target.value)}
+            type="date"
+            value={row?.startDate ?? ""}
+          />
+        </td>
+        <td>
+          <Input
+            id={`ff-savings-term-${index + 1}`}
+            label={`Savings term ${index + 1}`}
+            onChange={(event) => updateSavingsInvestmentRow(index, "term", event.target.value)}
+            type="text"
+            value={row?.term ?? ""}
+          />
+        </td>
+      </tr>
+    );
+  }
+
+  function renderPensionSection(section: "self" | "partner") {
+    const config =
+      section === "self"
+        ? {
+            title: "Self",
+            retiredYes: "selfAlreadyRetired",
+            retiredNo: "selfNotRetired",
+            retirementAge: "selfRetirementAge",
+            target: "selfRetirementIncomeTargetPercent",
+            employeeYes: "selfEmployeeDirectorPensionYes",
+            employeeNo: "selfEmployeeDirectorPensionNo",
+            schemeType: "selfEmployeeDirectorSchemeType",
+            schemeRetirementAge: "selfEmployeeDirectorRetirementAge",
+            employerContribution: "selfEmployeeDirectorEmployerContribution",
+            personalContribution: "selfEmployeeDirectorPersonalContribution",
+            employeeYears: "selfEmployeeDirectorYearsInForce",
+            personalYes: "selfPersonalPensionYes",
+            personalNo: "selfPersonalPensionNo",
+            personalCompany: "selfPersonalPensionCompany",
+            personalPolicyType: "selfPersonalPensionPolicyType",
+            personalContributionField: "selfPersonalPensionContribution",
+            personalCurrentValue: "selfPersonalPensionCurrentValue",
+            personalYears: "selfPersonalPensionYearsInForce",
+          }
+        : {
+            title: "Partner",
+            retiredYes: "partnerAlreadyRetired",
+            retiredNo: "partnerNotRetired",
+            retirementAge: "partnerRetirementAge",
+            target: "partnerRetirementIncomeTargetPercent",
+            employeeYes: "partnerEmployeeDirectorPensionYes",
+            employeeNo: "partnerEmployeeDirectorPensionNo",
+            schemeType: "partnerEmployeeDirectorSchemeType",
+            schemeRetirementAge: "partnerEmployeeDirectorRetirementAge",
+            employerContribution: "partnerEmployeeDirectorEmployerContribution",
+            personalContribution: "partnerEmployeeDirectorPersonalContribution",
+            employeeYears: "partnerEmployeeDirectorYearsInForce",
+            personalYes: "partnerPersonalPensionYes",
+            personalNo: "partnerPersonalPensionNo",
+            personalCompany: "partnerPersonalPensionCompany",
+            personalPolicyType: "partnerPersonalPensionPolicyType",
+            personalContributionField: "partnerPersonalPensionContribution",
+            personalCurrentValue: "partnerPersonalPensionCurrentValue",
+            personalYears: "partnerPersonalPensionYearsInForce",
+          } as const;
+
+    return (
+      <>
+        {renderYesNoGroup("Are you already retired?", config.retiredYes, config.retiredNo, `${section}-retired`)}
+        <div className="form-grid">
+          {renderTextInput(`ff-${section}-retirementAge`, "Planned retirement age", config.retirementAge)}
+          {renderTextInput(`ff-${section}-retirementTarget`, "Retirement income target (%)", config.target)}
+        </div>
+        {renderYesNoGroup(
+          "If an Employee or Director, have you pension provisions in place?",
+          config.employeeYes,
+          config.employeeNo,
+          `${section}-employee-pension`,
+        )}
+        <div className="form-grid">
+          {renderTextInput(`ff-${section}-schemeType`, "Scheme type", config.schemeType)}
+          {renderTextInput(`ff-${section}-schemeRetirementAge`, "Retirement age", config.schemeRetirementAge)}
+          {renderCurrencyInput(`ff-${section}-employerContribution`, "Employer contribution", config.employerContribution)}
+          {renderCurrencyInput(`ff-${section}-personalContribution`, "Personal contribution", config.personalContribution)}
+          {renderTextInput(`ff-${section}-employeeYears`, "Number of years in force", config.employeeYears)}
+        </div>
+        {renderYesNoGroup(
+          "If self employed or in non-pensionable employment do you contribute to a personal pension plan?",
+          config.personalYes,
+          config.personalNo,
+          `${section}-personal-pension`,
+        )}
+        <div className="form-grid">
+          {renderTextInput(`ff-${section}-personalCompany`, "Name of company", config.personalCompany)}
+          {renderTextInput(`ff-${section}-personalPolicyType`, "Type of policy", config.personalPolicyType)}
+          {renderCurrencyInput(`ff-${section}-personalContributionValue`, "Contribution", config.personalContributionField)}
+          {renderCurrencyInput(`ff-${section}-personalCurrentValue`, "Current value", config.personalCurrentValue)}
+          {renderTextInput(`ff-${section}-personalYears`, "Number of years in force", config.personalYears)}
+        </div>
+      </>
+    );
   }
 
   function getGeneratedDocumentReservationKey(clientReference: string, documentType: SupportedDocumentType) {
@@ -591,6 +849,33 @@ export function IncomeProtectionPage() {
     setStatementSaveStatus("Saved just now");
   }
 
+  async function handleFactFindUpdateGenerate() {
+    saveFactFindUpdateDraft();
+    setFactFindUpdateGenerationStatus("Generation: Generating");
+    saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "generating" });
+    try {
+      const generatedDocument = await generateDocument({
+        clientReference: resolvedDraft.clientReference,
+        documentType: "Fact Find Update",
+        templateId: getDocumentDraft("Fact Find Update").selectedTemplateId,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
+      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+        integrationRequests: generatedDocument.integrationRequests,
+        editedHtml: buildGeneratedEditorHtml("Fact Find Update", generatedDocument),
+      });
+      setFactFindUpdateGenerationStatus("Generation: Draft generated");
+      addToast("Fact Find Update draft generated", "success");
+    } catch {
+      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "failed" });
+      setFactFindUpdateGenerationStatus("Generation: Draft generation failed");
+      addToast("Failed to generate Fact Find Update draft", "error");
+    }
+  }
+
   async function handleStatementGenerate() {
     if (statementMissingFields.length > 0) {
       setShowStatementValidation(true);
@@ -682,6 +967,8 @@ export function IncomeProtectionPage() {
     const type = document.documentType as SupportedDocumentType;
     if (type === "Fact Find") {
       void handleFactFindGenerate();
+    } else if (type === "Fact Find Update") {
+      void handleFactFindUpdateGenerate();
     } else if (type === "Statement of Suitability") {
       void handleStatementGenerate();
     }
@@ -720,12 +1007,24 @@ export function IncomeProtectionPage() {
     ];
     const factFindComplete = factFindFields.every(hasValue);
 
+    const factFindUpdateFields = [
+      resolvedDraft.factFindUpdatePersonalCircumstances,
+      resolvedDraft.factFindUpdateFinancialSituation,
+      resolvedDraft.factFindUpdateNeedsAndObjectives,
+      resolvedDraft.factFindUpdateExecutionOnlyBasis,
+      resolvedDraft.factFindUpdateTermsReviewedReceived,
+    ];
+    const factFindUpdateComplete = factFindUpdateFields.every(hasValue);
+
     const statementComplete = statementMissingFields.length === 0;
     const filesComplete = resolvedDraft.files.length > 0;
     const generatedComplete = resolvedDraft.generatedDocuments.length > 0;
 
     return {
       "fact-find": factFindComplete ? "complete" : (factFindFields.some(hasValue) ? "partial" : "incomplete"),
+      "fact-find-update": factFindUpdateComplete
+        ? "complete"
+        : (factFindUpdateFields.some(hasValue) ? "partial" : "incomplete"),
       "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 15 ? "partial" : "incomplete"),
       "files": filesComplete ? "complete" : "incomplete",
       "generated-documents": generatedComplete ? "complete" : "incomplete",
@@ -759,94 +1058,97 @@ export function IncomeProtectionPage() {
             </div>
           ) : null}
 
-          <Accordion>
+          <Accordion flush>
             <AccordionItem
               indicator={tabProgress["fact-find"]}
               isOpen={factFindWorkspaceAccordion.isOpen("fact-find-form")}
               onToggle={() => factFindWorkspaceAccordion.toggle("fact-find-form")}
               title="Fact Find Form"
             >
-              <div className="generated-output-section-heading">
-                <Button onClick={saveFactFindDraft} variant="secondary">
-                  <Save size={16} />
-                  Save
-                </Button>
-                <span className="text-muted text-small">{factFindDraftSavedLabel}</span>
-              </div>
-              <Accordion>
-            <AccordionItem
-              indicator={getSectionProgress([
-                resolvedDraft.fullName,
-                resolvedDraft.dateOfBirth,
-                resolvedDraft.gender,
-                resolvedDraft.email,
-                resolvedDraft.mobileNumber,
-                resolvedDraft.maritalStatus,
-              ])}
-              isOpen={factFindAccordion.isOpen("personal-details")}
-              onToggle={() => factFindAccordion.toggle("personal-details")}
-              title="Personal Details"
-            >
-              <div className="form-grid">
-                <Input
-                  id="ff-fullName"
-                  label="Client name"
-                  onChange={(event) => updateField("fullName", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.fullName}
-                />
-                <Select
-                  id="ff-maritalStatus"
-                  label="Marital status"
-                  onChange={(event) => updateField("maritalStatus", event.target.value)}
-                  options={[
-                    { value: "", label: "Select status" },
-                    { value: "Single", label: "Single" },
-                    { value: "Married", label: "Married" },
-                    { value: "Civil Partnership", label: "Civil Partnership" },
-                    { value: "Divorced", label: "Divorced" },
-                    { value: "Widowed", label: "Widowed" },
-                    { value: "Separated", label: "Separated" },
-                  ]}
-                  value={resolvedDraft.maritalStatus}
-                />
-                <Input
-                  id="ff-dob"
-                  label="Date of birth"
-                  onChange={(event) => updateField("dateOfBirth", event.target.value)}
-                  type="date"
-                  value={resolvedDraft.dateOfBirth}
-                />
-                <Select
-                  id="ff-gender"
-                  label="Gender"
-                  onChange={(event) => updateField("gender", event.target.value)}
-                  options={genderOptions}
-                  value={resolvedDraft.gender}
-                />
-                <Input
-                  id="ff-email"
-                  label="Email"
-                  onChange={(event) => updateField("email", event.target.value)}
-                  type="email"
-                  value={resolvedDraft.email}
-                />
-                <Input
-                  id="ff-phone"
-                  label="Home / mobile"
-                  onChange={(event) => updateField("mobileNumber", event.target.value)}
-                  type="tel"
-                  value={resolvedDraft.mobileNumber}
-                />
-                <Input
-                  id="ff-partnerName"
-                  label="Partner name"
-                  onChange={(event) => updateField("partnerName", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.partnerName}
-                />
-              </div>
-            </AccordionItem>
+              <Accordion flush>
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.servicesRequestedLifeProtection,
+                    resolvedDraft.servicesRequestedIncomeProtection,
+                    resolvedDraft.servicesRequestedSavingsProtection,
+                    resolvedDraft.servicesRequestedPensionPlanning,
+                  ])}
+                  isOpen={factFindAccordion.isOpen("services-requested")}
+                  onToggle={() => factFindAccordion.toggle("services-requested")}
+                  title="Services Requested"
+                >
+                  <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                    The purpose of this review is to ensure that the plans in place will meet the needs of you and your dependants into the future. If you have a particular area of concern on which you wish to focus, we can limit or review that particular area.
+                  </p>
+                  <div className="form-grid">
+                    {renderToggleField("ff-services-lifeProtection", "Life Protection", "servicesRequestedLifeProtection")}
+                    {renderToggleField("ff-services-incomeProtection", "Income Protection", "servicesRequestedIncomeProtection")}
+                    {renderToggleField("ff-services-savingsProtection", "Savings & Protection", "servicesRequestedSavingsProtection")}
+                    {renderToggleField("ff-services-pensionPlanning", "Pension Planning", "servicesRequestedPensionPlanning")}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.fullName,
+                    resolvedDraft.dateOfBirth,
+                    resolvedDraft.email,
+                    resolvedDraft.mobileNumber,
+                    resolvedDraft.homeAddressLine1,
+                    resolvedDraft.maritalStatus,
+                  ])}
+                  isOpen={factFindAccordion.isOpen("personal-details")}
+                  onToggle={() => factFindAccordion.toggle("personal-details")}
+                  title="Personal Details"
+                >
+                  <div className="form-grid">
+                    {renderTextInput("ff-fullName", "Name", "fullName")}
+                    <Select
+                      id="ff-maritalStatus"
+                      label="Marital status"
+                      onChange={(event) => updateField("maritalStatus", event.target.value)}
+                      options={[
+                        { value: "", label: "Select status" },
+                        { value: "Single", label: "Single" },
+                        { value: "Married", label: "Married" },
+                        { value: "Civil Partnership", label: "Civil Partnership" },
+                        { value: "Divorced", label: "Divorced" },
+                        { value: "Widowed", label: "Widowed" },
+                        { value: "Separated", label: "Separated" },
+                      ]}
+                      value={resolvedDraft.maritalStatus}
+                    />
+                    {renderTextInput("ff-homeAddress1", "Home address line 1", "homeAddressLine1")}
+                    {renderTextInput("ff-homeAddress2", "Home address line 2", "homeAddressLine2")}
+                    {renderTextInput("ff-homeAddress3", "Home address line 3", "clientHomeAddressLine3")}
+                    {renderTextInput("ff-homeAddress4", "Home address line 4", "clientHomeAddressLine4")}
+                    {renderTextInput("ff-workAddress1", "Work address line 1", "clientWorkAddressLine1")}
+                    {renderTextInput("ff-workAddress2", "Work address line 2", "clientWorkAddressLine2")}
+                    {renderTextInput("ff-workAddress3", "Work address line 3", "clientWorkAddressLine3")}
+                    {renderTextInput("ff-workAddress4", "Work address line 4", "clientWorkAddressLine4")}
+                    {renderTextInput("ff-dob", "Date of Birth", "dateOfBirth", "date")}
+                    <Select
+                      id="ff-gender"
+                      label="Gender"
+                      onChange={(event) => updateField("gender", event.target.value)}
+                      options={genderOptions}
+                      value={resolvedDraft.gender}
+                    />
+                    {renderTextInput("ff-email", "Email", "email", "email")}
+                    {renderTextInput("ff-phone", "Home / Mobile", "mobileNumber", "tel")}
+                    {renderTextInput("ff-workPhone", "Work Phone", "workPhone", "tel")}
+                    {renderTextInput("ff-partnerName", "Partner Name", "partnerName")}
+                    {renderTextInput("ff-partnerDob", "Partner Date of Birth", "partnerDateOfBirth", "date")}
+                    {renderTextInput("ff-partnerAddress1", "Partner address line 1", "partnerAddressLine1")}
+                    {renderTextInput("ff-partnerAddress2", "Partner address line 2", "partnerAddressLine2")}
+                    {renderTextInput("ff-partnerAddress3", "Partner address line 3", "partnerAddressLine3")}
+                    {renderTextInput("ff-partnerAddress4", "Partner address line 4", "partnerAddressLine4")}
+                    {renderTextInput("ff-partnerHomeMobile", "Partner Home / Mobile", "partnerHomeMobile", "tel")}
+                    {renderTextInput("ff-partnerWorkPhone", "Partner Work Phone", "partnerWorkPhone", "tel")}
+                    {renderTextInput("ff-partnerEmail", "Partner Email", "partnerEmail", "email")}
+                    {renderTextInput("ff-dependantsSummary", "Dependants", "dependantsSummary")}
+                  </div>
+                </AccordionItem>
 
             <AccordionItem
               indicator={getSectionProgress([resolvedDraft.occupation, resolvedDraft.employmentStatus, resolvedDraft.income, resolvedDraft.advisorName])}
@@ -855,13 +1157,7 @@ export function IncomeProtectionPage() {
               title="Employment Details"
             >
               <div className="form-grid">
-                <Input
-                  id="ff-occupation"
-                  label="Occupation"
-                  onChange={(event) => updateField("occupation", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.occupation}
-                />
+                {renderTextInput("ff-occupation", "Occupation", "occupation")}
                 <Select
                   id="ff-employmentStatus"
                   label="Employment status"
@@ -886,6 +1182,8 @@ export function IncomeProtectionPage() {
                   type="text"
                   value={resolvedDraft.advisorName}
                 />
+                {renderToggleField("ff-employed", "Employed", "employed")}
+                {renderToggleField("ff-selfEmployed", "Self Employed", "selfEmployed")}
               </div>
             </AccordionItem>
 
@@ -965,7 +1263,154 @@ export function IncomeProtectionPage() {
                   value={resolvedDraft.phiIndexation}
                 />
               </div>
+              <div className="form-section">
+                <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
+                  Income Protection with No Deferred Period
+                </p>
+                <div className="form-grid">
+                  {renderTextInput("ff-noDeferredProvider", "No deferred provider", "incomeProtectionNoDeferredProvider")}
+                  {renderCurrencyInput("ff-noDeferredWeeklyCover", "No deferred current weekly cover", "incomeProtectionNoDeferredCurrentWeeklyCover")}
+                  {renderCurrencyInput("ff-noDeferredMonthlyPremium", "No deferred monthly premium", "incomeProtectionNoDeferredMonthlyPremium")}
+                  {renderToggleField("ff-noDeferredDentistProvident", "Dentist Provident", "incomeProtectionNoDeferredDentistProvident")}
+                  {renderToggleField("ff-noDeferredDentistGeneral", "Dentist & General", "incomeProtectionNoDeferredDentistGeneral")}
+                  {renderToggleField("ff-noDeferredOther", "Other", "incomeProtectionNoDeferredOther")}
+                  {renderToggleField("ff-noDeferredAge60", "Cover to Age 60", "incomeProtectionNoDeferredCoverToAge60")}
+                  {renderToggleField("ff-noDeferredAge65", "Cover to Age 65", "incomeProtectionNoDeferredCoverToAge65")}
+                </div>
+              </div>
+              <div className="form-section">
+                <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
+                  Income Protection with Deferred Period
+                </p>
+                <div className="form-grid">
+                  {renderTextInput("ff-deferredProviderDetailed", "Deferred period provider", "incomeProtectionDeferredProvider")}
+                  {renderCurrencyInput("ff-deferredWeeklyCover", "Deferred current weekly cover", "incomeProtectionDeferredCurrentWeeklyCover")}
+                  {renderCurrencyInput("ff-deferredMonthlyPremium", "Deferred monthly premium", "incomeProtectionDeferredMonthlyPremium")}
+                  {renderToggleField("ff-deferredFriendsFirst", "Friends First", "incomeProtectionDeferredFriendsFirst")}
+                  {renderToggleField("ff-deferredIrishLife", "Irish Life", "incomeProtectionDeferredIrishLife")}
+                  {renderToggleField("ff-deferredOther", "Other", "incomeProtectionDeferredOther")}
+                  {renderToggleField("ff-deferred13Weeks", "13 Weeks", "incomeProtectionDeferred13Weeks")}
+                  {renderToggleField("ff-deferred26Weeks", "26 Weeks", "incomeProtectionDeferred26Weeks")}
+                  {renderToggleField("ff-deferred52Weeks", "52 Weeks", "incomeProtectionDeferred52Weeks")}
+                  {renderToggleField("ff-deferredAge60", "Deferred Cover to Age 60", "incomeProtectionDeferredCoverToAge60")}
+                  {renderToggleField("ff-deferredAge65", "Deferred Cover to Age 65", "incomeProtectionDeferredCoverToAge65")}
+                </div>
+              </div>
             </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.assetHomeSelf,
+                    resolvedDraft.liabilityMortgageAmount,
+                    resolvedDraft.totalLiabilitiesPerMonthSelf,
+                  ])}
+                  isOpen={factFindAccordion.isOpen("assets-liabilities")}
+                  onToggle={() => factFindAccordion.toggle("assets-liabilities")}
+                  title="Assets & Liabilities"
+                >
+                  <div className="form-section">
+                    <h3 className="form-section-title">Assets</h3>
+                    <div className="table-wrap-flush">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Asset</th>
+                            <th>Self</th>
+                            <th>Partner</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {renderAssetRow("Home", "assetHomeSelf", "assetHomePartner", "ff-asset-home")}
+                          {renderAssetRow("Land / Property", "assetLandPropertySelf", "assetLandPropertyPartner", "ff-asset-land")}
+                          {renderAssetRow("Bank / Build Soc", "assetBankBuildSocSelf", "assetBankBuildSocPartner", "ff-asset-bank")}
+                          {renderAssetRow("Credit Union", "assetCreditUnionSelf", "assetCreditUnionPartner", "ff-asset-credit-union")}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="form-section">
+                    <h3 className="form-section-title">Liabilities</h3>
+                    <div className="table-wrap-flush">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Liability</th>
+                            <th>Amount</th>
+                            <th>Monthly Repayments</th>
+                            <th>Bank / Mortgage Provider</th>
+                            <th>Balance Outstanding</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {renderLiabilityRow("Mortgage", "liabilityMortgageAmount", "liabilityMortgageMonthlyRepayment", "liabilityMortgageProvider", "liabilityMortgageBalanceOutstanding", "ff-liability-mortgage")}
+                          {renderLiabilityRow("Car Loan", "liabilityCarLoanAmount", "liabilityCarLoanMonthlyRepayment", "liabilityCarLoanProvider", "liabilityCarLoanBalanceOutstanding", "ff-liability-car")}
+                          {renderLiabilityRow("Other Loan Payments", "liabilityOtherLoanPaymentsAmount", "liabilityOtherLoanPaymentsMonthlyRepayment", "liabilityOtherLoanPaymentsProvider", "liabilityOtherLoanPaymentsBalanceOutstanding", "ff-liability-other-loans")}
+                          {renderLiabilityRow("Others", "liabilityOthersAmount", "liabilityOthersMonthlyRepayment", "liabilityOthersProvider", "liabilityOthersBalanceOutstanding", "ff-liability-others")}
+                        </tbody>
+                      </table>
+                    </div>
+                    {renderTextarea("ff-liabilityOthersDetails", "Please give details - utilities & household bills, transport & travel, living costs.", "liabilityOthersDetails")}
+                  </div>
+                  <div className="form-grid">
+                    {renderCurrencyInput("ff-totalLiabilitySelf", "Total liabilities per month - Self", "totalLiabilitiesPerMonthSelf")}
+                    {renderCurrencyInput("ff-totalLiabilityPartner", "Total liabilities per month - Partner", "totalLiabilitiesPerMonthPartner")}
+                    {renderCurrencyInput("ff-totalLiabilityJoint", "Total liabilities per month - Joint", "totalLiabilitiesPerMonthJoint")}
+                  </div>
+                  {renderYesNoGroup("Are your liabilities covered by any other insurance?", "liabilitiesCoveredByOtherInsuranceYes", "liabilitiesCoveredByOtherInsuranceNo", "ff-liabilities-covered")}
+                  {renderTextarea("ff-liabilitiesCoveredDetails", "If yes, please provide details.", "liabilitiesCoveredByOtherInsuranceDetails")}
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.selfRetirementAge,
+                    resolvedDraft.selfEmployeeDirectorSchemeType,
+                    resolvedDraft.selfPersonalPensionCompany,
+                  ])}
+                  isOpen={factFindAccordion.isOpen("pension-self")}
+                  onToggle={() => factFindAccordion.toggle("pension-self")}
+                  title="Pension Arrangements - Self"
+                >
+                  {renderPensionSection("self")}
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.partnerRetirementAge,
+                    resolvedDraft.partnerEmployeeDirectorSchemeType,
+                    resolvedDraft.partnerPersonalPensionCompany,
+                  ])}
+                  isOpen={factFindAccordion.isOpen("pension-partner")}
+                  onToggle={() => factFindAccordion.toggle("pension-partner")}
+                  title="Pension Arrangements - Partner"
+                >
+                  {renderPensionSection("partner")}
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.savingsInvestmentRows[0]?.financialInstitution ?? "",
+                    resolvedDraft.savingsInvestmentRows[1]?.financialInstitution ?? "",
+                    resolvedDraft.savingsInvestmentRows[2]?.financialInstitution ?? "",
+                  ])}
+                  isOpen={factFindAccordion.isOpen("savings-investments")}
+                  onToggle={() => factFindAccordion.toggle("savings-investments")}
+                  title="Savings & Investments"
+                >
+                  <div className="table-wrap-flush">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Financial Institution</th>
+                          <th>Value</th>
+                          <th>Start Date</th>
+                          <th>Term</th>
+                        </tr>
+                      </thead>
+                      <tbody>{resolvedDraft.savingsInvestmentRows.map((_, index) => renderSavingsInvestmentRow(index))}</tbody>
+                    </table>
+                  </div>
+                  {renderTextarea("ff-savings-comments", "Comments", "savingsInvestmentComments")}
+                </AccordionItem>
 
             <AccordionItem
               indicator={getSectionProgress([
@@ -978,6 +1423,30 @@ export function IncomeProtectionPage() {
               onToggle={() => factFindAccordion.toggle("life-insurance")}
               title="Life Insurance & Serious Illness"
             >
+              {renderYesNoGroup("Mortgage Protection", "mortgageProtectionYes", "mortgageProtectionNo", "ff-mortgage-protection")}
+              <div className="table-wrap-flush">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Cover Type</th>
+                      <th>Self</th>
+                      <th>Partner</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Life Insurance</td>
+                      <td>{renderCurrencyInput("ff-selfLifeInsuranceAmount", "Life Insurance self", "selfLifeInsuranceAmount")}</td>
+                      <td>{renderCurrencyInput("ff-partnerLifeInsuranceAmount", "Life Insurance partner", "partnerLifeInsuranceAmount")}</td>
+                    </tr>
+                    <tr>
+                      <td>Serious Illness</td>
+                      <td>{renderCurrencyInput("ff-selfSeriousIllnessAmount", "Serious Illness self", "selfSeriousIllnessAmount")}</td>
+                      <td>{renderCurrencyInput("ff-partnerSeriousIllnessAmountTable", "Serious Illness partner", "partnerSeriousIllnessAmount")}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
               <div className="form-grid">
                 <Input
                   id="ff-mortgageProtection"
@@ -1062,25 +1531,23 @@ export function IncomeProtectionPage() {
               title="Client Declarations"
             >
               <div className="form-grid">
-                <Input
-                  id="ff-executionOnlyConfirmation"
-                  label="Execution-only confirmation"
-                  onChange={(event) => updateField("executionOnlyConfirmation", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.executionOnlyConfirmation}
-                />
-                <Input
-                  id="ff-termsReviewedReceived"
-                  label="Terms of Business reviewed and copy received"
-                  onChange={(event) => updateField("termsReviewedReceived", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.termsReviewedReceived}
-                />
+                {renderToggleField(
+                  "ff-executionOnlyConfirmation",
+                  "I confirm that I wish to proceed with this financial agreement on an execution only basis",
+                  "executionOnlyConfirmation",
+                )}
+                {renderToggleField(
+                  "ff-termsReviewedReceived",
+                  "I confirm that I have reviewed the Terms of Business and received a copy",
+                  "termsReviewedReceived",
+                )}
               </div>
             </AccordionItem>
 
             <AccordionItem
               indicator={getSectionProgress([
+                resolvedDraft.doNotContact,
+                resolvedDraft.agreeToMarketing,
                 resolvedDraft.contactByPhone,
                 resolvedDraft.contactBySms,
                 resolvedDraft.contactByEmail,
@@ -1090,55 +1557,50 @@ export function IncomeProtectionPage() {
               onToggle={() => factFindAccordion.toggle("marketing-preferences")}
               title="Data Protection & Marketing Preferences"
             >
+              <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                Let us know whether you wish to receive product and service information and which contact methods you consent to for marketing communications.
+              </p>
               <div className="form-grid">
-                <Toggle
-                  checked={toLower(resolvedDraft.contactByPhone).startsWith("y")}
-                  id="ff-contactByPhone"
-                  label="Contact by phone"
-                  onChange={(event) => updateField("contactByPhone", event.target.checked ? "Yes" : "No")}
-                />
-                <Toggle
-                  checked={toLower(resolvedDraft.contactBySms).startsWith("y")}
-                  id="ff-contactBySms"
-                  label="Contact by SMS"
-                  onChange={(event) => updateField("contactBySms", event.target.checked ? "Yes" : "No")}
-                />
-                <Toggle
-                  checked={toLower(resolvedDraft.contactByEmail).startsWith("y")}
-                  id="ff-contactByEmail"
-                  label="Contact by email"
-                  onChange={(event) => updateField("contactByEmail", event.target.checked ? "Yes" : "No")}
-                />
-                <Toggle
-                  checked={toLower(resolvedDraft.contactByPost).startsWith("y")}
-                  id="ff-contactByPost"
-                  label="Contact by post"
-                  onChange={(event) => updateField("contactByPost", event.target.checked ? "Yes" : "No")}
-                />
+                {renderToggleField(
+                  "ff-doNotContact",
+                  "I/We do not wish to be contacted and/or receive information on products and services",
+                  "doNotContact",
+                )}
+                {renderToggleField(
+                  "ff-agreeToMarketing",
+                  "I/We agree to be contacted for the provision of marketing information on the products and services offered by Omega Financial Management",
+                  "agreeToMarketing",
+                )}
+                {renderToggleField("ff-contactByPhone", "Phone", "contactByPhone")}
+                {renderToggleField("ff-contactBySms", "SMS", "contactBySms")}
+                {renderToggleField("ff-contactByEmail", "Email", "contactByEmail")}
+                {renderToggleField("ff-contactByPost", "Post", "contactByPost")}
               </div>
             </AccordionItem>
 
             <AccordionItem
-              indicator={getSectionProgress([resolvedDraft.pepConfirmation, resolvedDraft.pepRelatedConfirmation])}
+              indicator={getSectionProgress([
+                resolvedDraft.pepConfirmation,
+                resolvedDraft.pepRelatedConfirmation,
+                resolvedDraft.pepDeclarationConfirmed,
+                resolvedDraft.pepDirectlyRelatedConfirmed,
+              ])}
               isOpen={factFindAccordion.isOpen("pep")}
               onToggle={() => factFindAccordion.toggle("pep")}
               title="PEP Confirmation"
             >
+              <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                A politically exposed person (PEP) is an individual who is or has been entrusted with a prominent public function. Many PEPs hold positions of influence and as a result carry a greater risk if their influence is abused for the purpose of money laundering, corruption or bribery.
+              </p>
               <div className="form-grid">
-                <Input
-                  id="ff-pepConfirmation"
-                  label="Politically Exposed Person confirmation"
-                  onChange={(event) => updateField("pepConfirmation", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.pepConfirmation}
-                />
-                <Input
-                  id="ff-pepRelatedConfirmation"
-                  label="Related to a PEP"
-                  onChange={(event) => updateField("pepRelatedConfirmation", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.pepRelatedConfirmation}
-                />
+                {renderToggleField(
+                  "ff-pepDeclarationConfirmed",
+                  "I/We confirm that I/We are not PEP's nor are we directly related to a PEP as defined by the Criminal Justice Act 2010",
+                  "pepDeclarationConfirmed",
+                )}
+                {renderToggleField("ff-pepConfirmation", "Politically exposed person confirmation", "pepConfirmation")}
+                {renderToggleField("ff-pepRelatedConfirmation", "Related to a PEP confirmation", "pepRelatedConfirmation")}
+                {renderToggleField("ff-pepDirectlyRelatedConfirmed", "Directly related to a PEP", "pepDirectlyRelatedConfirmed")}
               </div>
             </AccordionItem>
 
@@ -1159,18 +1621,34 @@ export function IncomeProtectionPage() {
               </div>
             </AccordionItem>
 
+                <AccordionItem
+                  indicator={getSectionProgress([resolvedDraft.recommendationAcknowledged])}
+                  isOpen={factFindAccordion.isOpen("recommendation-acknowledgement")}
+                  onToggle={() => factFindAccordion.toggle("recommendation-acknowledgement")}
+                  title="Recommendation Acknowledgement"
+                >
+                  <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                    I/We understood the recommendation is based on the information disclosed and that the actions agreed are to my / our satisfaction.
+                  </p>
+                  <div className="form-grid">
+                    {renderToggleField("ff-recommendationAcknowledged", "Confirmed / agreed", "recommendationAcknowledged")}
+                  </div>
+                </AccordionItem>
+
             <AccordionItem
               indicator={getSectionProgress([
                 resolvedDraft.clientSignature1,
                 resolvedDraft.clientSignature1Date,
                 resolvedDraft.clientSignature2,
+                resolvedDraft.clientSignature2Date,
                 resolvedDraft.financialAdvisorSignature,
+                resolvedDraft.financialAdvisorSignatureDate,
               ])}
               isOpen={factFindAccordion.isOpen("signatures")}
               onToggle={() => factFindAccordion.toggle("signatures")}
               title="Signatures"
             >
-              <div className="card mb-4">
+              <div className="form-section" style={{ marginBottom: "var(--space-4)" }}>
                 <div className="form-grid">
                   <Input
                     id="ff-clientSignature1"
@@ -1194,11 +1672,25 @@ export function IncomeProtectionPage() {
                     value={resolvedDraft.clientSignature2}
                   />
                   <Input
+                    id="ff-clientSignature2Date"
+                    label="Client signature 2 date"
+                    onChange={(event) => updateField("clientSignature2Date", event.target.value)}
+                    type="date"
+                    value={resolvedDraft.clientSignature2Date}
+                  />
+                  <Input
                     id="ff-financialAdvisorSignature"
-                    label="Financial advisor signature"
+                    label="Financial Advisor's Signature"
                     onChange={(event) => updateField("financialAdvisorSignature", event.target.value)}
                     type="text"
                     value={resolvedDraft.financialAdvisorSignature}
+                  />
+                  <Input
+                    id="ff-financialAdvisorSignatureDate"
+                    label="Financial Advisor Signature Date"
+                    onChange={(event) => updateField("financialAdvisorSignatureDate", event.target.value)}
+                    type="date"
+                    value={resolvedDraft.financialAdvisorSignatureDate}
                   />
                 </div>
               </div>
@@ -1206,9 +1698,9 @@ export function IncomeProtectionPage() {
 
             <AccordionItem
               indicator={getSectionProgress([
-                resolvedDraft.fullName,
-                `${resolvedDraft.townCity}, ${resolvedDraft.county}`,
-                resolvedDraft.dateOfBirth,
+                resolvedDraft.requestClientNames,
+                resolvedDraft.requestInfoAddressLine1,
+                resolvedDraft.requestDateOfBirth,
                 resolvedDraft.requestCompanyName,
                 resolvedDraft.requestPolicies,
                 resolvedDraft.requestLetterDate,
@@ -1217,52 +1709,31 @@ export function IncomeProtectionPage() {
               onToggle={() => factFindAccordion.toggle("request-for-information")}
               title="Request for Information"
             >
+              <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                I/We request that you furnish Omega Financial Management, Suite 31 The Mall, Beacon Court, Sandyford, Dublin 18 with all of the information they require to prepare a full analysis of all of my Pension, Life Assurance, Income Protection and Investment Policies.
+              </p>
               <div className="form-grid">
-                <Input
-                  id="ff-rfi-fullName"
-                  label="Client name(s)"
-                  onChange={(event) => updateField("fullName", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.fullName}
-                />
-                <Input
-                  id="ff-rfi-address"
-                  label="Address"
-                  onChange={(event) => updateRequestInformationAddress(event.target.value)}
-                  type="text"
-                  value={`${resolvedDraft.townCity}, ${resolvedDraft.county}`.replace(/^,\s*/, "")}
-                />
-                <Input
-                  id="ff-rfi-dob"
-                  label="Date of birth"
-                  onChange={(event) => updateField("dateOfBirth", event.target.value)}
-                  type="date"
-                  value={resolvedDraft.dateOfBirth}
-                />
-                <Input
-                  id="ff-requestCompanyName"
-                  label="Company/provider name"
-                  onChange={(event) => updateField("requestCompanyName", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.requestCompanyName}
-                />
-                <Input
-                  id="ff-requestPolicies"
-                  label="Policies"
-                  onChange={(event) => updateField("requestPolicies", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.requestPolicies}
-                />
-                <Input
-                  id="ff-requestLetterDate"
-                  label="Request letter date"
-                  onChange={(event) => updateField("requestLetterDate", event.target.value)}
-                  type="date"
-                  value={resolvedDraft.requestLetterDate}
-                />
+                {renderTextInput("ff-requestClientNames", "Client Name(s)", "requestClientNames")}
+                {renderTextInput("ff-requestInfoAddressLine1", "Request information address line 1", "requestInfoAddressLine1")}
+                {renderTextInput("ff-requestInfoAddressLine2", "Request information address line 2", "requestInfoAddressLine2")}
+                {renderTextInput("ff-requestInfoAddressLine3", "Request information address line 3", "requestInfoAddressLine3")}
+                {renderTextInput("ff-requestInfoAddressLine4", "Request information address line 4", "requestInfoAddressLine4")}
+                {renderTextInput("ff-requestDateOfBirth", "Date of Birth", "requestDateOfBirth", "date")}
+                {renderTextInput("ff-requestClientSignature", "Client(s) signature", "requestClientSignature")}
+                {renderTextInput("ff-requestLetterDate", "Date", "requestLetterDate", "date")}
+                {renderTextInput("ff-requestCompanyName", "Request information company", "requestCompanyName")}
+                {renderTextInput("ff-requestPolicies", "Policies", "requestPolicies")}
               </div>
+              <p className="text-muted text-small">OFM Financial Ltd T/A Omega Financial Management, regulated by the Central Bank of Ireland.</p>
             </AccordionItem>
               </Accordion>
+              <div className="sticky-action-bar">
+                <span className="sticky-action-bar-status">{factFindDraftSavedLabel}</span>
+                <Button onClick={saveFactFindDraft} variant="primary">
+                  <Save size={18} />
+                  Save Fact Find
+                </Button>
+              </div>
             </AccordionItem>
             <AccordionItem
               indicator={getGeneratedDraftStatusLabel(factFindDraft.generationStatus)}
@@ -1294,6 +1765,141 @@ export function IncomeProtectionPage() {
       );
     }
 
+    if (activeTab.id === "fact-find-update") {
+      const factFindUpdateDraft = getDocumentDraft("Fact Find Update");
+
+      return (
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Fact Find Update Draft</h2>
+            </div>
+          </div>
+
+          <Accordion flush>
+            <AccordionItem
+              indicator={tabProgress["fact-find-update"]}
+              isOpen={factFindUpdateWorkspaceAccordion.isOpen("fact-find-update-form")}
+              onToggle={() => factFindUpdateWorkspaceAccordion.toggle("fact-find-update-form")}
+              title="Fact Find Update Form"
+            >
+              <Accordion flush>
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.factFindUpdatePersonalCircumstances,
+                    resolvedDraft.factFindUpdateFinancialSituation,
+                    resolvedDraft.factFindUpdateNeedsAndObjectives,
+                  ])}
+                  isOpen={factFindUpdateWorkspaceAccordion.isOpen("additional-relevant-information")}
+                  onToggle={() => factFindUpdateWorkspaceAccordion.toggle("additional-relevant-information")}
+                  title="Additional Relevant Information"
+                >
+                  <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                    Please use an additional page if required
+                  </p>
+                  <div className="form-grid">
+                    {renderTextarea(
+                      "ffu-personalCircumstances",
+                      "Personal Circumstances",
+                      "factFindUpdatePersonalCircumstances",
+                      6,
+                      "form-grid-full",
+                    )}
+                    {renderTextarea(
+                      "ffu-financialSituation",
+                      "Financial Situation",
+                      "factFindUpdateFinancialSituation",
+                      6,
+                      "form-grid-full",
+                    )}
+                    {renderTextarea(
+                      "ffu-needsAndObjectives",
+                      "Needs & Objectives",
+                      "factFindUpdateNeedsAndObjectives",
+                      6,
+                      "form-grid-full",
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.factFindUpdateExecutionOnlyBasis,
+                    resolvedDraft.factFindUpdateTermsReviewedReceived,
+                  ])}
+                  isOpen={factFindUpdateWorkspaceAccordion.isOpen("client-declarations")}
+                  onToggle={() => factFindUpdateWorkspaceAccordion.toggle("client-declarations")}
+                  title="Client Declarations"
+                >
+                  <div className="form-grid">
+                    {renderToggleField(
+                      "ffu-executionOnlyBasis",
+                      "I confirm that I wish to proceed with this financial agreement on an execution only basis",
+                      "factFindUpdateExecutionOnlyBasis",
+                    )}
+                    {renderToggleField(
+                      "ffu-termsReviewedReceived",
+                      "I confirm that I have reviewed the Terms of Business and received a copy",
+                      "factFindUpdateTermsReviewedReceived",
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={<Check size={16} className="text-success" />}
+                  isOpen={factFindUpdateWorkspaceAccordion.isOpen("data-protection-marketing-preferences")}
+                  onToggle={() => factFindUpdateWorkspaceAccordion.toggle("data-protection-marketing-preferences")}
+                  title="Data Protection & Marketing Preferences"
+                >
+                  <p>
+                    We collect your personal details in order to provide the highest standard of service to you. We
+                    take great care with the information provided; taking steps to keep it secure and to ensure it is
+                    used only for legitimate purposes. The information you have provided will be treated as confidential
+                    and will be retained by Omega Financial Management in electronic format for the purposes of
+                    providing financial services. We will use your contact details when we need to contact you in respect
+                    of the policy(ies) that you have with us. Under the General Data Protection Regulation 2018 you have
+                    various rights relating to your Personal Data.
+                  </p>
+                </AccordionItem>
+              </Accordion>
+              <div className="sticky-action-bar">
+                <span className="sticky-action-bar-status">{factFindUpdateSavedLabel}</span>
+                <Button onClick={saveFactFindUpdateDraft} variant="primary">
+                  <Save size={18} />
+                  Save Fact Find Update
+                </Button>
+              </div>
+            </AccordionItem>
+            <AccordionItem
+              indicator={getGeneratedDraftStatusLabel(factFindUpdateDraft.generationStatus)}
+              isOpen={factFindUpdateWorkspaceAccordion.isOpen("fact-find-update-output")}
+              onToggle={() => factFindUpdateWorkspaceAccordion.toggle("fact-find-update-output")}
+              title="Generated Output"
+            >
+              <GeneratedOutputWorkspace
+                draft={factFindUpdateDraft}
+                generateDisabled={false}
+                onContentChange={(html) => updateGeneratedOutput("Fact Find Update", html)}
+                onExportDocx={() => void handleGeneratedOutputExport("Fact Find Update", "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport("Fact Find Update", "pdf")}
+                onGenerate={() => void handleFactFindUpdateGenerate()}
+                statusDotClass={getDraftStatusDotClass(factFindUpdateDraft.generationStatus)}
+                statusLabel={factFindUpdateGenerationStatus.replace("Generation: ", "")}
+                templatePicker={
+                  <TemplatePicker
+                    documentType="Fact Find Update"
+                    onChange={(templateId) =>
+                      updateSelectedTemplate(resolvedDraft.clientReference, "Fact Find Update", templateId)
+                    }
+                    selectedTemplateId={factFindUpdateDraft.selectedTemplateId}
+                  />
+                }
+              />
+            </AccordionItem>
+          </Accordion>
+        </div>
+      );
+    }
 
     if (activeTab.id === "statement-of-suitability") {
       const statementDraft = getDocumentDraft("Statement of Suitability");
@@ -1313,20 +1919,13 @@ export function IncomeProtectionPage() {
             </div>
           ) : null}
 
-          <Accordion>
+          <Accordion flush>
             <AccordionItem
               indicator={tabProgress["statement-of-suitability"]}
               isOpen={statementWorkspaceAccordion.isOpen("statement-form")}
               onToggle={() => statementWorkspaceAccordion.toggle("statement-form")}
               title="Statement Form"
             >
-              <div className="generated-output-section-heading">
-                <Button onClick={saveStatementDraft} variant="secondary">
-                  <Save size={16} />
-                  Save
-                </Button>
-                <span className="text-muted text-small">{statementSaveStatus}</span>
-              </div>
               <section className="form-section">
                 <h3 className="form-section-title">Recommendation basics</h3>
                 <div className="form-grid">
@@ -1425,6 +2024,13 @@ export function IncomeProtectionPage() {
               />
             </div>
           </section>
+              <div className="sticky-action-bar">
+                <span className="sticky-action-bar-status">{statementSaveStatus}</span>
+                <Button onClick={saveStatementDraft} variant="primary">
+                  <Save size={18} />
+                  Save Statement
+                </Button>
+              </div>
             </AccordionItem>
             <AccordionItem
               indicator={getGeneratedDraftStatusLabel(statementDraft.generationStatus)}
@@ -1498,9 +2104,9 @@ export function IncomeProtectionPage() {
             <div className="upload-zone-hint">or click to browse</div>
           </div>
 
-          <section className="card">
-            <div className="card-header">
-              <h3 className="card-title">Tracked client files</h3>
+          <section className="section-divided">
+            <div className="section-header">
+              <h3 className="section-title">Tracked client files</h3>
               <div style={{ maxWidth: "260px", width: "100%" }}>
                 <div className="field-input-wrap">
                   <Search size={16} style={{ marginLeft: "12px", color: "var(--color-text-muted)" }} />
@@ -1531,7 +2137,7 @@ export function IncomeProtectionPage() {
                 </Button>
               </div>
             ) : (
-              <div className="file-list">
+              <div className="file-list" style={{ marginTop: "var(--space-4)" }}>
                 {filteredFiles.map((file) => (
                   <div className="file-item" key={file.id}>
                     <div className="file-icon">{getFileIcon(file.originalFilename)}</div>
@@ -1603,7 +2209,7 @@ export function IncomeProtectionPage() {
             </Button>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap-flush">
             <table className="data-table">
               <thead>
                 <tr>
@@ -1676,76 +2282,76 @@ export function IncomeProtectionPage() {
 
   return (
     <div className="page-stack">
-      <section className="card">
-        <section className="workflow-header" aria-label="Selected client summary">
-          <div className="workflow-header-top">
-            <div className="workflow-header-title">
-              <div className="flex items-center gap-3">
-                <h1>Income Protection</h1>
-                <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
-              </div>
+      <section className="workflow-header" aria-label="Selected client summary">
+        <div className="workflow-header-top">
+          <div className="workflow-header-title">
+            <div className="flex items-center gap-3">
+              <h1>Income Protection</h1>
+              <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
             </div>
           </div>
+        </div>
 
-          <div className="workflow-header-grid">
+        <div className="workflow-header-grid">
+          <div className="workflow-client-field">
+            <label className="field-label" htmlFor="client-select">
+              Select workflow client
+            </label>
+            <select
+              className="field-input field-select"
+              id="client-select"
+              onChange={(event) => {
+                if (event.target.value) {
+                  setSelectedClientReference(event.target.value);
+                  window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
+                }
+              }}
+              value={resolvedDraft.clientReference}
+            >
+              {clients.map((entry) => (
+                <option key={entry.clientReference} value={entry.clientReference}>
+                  {entry.fullName} ({entry.clientReference})
+                </option>
+              ))}
+            </select>
             <div className="workflow-header-actions">
-              <div className="workflow-client-field">
-                <label className="field-label" htmlFor="client-select">
-                  Select workflow client
-                </label>
-                <select
-                  className="field-input field-select"
-                  id="client-select"
-                  onChange={(event) => {
-                    if (event.target.value) {
-                      setSelectedClientReference(event.target.value);
-                      window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
-                    }
-                  }}
-                  value={resolvedDraft.clientReference}
-                >
-                  {clients.map((entry) => (
-                    <option key={entry.clientReference} value={entry.clientReference}>
-                      {entry.fullName} ({entry.clientReference})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Link className="btn btn-secondary" to="/clients/new">
+              <Link className="btn btn-primary" to="/clients/new">
                 <Plus size={18} />
                 Add Client
               </Link>
               <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
+                <Edit size={18} />
                 Edit Client
               </Link>
             </div>
+          </div>
 
-            <div className="workflow-summary-bar">
-              <div className="workflow-summary-item">
-                <span className="workflow-summary-label">Client</span>
-                <strong>{resolvedDraft.fullName}</strong>
-              </div>
-              <div className="workflow-summary-item">
-                <span className="workflow-summary-label">Reference</span>
-                <strong>{resolvedDraft.clientReference}</strong>
-              </div>
-              <div className="workflow-summary-item">
-                <span className="workflow-summary-label">DOB</span>
-                <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
-              </div>
-              <div className="workflow-summary-item">
-                <span className="workflow-summary-label">Contact</span>
-                <strong>{summaryContact}</strong>
-              </div>
-              <div className="workflow-summary-item">
-                <span className="workflow-summary-label">Occupation</span>
-                <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
-              </div>
+          <div className="workflow-summary-bar">
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Client</span>
+              <strong>{resolvedDraft.fullName}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Reference</span>
+              <strong>{resolvedDraft.clientReference}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">DOB</span>
+              <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Contact</span>
+              <strong>{summaryContact}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Occupation</span>
+              <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <div aria-label="Income Protection sections" className="tab-list" role="tablist">
+      <div aria-label="Income Protection sections" className="tab-list" role="tablist">
           {moduleTabs.map((tab) => {
             const Icon = tab.icon;
             const progress = tabProgress[tab.id];
@@ -1771,9 +2377,8 @@ export function IncomeProtectionPage() {
           })}
         </div>
 
-        <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
-          {renderTabPanel()}
-        </section>
+      <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
+        {renderTabPanel()}
       </section>
     </div>
   );

@@ -196,7 +196,7 @@ export function ClientsPage() {
 
   return (
     <div className="page-stack">
-      <section className="card">
+      <section className="section-divided">
         <div className="page-heading page-heading-compact">
           <div>
             <h1>Clients</h1>
@@ -217,8 +217,8 @@ export function ClientsPage() {
         </div>
       </section>
 
-      <section className="card">
-        <div className="section-header">
+      <section className="section-divided">
+        <div className="section-toolbar">
           <div className="field" style={{ maxWidth: "320px", width: "100%" }}>
             <label className="field-label" htmlFor="client-search">
               Search clients
@@ -235,12 +235,12 @@ export function ClientsPage() {
               />
             </div>
           </div>
-          <span className="text-muted" style={{ fontSize: "var(--font-size-small)" }}>
+          <span className="section-toolbar-meta">
             {isLoading ? "Loading..." : `${filteredClients.length} result${filteredClients.length === 1 ? "" : "s"} found`}
           </span>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap-flush">
           <table className="data-table">
             <thead>
               <tr>

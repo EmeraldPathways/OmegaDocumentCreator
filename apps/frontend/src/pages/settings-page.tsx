@@ -200,167 +200,164 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <section className="card">
-        <div className="page-heading page-heading-compact">
-          <div>
-            <h1>Settings</h1>
-            <p className="page-subtitle">Configure the Omega Document Creator application.</p>
+      <div className="page-heading page-heading-compact">
+        <div>
+          <h1>Settings</h1>
+          <p className="page-subtitle">Configure the Omega Document Creator application.</p>
+        </div>
+      </div>
+
+      <section className="section-divided">
+        <h2 className="section-title">Core App Settings</h2>
+        <div className="form-grid">
+            <Input
+              error={errors.adminEmail}
+              id="adminEmail"
+              label="Admin email"
+              onChange={(event) => updateField("adminEmail", event.target.value)}
+              type="email"
+              value={settings.adminEmail}
+            />
+            <Input
+              error={errors.appUrl}
+              id="appUrl"
+              label="App URL"
+              onChange={(event) => updateField("appUrl", event.target.value)}
+              type="url"
+              value={settings.appUrl}
+            />
+            <div className="form-grid-full">
+              <div className="field">
+                <label className="field-label" htmlFor="fileStoragePath">
+                  File storage path
+                </label>
+                <div className="field-input-wrap">
+                  <input
+                    className="field-input"
+                    id="fileStoragePath"
+                    onChange={(event) => updateField("fileStoragePath", event.target.value)}
+                    type="text"
+                    value={settings.fileStoragePath}
+                  />
+                  <Button
+                    className="field-suffix field-suffix-action"
+                    onClick={() => testPath("fileStoragePath")}
+                    variant="secondary"
+                  >
+                    Test Path
+                  </Button>
+                </div>
+                {errors.fileStoragePath ? <span className="field-error">{errors.fileStoragePath}</span> : null}
+                {pathTests.fileStoragePath.status !== "idle" ? (
+                  <span className={`field-status ${pathTests.fileStoragePath.status === "success" ? "text-success" : "text-danger"}`}>
+                    {pathTests.fileStoragePath.status === "success" ? <Check size={14} /> : <X size={14} />}
+                    {pathTests.fileStoragePath.message}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="form-grid-full">
+              <div className="field">
+                <label className="field-label" htmlFor="backupPath">
+                  Backup path
+                </label>
+                <div className="field-input-wrap">
+                  <input
+                    className="field-input"
+                    id="backupPath"
+                    onChange={(event) => updateField("backupPath", event.target.value)}
+                    type="text"
+                    value={settings.backupPath}
+                  />
+                  <Button
+                    className="field-suffix field-suffix-action"
+                    onClick={() => testPath("backupPath")}
+                    variant="secondary"
+                  >
+                    Test Path
+                  </Button>
+                </div>
+                {errors.backupPath ? <span className="field-error">{errors.backupPath}</span> : null}
+                {pathTests.backupPath.status !== "idle" ? (
+                  <span className={`field-status ${pathTests.backupPath.status === "success" ? "text-success" : "text-danger"}`}>
+                    {pathTests.backupPath.status === "success" ? <Check size={14} /> : <X size={14} />}
+                    {pathTests.backupPath.message}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <Select
+              id="remoteAccessMode"
+              label="Remote access mode"
+              onChange={(event) => updateField("remoteAccessMode", event.target.value)}
+              options={remoteAccessOptions}
+              value={settings.remoteAccessMode}
+            />
+            <Input
+              error={errors.sessionTimeoutMinutes}
+              hint="Between 5 and 120 minutes"
+              id="sessionTimeoutMinutes"
+              label="Session timeout"
+              max={120}
+              min={5}
+              onChange={(event) => updateField("sessionTimeoutMinutes", event.target.value)}
+              suffix={<span className="text-muted">minutes</span>}
+              type="number"
+              value={settings.sessionTimeoutMinutes}
+            />
           </div>
-          <div className="page-actions">
-            <Button isLoading={saveStatus === "saving"} onClick={saveSettings} variant="primary">
-              {saveStatus === "saved" ? <Check size={18} /> : <Save size={18} />}
-              {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save Settings"}
-            </Button>
-            {saveStatus === "error" ? (
-              <Button onClick={saveSettings} variant="secondary">
-                <RefreshCw size={18} />
-                Retry
-              </Button>
+      </section>
+
+      <section className="section-divided">
+        <h2 className="section-title">AI Readiness</h2>
+        <div className="status-row-flex">
+            <Cpu size={18} color="var(--color-text-muted)" />
+            <span>AI Assistant</span>
+            <Badge variant={aiSettings.enabled ? "approved" : "default"}>{aiStatus}</Badge>
+          </div>
+          <div className="form-grid" style={{ marginTop: "var(--space-4)" }}>
+            <div className="form-grid-full">
+              <Toggle
+                checked={aiSettings.enabled}
+                id="ai-enabled"
+                label="Enable AI Assistant"
+                onChange={(event) => updateAiField("enabled", event.target.checked)}
+              />
+            </div>
+            {aiSettings.enabled ? (
+              <>
+                <Select
+                  id="ai-model"
+                  label="AI model"
+                  onChange={(event) => updateAiField("model", event.target.value)}
+                  options={modelOptions}
+                  value={aiSettings.model}
+                />
+                <Input
+                  id="ai-api-key"
+                  label="API key"
+                  onChange={(event) => updateAiField("apiKey", event.target.value)}
+                  placeholder="sk-..."
+                  type="password"
+                  value={aiSettings.apiKey}
+                />
+              </>
             ) : null}
           </div>
-        </div>
-
-        <div className="form-grid">
-          <section className="form-section">
-            <h2 className="form-section-title">Core App Settings</h2>
-            <div className="form-grid">
-              <Input
-                error={errors.adminEmail}
-                id="adminEmail"
-                label="Admin email"
-                onChange={(event) => updateField("adminEmail", event.target.value)}
-                type="email"
-                value={settings.adminEmail}
-              />
-              <Input
-                error={errors.appUrl}
-                id="appUrl"
-                label="App URL"
-                onChange={(event) => updateField("appUrl", event.target.value)}
-                type="url"
-                value={settings.appUrl}
-              />
-              <div className="form-grid-full">
-                <div className="field">
-                  <label className="field-label" htmlFor="fileStoragePath">
-                    File storage path
-                  </label>
-                  <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1 }}>
-                      <Input
-                        error={errors.fileStoragePath}
-                        id="fileStoragePath"
-                        onChange={(event) => updateField("fileStoragePath", event.target.value)}
-                        type="text"
-                        value={settings.fileStoragePath}
-                      />
-                    </div>
-                    <Button onClick={() => testPath("fileStoragePath")} variant="secondary">
-                      Test Path
-                    </Button>
-                  </div>
-                  {pathTests.fileStoragePath.status !== "idle" ? (
-                    <span
-                      className={pathTests.fileStoragePath.status === "success" ? "text-success" : "text-danger"}
-                      style={{ fontSize: "var(--font-size-small)", marginTop: "var(--space-2)", display: "flex", alignItems: "center", gap: "6px" }}
-                    >
-                      {pathTests.fileStoragePath.status === "success" ? <Check size={14} /> : <X size={14} />}
-                      {pathTests.fileStoragePath.message}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <div className="form-grid-full">
-                <div className="field">
-                  <label className="field-label" htmlFor="backupPath">
-                    Backup path
-                  </label>
-                  <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1 }}>
-                      <Input
-                        error={errors.backupPath}
-                        id="backupPath"
-                        onChange={(event) => updateField("backupPath", event.target.value)}
-                        type="text"
-                        value={settings.backupPath}
-                      />
-                    </div>
-                    <Button onClick={() => testPath("backupPath")} variant="secondary">
-                      Test Path
-                    </Button>
-                  </div>
-                  {pathTests.backupPath.status !== "idle" ? (
-                    <span
-                      className={pathTests.backupPath.status === "success" ? "text-success" : "text-danger"}
-                      style={{ fontSize: "var(--font-size-small)", marginTop: "var(--space-2)", display: "flex", alignItems: "center", gap: "6px" }}
-                    >
-                      {pathTests.backupPath.status === "success" ? <Check size={14} /> : <X size={14} />}
-                      {pathTests.backupPath.message}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <Select
-                id="remoteAccessMode"
-                label="Remote access mode"
-                onChange={(event) => updateField("remoteAccessMode", event.target.value)}
-                options={remoteAccessOptions}
-                value={settings.remoteAccessMode}
-              />
-              <Input
-                error={errors.sessionTimeoutMinutes}
-                hint="Between 5 and 120 minutes"
-                id="sessionTimeoutMinutes"
-                label="Session timeout"
-                max={120}
-                min={5}
-                onChange={(event) => updateField("sessionTimeoutMinutes", event.target.value)}
-                suffix={<span className="text-muted">minutes</span>}
-                type="number"
-                value={settings.sessionTimeoutMinutes}
-              />
-            </div>
-          </section>
-
-          <section className="form-section">
-            <h2 className="form-section-title">AI Readiness</h2>
-            <div className="status-row-flex">
-              <Cpu size={18} color="var(--color-text-muted)" />
-              <span>AI Assistant</span>
-              <Badge variant={aiSettings.enabled ? "approved" : "default"}>{aiStatus}</Badge>
-            </div>
-            <div className="form-grid" style={{ marginTop: "var(--space-4)" }}>
-              <div className="form-grid-full">
-                <Toggle
-                  checked={aiSettings.enabled}
-                  id="ai-enabled"
-                  label="Enable AI Assistant"
-                  onChange={(event) => updateAiField("enabled", event.target.checked)}
-                />
-              </div>
-              {aiSettings.enabled ? (
-                <>
-                  <Select
-                    id="ai-model"
-                    label="AI model"
-                    onChange={(event) => updateAiField("model", event.target.value)}
-                    options={modelOptions}
-                    value={aiSettings.model}
-                  />
-                  <Input
-                    id="ai-api-key"
-                    label="API key"
-                    onChange={(event) => updateAiField("apiKey", event.target.value)}
-                    placeholder="sk-..."
-                    type="password"
-                    value={aiSettings.apiKey}
-                  />
-                </>
-              ) : null}
-            </div>
-          </section>
-        </div>
       </section>
+
+      <div className="sticky-action-bar">
+        {saveStatus === "error" ? (
+          <Button onClick={saveSettings} variant="secondary">
+            <RefreshCw size={18} />
+            Retry
+          </Button>
+        ) : null}
+        <Button isLoading={saveStatus === "saving"} onClick={saveSettings} variant="primary">
+          {saveStatus === "saved" ? <Check size={18} /> : <Save size={18} />}
+          {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save Settings"}
+        </Button>
+      </div>
     </div>
   );
 }

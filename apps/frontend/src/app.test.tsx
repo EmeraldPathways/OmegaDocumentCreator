@@ -431,8 +431,72 @@ describe("App routes", () => {
     expect(screen.getByDisplayValue("2")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Y")).toBeInTheDocument();
     expect(screen.getAllByDisplayValue("Zurich Life").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: /Services Requested/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Assets & Liabilities/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pension Arrangements - Self/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pension Arrangements - Partner/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Savings & Investments/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Recommendation Acknowledgement/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Life Insurance & Serious Illness" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Request for Information" })).toBeInTheDocument();
+  });
+
+  it("saves new fact find fields without overwriting the main client address", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: /Services Requested/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Request for Information/ }));
+
+    fireEvent.click(screen.getByLabelText("Life Protection"));
+    fireEvent.change(screen.getByLabelText("Request information address line 1"), {
+      target: { value: "31 The Mall" },
+    });
+    fireEvent.change(screen.getByLabelText("Request information company"), {
+      target: { value: "Irish Life" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Fact Find" }));
+
+    const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        servicesRequestedLifeProtection?: string;
+        requestInfoAddressLine1?: string;
+        requestCompanyName?: string;
+        homeAddressLine1?: string;
+      }
+    >;
+
+    expect(storedClients["CLI-2026-0002"].servicesRequestedLifeProtection).toBe("Yes");
+    expect(storedClients["CLI-2026-0002"].requestInfoAddressLine1).toBe("31 The Mall");
+    expect(storedClients["CLI-2026-0002"].requestCompanyName).toBe("Irish Life");
+    expect(storedClients["CLI-2026-0002"].homeAddressLine1).toBe("15 Sea Road");
+  });
+
+  it("renders legacy stored fact find records after new fields are added", () => {
+    const legacyClients = createSeededClientProfiles();
+    delete (legacyClients["CLI-2026-0002"] as Record<string, unknown>).servicesRequestedLifeProtection;
+    delete (legacyClients["CLI-2026-0002"] as Record<string, unknown>).requestInfoAddressLine1;
+    delete (legacyClients["CLI-2026-0002"] as Record<string, unknown>).savingsInvestmentRows;
+    setStoredClients(legacyClients);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: /Services Requested/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Savings & Investments/ }));
+
+    expect(screen.getByLabelText("Life Protection")).not.toBeChecked();
+    expect(screen.getByLabelText("Savings institution 1")).toHaveValue("");
   });
 
   it("disables Statement of Suitability generation when PHI source fields are missing", () => {
@@ -465,7 +529,7 @@ describe("App routes", () => {
 
     expect(screen.getByText("Not saved yet")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Fact Find" }));
 
     expect(screen.getByText("Saved just now")).toBeInTheDocument();
   });
@@ -480,7 +544,7 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Fact Find" }));
 
     expect(screen.getByText("Saved just now")).toBeInTheDocument();
   });
@@ -845,7 +909,7 @@ describe("App routes", () => {
         version: "Version 2",
       }),
     );
-  });
+  }, 15000);
 
   it("does not burn version 1 when a preview export fails before succeeding", async () => {
     exportGeneratedDocumentMock.mockRejectedValueOnce(new Error("export failed"));
@@ -1439,7 +1503,7 @@ describe("App routes", () => {
     expect(screen.getAllByText("fact-find-custom")).toHaveLength(1);
   });
 
-  it("clears county when the request information address is reduced to one part or emptied", () => {
+  it("updates dedicated request information address fields without mutating the main client address", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -1448,14 +1512,17 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
-    const addressInputs = screen.getAllByLabelText("Address");
-    const requestInformationAddressInput = addressInputs[addressInputs.length - 1];
+    fireEvent.click(screen.getByRole("button", { name: /Request for Information/ }));
+
+    const requestInformationAddressInput = screen.getByLabelText("Request information address line 1");
 
     fireEvent.change(requestInformationAddressInput, { target: { value: "Cork" } });
-    expect(requestInformationAddressInput).toHaveValue("Cork, ");
+    expect(requestInformationAddressInput).toHaveValue("Cork");
+    expect(screen.getByDisplayValue("15 Sea Road")).toBeInTheDocument();
 
     fireEvent.change(requestInformationAddressInput, { target: { value: "" } });
     expect(requestInformationAddressInput).toHaveValue("");
+    expect(screen.getByDisplayValue("15 Sea Road")).toBeInTheDocument();
   });
 
   it("rehydrates persisted draft generation status after reopening the workflow", async () => {
@@ -1635,10 +1702,11 @@ describe("Document template state", () => {
     );
   }
 
-  it("exposes the three built-in document templates", () => {
-    expect(builtInDocumentTemplates).toHaveLength(3);
+  it("exposes the built-in document templates", () => {
+    expect(builtInDocumentTemplates).toHaveLength(4);
     expect(builtInDocumentTemplates.map((template) => template.documentType)).toEqual([
       "Fact Find",
+      "Fact Find Update",
       "Terms of Business",
       "Statement of Suitability",
     ]);

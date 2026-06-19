@@ -233,7 +233,7 @@ export function ClientProfilePage() {
 
   return (
     <div className="page-stack">
-      <section className="card">
+      <section className="section-divided">
         <div className="profile-header">
           <nav aria-label="Breadcrumb" className="breadcrumb">
             <Link to="/clients">Clients</Link>
@@ -273,7 +273,7 @@ export function ClientProfilePage() {
 
         <div className="profile-grid">
           <div className="profile-section">
-            <h2 className="card-title">
+            <h2 className="section-title">
               <Users size={20} />
               Personal Information
             </h2>
@@ -288,7 +288,7 @@ export function ClientProfilePage() {
           </div>
 
           <div className="profile-section">
-            <h2 className="card-title">
+            <h2 className="section-title">
               <FolderOpen size={20} />
               Address
             </h2>
@@ -303,14 +303,14 @@ export function ClientProfilePage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="section-divided">
         <div className="section-header">
-          <h2 className="card-title">
+          <h2 className="section-title">
             <FileText size={20} />
             Generated Documents
           </h2>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap-flush">
           <table className="data-table">
             <thead>
               <tr>
@@ -355,9 +355,9 @@ export function ClientProfilePage() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="section-divided">
         <div className="section-header">
-          <h2 className="card-title">
+          <h2 className="section-title">
             <FolderOpen size={20} />
             Files
           </h2>
@@ -379,7 +379,7 @@ export function ClientProfilePage() {
             </Button>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap-flush">
             <table className="data-table">
               <thead>
                 <tr>
@@ -430,9 +430,9 @@ export function ClientProfilePage() {
         )}
       </section>
 
-      <section className="card">
+      <section className="section-divided">
         <div className="section-header">
-          <h2 className="card-title">
+          <h2 className="section-title">
             <Users size={20} />
             Dependants
           </h2>
