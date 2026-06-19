@@ -26,7 +26,13 @@ vi.mock("./documents/word-export", () => ({
 }));
 
 function createGenerateDocumentResponse(
-  overrides?: Partial<{ generatedHtml: string; sectionBodyHtml: string; title: string; sectionTitle: string }>,
+  overrides?: Partial<{
+    generatedHtml: string;
+    sectionBodyHtml: string;
+    title: string;
+    sectionTitle: string;
+    integrationRequests: unknown[];
+  }>,
 ) {
   return {
     ok: true,
@@ -43,6 +49,7 @@ function createGenerateDocumentResponse(
         ],
         warnings: [],
         generated_html: overrides?.generatedHtml ?? "<section><p>Generated body</p></section>",
+        integration_requests: overrides?.integrationRequests ?? [],
       },
     }),
   };
@@ -54,7 +61,7 @@ import { createSeededClientProfiles } from "./data/seeded-clients";
 import { builtInDocumentTemplates } from "./documents/document-templates";
 
 function setStoredClients(clients: unknown) {
-  window.localStorage.setItem("omega-client-records-version", "2");
+  window.localStorage.setItem("omega-client-records-version", "3");
   window.localStorage.setItem("omega-client-records", JSON.stringify(clients));
 }
 
@@ -419,9 +426,32 @@ describe("App routes", () => {
     expect(screen.getByDisplayValue("jamie.murphy@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Employed")).toBeInTheDocument();
     expect(screen.getByDisplayValue("60000")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Female")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Non-Smoker")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Y")).toBeInTheDocument();
     expect(screen.getAllByDisplayValue("Zurich Life").length).toBeGreaterThan(1);
     expect(screen.getByRole("button", { name: "Life Insurance & Serious Illness" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Request for Information" })).toBeInTheDocument();
+  });
+
+  it("disables Statement of Suitability generation when PHI source fields are missing", () => {
+    const storedClients = createSeededClientProfiles();
+    storedClients["CLI-2026-0002"].gender = "";
+    storedClients["CLI-2026-0002"].smokerStatus = "";
+    storedClients["CLI-2026-0002"].phiOccupationalClass = "";
+    storedClients["CLI-2026-0002"].phiIndexation = "";
+    setStoredClients(storedClients);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+
+    expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
   });
 
   it("updates the draft save status inside the Fact Find tab", () => {
@@ -469,13 +499,7 @@ describe("App routes", () => {
       expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
     expect(screen.getByRole("heading", { name: "Generated preview" })).toBeInTheDocument();
-    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
-      string,
-      {
-        documentDrafts?: Record<string, { editedHtml?: string }>;
-      }
-    >;
-    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain("Generated body");
+    expect(screen.getByText("Generated body")).toBeInTheDocument();
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
@@ -506,6 +530,104 @@ describe("App routes", () => {
     expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
       'class="document-banner"',
     );
+  });
+
+  it("renders PHI request details inside the Statement of Suitability generated output and persists them", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        createGenerateDocumentResponse({
+          title: "Statement of Suitability",
+          integrationRequests: [
+            {
+              provider: "BestAdvice",
+              request_type: "Phi",
+              status: "sent",
+              requested_at: "2026-06-19T10:00:00+00:00",
+              request_fields: [
+                { label: "DOB", value: "08/11/1990" },
+                { label: "Sex", value: "Female" },
+              ],
+              quote_results: [
+                {
+                  provider_name: "Acme Life",
+                  level_premium: "42.10",
+                  escalation_3_premium: "49.20",
+                  escalation_5_premium: "53.40",
+                },
+              ],
+              errors: [],
+            },
+          ],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("PHI Request Details")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("BestAdvice")).toBeInTheDocument();
+    expect(screen.getByText("08/11/1990")).toBeInTheDocument();
+    expect(screen.getByText("Acme Life")).toBeInTheDocument();
+    expect(screen.getByText(/Level: 42.10/)).toBeInTheDocument();
+
+    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { integrationRequests?: Array<{ provider: string; status: string }> }>;
+      }
+    >;
+
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.integrationRequests).toEqual([
+      expect.objectContaining({ provider: "BestAdvice", status: "sent" }),
+    ]);
+  });
+
+  it("renders a PHI integration warning when the Statement of Suitability generation returns a failed request artifact", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        createGenerateDocumentResponse({
+          title: "Statement of Suitability",
+          integrationRequests: [
+            {
+              provider: "BestAdvice",
+              request_type: "Phi",
+              status: "failed",
+              requested_at: "2026-06-19T10:00:00+00:00",
+              request_fields: [{ label: "DOB", value: "08/11/1990" }],
+              quote_results: [],
+              errors: ["service unavailable"],
+            },
+          ],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("PHI Integration Warning")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("service unavailable")).toBeInTheDocument();
   });
 
   it("allows inline editing of generated preview sections and persists the edited content after reopening", async () => {
@@ -893,15 +1015,7 @@ describe("App routes", () => {
       });
     });
 
-    const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
-      string,
-      {
-        documentDrafts?: Record<string, { editedHtml?: string }>;
-      }
-    >;
-    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
-      "AI generated fact find summary.",
-    );
+    expect(screen.getByText("AI generated fact find summary.")).toBeInTheDocument();
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
@@ -1595,6 +1709,55 @@ describe("Document template state", () => {
     expect(screen.getByText("completed")).toBeInTheDocument();
     expect(screen.getByText("<p>Generated fact find summary</p>")).toBeInTheDocument();
     expect(screen.getByText("Summary")).toBeInTheDocument();
+  });
+
+  it("restores seeded statement defaults when stored clients are missing newer PHI fields and only have pristine drafts", () => {
+    const legacyClients = createSeededClientProfiles();
+    delete (legacyClients["CLI-2026-0002"] as Partial<typeof legacyClients["CLI-2026-0002"]>).gender;
+    delete (legacyClients["CLI-2026-0002"] as Partial<typeof legacyClients["CLI-2026-0002"]>).smokerStatus;
+    delete (legacyClients["CLI-2026-0002"] as Partial<typeof legacyClients["CLI-2026-0002"]>).phiOccupationalClass;
+    delete (legacyClients["CLI-2026-0002"] as Partial<typeof legacyClients["CLI-2026-0002"]>).phiIndexation;
+    legacyClients["CLI-2026-0002"].documentDrafts["Statement of Suitability"] = {
+      ...legacyClients["CLI-2026-0002"].documentDrafts["Statement of Suitability"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    };
+    setStoredClients(legacyClients);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    expect(screen.getByRole("button", { name: "Generate Draft" })).toBeEnabled();
+    expect(screen.getByText("Statement of Suitability prepared for Jamie Murphy.")).toBeInTheDocument();
+  });
+
+  it("restores seeded fact find preview content when stored drafts are still pristine", () => {
+    const legacyClients = createSeededClientProfiles();
+    legacyClients["CLI-2026-0001"].documentDrafts["Fact Find"] = {
+      ...legacyClients["CLI-2026-0001"].documentDrafts["Fact Find"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    };
+    setStoredClients(legacyClients);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    expect(screen.getByText("Income protection fact find draft generated for Test Client.")).toBeInTheDocument();
   });
 });
 

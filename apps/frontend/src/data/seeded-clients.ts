@@ -53,11 +53,15 @@ export type SeededClientProfile = {
   occupation: string;
   employmentStatus: string;
   income: string;
+  gender: string;
+  smokerStatus: string;
   provider: string;
   recommendedCover: string;
   premium: string;
   deferredPeriod: string;
   coverAge: string;
+  phiOccupationalClass: string;
+  phiIndexation: string;
   advisorName: string;
   termsVersion: string;
   termsDeliveryMethod: string;
@@ -128,11 +132,15 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     occupation: "",
     employmentStatus: "Employed",
     income: "52000",
+    gender: "",
+    smokerStatus: "",
     provider: "",
     recommendedCover: "26000",
     premium: "145",
     deferredPeriod: "26 weeks",
     coverAge: "65",
+    phiOccupationalClass: "",
+    phiIndexation: "",
     advisorName: "",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Post",
@@ -236,11 +244,15 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     occupation: "Project Analyst",
     employmentStatus: "Employed",
     income: "60000",
+    gender: "Female",
+    smokerStatus: "Non-Smoker",
     provider: "Zurich Life",
     recommendedCover: "30000",
     premium: "165",
     deferredPeriod: "13 weeks",
     coverAge: "65",
+    phiOccupationalClass: "2",
+    phiIndexation: "Y",
     advisorName: "Office Staff",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Email",

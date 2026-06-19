@@ -73,11 +73,9 @@ const statementTypeOptions = [
 
 const deferredPeriodOptions = [
   { value: "", label: "Select deferred period" },
-  { value: "1 month", label: "1 month" },
-  { value: "3 months", label: "3 months" },
-  { value: "6 months", label: "6 months" },
-  { value: "12 months", label: "12 months" },
-  { value: "24 months", label: "24 months" },
+  { value: "13 weeks", label: "13 weeks" },
+  { value: "26 weeks", label: "26 weeks" },
+  { value: "52 weeks", label: "52 weeks" },
 ];
 
 const coverAgeOptions = [
@@ -85,7 +83,32 @@ const coverAgeOptions = [
   { value: "55", label: "55" },
   { value: "60", label: "60" },
   { value: "65", label: "65" },
-  { value: "70", label: "70" },
+];
+
+const genderOptions = [
+  { value: "", label: "Select gender" },
+  { value: "Male", label: "Male" },
+  { value: "Female", label: "Female" },
+];
+
+const smokerStatusOptions = [
+  { value: "", label: "Select smoker status" },
+  { value: "Non-Smoker", label: "Non-Smoker" },
+  { value: "Smoker", label: "Smoker" },
+];
+
+const phiOccupationalClassOptions = [
+  { value: "", label: "Select occupational class" },
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "4", label: "4" },
+];
+
+const phiIndexationOptions = [
+  { value: "", label: "Select indexation" },
+  { value: "Y", label: "Y" },
+  { value: "N", label: "N" },
 ];
 
 function hasValue(value: unknown) {
@@ -337,6 +360,10 @@ export function IncomeProtectionPage() {
     !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
     !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
     !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
+    !hasValue(resolvedDraft.gender) ? "Gender" : null,
+    !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
+    !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
+    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
     !hasValue(resolvedDraft.premium) ? "Gross monthly premium" : null,
     !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
     !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
@@ -483,7 +510,11 @@ export function IncomeProtectionPage() {
 
   function buildGeneratedEditorHtml(
     documentType: SupportedDocumentType,
-    generatedDocument: { generatedHtml: string; sections: Array<{ id: string; title: string; bodyHtml: string }> },
+    generatedDocument: {
+      generatedHtml: string;
+      sections: Array<{ id: string; title: string; bodyHtml: string }>;
+      integrationRequests?: GeneratedDocumentDraft["integrationRequests"];
+    },
   ) {
     const nextProfile = {
       ...resolvedDraft,
@@ -493,6 +524,7 @@ export function IncomeProtectionPage() {
           ...resolvedDraft.documentDrafts[documentType],
           lastGeneratedHtml: generatedDocument.generatedHtml,
           lastGeneratedSections: generatedDocument.sections,
+          integrationRequests: generatedDocument.integrationRequests ?? [],
           editedHtml: "",
         },
       },
@@ -542,6 +574,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
+        integrationRequests: generatedDocument.integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Fact Find", generatedDocument),
       });
       setFactFindGenerationStatus("Generation: Draft generated");
@@ -579,6 +612,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
+        integrationRequests: generatedDocument.integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Statement of Suitability", generatedDocument),
       });
       setStatementDocumentStatus("Document: Draft generated");
@@ -692,7 +726,7 @@ export function IncomeProtectionPage() {
 
     return {
       "fact-find": factFindComplete ? "complete" : (factFindFields.some(hasValue) ? "partial" : "incomplete"),
-      "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 11 ? "partial" : "incomplete"),
+      "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 15 ? "partial" : "incomplete"),
       "files": filesComplete ? "complete" : "incomplete",
       "generated-documents": generatedComplete ? "complete" : "incomplete",
     } as Record<(typeof moduleTabs)[number]["id"], "complete" | "partial" | "incomplete">;
@@ -741,7 +775,14 @@ export function IncomeProtectionPage() {
               </div>
               <Accordion>
             <AccordionItem
-              indicator={getSectionProgress([resolvedDraft.fullName, resolvedDraft.dateOfBirth, resolvedDraft.email, resolvedDraft.mobileNumber, resolvedDraft.maritalStatus])}
+              indicator={getSectionProgress([
+                resolvedDraft.fullName,
+                resolvedDraft.dateOfBirth,
+                resolvedDraft.gender,
+                resolvedDraft.email,
+                resolvedDraft.mobileNumber,
+                resolvedDraft.maritalStatus,
+              ])}
               isOpen={factFindAccordion.isOpen("personal-details")}
               onToggle={() => factFindAccordion.toggle("personal-details")}
               title="Personal Details"
@@ -775,6 +816,13 @@ export function IncomeProtectionPage() {
                   onChange={(event) => updateField("dateOfBirth", event.target.value)}
                   type="date"
                   value={resolvedDraft.dateOfBirth}
+                />
+                <Select
+                  id="ff-gender"
+                  label="Gender"
+                  onChange={(event) => updateField("gender", event.target.value)}
+                  options={genderOptions}
+                  value={resolvedDraft.gender}
                 />
                 <Input
                   id="ff-email"
@@ -842,7 +890,16 @@ export function IncomeProtectionPage() {
             </AccordionItem>
 
             <AccordionItem
-              indicator={getSectionProgress([resolvedDraft.provider, resolvedDraft.recommendedCover, resolvedDraft.premium, resolvedDraft.deferredPeriod, resolvedDraft.coverAge])}
+              indicator={getSectionProgress([
+                resolvedDraft.provider,
+                resolvedDraft.recommendedCover,
+                resolvedDraft.premium,
+                resolvedDraft.deferredPeriod,
+                resolvedDraft.coverAge,
+                resolvedDraft.smokerStatus,
+                resolvedDraft.phiOccupationalClass,
+                resolvedDraft.phiIndexation,
+              ])}
               isOpen={factFindAccordion.isOpen("income-protection")}
               onToggle={() => factFindAccordion.toggle("income-protection")}
               title="Income Protection"
@@ -885,6 +942,27 @@ export function IncomeProtectionPage() {
                   onChange={(event) => updateField("coverAge", event.target.value)}
                   options={coverAgeOptions}
                   value={resolvedDraft.coverAge}
+                />
+                <Select
+                  id="ff-smokerStatus"
+                  label="Smoker status"
+                  onChange={(event) => updateField("smokerStatus", event.target.value)}
+                  options={smokerStatusOptions}
+                  value={resolvedDraft.smokerStatus}
+                />
+                <Select
+                  id="ff-phiOccupationalClass"
+                  label="PHI occupational class"
+                  onChange={(event) => updateField("phiOccupationalClass", event.target.value)}
+                  options={phiOccupationalClassOptions}
+                  value={resolvedDraft.phiOccupationalClass}
+                />
+                <Select
+                  id="ff-phiIndexation"
+                  label="PHI indexation"
+                  onChange={(event) => updateField("phiIndexation", event.target.value)}
+                  options={phiIndexationOptions}
+                  value={resolvedDraft.phiIndexation}
                 />
               </div>
             </AccordionItem>

@@ -33,6 +33,27 @@ class ApiTests(unittest.TestCase):
             },
         }
 
+    def _statement_generation_payload_with_phi_fields(self) -> dict[str, object]:
+        return {
+            "client_reference": "CLI-2026-0002",
+            "document_type": "Statement of Suitability",
+            "template_id": "income-protection-statement",
+            "workflow_snapshot": {
+                "fullName": "Jamie Murphy",
+                "dateOfBirth": "1990-11-08",
+                "gender": "Female",
+                "smokerStatus": "Non-Smoker",
+                "coverAge": "65",
+                "recommendedCover": "30000",
+                "deferredPeriod": "13 weeks",
+                "phiOccupationalClass": "2",
+                "phiIndexation": "Y",
+                "provider": "Zurich Life",
+                "occupation": "Project Analyst",
+                "advisorName": "Office Staff",
+            },
+        }
+
     def test_login_returns_seeded_user_profile(self) -> None:
         response = self.client.post(
             "/auth/login",
@@ -332,6 +353,56 @@ class ApiTests(unittest.TestCase):
         self.assertIn("<h1>", payload["generated_html"])
         self.assertIn("Jamie Murphy", payload["generated_html"])
         self.assertIn("Seeded fallback content", payload["warnings"][0])
+        self.assertEqual(payload["integration_requests"][0]["status"], "failed")
+
+    def test_statement_generation_includes_phi_request_artifact_when_phi_call_succeeds(self) -> None:
+        self._login_as_staff()
+
+        phi_result = {
+            "provider": "BestAdvice",
+            "request_type": "Phi",
+            "status": "sent",
+            "requested_at": "2026-06-19T10:00:00+00:00",
+            "request_fields": [
+                {"label": "DOB", "value": "08/11/1990"},
+                {"label": "Sex", "value": "Female"},
+            ],
+            "quote_results": [
+                {
+                    "provider_name": "Acme Life",
+                    "policy_type": "Executive",
+                    "level_premium": "42.10",
+                    "escalation_3_premium": "49.20",
+                    "escalation_5_premium": "53.40",
+                }
+            ],
+            "errors": [],
+        }
+
+        with patch("app.document_generation.submit_phi_request", return_value=phi_result):
+            response = self.client.post("/documents/generate", json=self._statement_generation_payload_with_phi_fields())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["document_type"], "Statement of Suitability")
+        self.assertEqual(len(payload["integration_requests"]), 1)
+        self.assertEqual(payload["integration_requests"][0]["provider"], "BestAdvice")
+        self.assertEqual(payload["integration_requests"][0]["status"], "sent")
+        self.assertEqual(payload["integration_requests"][0]["quote_results"][0]["provider_name"], "Acme Life")
+
+    def test_statement_generation_returns_failed_phi_artifact_and_warning_when_phi_call_fails(self) -> None:
+        self._login_as_staff()
+
+        with patch("app.document_generation.submit_phi_request", side_effect=RuntimeError("service unavailable")):
+            response = self.client.post("/documents/generate", json=self._statement_generation_payload_with_phi_fields())
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["document_type"], "Statement of Suitability")
+        self.assertEqual(payload["integration_requests"][0]["status"], "failed")
+        self.assertEqual(payload["integration_requests"][0]["provider"], "BestAdvice")
+        self.assertIn("service unavailable", payload["integration_requests"][0]["errors"][0])
+        self.assertTrue(any("PHI integration failed" in warning for warning in payload["warnings"]))
 
     def test_document_generation_persists_generated_draft_in_seeded_store(self) -> None:
         from app.store import get_client, get_client_generated_document_draft
@@ -349,6 +420,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(saved_draft["sections"][0]["title"], "Client overview")
         self.assertIn("bodyHtml", saved_draft["sections"][0])
         self.assertIn("Jamie Murphy", saved_draft["generated_html"])
+        self.assertEqual(saved_draft["integration_requests"][0]["status"], "failed")
         client = get_client("CLI-2026-0002")
         self.assertIsNotNone(client)
         self.assertEqual(client["generated_documents"][0]["document_type"], "Statement of Suitability")

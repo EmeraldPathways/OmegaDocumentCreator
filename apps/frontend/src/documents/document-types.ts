@@ -15,6 +15,29 @@ export type GeneratedDocumentSection = {
   summary?: string;
 };
 
+export type IntegrationRequestField = {
+  label: string;
+  value: string;
+};
+
+export type IntegrationQuoteResult = {
+  providerName: string;
+  policyType?: string;
+  levelPremium?: string;
+  escalation3Premium?: string;
+  escalation5Premium?: string;
+};
+
+export type IntegrationRequestArtifact = {
+  provider: string;
+  requestType: string;
+  status: "sent" | "failed";
+  requestedAt: string;
+  requestFields: IntegrationRequestField[];
+  quoteResults: IntegrationQuoteResult[];
+  errors: string[];
+};
+
 export type GeneratedDocumentDraftStatus = "idle" | "generating" | "completed" | "failed";
 
 export type GeneratedDocumentDraft = {
@@ -22,6 +45,7 @@ export type GeneratedDocumentDraft = {
   generationStatus: GeneratedDocumentDraftStatus;
   lastGeneratedHtml: string;
   lastGeneratedSections: GeneratedDocumentSection[];
+  integrationRequests: IntegrationRequestArtifact[];
   editedHtml: string;
 };
 

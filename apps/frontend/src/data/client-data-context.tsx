@@ -26,44 +26,66 @@ type ClientDataContextValue = {
 
 const STORAGE_KEY = "omega-client-records";
 const STORAGE_VERSION_KEY = "omega-client-records-version";
-const STORAGE_VERSION = "2";
+const STORAGE_VERSION = "3";
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
 
-function normalizeDocumentDrafts(documentDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>) {
-  const defaultDrafts = createDefaultDocumentDrafts();
+function isPristineDraft(draft?: Partial<GeneratedDocumentDraft>) {
+  if (!draft) {
+    return true;
+  }
+
+  return (
+    (draft.generationStatus ?? "idle") === "idle" &&
+    !draft.lastGeneratedHtml &&
+    (draft.lastGeneratedSections?.length ?? 0) === 0 &&
+    (draft.integrationRequests?.length ?? 0) === 0 &&
+    !draft.editedHtml
+  );
+}
+
+function normalizeDraft(
+  fallbackDraft: GeneratedDocumentDraft,
+  storedDraft?: Partial<GeneratedDocumentDraft>,
+): GeneratedDocumentDraft {
+  const contentDraft = isPristineDraft(storedDraft) ? undefined : storedDraft;
 
   return {
-    "Fact Find": {
-      ...defaultDrafts["Fact Find"],
-      ...documentDrafts?.["Fact Find"],
-      lastGeneratedSections: documentDrafts?.["Fact Find"]?.lastGeneratedSections ?? defaultDrafts["Fact Find"].lastGeneratedSections,
-      editedHtml: documentDrafts?.["Fact Find"]?.editedHtml ?? defaultDrafts["Fact Find"].editedHtml,
-    },
-    "Terms of Business": {
-      ...defaultDrafts["Terms of Business"],
-      ...documentDrafts?.["Terms of Business"],
-      lastGeneratedSections:
-        documentDrafts?.["Terms of Business"]?.lastGeneratedSections ?? defaultDrafts["Terms of Business"].lastGeneratedSections,
-      editedHtml: documentDrafts?.["Terms of Business"]?.editedHtml ?? defaultDrafts["Terms of Business"].editedHtml,
-    },
-    "Statement of Suitability": {
-      ...defaultDrafts["Statement of Suitability"],
-      ...documentDrafts?.["Statement of Suitability"],
-      lastGeneratedSections:
-        documentDrafts?.["Statement of Suitability"]?.lastGeneratedSections ??
-        defaultDrafts["Statement of Suitability"].lastGeneratedSections,
-      editedHtml: documentDrafts?.["Statement of Suitability"]?.editedHtml ?? defaultDrafts["Statement of Suitability"].editedHtml,
-    },
+    ...fallbackDraft,
+    ...storedDraft,
+    generationStatus: contentDraft?.generationStatus ?? fallbackDraft.generationStatus,
+    lastGeneratedHtml: contentDraft?.lastGeneratedHtml ?? fallbackDraft.lastGeneratedHtml,
+    lastGeneratedSections: contentDraft?.lastGeneratedSections ?? fallbackDraft.lastGeneratedSections,
+    integrationRequests: contentDraft?.integrationRequests ?? fallbackDraft.integrationRequests,
+    editedHtml: contentDraft?.editedHtml ?? fallbackDraft.editedHtml,
+  };
+}
+
+function normalizeDocumentDrafts(
+  documentDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>,
+  fallbackDrafts?: Record<SupportedDocumentType, GeneratedDocumentDraft>,
+) {
+  const defaultDrafts = fallbackDrafts ?? createDefaultDocumentDrafts();
+
+  return {
+    "Fact Find": normalizeDraft(defaultDrafts["Fact Find"], documentDrafts?.["Fact Find"]),
+    "Terms of Business": normalizeDraft(defaultDrafts["Terms of Business"], documentDrafts?.["Terms of Business"]),
+    "Statement of Suitability": normalizeDraft(
+      defaultDrafts["Statement of Suitability"],
+      documentDrafts?.["Statement of Suitability"],
+    ),
   };
 }
 
 function normalizeClient(client: SeededClientProfile): SeededClientProfile {
+  const seededClient = createSeededClientProfiles()[client.clientReference];
+
   return {
+    ...seededClient,
     ...client,
     status: client.status ?? "Draft",
-    files: client.files ?? [],
-    generatedDocuments: client.generatedDocuments ?? [],
-    documentDrafts: normalizeDocumentDrafts(client.documentDrafts),
+    files: client.files ?? seededClient?.files ?? [],
+    generatedDocuments: client.generatedDocuments ?? seededClient?.generatedDocuments ?? [],
+    documentDrafts: normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts),
   };
 }
 

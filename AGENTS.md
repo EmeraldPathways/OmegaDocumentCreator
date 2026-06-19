@@ -88,6 +88,31 @@ For code tasks:
 
 ---
 
+## AI context files
+
+`.ai-codex/` is the project knowledge base. Read it instead of scanning source files.
+
+| File | When to read |
+|------|-------------|
+| `.ai-codex/index.md` | Every session — one-liner per file, do not read unless listed here |
+| `.ai-codex/architecture.md` | Stack, module map, persistence state |
+| `.ai-codex/patterns.md` | Auth, API patterns, gotchas |
+| `.ai-codex/api-surface.md` | All endpoints and types |
+| `.ai-codex/decisions-archive.md` | Why things are the way they are |
+| `.ai-codex/scopes/persistence.md` | When wiring PostgreSQL |
+| `.ai-codex/scopes/document-generation.md` | When touching AI or export pipeline |
+| `.ai-codex/scopes/income-protection.md` | When working on workflow tabs |
+| `.ai-codex/scopes/auth-admin.md` | When touching login, users, or audit |
+
+### File reading discipline
+- Never read a file just to confirm it exists
+- Skip test files unless the task is specifically about tests
+- Skip `node_modules/`, `apps/api/.venv/`, `dist/`, `.vite-run-cache/`, `*.lock`, `*.log` always
+- On new session: read `.ai-codex/index.md` only, then read the relevant scope file for the task
+- Do not read `PROJECT.md` unless the task spans multiple modules or scope is unclear
+
+---
+
 ## Memory usage
 
 After non-trivial work, store:
@@ -130,8 +155,8 @@ Persist anything likely to save future time.
 
 - Preferred local startup command: `run-omega.cmd` from the repo root.
 - This launches:
-  - frontend on `127.0.0.1:3001`
-  - backend on `127.0.0.1:8000`
+  - frontend on `127.0.0.1:3007`
+  - backend on `127.0.0.1:8007`
 - Direct fallback commands:
   - frontend: `apps\frontend\run-frontend.cmd`
   - backend: `apps\api\run-api.cmd`

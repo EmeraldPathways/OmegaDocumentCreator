@@ -481,22 +481,22 @@ This starts the Omega frontend with:
 
 - `apps/frontend/vite.run.config.ts`
 - host `127.0.0.1`
-- port `3001`
+- port `3007`
 - cache dir `.vite-run-cache`
 
 Important note:
 
 - port `3000` may already be in use by a different local app on this machine
-- use `http://127.0.0.1:3001` for Omega Document Creator
+- use `http://127.0.0.1:3007` for Omega Document Creator
 - `run-frontend.cmd` is the preferred local run path because it avoids the Vite cache/port confusion seen during setup
-- `run-api.cmd` is the preferred backend run path on `127.0.0.1:8000`
+- `run-api.cmd` is the preferred backend run path on `127.0.0.1:8007`
 - `run-omega.cmd` starts both frontend and backend in separate Windows shells
 
 Memory-first workflow note:
 
 - before broad repo reads, prefer stored project context from `.ai-codex`, Agentmemory, and Token Savior
 - saved Token Savior entries currently cover:
-  - the Omega frontend run path on `127.0.0.1:3001`
+  - the Omega frontend run path on `127.0.0.1:3007`
   - the PDF/DOCX export integration boundary in the frontend document utilities and Income Protection page
 
 ### Current known warnings

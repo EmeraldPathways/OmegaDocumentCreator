@@ -27,6 +27,17 @@ describe("buildWorkflowDocument", () => {
         bodyHtml: "<p>Benefits may be limited by underwriting and policy definitions.</p>",
       },
     ];
+    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-19T10:00:00+00:00",
+        requestFields: [{ label: "DOB", value: "08/11/1990" }],
+        quoteResults: [{ providerName: "Acme Life", levelPremium: "42.10" }],
+        errors: [],
+      },
+    ];
 
     const document = buildWorkflowDocument(profile, "Statement of Suitability");
 
@@ -45,6 +56,9 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("2026-06-06");
     expect(document.html).toContain("Not confirmed");
     expect(document.html).toContain("Pending");
+    expect(document.html).toContain("PHI Request Details");
+    expect(document.html).toContain("08/11/1990");
+    expect(document.html).toContain("Acme Life");
   });
 
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {

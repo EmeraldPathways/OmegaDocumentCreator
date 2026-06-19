@@ -27,6 +27,11 @@ class AppSettings:
     ai_api_key: str = ""
     ai_model: str = "gemini-2.0-flash"
     ai_temperature: float = 0.3
+    phi_endpoint_url: str = ""
+    phi_username: str = ""
+    phi_password: str = ""
+    phi_request_from: str = ""
+    phi_request_from_code: str = ""
 
     def __post_init__(self) -> None:
         self.file_storage_path = Path(self.file_storage_path)
@@ -65,6 +70,11 @@ def get_settings(**overrides: str) -> AppSettings:
         "ai_api_key": overrides.get("AI_API_KEY") or os.getenv("AI_API_KEY", os.getenv("GEMINI_API_KEY", "")),
         "ai_model": overrides.get("AI_MODEL") or os.getenv("AI_MODEL", "gemini-2.0-flash"),
         "ai_temperature": float(overrides.get("AI_TEMPERATURE") or os.getenv("AI_TEMPERATURE", "0.3")),
+        "phi_endpoint_url": overrides.get("PHI_ENDPOINT_URL") or os.getenv("PHI_ENDPOINT_URL", ""),
+        "phi_username": overrides.get("PHI_USERNAME") or os.getenv("PHI_USERNAME", ""),
+        "phi_password": overrides.get("PHI_PASSWORD") or os.getenv("PHI_PASSWORD", ""),
+        "phi_request_from": overrides.get("PHI_REQUEST_FROM") or os.getenv("PHI_REQUEST_FROM", ""),
+        "phi_request_from_code": overrides.get("PHI_REQUEST_FROM_CODE") or os.getenv("PHI_REQUEST_FROM_CODE", ""),
     }
     settings = AppSettings(**values)
     ensure_storage_directories(settings)

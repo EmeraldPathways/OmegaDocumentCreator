@@ -5,11 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: "0.0.0.0",
-    port: 3000,
+    port: 3007,
     proxy: {
-      "/auth": "http://127.0.0.1:8000",
-      "/documents": "http://127.0.0.1:8000",
-      "/health": "http://127.0.0.1:8000",
+      "/auth": "http://127.0.0.1:8007",
+      "/documents": "http://127.0.0.1:8007",
+      "/health": "http://127.0.0.1:8007",
     },
   },
   test: {

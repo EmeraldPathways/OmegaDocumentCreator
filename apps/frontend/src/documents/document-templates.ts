@@ -43,6 +43,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      integrationRequests: [],
       editedHtml: "",
     },
     "Terms of Business": {
@@ -50,6 +51,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      integrationRequests: [],
       editedHtml: "",
     },
     "Statement of Suitability": {
@@ -57,6 +59,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
+      integrationRequests: [],
       editedHtml: "",
     },
   };

@@ -1,4 +1,8 @@
-import type { GeneratedDocumentSection, SupportedDocumentType } from "./document-types";
+import type {
+  GeneratedDocumentSection,
+  IntegrationRequestArtifact,
+  SupportedDocumentType,
+} from "./document-types";
 
 type GenerateDocumentRequest = {
   clientReference: string;
@@ -17,6 +21,7 @@ type GenerateDocumentResponseItem = {
   sections: GeneratedDocumentSection[];
   warnings: string[];
   generatedHtml: string;
+  integrationRequests: IntegrationRequestArtifact[];
 };
 
 type RawGeneratedSection = {
@@ -34,6 +39,21 @@ type RawGenerateDocumentResponse = {
     sections?: RawGeneratedSection[];
     warnings?: string[];
     generated_html?: string;
+    integration_requests?: Array<{
+      provider?: string;
+      request_type?: string;
+      status?: "sent" | "failed";
+      requested_at?: string;
+      request_fields?: Array<{ label?: string; value?: string }>;
+      quote_results?: Array<{
+        provider_name?: string;
+        policy_type?: string;
+        level_premium?: string;
+        escalation_3_premium?: string;
+        escalation_5_premium?: string;
+      }>;
+      errors?: string[];
+    }>;
   };
 };
 
@@ -136,6 +156,45 @@ function normalizeSections(sections: RawGeneratedSection[] | undefined): Generat
   }));
 }
 
+function normalizeIntegrationRequests(
+  rawRequests:
+    | Array<{
+        provider?: string;
+        request_type?: string;
+        status?: "sent" | "failed";
+        requested_at?: string;
+        request_fields?: Array<{ label?: string; value?: string }>;
+        quote_results?: Array<{
+          provider_name?: string;
+          policy_type?: string;
+          level_premium?: string;
+          escalation_3_premium?: string;
+          escalation_5_premium?: string;
+        }>;
+        errors?: string[];
+      }>
+    | undefined,
+): IntegrationRequestArtifact[] {
+  return (rawRequests ?? []).map((request) => ({
+    provider: request.provider ?? "BestAdvice",
+    requestType: request.request_type ?? "Phi",
+    status: request.status ?? "failed",
+    requestedAt: request.requested_at ?? "",
+    requestFields: (request.request_fields ?? []).map((field) => ({
+      label: field.label ?? "",
+      value: field.value ?? "",
+    })),
+    quoteResults: (request.quote_results ?? []).map((quote) => ({
+      providerName: quote.provider_name ?? "",
+      policyType: quote.policy_type ?? "",
+      levelPremium: quote.level_premium ?? "",
+      escalation3Premium: quote.escalation_3_premium ?? "",
+      escalation5Premium: quote.escalation_5_premium ?? "",
+    })),
+    errors: request.errors ?? [],
+  }));
+}
+
 export async function generateDocument({
   clientReference,
   documentType,
@@ -179,6 +238,7 @@ export async function generateDocument({
     sections: normalizeSections(payload.item.sections),
     warnings: payload.item.warnings ?? [],
     generatedHtml: sanitizeGeneratedHtml(payload.item.generated_html ?? ""),
+    integrationRequests: normalizeIntegrationRequests(payload.item.integration_requests),
   };
 }
 

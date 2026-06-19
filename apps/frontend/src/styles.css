@@ -1365,7 +1365,7 @@ button {
   background: #eef2f7;
 }
 
-.generated-output-editor,
+.generated-output-editor .ProseMirror,
 .generated-output-preview-shell {
   min-height: 680px;
   background: #fff;
@@ -1374,7 +1374,7 @@ button {
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
 }
 
-.generated-output-editor {
+.generated-output-editor .ProseMirror {
   padding: 44px 46px 64px;
   outline: none;
   font-family: Georgia, "Times New Roman", serif;
@@ -1382,39 +1382,39 @@ button {
   color: #0f172a;
 }
 
-.generated-output-editor p,
-.generated-output-editor h1,
-.generated-output-editor h2,
-.generated-output-editor h3,
-.generated-output-editor ul,
-.generated-output-editor ol {
+.generated-output-editor .ProseMirror p,
+.generated-output-editor .ProseMirror h1,
+.generated-output-editor .ProseMirror h2,
+.generated-output-editor .ProseMirror h3,
+.generated-output-editor .ProseMirror ul,
+.generated-output-editor .ProseMirror ol {
   margin: 0 0 1rem;
 }
 
-.generated-output-editor h1,
-.generated-output-editor h2,
-.generated-output-editor h3 {
+.generated-output-editor .ProseMirror h1,
+.generated-output-editor .ProseMirror h2,
+.generated-output-editor .ProseMirror h3 {
   font-family: "Segoe UI", Tahoma, sans-serif;
   line-height: 1.3;
 }
 
-.generated-output-editor ul,
-.generated-output-editor ol {
+.generated-output-editor .ProseMirror ul,
+.generated-output-editor .ProseMirror ol {
   padding-left: 1.5rem;
 }
 
-.generated-output-editor img {
+.generated-output-editor .ProseMirror img {
   display: block;
   max-width: 100%;
   margin: 1rem auto;
 }
 
-.generated-output-editor .workflow-document,
+.generated-output-editor .ProseMirror .workflow-document,
 .generated-output-pdf-page-body .workflow-document {
   color: #1f2937;
 }
 
-.generated-output-editor .document-banner,
+.generated-output-editor .ProseMirror .document-banner,
 .generated-output-pdf-page-body .document-banner {
   background: #f6ede3;
   border: 1px solid #e5d5c5;
@@ -1423,7 +1423,7 @@ button {
   margin-bottom: 24px;
 }
 
-.generated-output-editor .document-eyebrow,
+.generated-output-editor .ProseMirror .document-eyebrow,
 .generated-output-pdf-page-body .document-eyebrow {
   margin: 0 0 8px;
   font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1434,7 +1434,7 @@ button {
   color: #7c4b2a;
 }
 
-.generated-output-editor .document-subtitle,
+.generated-output-editor .ProseMirror .document-subtitle,
 .generated-output-pdf-page-body .document-subtitle {
   margin: 8px 0 0;
   font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1442,8 +1442,8 @@ button {
   color: #6b7280;
 }
 
-.generated-output-editor .client-summary-grid,
-.generated-output-editor .document-grid,
+.generated-output-editor .ProseMirror .client-summary-grid,
+.generated-output-editor .ProseMirror .document-grid,
 .generated-output-pdf-page-body .client-summary-grid,
 .generated-output-pdf-page-body .document-grid {
   border: 1px solid #e5e7eb;
@@ -1453,14 +1453,14 @@ button {
   margin-bottom: 18px;
 }
 
-.generated-output-editor .grid-items,
+.generated-output-editor .ProseMirror .grid-items,
 .generated-output-pdf-page-body .grid-items {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.generated-output-editor .grid-item,
+.generated-output-editor .ProseMirror .grid-item,
 .generated-output-pdf-page-body .grid-item {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -1468,7 +1468,7 @@ button {
   padding: 10px 12px;
 }
 
-.generated-output-editor .grid-label,
+.generated-output-editor .ProseMirror .grid-label,
 .generated-output-pdf-page-body .grid-label {
   display: block;
   margin-bottom: 4px;
@@ -1480,19 +1480,19 @@ button {
   color: #7c4b2a;
 }
 
-.generated-output-editor .grid-item strong,
+.generated-output-editor .ProseMirror .grid-item strong,
 .generated-output-pdf-page-body .grid-item strong {
   display: block;
   font-size: 13px;
   color: #111827;
 }
 
-.generated-output-editor .document-section,
+.generated-output-editor .ProseMirror .document-section,
 .generated-output-pdf-page-body .document-section {
   margin-bottom: 18px;
 }
 
-.generated-output-editor .document-callout,
+.generated-output-editor .ProseMirror .document-callout,
 .generated-output-pdf-page-body .document-callout {
   border-left: 6px solid #c68b2c;
   border-radius: 12px;
@@ -1501,14 +1501,14 @@ button {
   margin-bottom: 18px;
 }
 
-.generated-output-editor .signatures-footer,
+.generated-output-editor .ProseMirror .signatures-footer,
 .generated-output-pdf-page-body .signatures-footer {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 2px solid #5b2230;
 }
 
-.generated-output-editor .workflow-document h1,
+.generated-output-editor .ProseMirror .workflow-document h1,
 .generated-output-pdf-page-body .workflow-document h1 {
   margin: 0;
   font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1518,7 +1518,7 @@ button {
   color: #3c1321;
 }
 
-.generated-output-editor .workflow-document h2,
+.generated-output-editor .ProseMirror .workflow-document h2,
 .generated-output-pdf-page-body .workflow-document h2 {
   margin: 0 0 10px;
   font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1528,7 +1528,7 @@ button {
   color: #5b2230;
 }
 
-.generated-output-editor .workflow-document h3,
+.generated-output-editor .ProseMirror .workflow-document h3,
 .generated-output-pdf-page-body .workflow-document h3 {
   margin: 0 0 8px;
   font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1537,20 +1537,20 @@ button {
   color: #374151;
 }
 
-.generated-output-editor .workflow-document p,
+.generated-output-editor .ProseMirror .workflow-document p,
 .generated-output-pdf-page-body .workflow-document p {
   margin: 0 0 10px;
 }
 
-.generated-output-editor .workflow-document ul,
-.generated-output-editor .workflow-document ol,
+.generated-output-editor .ProseMirror .workflow-document ul,
+.generated-output-editor .ProseMirror .workflow-document ol,
 .generated-output-pdf-page-body .workflow-document ul,
 .generated-output-pdf-page-body .workflow-document ol {
   margin: 0 0 10px;
   padding-left: 22px;
 }
 
-.generated-output-editor .workflow-document li,
+.generated-output-editor .ProseMirror .workflow-document li,
 .generated-output-pdf-page-body .workflow-document li {
   margin-bottom: 6px;
 }

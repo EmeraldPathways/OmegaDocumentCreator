@@ -1,5 +1,11 @@
 import type { SeededClientProfile } from "../data/seeded-clients";
-import type { ComposedBlock, ComposedDocument, GeneratedDocumentSection, SupportedDocumentType } from "./document-types";
+import type {
+  ComposedBlock,
+  ComposedDocument,
+  GeneratedDocumentSection,
+  IntegrationRequestArtifact,
+  SupportedDocumentType,
+} from "./document-types";
 
 function escapeHtml(value: string) {
   return value
@@ -64,6 +70,77 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
     className,
     items,
   };
+}
+
+function requestFieldsHtml(requestFields: IntegrationRequestArtifact["requestFields"]) {
+  if (requestFields.length === 0) {
+    return "<p>No PHI request fields were captured.</p>";
+  }
+
+  return `<ul>${requestFields
+    .map((field) => `<li><strong>${escapeHtml(field.label)}:</strong> ${escapeHtml(valueOrFallback(field.value))}</li>`)
+    .join("")}</ul>`;
+}
+
+function quoteResultsHtml(quoteResults: IntegrationRequestArtifact["quoteResults"]) {
+  if (quoteResults.length === 0) {
+    return "<p>No PHI quote results were returned.</p>";
+  }
+
+  return `<ul>${quoteResults
+    .map((quote) => {
+      const premiumParts = [
+        quote.levelPremium ? `Level: ${quote.levelPremium}` : "",
+        quote.escalation3Premium ? `Esc 3%: ${quote.escalation3Premium}` : "",
+        quote.escalation5Premium ? `Esc 5%: ${quote.escalation5Premium}` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      return `<li><strong>${escapeHtml(valueOrFallback(quote.providerName))}</strong>${quote.policyType ? ` (${escapeHtml(quote.policyType)})` : ""}${
+        premiumParts ? ` - ${escapeHtml(premiumParts)}` : ""
+      }</li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function buildPhiBlocks(profile: SeededClientProfile): ComposedBlock[] {
+  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+  if (requests.length === 0) {
+    return [];
+  }
+
+  return requests.flatMap((request) => {
+    const blocks: ComposedBlock[] = [
+      detailGrid("PHI Request Details", [
+        { label: "Provider", value: request.provider },
+        { label: "Request type", value: request.requestType },
+        { label: "Status", value: request.status },
+        { label: "Requested at", value: request.requestedAt },
+      ]),
+      {
+        kind: "section",
+        title: "PHI Request Fields",
+        bodyHtml: requestFieldsHtml(request.requestFields),
+      },
+      {
+        kind: "section",
+        title: "PHI Quote Results",
+        bodyHtml: quoteResultsHtml(request.quoteResults),
+      },
+    ];
+
+    if (request.status === "failed" || request.errors.length > 0) {
+      blocks.push({
+        kind: "callout",
+        tone: "warning",
+        title: "PHI Integration Warning",
+        bodyHtml: listHtml(request.errors, "PHI integration did not return a specific error."),
+      });
+    }
+
+    return blocks;
+  });
 }
 
 function getDraftSections(profile: SeededClientProfile, documentType: SupportedDocumentType) {
@@ -254,6 +331,7 @@ function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: 
       title: "Needs and Objectives",
       bodyHtml: needsHtml,
     },
+    ...buildPhiBlocks(profile),
     detailGrid("Declarations", [
       { label: "PEP confirmation", value: profile.pepConfirmation },
       { label: "Related PEP confirmation", value: profile.pepRelatedConfirmation },

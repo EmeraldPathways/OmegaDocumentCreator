@@ -149,6 +149,7 @@ def _default_generated_document_drafts() -> dict[str, dict[str, object]]:
             "sections": [],
             "warnings": [],
             "generated_html": "",
+            "integration_requests": [],
             "generation_status": "idle",
         }
         for document_type in SUPPORTED_DOCUMENT_TYPES
@@ -373,6 +374,7 @@ def save_generated_document_draft(
     sections: list[dict[str, object]],
     warnings: list[str],
     generated_html: str,
+    integration_requests: list[dict[str, object]],
 ) -> dict[str, object] | None:
     for client in SEEDED_CLIENTS:
         if client["client_reference"] != client_reference:
@@ -388,6 +390,7 @@ def save_generated_document_draft(
             "sections": deepcopy(sections),
             "warnings": deepcopy(warnings),
             "generated_html": generated_html,
+            "integration_requests": deepcopy(integration_requests),
             "generation_status": "completed",
         }
         client["document_drafts"][document_type] = draft

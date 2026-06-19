@@ -1,13 +1,141 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from html import escape
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+import xml.etree.ElementTree as ET
 
 from fastapi import HTTPException
 
 from app.ai import build_document_prompt, generate_document_content
 from app.config import AppSettings
 from app.store import get_client, save_generated_document_draft
+
+
+def _get_snapshot_value(workflow_snapshot: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = workflow_snapshot.get(key)
+        if value is None:
+            continue
+        normalized = str(value).strip()
+        if normalized:
+            return normalized
+    return ""
+
+
+def _format_phi_date(value: str) -> str:
+    parts = value.split("-")
+    if len(parts) == 3:
+        return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    return value
+
+
+def _normalize_phi_deferred_period(value: str) -> str:
+    if value.startswith("13"):
+        return "13"
+    if value.startswith("26"):
+        return "26"
+    if value.startswith("52"):
+        return "52"
+    return value
+
+
+def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
+    request_fields = [
+        {"label": "DOB", "value": _format_phi_date(_get_snapshot_value(workflow_snapshot, "dateOfBirth", "date_of_birth"))},
+        {"label": "Sex", "value": _get_snapshot_value(workflow_snapshot, "gender")},
+        {"label": "Smoker", "value": _get_snapshot_value(workflow_snapshot, "smokerStatus")},
+        {"label": "NRA", "value": _get_snapshot_value(workflow_snapshot, "coverAge", "cover_age")},
+        {"label": "AnnualAmount", "value": _get_snapshot_value(workflow_snapshot, "recommendedCover", "recommended_cover")},
+        {
+            "label": "DeferredPeriod",
+            "value": _normalize_phi_deferred_period(_get_snapshot_value(workflow_snapshot, "deferredPeriod", "deferred_period")),
+        },
+        {"label": "OccupationalClass", "value": _get_snapshot_value(workflow_snapshot, "phiOccupationalClass")},
+        {"label": "Indexation", "value": _get_snapshot_value(workflow_snapshot, "phiIndexation")},
+    ]
+
+    missing_fields = [field["label"] for field in request_fields if not field["value"]]
+    if missing_fields:
+        raise ValueError(f"Missing PHI request fields: {', '.join(missing_fields)}")
+
+    if not all(
+        [
+            settings.phi_endpoint_url,
+            settings.phi_username,
+            settings.phi_password,
+            settings.phi_request_from,
+            settings.phi_request_from_code,
+        ]
+    ):
+        raise RuntimeError("PHI integration is not configured.")
+
+    xml = (
+        "<Inputs>"
+        "<Authentication>"
+        f"<Username>{escape(settings.phi_username)}</Username>"
+        f"<Password>{escape(settings.phi_password)}</Password>"
+        f"<RequestFrom>{escape(settings.phi_request_from)}</RequestFrom>"
+        f"<RequestFromCode>{escape(settings.phi_request_from_code)}</RequestFromCode>"
+        "</Authentication>"
+        "<RequestType>Phi</RequestType>"
+        "<Life1>"
+        f"<DOB>{escape(request_fields[0]['value'])}</DOB>"
+        f"<Sex>{escape(request_fields[1]['value'])}</Sex>"
+        f"<Smoker>{escape(request_fields[2]['value'])}</Smoker>"
+        "</Life1>"
+        "<Plan>"
+        f"<NRA>{escape(request_fields[3]['value'])}</NRA>"
+        f"<AnnualAmount>{escape(request_fields[4]['value'])}</AnnualAmount>"
+        f"<DeferredPeriod>{escape(request_fields[5]['value'])}</DeferredPeriod>"
+        f"<OccupationalClass>{escape(request_fields[6]['value'])}</OccupationalClass>"
+        f"<Indexation>{escape(request_fields[7]['value'])}</Indexation>"
+        "</Plan>"
+        "</Inputs>"
+    )
+
+    return {"xml": xml, "request_fields": request_fields}
+
+
+def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
+    payload = build_phi_request_payload(settings, workflow_snapshot)
+    body = urlencode({"xml": payload["xml"]}).encode("utf-8")
+    request = Request(
+        settings.phi_endpoint_url,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+
+    with urlopen(request, timeout=20) as response:
+        xml_result = response.read().decode("utf-8")
+
+    root = ET.fromstring(xml_result)
+    errors_text = (root.findtext("Errors") or "").strip()
+    quote_results: list[dict[str, str]] = []
+
+    for company in root.findall("./Quotes/Company"):
+        quote_results.append(
+            {
+                "provider_name": (company.findtext("Name") or "").strip(),
+                "policy_type": (company.findtext("Type") or "").strip(),
+                "level_premium": (company.findtext("Level") or "").strip(),
+                "escalation_3_premium": (company.findtext("Esc3") or "").strip(),
+                "escalation_5_premium": (company.findtext("Esc5") or "").strip(),
+            }
+        )
+
+    return {
+        "provider": "BestAdvice",
+        "request_type": "Phi",
+        "status": "failed" if errors_text else "sent",
+        "requested_at": datetime.now(UTC).isoformat(),
+        "request_fields": payload["request_fields"],
+        "quote_results": quote_results,
+        "errors": [errors_text] if errors_text else [],
+    }
 
 
 def generate_document(
@@ -24,6 +152,7 @@ def generate_document(
 
     client_name = str(
         workflow_snapshot.get("full_name")
+        or workflow_snapshot.get("fullName")
         or client.get("full_name")
         or f"{client.get('first_name', '')} {client.get('surname', '')}".strip()
         or client_reference
@@ -44,6 +173,15 @@ def generate_document(
         workflow_snapshot=workflow_snapshot,
     )
     generated_document["sections"] = _normalize_sections(generated_document.get("sections"))
+    warnings = [str(warning) for warning in generated_document.get("warnings", [])]
+    integration_requests = _build_integration_requests(
+        settings=settings,
+        document_type=document_type,
+        workflow_snapshot=workflow_snapshot,
+        warnings=warnings,
+    )
+    generated_document["warnings"] = warnings
+    generated_document["integration_requests"] = integration_requests
     save_generated_document_draft(
         client_reference=client_reference,
         document_type=document_type,
@@ -51,10 +189,38 @@ def generate_document(
         title=str(generated_document.get("title") or document_type),
         summary=str(generated_document.get("summary") or ""),
         sections=generated_document["sections"],
-        warnings=[str(warning) for warning in generated_document.get("warnings", [])],
+        warnings=warnings,
         generated_html=str(generated_document.get("generated_html") or ""),
+        integration_requests=integration_requests,
     )
     return generated_document
+
+
+def _build_integration_requests(
+    *,
+    settings: AppSettings,
+    document_type: str,
+    workflow_snapshot: dict[str, Any],
+    warnings: list[str],
+) -> list[dict[str, Any]]:
+    if document_type != "Statement of Suitability":
+        return []
+
+    try:
+        return [submit_phi_request(settings, workflow_snapshot)]
+    except Exception as exc:
+        warnings.append(f"PHI integration failed: {exc}")
+        return [
+            {
+                "provider": "BestAdvice",
+                "request_type": "Phi",
+                "status": "failed",
+                "requested_at": datetime.now(UTC).isoformat(),
+                "request_fields": [],
+                "quote_results": [],
+                "errors": [str(exc)],
+            }
+        ]
 
 
 def _normalize_sections(raw_sections: Any) -> list[dict[str, Any]]:
@@ -86,11 +252,13 @@ def _seeded_document(
     template_id: str,
     workflow_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
-    product_type = str(workflow_snapshot.get("product_type") or "Income Protection")
+    product_type = str(workflow_snapshot.get("product_type") or workflow_snapshot.get("productType") or "Income Protection")
     provider = str(workflow_snapshot.get("provider") or "Recommended provider")
-    recommended_cover = str(workflow_snapshot.get("recommended_cover") or "Coverage to be confirmed")
+    recommended_cover = str(workflow_snapshot.get("recommended_cover") or workflow_snapshot.get("recommendedCover") or "Coverage to be confirmed")
     needs_objectives = str(
-        workflow_snapshot.get("needs_objectives") or "Protect the client against a loss of earned income."
+        workflow_snapshot.get("needs_objectives")
+        or workflow_snapshot.get("needsObjectives")
+        or "Protect the client against a loss of earned income."
     )
 
     title = f"{document_type} for {client_name}"
@@ -138,4 +306,5 @@ def _seeded_document(
         "sections": sections,
         "warnings": warnings,
         "generated_html": generated_html,
+        "integration_requests": [],
     }
