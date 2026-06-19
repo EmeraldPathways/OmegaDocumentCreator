@@ -2,119 +2,70 @@
 
 ## Auth pattern
 
-Session cookie is set by backend on `POST /auth/login`.
-Frontend reads current user via `GET /auth/me` on mount.
-All protected API calls rely on the cookie — no Bearer token.
+- Backend sets the cookie on `POST /auth/login`.
+- Frontend validates an existing session with `GET /auth/me`.
+- No Bearer token flow exists.
 
-```typescript
-// Correct — cookie is sent automatically
-const res = await fetch('/auth/me', { credentials: 'include' });
+```ts
+await fetch("/auth/me");
 ```
 
-Never pass auth headers. Never store token in localStorage.
+## Client identifiers
 
-## API call pattern (frontend)
-
-```typescript
-const res = await fetch(`/api/clients/${ref}`, {
-  method: 'PATCH',
-  credentials: 'include',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(payload),
-});
-if (!res.ok) throw new Error(await res.text());
-```
-
-## Client reference
-
-Clients are keyed by `client_reference` (e.g. `OMG-001`), not numeric ID.
-Use this in all routes and API calls.
+- Client routes and store helpers use `client_reference`.
+- Current format is `CLI-YYYY-NNNN`, not `OMG-001`.
 
 ## Document generation pattern
 
-1. Frontend collects workflow data from `client-data-context`
-2. Calls `document-api.ts` → `POST /documents/generate` with `{ doc_type, client_data }`
-3. Backend `document_generation.py` builds prompt → calls `ai.py` → returns `{ title, summary, sections[], warnings[], generated_html }`
-4. Frontend `document-composer.ts` wraps response in styled HTML shell
-5. `document-preview.tsx` renders editable preview
-6. Export via `pdf-export.ts` or `word-export.ts` using composed HTML
+1. `income-protection-page.tsx` collects the workflow snapshot.
+2. `document-api.ts` posts:
 
-Do not call Gemini directly from the frontend.
-Do not bypass `document-composer.ts` for export — it is the single source of styled output.
+```json
+{
+  "client_reference": "CLI-2026-0002",
+  "document_type": "Statement of Suitability",
+  "template_id": "default",
+  "workflow_snapshot": {}
+}
+```
 
-## In-memory store pattern (current)
+3. `document_generation.py` builds the prompt and fallback/integration behavior.
+4. `document-api.ts` normalizes the backend response into camelCase fields.
+5. `workflow-document-builders.ts` + `document-composer.ts` produce the styled exportable HTML.
 
-All seeded data lives in `store.py` as module-level mutable dicts/lists.
-When replacing with DB: create a `repositories/` folder, one file per entity, matching the same function signatures so routes don't change.
+## Session handling
+
+- Backend session keys in live code: `user_email`, `last_seen_at`
+- No `role` session key is stored directly.
+- Admin checks happen after `_current_user()` resolves the user record from `store.py`.
+
+## Password helpers
 
 ```python
-# Current (store.py)
-def get_client(ref: str) -> dict | None:
-    return CLIENTS.get(ref)
-
-# Future (repositories/clients.py) — same signature
-def get_client(ref: str) -> dict | None:
-    return db.query(Client).filter_by(reference=ref).first()
+hash_password(password: str) -> str
+verify_password(password: str, password_hash: str) -> bool
+is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 ```
 
-## Password hashing (security.py)
+## Frontend workflow persistence
 
-```python
-hash_password(plain: str) -> str      # PBKDF2-HMAC-SHA256
-verify_password(plain, hashed) -> bool
-check_session_timeout(last_seen) -> bool
-```
+- `client-data-context.tsx` is the only frontend workflow persistence layer.
+- It writes browser state to `localStorage` under `omega-client-records`.
+- Selected auth user is mirrored separately in `sessionStorage`.
 
-Never store plain passwords. Never roll a custom scheme — use these functions.
+## Local run paths
 
-## Role check pattern (backend)
+- Root: `run-omega.cmd`
+- Frontend: `apps/frontend/run-frontend.cmd` -> `127.0.0.1:3007`
+- Backend: `apps/api/run-api.cmd` -> `127.0.0.1:8007`
 
-```python
-def require_admin(request: Request):
-    if request.session.get("role") != "admin":
-        raise HTTPException(403)
-```
+## Migration reality
 
-Always enforce server-side. Frontend role checks are display-only.
+- `apps/api/migrations/0001_initial.sql` defines users, clients, dependants, employment/protection tables, documents, terms of business, statement of suitability, files, and audit logs.
+- There is no `sessions` table in the migration.
 
-## Frontend draft persistence
+## Known drift to avoid
 
-All workflow draft state flows through `client-data-context.tsx`.
-Draft values are saved to browser storage keyed by `client_reference`.
-Do not persist workflow data anywhere else until backend persistence is wired.
-
-```typescript
-const { clientData, updateClientData } = useClientData();
-updateClientData(clientRef, { factFind: { ...updates } });
-```
-
-## Vite / run config
-
-- Local run: `run-frontend.cmd` → `vite.run.config.ts` → port `3001`
-- Do not use `vite.config.ts` for local dev — it may bind port 3000
-- Backend: `run-api.cmd` → `127.0.0.1:8000`
-- Both: `run-omega.cmd` from repo root
-
-## Known warnings (non-blocking)
-
-- FastAPI `testclient` emits Starlette/httpx deprecation warning — ignore
-- React Router future-flag warnings in tests — ignore
-
-## SQL migration
-
-`migrations/0001_initial.sql` defines the full MVP schema.
-Tables: `users`, `clients`, `dependants`, `employment_details`, `protection_details`, `life_si_details`, `fact_find`, `terms_of_business`, `statement_of_suitability`, `files`, `documents`, `audit_logs`.
-Foreign keys and indexes are included.
-Do not alter this file without updating backend tests that verify table/column presence.
-
-## Test commands
-
-```powershell
-# Backend
-cd "apps/api"
-.\.venv\Scripts\python -m unittest discover -s tests
-
-# Frontend
-cd "apps/frontend"
-npm.cmd test
-```
+- Do not document unused routed pages as live UX.
+- Do not describe Terms of Business as a live Income Protection tab unless `moduleTabs` is changed.
+- Do not describe `/clients` as supporting `?search=` unless backend code adds it.

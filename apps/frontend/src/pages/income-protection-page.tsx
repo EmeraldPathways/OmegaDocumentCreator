@@ -30,7 +30,7 @@ import { GeneratedOutputWorkspace } from "../documents/generated-output-workspac
 import { builtInDocumentTemplates } from "../documents/document-templates";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
-import { buildWorkflowDocument, type WorkflowDocumentType } from "../documents/workflow-document-builders";
+import { buildWorkflowDocument, buildWorkflowEditorDocument, type WorkflowDocumentType } from "../documents/workflow-document-builders";
 import {
   Accordion,
   AccordionItem,
@@ -530,7 +530,7 @@ export function IncomeProtectionPage() {
       },
     };
 
-    return buildWorkflowDocument(nextProfile, documentType).html;
+    return buildWorkflowEditorDocument(nextProfile, documentType).html;
   }
 
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {

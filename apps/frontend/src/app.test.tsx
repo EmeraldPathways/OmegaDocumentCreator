@@ -503,7 +503,7 @@ describe("App routes", () => {
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
-  it("seeds generated output with the formatted workflow document shell after generation", async () => {
+  it("seeds generated output with editor-safe formatted content after generation", async () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -525,10 +525,10 @@ describe("App routes", () => {
     >;
 
     expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
-      'class="workflow-document workflow-document-fact-find"',
+      "<h1>Income Protection Fact Find</h1>",
     );
     expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Fact Find"]?.editedHtml).toContain(
-      'class="document-banner"',
+      "<h2>Client Summary</h2>",
     );
   });
 

@@ -1,6 +1,6 @@
 import type { SeededClientProfile } from "../data/seeded-clients";
 import type { SupportedDocumentType } from "./document-types";
-import { composeWorkflowDocument, renderComposedDocumentHtml } from "./document-composer";
+import { composeWorkflowDocument, renderComposedDocumentEditorHtml, renderComposedDocumentHtml } from "./document-composer";
 
 export type WorkflowDocumentType = SupportedDocumentType;
 
@@ -15,5 +15,14 @@ export function buildWorkflowDocument(profile: SeededClientProfile, documentType
   return {
     title: document.title,
     html: renderComposedDocumentHtml(document),
+  };
+}
+
+export function buildWorkflowEditorDocument(profile: SeededClientProfile, documentType: WorkflowDocumentType): BuiltDocument {
+  const document = composeWorkflowDocument(profile, documentType);
+
+  return {
+    title: document.title,
+    html: renderComposedDocumentEditorHtml(document),
   };
 }

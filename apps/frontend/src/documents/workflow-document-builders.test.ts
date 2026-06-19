@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
-import { buildWorkflowDocument } from "./workflow-document-builders";
+import { buildWorkflowDocument, buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 function cloneProfile(clientReference: string) {
   return JSON.parse(JSON.stringify(getSeededClientProfile(clientReference))) as SeededClientProfile;
@@ -98,5 +98,18 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Yes");
     expect(document.html).toContain("Issue with Income Protection recommendation pack.");
     expect(document.html).toContain("signatures-footer");
+  });
+
+  it("returns editor-safe html for fact find drafts", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+
+    const document = buildWorkflowEditorDocument(profile, "Fact Find");
+
+    expect(document.html).toContain("<h1>Income Protection Fact Find</h1>");
+    expect(document.html).toContain("<h2>Client Summary</h2>");
+    expect(document.html).toContain("<strong>Client:</strong> Jamie Murphy");
+    expect(document.html).toContain("<h2>Recommendation Section</h2>");
+    expect(document.html).not.toContain("<article");
+    expect(document.html).not.toContain('class="client-summary-grid"');
   });
 });

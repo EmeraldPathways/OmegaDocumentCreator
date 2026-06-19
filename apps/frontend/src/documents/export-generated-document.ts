@@ -24,6 +24,45 @@ function getDirectHeadingElement(element: Element) {
   return Array.from(element.children).find(isHeadingElement) ?? null;
 }
 
+function buildHeadingPreviewBlocks(previewDocument: Document) {
+  const blocks: HTMLElement[] = [];
+  let currentBlock: HTMLElement | null = null;
+
+  Array.from(previewDocument.body.children).forEach((element) => {
+    if (isHeadingElement(element) && /H[23]/.test(element.tagName)) {
+      if (currentBlock && currentBlock.children.length > 0) {
+        blocks.push(currentBlock);
+      }
+
+      currentBlock = previewDocument.createElement("section");
+      currentBlock.appendChild(element.cloneNode(true));
+      return;
+    }
+
+    if (!currentBlock) {
+      return;
+    }
+
+    currentBlock.appendChild(element.cloneNode(true));
+  });
+
+  if (currentBlock && currentBlock.children.length > 0) {
+    blocks.push(currentBlock);
+  }
+
+  return blocks;
+}
+
+function getPreviewBlocks(previewDocument: Document) {
+  const structuredBlocks = Array.from(previewDocument.body.children).filter((element) => getDirectHeadingElement(element) !== null);
+
+  if (structuredBlocks.length > 0) {
+    return structuredBlocks;
+  }
+
+  return buildHeadingPreviewBlocks(previewDocument);
+}
+
 function getBlockBodyHtml(element: Element) {
   const heading = getDirectHeadingElement(element);
 
@@ -54,7 +93,7 @@ function mergePreviewSectionsIntoComposedHtml(composedHtml: string, previewHtml:
   }
 
   const footer = article.querySelector("footer.signatures-footer");
-  const previewBlocks = Array.from(previewDocument.body.children);
+  const previewBlocks = getPreviewBlocks(previewDocument);
 
   previewBlocks.forEach((previewBlock) => {
     const previewHeading = normalizeHeadingText(getDirectHeadingElement(previewBlock)?.textContent);
@@ -89,7 +128,7 @@ function hasStructuredPreviewSections(previewHtml: string) {
   const parser = new DOMParser();
   const previewDocument = parser.parseFromString(previewHtml, "text/html");
 
-  return Array.from(previewDocument.body.children).some((element) => getDirectHeadingElement(element) !== null);
+  return getPreviewBlocks(previewDocument).length > 0;
 }
 
 function resolveExportDocument(
