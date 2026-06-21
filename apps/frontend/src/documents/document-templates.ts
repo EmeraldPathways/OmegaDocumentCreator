@@ -9,6 +9,13 @@ export const builtInDocumentTemplates: DocumentTemplateDefinition[] = [
     sectionTitles: ["Personal Details", "Employment Details", "Protection Overview", "Request for Information"],
   },
   {
+    id: "fact-find-update",
+    documentType: "Fact Find Update",
+    title: "Fact Find Update",
+    description: "Update template for collecting revised client information at review meetings.",
+    sectionTitles: ["Additional Relevant Information", "Client Declarations", "Data Protection & Marketing Preferences"],
+  },
+  {
     id: "terms-of-business",
     documentType: "Terms of Business",
     title: "Terms of Business",
@@ -31,6 +38,7 @@ export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<R
   },
   {
     "Fact Find": "",
+    "Fact Find Update": "",
     "Terms of Business": "",
     "Statement of Suitability": "",
   },
@@ -40,6 +48,14 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
   return {
     "Fact Find": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Fact Find"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    },
+    "Fact Find Update": {
+      selectedTemplateId: defaultTemplateIdByDocumentType["Fact Find Update"],
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],

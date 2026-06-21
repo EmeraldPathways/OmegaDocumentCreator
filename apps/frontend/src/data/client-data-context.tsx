@@ -68,6 +68,7 @@ function normalizeDocumentDrafts(
 
   return {
     "Fact Find": normalizeDraft(defaultDrafts["Fact Find"], documentDrafts?.["Fact Find"]),
+    "Fact Find Update": normalizeDraft(defaultDrafts["Fact Find Update"], documentDrafts?.["Fact Find Update"]),
     "Terms of Business": normalizeDraft(defaultDrafts["Terms of Business"], documentDrafts?.["Terms of Business"]),
     "Statement of Suitability": normalizeDraft(
       defaultDrafts["Statement of Suitability"],

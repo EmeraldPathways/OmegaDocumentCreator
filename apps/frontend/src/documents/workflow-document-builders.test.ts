@@ -64,6 +64,18 @@ describe("buildWorkflowDocument", () => {
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {
     const profile = cloneProfile("CLI-2026-0001");
     profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
+    profile.servicesRequestedLifeProtection = "Yes";
+    profile.assetHomeSelf = "350000";
+    profile.liabilityMortgageBalanceOutstanding = "180000";
+    profile.selfRetirementAge = "60";
+    profile.savingsInvestmentRows[0] = {
+      financialInstitution: "AIB",
+      value: "12000",
+      startDate: "2024-01-01",
+      term: "5 years",
+    };
+    profile.recommendationAcknowledged = "Yes";
+    profile.requestInfoAddressLine1 = "31 The Mall";
 
     const document = buildWorkflowDocument(profile, "Fact Find");
 
@@ -78,6 +90,17 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Employed");
     expect(document.html).toContain("52000");
     expect(document.html).toContain("26 weeks");
+    expect(document.html).toContain("Services Requested");
+    expect(document.html).toContain("Life Protection");
+    expect(document.html).toContain("Assets &amp; Liabilities");
+    expect(document.html).toContain("350000");
+    expect(document.html).toContain("180000");
+    expect(document.html).toContain("Pension Arrangements");
+    expect(document.html).toContain("Savings &amp; Investments");
+    expect(document.html).toContain("AIB");
+    expect(document.html).toContain("Recommendation Acknowledgement");
+    expect(document.html).toContain("Request for Information");
+    expect(document.html).toContain("31 The Mall");
     expect(document.html).toContain("Not recorded");
     expect(document.html).toContain("signatures-footer");
   });
@@ -108,6 +131,8 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("<h1>Income Protection Fact Find</h1>");
     expect(document.html).toContain("<h2>Client Summary</h2>");
     expect(document.html).toContain("<strong>Client:</strong> Jamie Murphy");
+    expect(document.html).toContain("<h2>Services Requested</h2>");
+    expect(document.html).toContain("<h2>Assets &amp; Liabilities</h2>");
     expect(document.html).toContain("<h2>Recommendation Section</h2>");
     expect(document.html).not.toContain("<article");
     expect(document.html).not.toContain('class="client-summary-grid"');

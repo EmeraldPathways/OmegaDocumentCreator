@@ -35,6 +35,18 @@ function listHtml(items: string[], emptyText = "No items recorded.") {
   return `<ul>${values.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
 
+function yesNoValue(value: string | undefined) {
+  return value?.trim() === "Yes" ? "Yes" : "No";
+}
+
+function checkedItemLabels(items: Array<{ label: string; value: string | undefined }>) {
+  return items.filter((item) => item.value?.trim() === "Yes").map((item) => item.label);
+}
+
+function addressSummary(...lines: Array<string | undefined>) {
+  return lines.map((line) => line?.trim() ?? "").filter(Boolean).join(", ");
+}
+
 function summaryGridItems(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   const commonItems = [
     { label: "Client", value: profile.fullName },
@@ -229,19 +241,72 @@ function buildFooterBlock(profile: SeededClientProfile, documentType: SupportedD
   };
 }
 
+const DATA_PROTECTION_MARKETING_COPY =
+  "We collect your personal details in order to provide the highest standard of service to you. We take great care with the information provided; taking steps to keep it secure and to ensure it is used only for legitimate purposes. The information you have provided will be treated as confidential and will be retained by Omega Financial Management in electronic format for the purposes of providing financial services. We will use your contact details when we need to contact you in respect of the policy(ies) that you have with us. Under the General Data Protection Regulation 2018 you have various rights relating to your Personal Data.";
+
+function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[] {
+  return [
+    detailGrid(
+      "Client Summary",
+      summaryGridItems(profile, "Fact Find Update"),
+      "client-summary-grid",
+    ),
+    {
+      kind: "section",
+      title: "Additional Relevant Information",
+      bodyHtml: [
+        paragraphHtml(profile.factFindUpdatePersonalCircumstances, "No personal circumstances recorded."),
+        paragraphHtml(profile.factFindUpdateFinancialSituation, "No financial situation recorded."),
+        paragraphHtml(profile.factFindUpdateNeedsAndObjectives, "No needs and objectives recorded."),
+      ].join(""),
+    },
+    detailGrid("Client Declarations", [
+      { label: "Execution only basis", value: profile.factFindUpdateExecutionOnlyBasis },
+      { label: "Terms of Business reviewed", value: profile.factFindUpdateTermsReviewedReceived },
+    ]),
+    {
+      kind: "section",
+      title: "Data Protection & Marketing Preferences",
+      bodyHtml: paragraphHtml(profile.factFindUpdateDataProtectionText || DATA_PROTECTION_MARKETING_COPY),
+    },
+  ];
+}
+
 function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {
+  const servicesRequested = checkedItemLabels([
+    { label: "Life Protection", value: profile.servicesRequestedLifeProtection },
+    { label: "Income Protection", value: profile.servicesRequestedIncomeProtection },
+    { label: "Savings & Protection", value: profile.servicesRequestedSavingsProtection },
+    { label: "Pension Planning", value: profile.servicesRequestedPensionPlanning },
+  ]);
+
+  const savingsRows = profile.savingsInvestmentRows
+    .map((row) =>
+      [row.financialInstitution, row.value ? `Value: ${row.value}` : "", row.startDate ? `Start: ${row.startDate}` : "", row.term ? `Term: ${row.term}` : ""]
+        .filter(Boolean)
+        .join(", "),
+    )
+    .filter((row) => row.length > 0);
+
   return [
     detailGrid(
       "Client Summary",
       summaryGridItems(profile, "Fact Find"),
       "client-summary-grid",
     ),
+    {
+      kind: "section",
+      title: "Services Requested",
+      bodyHtml: listHtml(servicesRequested, "No services requested recorded."),
+    },
     detailGrid("Contact Details", [
       { label: "Email", value: profile.email },
       { label: "Phone", value: profile.mobileNumber },
       { label: "Date of birth", value: profile.dateOfBirth },
-      { label: "Address", value: [profile.townCity, profile.county].filter(Boolean).join(", ") },
+      { label: "Address", value: addressSummary(profile.homeAddressLine1, profile.homeAddressLine2, profile.clientHomeAddressLine3, profile.clientHomeAddressLine4, profile.townCity, profile.county) },
+      { label: "Work phone", value: profile.workPhone },
       { label: "Marital status", value: profile.maritalStatus },
+      { label: "Partner", value: profile.partnerName },
     ]),
     detailGrid("Employment Details", [
       { label: "Occupation", value: profile.occupation },
@@ -249,6 +314,43 @@ function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: s
       { label: "Income", value: profile.income },
       { label: "Advisor", value: profile.advisorName },
     ]),
+    detailGrid("Income Protection Arrangements", [
+      { label: "No deferred provider", value: profile.incomeProtectionNoDeferredProvider },
+      { label: "Deferred provider", value: profile.incomeProtectionDeferredProvider || profile.provider },
+      { label: "Current weekly cover", value: profile.incomeProtectionDeferredCurrentWeeklyCover || profile.recommendedCover },
+      { label: "Deferred period", value: profile.deferredPeriod },
+      { label: "Cover to age", value: profile.coverAge },
+      { label: "Monthly premium", value: profile.premium },
+    ]),
+    detailGrid("Assets & Liabilities", [
+      { label: "Home (Self)", value: profile.assetHomeSelf },
+      { label: "Home (Partner)", value: profile.assetHomePartner },
+      { label: "Mortgage balance outstanding", value: profile.liabilityMortgageBalanceOutstanding },
+      { label: "Mortgage monthly repayment", value: profile.liabilityMortgageMonthlyRepayment },
+      { label: "Total liabilities per month - Self", value: profile.totalLiabilitiesPerMonthSelf },
+      { label: "Total liabilities per month - Joint", value: profile.totalLiabilitiesPerMonthJoint },
+    ]),
+    detailGrid("Pension Arrangements", [
+      { label: "Self retirement age", value: profile.selfRetirementAge },
+      { label: "Self pension scheme", value: profile.selfEmployeeDirectorSchemeType },
+      { label: "Self personal pension company", value: profile.selfPersonalPensionCompany },
+      { label: "Partner retirement age", value: profile.partnerRetirementAge },
+      { label: "Partner pension scheme", value: profile.partnerEmployeeDirectorSchemeType },
+      { label: "Partner personal pension company", value: profile.partnerPersonalPensionCompany },
+    ]),
+    detailGrid("Life Insurance & Serious Illness", [
+      { label: "Mortgage protection", value: profile.mortgageProtection || yesNoValue(profile.mortgageProtectionYes) },
+      { label: "Life Insurance (Self)", value: profile.selfLifeInsuranceAmount },
+      { label: "Life Insurance (Partner)", value: profile.partnerLifeInsuranceAmount },
+      { label: "Serious Illness (Self)", value: profile.selfSeriousIllnessAmount },
+      { label: "Serious Illness (Partner)", value: profile.partnerSeriousIllnessAmount },
+      { label: "Personal insurance record", value: profile.personalInsurance },
+    ]),
+    {
+      kind: "section",
+      title: "Savings & Investments",
+      bodyHtml: [listHtml(savingsRows, "No savings or investments recorded."), paragraphHtml(profile.savingsInvestmentComments, "No comments recorded.")].join(""),
+    },
     {
       kind: "section",
       title: "Recommendation Section",
@@ -259,6 +361,22 @@ function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: s
       title: "Needs and Objectives",
       bodyHtml: needsHtml,
     },
+    detailGrid("Declarations and Confirmations", [
+      { label: "Execution only", value: profile.executionOnlyConfirmation },
+      { label: "Terms reviewed", value: profile.termsReviewedReceived },
+      { label: "Do not contact", value: profile.doNotContact },
+      { label: "Marketing agreed", value: profile.agreeToMarketing },
+      { label: "PEP confirmation", value: profile.pepConfirmation },
+      { label: "Recommendation Acknowledgement", value: profile.recommendationAcknowledged },
+    ]),
+    detailGrid("Request for Information", [
+      { label: "Client Name(s)", value: profile.requestClientNames },
+      { label: "Address", value: addressSummary(profile.requestInfoAddressLine1, profile.requestInfoAddressLine2, profile.requestInfoAddressLine3, profile.requestInfoAddressLine4) },
+      { label: "Date of Birth", value: profile.requestDateOfBirth },
+      { label: "Company", value: profile.requestCompanyName },
+      { label: "Policies", value: profile.requestPolicies },
+      { label: "Date", value: profile.requestLetterDate },
+    ]),
     {
       kind: "callout",
       tone: "warning",
@@ -360,9 +478,11 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const bodyBlocks =
     documentType === "Fact Find"
       ? buildFactFindBlocks(profile, recommendationHtml, needsHtml, warningHtml)
-      : documentType === "Terms of Business"
-        ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
-        : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
+      : documentType === "Fact Find Update"
+        ? buildFactFindUpdateBlocks(profile)
+        : documentType === "Terms of Business"
+          ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
+          : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
 
   return {
     documentType,

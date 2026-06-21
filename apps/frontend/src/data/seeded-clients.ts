@@ -7,6 +7,13 @@ export type SeededDependant = {
   notes: string;
 };
 
+export type SeededSavingsInvestmentRow = {
+  financialInstitution: string;
+  value: string;
+  startDate: string;
+  term: string;
+};
+
 export type SeededClientFile = {
   id: string;
   category: string;
@@ -45,13 +52,34 @@ export type SeededClientProfile = {
   county: string;
   homeAddressLine1: string;
   homeAddressLine2: string;
+  clientHomeAddressLine3: string;
+  clientHomeAddressLine4: string;
+  clientWorkAddressLine1: string;
+  clientWorkAddressLine2: string;
+  clientWorkAddressLine3: string;
+  clientWorkAddressLine4: string;
   eircode: string;
   generalNotes: string;
+  servicesRequestedLifeProtection: string;
+  servicesRequestedIncomeProtection: string;
+  servicesRequestedSavingsProtection: string;
+  servicesRequestedPensionPlanning: string;
   partnerName: string;
+  partnerDateOfBirth: string;
   partnerAddress: string;
+  partnerAddressLine1: string;
+  partnerAddressLine2: string;
+  partnerAddressLine3: string;
+  partnerAddressLine4: string;
+  partnerHomeMobile: string;
+  partnerWorkPhone: string;
+  partnerEmail: string;
+  dependantsSummary: string;
   dependants: SeededDependant[];
   occupation: string;
   employmentStatus: string;
+  employed: string;
+  selfEmployed: string;
   income: string;
   gender: string;
   smokerStatus: string;
@@ -62,6 +90,92 @@ export type SeededClientProfile = {
   coverAge: string;
   phiOccupationalClass: string;
   phiIndexation: string;
+  incomeProtectionNoDeferredProvider: string;
+  incomeProtectionNoDeferredDentistProvident: string;
+  incomeProtectionNoDeferredDentistGeneral: string;
+  incomeProtectionNoDeferredOther: string;
+  incomeProtectionNoDeferredCurrentWeeklyCover: string;
+  incomeProtectionNoDeferredMonthlyPremium: string;
+  incomeProtectionNoDeferredCoverToAge60: string;
+  incomeProtectionNoDeferredCoverToAge65: string;
+  incomeProtectionDeferredProvider: string;
+  incomeProtectionDeferredFriendsFirst: string;
+  incomeProtectionDeferredIrishLife: string;
+  incomeProtectionDeferredOther: string;
+  incomeProtectionDeferred13Weeks: string;
+  incomeProtectionDeferred26Weeks: string;
+  incomeProtectionDeferred52Weeks: string;
+  incomeProtectionDeferredCurrentWeeklyCover: string;
+  incomeProtectionDeferredMonthlyPremium: string;
+  incomeProtectionDeferredCoverToAge60: string;
+  incomeProtectionDeferredCoverToAge65: string;
+  assetHomeSelf: string;
+  assetHomePartner: string;
+  assetLandPropertySelf: string;
+  assetLandPropertyPartner: string;
+  assetBankBuildSocSelf: string;
+  assetBankBuildSocPartner: string;
+  assetCreditUnionSelf: string;
+  assetCreditUnionPartner: string;
+  liabilityMortgageAmount: string;
+  liabilityMortgageMonthlyRepayment: string;
+  liabilityMortgageProvider: string;
+  liabilityMortgageBalanceOutstanding: string;
+  liabilityCarLoanAmount: string;
+  liabilityCarLoanMonthlyRepayment: string;
+  liabilityCarLoanProvider: string;
+  liabilityCarLoanBalanceOutstanding: string;
+  liabilityOtherLoanPaymentsAmount: string;
+  liabilityOtherLoanPaymentsMonthlyRepayment: string;
+  liabilityOtherLoanPaymentsProvider: string;
+  liabilityOtherLoanPaymentsBalanceOutstanding: string;
+  liabilityOthersAmount: string;
+  liabilityOthersMonthlyRepayment: string;
+  liabilityOthersProvider: string;
+  liabilityOthersBalanceOutstanding: string;
+  liabilityOthersDetails: string;
+  totalLiabilitiesPerMonthSelf: string;
+  totalLiabilitiesPerMonthPartner: string;
+  totalLiabilitiesPerMonthJoint: string;
+  liabilitiesCoveredByOtherInsuranceYes: string;
+  liabilitiesCoveredByOtherInsuranceNo: string;
+  liabilitiesCoveredByOtherInsuranceDetails: string;
+  selfAlreadyRetired: string;
+  selfNotRetired: string;
+  selfRetirementAge: string;
+  selfRetirementIncomeTargetPercent: string;
+  selfEmployeeDirectorPensionYes: string;
+  selfEmployeeDirectorPensionNo: string;
+  selfEmployeeDirectorSchemeType: string;
+  selfEmployeeDirectorRetirementAge: string;
+  selfEmployeeDirectorEmployerContribution: string;
+  selfEmployeeDirectorPersonalContribution: string;
+  selfEmployeeDirectorYearsInForce: string;
+  selfPersonalPensionYes: string;
+  selfPersonalPensionNo: string;
+  selfPersonalPensionCompany: string;
+  selfPersonalPensionPolicyType: string;
+  selfPersonalPensionContribution: string;
+  selfPersonalPensionCurrentValue: string;
+  selfPersonalPensionYearsInForce: string;
+  partnerAlreadyRetired: string;
+  partnerNotRetired: string;
+  partnerRetirementAge: string;
+  partnerRetirementIncomeTargetPercent: string;
+  partnerEmployeeDirectorPensionYes: string;
+  partnerEmployeeDirectorPensionNo: string;
+  partnerEmployeeDirectorSchemeType: string;
+  partnerEmployeeDirectorRetirementAge: string;
+  partnerEmployeeDirectorEmployerContribution: string;
+  partnerEmployeeDirectorPersonalContribution: string;
+  partnerEmployeeDirectorYearsInForce: string;
+  partnerPersonalPensionYes: string;
+  partnerPersonalPensionNo: string;
+  partnerPersonalPensionCompany: string;
+  partnerPersonalPensionPolicyType: string;
+  partnerPersonalPensionContribution: string;
+  partnerPersonalPensionCurrentValue: string;
+  partnerPersonalPensionYearsInForce: string;
   advisorName: string;
   termsVersion: string;
   termsDeliveryMethod: string;
@@ -76,27 +190,53 @@ export type SeededClientProfile = {
   netMonthlyCost: string;
   coverSummary: string;
   mortgageProtection: string;
+  mortgageProtectionYes: string;
+  mortgageProtectionNo: string;
   personalInsurance: string;
   keymanInsurance: string;
   partnershipInsurance: string;
   selfLifeInsuranceAmount: string;
+  partnerLifeInsuranceAmount: string;
+  selfSeriousIllnessAmount: string;
   partnerSeriousIllnessAmount: string;
+  savingsInvestmentRows: SeededSavingsInvestmentRow[];
+  savingsInvestmentComments: string;
   personalCircumstances: string;
   financialSituation: string;
   needsObjectives: string;
   executionOnlyConfirmation: string;
   termsReviewedReceived: string;
+  factFindUpdatePersonalCircumstances: string;
+  factFindUpdateFinancialSituation: string;
+  factFindUpdateNeedsAndObjectives: string;
+  factFindUpdateExecutionOnlyBasis: string;
+  factFindUpdateTermsReviewedReceived: string;
+  factFindUpdateDataProtectionText: string;
+  doNotContact: string;
+  agreeToMarketing: string;
   contactByPhone: string;
   contactBySms: string;
   contactByEmail: string;
   contactByPost: string;
   pepConfirmation: string;
   pepRelatedConfirmation: string;
+  pepDeclarationConfirmed: string;
+  pepDirectlyRelatedConfirmed: string;
   businessSource: string;
+  recommendationAcknowledged: string;
   clientSignature1: string;
   clientSignature1Date: string;
   clientSignature2: string;
+  clientSignature2Date: string;
   financialAdvisorSignature: string;
+  financialAdvisorSignatureDate: string;
+  requestClientNames: string;
+  requestInfoAddressLine1: string;
+  requestInfoAddressLine2: string;
+  requestInfoAddressLine3: string;
+  requestInfoAddressLine4: string;
+  requestDateOfBirth: string;
+  requestClientSignature: string;
   requestCompanyName: string;
   requestPolicies: string;
   requestLetterDate: string;
@@ -104,6 +244,15 @@ export type SeededClientProfile = {
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
 };
+
+function createDefaultSavingsInvestmentRows(): SeededSavingsInvestmentRow[] {
+  return Array.from({ length: 3 }, () => ({
+    financialInstitution: "",
+    value: "",
+    startDate: "",
+    term: "",
+  }));
+}
 
 export const seededClientProfiles: Record<string, SeededClientProfile> = {
   "CLI-2026-0001": {
@@ -124,13 +273,34 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     county: "Dublin",
     homeAddressLine1: "1 Main Street",
     homeAddressLine2: "",
+    clientHomeAddressLine3: "",
+    clientHomeAddressLine4: "",
+    clientWorkAddressLine1: "",
+    clientWorkAddressLine2: "",
+    clientWorkAddressLine3: "",
+    clientWorkAddressLine4: "",
     eircode: "D01 AB12",
     generalNotes: "",
+    servicesRequestedLifeProtection: "",
+    servicesRequestedIncomeProtection: "Yes",
+    servicesRequestedSavingsProtection: "",
+    servicesRequestedPensionPlanning: "",
     partnerName: "Taylor Client",
+    partnerDateOfBirth: "",
     partnerAddress: "",
+    partnerAddressLine1: "",
+    partnerAddressLine2: "",
+    partnerAddressLine3: "",
+    partnerAddressLine4: "",
+    partnerHomeMobile: "",
+    partnerWorkPhone: "",
+    partnerEmail: "",
+    dependantsSummary: "",
     dependants: [],
     occupation: "",
     employmentStatus: "Employed",
+    employed: "Yes",
+    selfEmployed: "",
     income: "52000",
     gender: "",
     smokerStatus: "",
@@ -141,6 +311,92 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     coverAge: "65",
     phiOccupationalClass: "",
     phiIndexation: "",
+    incomeProtectionNoDeferredProvider: "",
+    incomeProtectionNoDeferredDentistProvident: "",
+    incomeProtectionNoDeferredDentistGeneral: "",
+    incomeProtectionNoDeferredOther: "",
+    incomeProtectionNoDeferredCurrentWeeklyCover: "",
+    incomeProtectionNoDeferredMonthlyPremium: "",
+    incomeProtectionNoDeferredCoverToAge60: "",
+    incomeProtectionNoDeferredCoverToAge65: "",
+    incomeProtectionDeferredProvider: "",
+    incomeProtectionDeferredFriendsFirst: "",
+    incomeProtectionDeferredIrishLife: "",
+    incomeProtectionDeferredOther: "",
+    incomeProtectionDeferred13Weeks: "",
+    incomeProtectionDeferred26Weeks: "Yes",
+    incomeProtectionDeferred52Weeks: "",
+    incomeProtectionDeferredCurrentWeeklyCover: "",
+    incomeProtectionDeferredMonthlyPremium: "145",
+    incomeProtectionDeferredCoverToAge60: "",
+    incomeProtectionDeferredCoverToAge65: "Yes",
+    assetHomeSelf: "",
+    assetHomePartner: "",
+    assetLandPropertySelf: "",
+    assetLandPropertyPartner: "",
+    assetBankBuildSocSelf: "",
+    assetBankBuildSocPartner: "",
+    assetCreditUnionSelf: "",
+    assetCreditUnionPartner: "",
+    liabilityMortgageAmount: "",
+    liabilityMortgageMonthlyRepayment: "",
+    liabilityMortgageProvider: "",
+    liabilityMortgageBalanceOutstanding: "",
+    liabilityCarLoanAmount: "",
+    liabilityCarLoanMonthlyRepayment: "",
+    liabilityCarLoanProvider: "",
+    liabilityCarLoanBalanceOutstanding: "",
+    liabilityOtherLoanPaymentsAmount: "",
+    liabilityOtherLoanPaymentsMonthlyRepayment: "",
+    liabilityOtherLoanPaymentsProvider: "",
+    liabilityOtherLoanPaymentsBalanceOutstanding: "",
+    liabilityOthersAmount: "",
+    liabilityOthersMonthlyRepayment: "",
+    liabilityOthersProvider: "",
+    liabilityOthersBalanceOutstanding: "",
+    liabilityOthersDetails: "",
+    totalLiabilitiesPerMonthSelf: "",
+    totalLiabilitiesPerMonthPartner: "",
+    totalLiabilitiesPerMonthJoint: "",
+    liabilitiesCoveredByOtherInsuranceYes: "",
+    liabilitiesCoveredByOtherInsuranceNo: "",
+    liabilitiesCoveredByOtherInsuranceDetails: "",
+    selfAlreadyRetired: "",
+    selfNotRetired: "Yes",
+    selfRetirementAge: "",
+    selfRetirementIncomeTargetPercent: "",
+    selfEmployeeDirectorPensionYes: "",
+    selfEmployeeDirectorPensionNo: "",
+    selfEmployeeDirectorSchemeType: "",
+    selfEmployeeDirectorRetirementAge: "",
+    selfEmployeeDirectorEmployerContribution: "",
+    selfEmployeeDirectorPersonalContribution: "",
+    selfEmployeeDirectorYearsInForce: "",
+    selfPersonalPensionYes: "",
+    selfPersonalPensionNo: "",
+    selfPersonalPensionCompany: "",
+    selfPersonalPensionPolicyType: "",
+    selfPersonalPensionContribution: "",
+    selfPersonalPensionCurrentValue: "",
+    selfPersonalPensionYearsInForce: "",
+    partnerAlreadyRetired: "",
+    partnerNotRetired: "Yes",
+    partnerRetirementAge: "",
+    partnerRetirementIncomeTargetPercent: "",
+    partnerEmployeeDirectorPensionYes: "",
+    partnerEmployeeDirectorPensionNo: "",
+    partnerEmployeeDirectorSchemeType: "",
+    partnerEmployeeDirectorRetirementAge: "",
+    partnerEmployeeDirectorEmployerContribution: "",
+    partnerEmployeeDirectorPersonalContribution: "",
+    partnerEmployeeDirectorYearsInForce: "",
+    partnerPersonalPensionYes: "",
+    partnerPersonalPensionNo: "",
+    partnerPersonalPensionCompany: "",
+    partnerPersonalPensionPolicyType: "",
+    partnerPersonalPensionContribution: "",
+    partnerPersonalPensionCurrentValue: "",
+    partnerPersonalPensionYearsInForce: "",
     advisorName: "",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Post",
@@ -155,27 +411,53 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     netMonthlyCost: "116",
     coverSummary: "",
     mortgageProtection: "No",
+    mortgageProtectionYes: "",
+    mortgageProtectionNo: "Yes",
     personalInsurance: "No",
     keymanInsurance: "No",
     partnershipInsurance: "No",
     selfLifeInsuranceAmount: "",
+    partnerLifeInsuranceAmount: "",
+    selfSeriousIllnessAmount: "",
     partnerSeriousIllnessAmount: "",
+    savingsInvestmentRows: createDefaultSavingsInvestmentRows(),
+    savingsInvestmentComments: "",
     personalCircumstances: "Partner noted: Taylor Client",
     financialSituation: "Annual income currently recorded as 52000.",
     needsObjectives: "Income Protection cover review requested.",
     executionOnlyConfirmation: "Pending",
     termsReviewedReceived: "Pending",
+    factFindUpdatePersonalCircumstances: "",
+    factFindUpdateFinancialSituation: "",
+    factFindUpdateNeedsAndObjectives: "",
+    factFindUpdateExecutionOnlyBasis: "",
+    factFindUpdateTermsReviewedReceived: "",
+    factFindUpdateDataProtectionText: "",
+    doNotContact: "",
+    agreeToMarketing: "",
     contactByPhone: "No preference recorded",
     contactBySms: "No preference recorded",
     contactByEmail: "No",
     contactByPost: "No preference recorded",
     pepConfirmation: "Not confirmed",
     pepRelatedConfirmation: "Not confirmed",
+    pepDeclarationConfirmed: "",
+    pepDirectlyRelatedConfirmed: "",
     businessSource: "Existing client referral",
+    recommendationAcknowledged: "",
     clientSignature1: "Pending",
     clientSignature1Date: "",
     clientSignature2: "Pending",
+    clientSignature2Date: "",
     financialAdvisorSignature: "",
+    financialAdvisorSignatureDate: "",
+    requestClientNames: "Test Client",
+    requestInfoAddressLine1: "1 Main Street",
+    requestInfoAddressLine2: "Dublin",
+    requestInfoAddressLine3: "",
+    requestInfoAddressLine4: "",
+    requestDateOfBirth: "1985-04-12",
+    requestClientSignature: "",
     requestCompanyName: "",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-01-15",
@@ -236,13 +518,34 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     county: "Galway",
     homeAddressLine1: "15 Sea Road",
     homeAddressLine2: "",
+    clientHomeAddressLine3: "",
+    clientHomeAddressLine4: "",
+    clientWorkAddressLine1: "",
+    clientWorkAddressLine2: "",
+    clientWorkAddressLine3: "",
+    clientWorkAddressLine4: "",
     eircode: "H91 CD34",
     generalNotes: "",
+    servicesRequestedLifeProtection: "",
+    servicesRequestedIncomeProtection: "Yes",
+    servicesRequestedSavingsProtection: "",
+    servicesRequestedPensionPlanning: "",
     partnerName: "",
+    partnerDateOfBirth: "",
     partnerAddress: "",
+    partnerAddressLine1: "",
+    partnerAddressLine2: "",
+    partnerAddressLine3: "",
+    partnerAddressLine4: "",
+    partnerHomeMobile: "",
+    partnerWorkPhone: "",
+    partnerEmail: "",
+    dependantsSummary: "Ella Murphy",
     dependants: [{ name: "Ella Murphy", dateOfBirth: "2017-06-20", notes: "Child" }],
     occupation: "Project Analyst",
     employmentStatus: "Employed",
+    employed: "Yes",
+    selfEmployed: "",
     income: "60000",
     gender: "Female",
     smokerStatus: "Non-Smoker",
@@ -253,6 +556,92 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     coverAge: "65",
     phiOccupationalClass: "2",
     phiIndexation: "Y",
+    incomeProtectionNoDeferredProvider: "",
+    incomeProtectionNoDeferredDentistProvident: "",
+    incomeProtectionNoDeferredDentistGeneral: "",
+    incomeProtectionNoDeferredOther: "",
+    incomeProtectionNoDeferredCurrentWeeklyCover: "",
+    incomeProtectionNoDeferredMonthlyPremium: "",
+    incomeProtectionNoDeferredCoverToAge60: "",
+    incomeProtectionNoDeferredCoverToAge65: "",
+    incomeProtectionDeferredProvider: "Zurich Life",
+    incomeProtectionDeferredFriendsFirst: "",
+    incomeProtectionDeferredIrishLife: "",
+    incomeProtectionDeferredOther: "",
+    incomeProtectionDeferred13Weeks: "Yes",
+    incomeProtectionDeferred26Weeks: "",
+    incomeProtectionDeferred52Weeks: "",
+    incomeProtectionDeferredCurrentWeeklyCover: "30000",
+    incomeProtectionDeferredMonthlyPremium: "165",
+    incomeProtectionDeferredCoverToAge60: "",
+    incomeProtectionDeferredCoverToAge65: "Yes",
+    assetHomeSelf: "",
+    assetHomePartner: "",
+    assetLandPropertySelf: "",
+    assetLandPropertyPartner: "",
+    assetBankBuildSocSelf: "",
+    assetBankBuildSocPartner: "",
+    assetCreditUnionSelf: "",
+    assetCreditUnionPartner: "",
+    liabilityMortgageAmount: "",
+    liabilityMortgageMonthlyRepayment: "",
+    liabilityMortgageProvider: "",
+    liabilityMortgageBalanceOutstanding: "",
+    liabilityCarLoanAmount: "",
+    liabilityCarLoanMonthlyRepayment: "",
+    liabilityCarLoanProvider: "",
+    liabilityCarLoanBalanceOutstanding: "",
+    liabilityOtherLoanPaymentsAmount: "",
+    liabilityOtherLoanPaymentsMonthlyRepayment: "",
+    liabilityOtherLoanPaymentsProvider: "",
+    liabilityOtherLoanPaymentsBalanceOutstanding: "",
+    liabilityOthersAmount: "",
+    liabilityOthersMonthlyRepayment: "",
+    liabilityOthersProvider: "",
+    liabilityOthersBalanceOutstanding: "",
+    liabilityOthersDetails: "",
+    totalLiabilitiesPerMonthSelf: "",
+    totalLiabilitiesPerMonthPartner: "",
+    totalLiabilitiesPerMonthJoint: "",
+    liabilitiesCoveredByOtherInsuranceYes: "",
+    liabilitiesCoveredByOtherInsuranceNo: "",
+    liabilitiesCoveredByOtherInsuranceDetails: "",
+    selfAlreadyRetired: "",
+    selfNotRetired: "Yes",
+    selfRetirementAge: "",
+    selfRetirementIncomeTargetPercent: "",
+    selfEmployeeDirectorPensionYes: "",
+    selfEmployeeDirectorPensionNo: "",
+    selfEmployeeDirectorSchemeType: "",
+    selfEmployeeDirectorRetirementAge: "",
+    selfEmployeeDirectorEmployerContribution: "",
+    selfEmployeeDirectorPersonalContribution: "",
+    selfEmployeeDirectorYearsInForce: "",
+    selfPersonalPensionYes: "",
+    selfPersonalPensionNo: "",
+    selfPersonalPensionCompany: "",
+    selfPersonalPensionPolicyType: "",
+    selfPersonalPensionContribution: "",
+    selfPersonalPensionCurrentValue: "",
+    selfPersonalPensionYearsInForce: "",
+    partnerAlreadyRetired: "",
+    partnerNotRetired: "Yes",
+    partnerRetirementAge: "",
+    partnerRetirementIncomeTargetPercent: "",
+    partnerEmployeeDirectorPensionYes: "",
+    partnerEmployeeDirectorPensionNo: "",
+    partnerEmployeeDirectorSchemeType: "",
+    partnerEmployeeDirectorRetirementAge: "",
+    partnerEmployeeDirectorEmployerContribution: "",
+    partnerEmployeeDirectorPersonalContribution: "",
+    partnerEmployeeDirectorYearsInForce: "",
+    partnerPersonalPensionYes: "",
+    partnerPersonalPensionNo: "",
+    partnerPersonalPensionCompany: "",
+    partnerPersonalPensionPolicyType: "",
+    partnerPersonalPensionContribution: "",
+    partnerPersonalPensionCurrentValue: "",
+    partnerPersonalPensionYearsInForce: "",
     advisorName: "Office Staff",
     termsVersion: "January 2026",
     termsDeliveryMethod: "Email",
@@ -267,27 +656,53 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     netMonthlyCost: "132",
     coverSummary: "",
     mortgageProtection: "No",
+    mortgageProtectionYes: "",
+    mortgageProtectionNo: "Yes",
     personalInsurance: "No",
     keymanInsurance: "No",
     partnershipInsurance: "No",
     selfLifeInsuranceAmount: "",
+    partnerLifeInsuranceAmount: "",
+    selfSeriousIllnessAmount: "",
     partnerSeriousIllnessAmount: "",
+    savingsInvestmentRows: createDefaultSavingsInvestmentRows(),
+    savingsInvestmentComments: "",
     personalCircumstances: "",
     financialSituation: "Annual income currently recorded as 60000.",
     needsObjectives: "Income Protection cover review requested.",
     executionOnlyConfirmation: "Pending",
     termsReviewedReceived: "Pending",
+    factFindUpdatePersonalCircumstances: "",
+    factFindUpdateFinancialSituation: "",
+    factFindUpdateNeedsAndObjectives: "",
+    factFindUpdateExecutionOnlyBasis: "",
+    factFindUpdateTermsReviewedReceived: "",
+    factFindUpdateDataProtectionText: "",
+    doNotContact: "",
+    agreeToMarketing: "",
     contactByPhone: "No preference recorded",
     contactBySms: "No preference recorded",
     contactByEmail: "Yes",
     contactByPost: "No preference recorded",
     pepConfirmation: "Not confirmed",
     pepRelatedConfirmation: "Not confirmed",
+    pepDeclarationConfirmed: "",
+    pepDirectlyRelatedConfirmed: "",
     businessSource: "Existing client referral",
+    recommendationAcknowledged: "",
     clientSignature1: "Pending",
     clientSignature1Date: "",
     clientSignature2: "Pending",
+    clientSignature2Date: "",
     financialAdvisorSignature: "Office Staff",
+    financialAdvisorSignatureDate: "",
+    requestClientNames: "Jamie Murphy",
+    requestInfoAddressLine1: "15 Sea Road",
+    requestInfoAddressLine2: "Galway",
+    requestInfoAddressLine3: "",
+    requestInfoAddressLine4: "",
+    requestDateOfBirth: "1990-11-08",
+    requestClientSignature: "",
     requestCompanyName: "Zurich Life",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-06-06",

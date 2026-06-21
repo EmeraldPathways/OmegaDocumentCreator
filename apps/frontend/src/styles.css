@@ -1295,6 +1295,37 @@ button {
   overflow-wrap: break-word;
 }
 
+.income-protection-page .workflow-header {
+  gap: var(--space-4);
+}
+
+.income-protection-page .income-protection-header-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.income-protection-page .income-protection-client-field {
+  flex: 1 1 320px;
+  max-width: 420px;
+}
+
+.income-protection-page .income-protection-header-actions {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-top: 0;
+  border-radius: 0;
+}
+
+.income-protection-page .income-protection-summary-bar {
+  margin-top: 0;
+}
+
 /* Generated output workspace */
 .generated-output-workspace {
   border: 1px solid var(--color-border);

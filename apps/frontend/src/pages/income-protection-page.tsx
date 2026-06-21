@@ -2281,7 +2281,7 @@ export function IncomeProtectionPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack income-protection-page">
       <section className="workflow-header" aria-label="Selected client summary">
         <div className="workflow-header-top">
           <div className="workflow-header-title">
@@ -2292,8 +2292,8 @@ export function IncomeProtectionPage() {
           </div>
         </div>
 
-        <div className="workflow-header-grid">
-          <div className="workflow-client-field">
+        <div className="income-protection-header-controls">
+          <div className="workflow-client-field income-protection-client-field">
             <label className="field-label" htmlFor="client-select">
               Select workflow client
             </label>
@@ -2314,39 +2314,40 @@ export function IncomeProtectionPage() {
                 </option>
               ))}
             </select>
-            <div className="workflow-header-actions">
-              <Link className="btn btn-primary" to="/clients/new">
-                <Plus size={18} />
-                Add Client
-              </Link>
-              <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
-                <Edit size={18} />
-                Edit Client
-              </Link>
-            </div>
           </div>
 
-          <div className="workflow-summary-bar">
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Client</span>
-              <strong>{resolvedDraft.fullName}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Reference</span>
-              <strong>{resolvedDraft.clientReference}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">DOB</span>
-              <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Contact</span>
-              <strong>{summaryContact}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Occupation</span>
-              <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
-            </div>
+          <div className="workflow-header-actions income-protection-header-actions">
+            <Link className="btn btn-primary" to="/clients/new">
+              <Plus size={18} />
+              Add Client
+            </Link>
+            <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
+              <Edit size={18} />
+              Edit Client
+            </Link>
+          </div>
+        </div>
+
+        <div className="workflow-summary-bar income-protection-summary-bar">
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Client</span>
+            <strong>{resolvedDraft.fullName}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Reference</span>
+            <strong>{resolvedDraft.clientReference}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">DOB</span>
+            <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Contact</span>
+            <strong>{summaryContact}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Occupation</span>
+            <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
           </div>
         </div>
       </section>
