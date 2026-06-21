@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { Extension, Node, mergeAttributes } from "@tiptap/core";
 import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type NodeViewProps } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -13,6 +14,148 @@ type RichDocumentEditorProps = {
 };
 
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px"];
+const WORKFLOW_BLOCK_CLASSES = new Set([
+  "document-banner",
+  "client-summary-grid",
+  "document-grid",
+  "grid-items",
+  "document-section",
+  "document-callout",
+  "signatures-footer",
+]);
+const WORKFLOW_INLINE_BLOCK_CLASSES = new Set(["grid-item"]);
+const WORKFLOW_INLINE_CLASSES = new Set(["grid-label"]);
+const WORKFLOW_TEXT_CLASSES = new Set(["document-eyebrow", "document-subtitle"]);
+
+function normalizeClassNames(
+  value: string | null | undefined,
+  allowed: Set<string>,
+  allowedPrefixes: string[] = [],
+) {
+  const classNames = (value ?? "")
+    .split(/\s+/)
+    .map((className) => className.trim())
+    .filter((className) => className.length > 0)
+    .filter((className) => allowed.has(className) || allowedPrefixes.some((prefix) => className.startsWith(prefix)));
+
+  return classNames.length > 0 ? classNames.join(" ") : null;
+}
+
+const WorkflowClassAttributes = Extension.create({
+  name: "workflowClassAttributes",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph", "heading"],
+        attributes: {
+          class: {
+            default: null,
+            parseHTML: (element) => normalizeClassNames(element.getAttribute("class"), WORKFLOW_TEXT_CLASSES),
+            renderHTML: (attributes) => (attributes.class ? { class: attributes.class } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
+const WorkflowArticleNode = Node.create({
+  name: "workflowArticle",
+  group: "block",
+  content: "block+",
+  defining: true,
+  parseHTML() {
+    return [{ tag: "article.workflow-document" }];
+  },
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          normalizeClassNames(element.getAttribute("class"), new Set(["workflow-document"]), ["workflow-document-"]),
+        renderHTML: (attributes: { class?: string | null }) => (attributes.class ? { class: attributes.class } : {}),
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["article", mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+const WorkflowBlockNode = Node.create({
+  name: "workflowBlock",
+  group: "block",
+  content: "block+",
+  defining: true,
+  parseHTML() {
+    return [
+      { tag: "div.document-banner" },
+      { tag: "div.client-summary-grid" },
+      { tag: "div.document-grid" },
+      { tag: "div.grid-items" },
+      { tag: "div.document-section" },
+      { tag: "div.document-callout" },
+      { tag: "div.signatures-footer" },
+    ];
+  },
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          normalizeClassNames(element.getAttribute("class"), WORKFLOW_BLOCK_CLASSES, ["document-callout-"]),
+        renderHTML: (attributes: { class?: string | null }) => (attributes.class ? { class: attributes.class } : {}),
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+const WorkflowInlineBlockNode = Node.create({
+  name: "workflowInlineBlock",
+  group: "block",
+  content: "inline*",
+  defining: true,
+  parseHTML() {
+    return [{ tag: "div.grid-item" }];
+  },
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element: HTMLElement) => normalizeClassNames(element.getAttribute("class"), WORKFLOW_INLINE_BLOCK_CLASSES),
+        renderHTML: (attributes: { class?: string | null }) => (attributes.class ? { class: attributes.class } : {}),
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["div", mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+const WorkflowSpanNode = Node.create({
+  name: "workflowSpan",
+  group: "inline",
+  inline: true,
+  content: "inline*",
+  parseHTML() {
+    return [{ tag: "span.grid-label" }];
+  },
+  addAttributes() {
+    return {
+      class: {
+        default: null,
+        parseHTML: (element: HTMLElement) => normalizeClassNames(element.getAttribute("class"), WORKFLOW_INLINE_CLASSES),
+        renderHTML: (attributes: { class?: string | null }) => (attributes.class ? { class: attributes.class } : {}),
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes), 0];
+  },
+});
 
 function ToolbarButton({
   active = false,
@@ -88,6 +231,11 @@ export function RichDocumentEditor({
   const editor = useEditor({
     content,
     extensions: [
+      WorkflowClassAttributes,
+      WorkflowArticleNode,
+      WorkflowBlockNode,
+      WorkflowInlineBlockNode,
+      WorkflowSpanNode,
       StarterKit.configure({
         bulletList: {
           keepMarks: true,
@@ -107,6 +255,7 @@ export function RichDocumentEditor({
       attributes: {
         class: "generated-output-editor",
       },
+      handleScrollToSelection: () => typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent),
     },
     onUpdate: ({ editor: nextEditor }) => {
       onContentChange(nextEditor.getHTML());

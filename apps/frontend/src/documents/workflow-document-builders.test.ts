@@ -128,13 +128,13 @@ describe("buildWorkflowDocument", () => {
 
     const document = buildWorkflowEditorDocument(profile, "Fact Find");
 
+    expect(document.html).toContain('<article class="workflow-document workflow-document-fact-find">');
+    expect(document.html).toContain('class="document-banner"');
     expect(document.html).toContain("<h1>Income Protection Fact Find</h1>");
-    expect(document.html).toContain("<h2>Client Summary</h2>");
-    expect(document.html).toContain("<strong>Client:</strong> Jamie Murphy");
-    expect(document.html).toContain("<h2>Services Requested</h2>");
-    expect(document.html).toContain("<h2>Assets &amp; Liabilities</h2>");
-    expect(document.html).toContain("<h2>Recommendation Section</h2>");
-    expect(document.html).not.toContain("<article");
-    expect(document.html).not.toContain('class="client-summary-grid"');
+    expect(document.html).toContain('class="client-summary-grid"');
+    expect(document.html).toContain('class="document-section"');
+    expect(document.html).toContain('class="document-callout document-callout-warning"');
+    expect(document.html).toContain('class="signatures-footer"');
+    expect(document.html).toContain('class="grid-label">Client</span><strong>Jamie Murphy</strong>');
   });
 });

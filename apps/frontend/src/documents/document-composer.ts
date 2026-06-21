@@ -548,29 +548,40 @@ function renderEditorBlock(block: ComposedBlock) {
   switch (block.kind) {
     case "banner":
       return [
-        `<p><strong>${escapeHtml(block.eyebrow)}</strong></p>`,
+        '<div class="document-banner">',
+        `<p class="document-eyebrow">${escapeHtml(block.eyebrow)}</p>`,
         `<h1>${escapeHtml(block.title)}</h1>`,
-        `<p>${escapeHtml(block.subtitle)}</p>`,
+        `<p class="document-subtitle">${escapeHtml(block.subtitle)}</p>`,
+        "</div>",
       ].join("");
     case "grid":
       return [
+        `<div class="${escapeHtml(block.className ?? "document-grid")}">`,
         `<h2>${escapeHtml(block.title)}</h2>`,
+        '<div class="grid-items">',
         ...block.items.map(
-          (item) => `<p><strong>${escapeHtml(item.label)}:</strong> ${escapeHtml(valueOrFallback(item.value))}</p>`,
+          (item) =>
+            `<div class="grid-item"><span class="grid-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(
+              valueOrFallback(item.value),
+            )}</strong></div>`,
         ),
+        "</div>",
+        "</div>",
       ].join("");
     case "section":
-      return `<h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}`;
+      return `<div class="${escapeHtml(block.className ?? "document-section")}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</div>`;
     case "callout":
-      return `<h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}`;
+      return `<div class="document-callout document-callout-${escapeHtml(block.tone)}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</div>`;
     case "footer":
       return [
+        '<div class="signatures-footer">',
         `<h2>${escapeHtml(block.title)}</h2>`,
         `<p><strong>Advisor:</strong> ${escapeHtml(block.advisorName)}</p>`,
         `<p><strong>Client signature:</strong> ${escapeHtml(block.clientSignature)}</p>`,
         `<p><strong>Client signature date:</strong> ${escapeHtml(block.clientSignatureDate)}</p>`,
         `<p><strong>Advisor signature:</strong> ${escapeHtml(block.advisorSignature)}</p>`,
         ...block.complianceCopy.map((line) => `<p>${escapeHtml(line)}</p>`),
+        "</div>",
       ].join("");
   }
 }
@@ -582,5 +593,7 @@ export function renderComposedDocumentHtml(document: ComposedDocument) {
 }
 
 export function renderComposedDocumentEditorHtml(document: ComposedDocument) {
-  return document.blocks.map((block) => renderEditorBlock(block)).join("");
+  return `<article class="workflow-document workflow-document-${escapeHtml(document.documentType.toLowerCase().replace(/\s+/g, "-"))}">${document.blocks
+    .map((block) => renderEditorBlock(block))
+    .join("")}</article>`;
 }

@@ -151,13 +151,18 @@ function appendNestedContent(element: Element, blocks: WordExportBlock[]) {
 function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
   const tagName = element.tagName.toLowerCase();
   const classList = element.classList;
+  const isBanner = classList.contains("document-banner");
+  const isGrid = classList.contains("client-summary-grid") || classList.contains("document-grid");
+  const isSection = classList.contains("document-section");
+  const isCallout = classList.contains("document-callout");
+  const isFooter = classList.contains("signatures-footer");
 
   if (tagName === "article") {
     Array.from(element.children).forEach((child) => extractBlocksFromElement(child, blocks));
     return;
   }
 
-  if (tagName === "header" && classList.contains("document-banner")) {
+  if (isBanner) {
     const eyebrow = textFromElement(element.querySelector(".document-eyebrow"));
     const title = textFromElement(element.querySelector("h1"));
     const subtitle = textFromElement(element.querySelector(".document-subtitle"));
@@ -175,7 +180,7 @@ function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
     return;
   }
 
-  if (tagName === "section" && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
+  if (isGrid) {
     const heading = textFromElement(element.querySelector("h2"));
     if (heading) {
       blocks.push({ kind: "gridHeading", text: heading });
@@ -197,7 +202,7 @@ function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
     return;
   }
 
-  if (tagName === "section" && classList.contains("document-section")) {
+  if (isSection) {
     const heading = textFromElement(element.querySelector("h2"));
     if (heading) {
       blocks.push({ kind: "sectionHeading", text: heading });
@@ -207,7 +212,7 @@ function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
     return;
   }
 
-  if (tagName === "aside" && classList.contains("document-callout")) {
+  if (isCallout) {
     const heading = textFromElement(element.querySelector("h2"));
     if (heading) {
       blocks.push({ kind: "calloutHeading", text: heading });
@@ -217,7 +222,7 @@ function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
     return;
   }
 
-  if (tagName === "footer" && classList.contains("signatures-footer")) {
+  if (isFooter) {
     const heading = textFromElement(element.querySelector("h2"));
     if (heading) {
       blocks.push({ kind: "footerHeading", text: heading });
