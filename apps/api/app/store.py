@@ -8,6 +8,10 @@ from app.domain.users import UserRecord, UserRole, UserStatus
 from app.security import hash_password
 
 
+# ---------------------------------------------------------------------------
+# Seeded templates (kept for backward compat / hybrid mode)
+# ---------------------------------------------------------------------------
+
 USER_TEMPLATES = {
     "admin@omega.local": UserRecord(
         first_name="Omega",
@@ -138,6 +142,8 @@ SECURITY_SUMMARY_TEMPLATE = {
     "file_storage_visibility": "private_server_storage",
 }
 
+_DRAFT_STORE: dict[str, dict[str, dict[str, object]]] = {}
+
 
 def _default_generated_document_drafts() -> dict[str, dict[str, object]]:
     return {
@@ -156,13 +162,6 @@ def _default_generated_document_drafts() -> dict[str, dict[str, object]]:
     }
 
 
-def _ensure_generated_document_state(client: dict[str, object]) -> None:
-    if "document_drafts" not in client:
-        client["document_drafts"] = _default_generated_document_drafts()
-    if "generated_documents" not in client:
-        client["generated_documents"] = []
-
-
 def _build_generated_document_name(full_name: str, document_type: str, generated_at: str, version: int) -> str:
     sanitized_name = full_name.replace(" ", "_")
     sanitized_document_type = document_type.replace(" ", "_")
@@ -171,7 +170,7 @@ def _build_generated_document_name(full_name: str, document_type: str, generated
 
 
 def reset_store() -> None:
-    global SEEDED_USERS, SEEDED_CLIENTS, SEEDED_AUDIT_LOGS, SEEDED_BACKUP_RUNS
+    global SEEDED_USERS, SEEDED_CLIENTS, SEEDED_AUDIT_LOGS, SEEDED_BACKUP_RUNS, _DRAFT_STORE
     SEEDED_USERS = {
         email: UserRecord(
             first_name=user.first_name,
@@ -186,10 +185,155 @@ def reset_store() -> None:
     SEEDED_CLIENTS = deepcopy(CLIENT_TEMPLATES)
     SEEDED_AUDIT_LOGS = deepcopy(AUDIT_LOG_TEMPLATES)
     SEEDED_BACKUP_RUNS = deepcopy(BACKUP_RUN_TEMPLATES)
+    _DRAFT_STORE = {}
 
 
 reset_store()
 
+
+# ---------------------------------------------------------------------------
+# Hybrid client lookup: DB first, in-memory fallback
+# ---------------------------------------------------------------------------
+
+
+def _try_db_client_lookup(client_reference: str) -> dict[str, object] | None:
+    try:
+        from app.db import get_session
+        from app.repositories.clients import ClientRepository
+
+        db = get_session()
+        try:
+            repo = ClientRepository(db)
+            client_model = repo.get_by_reference(client_reference)
+            if client_model is not None:
+                result = repo._to_detail_response(client_model)
+                # Merge in-memory draft data for Phase 2/5 bridge
+                if client_reference in _DRAFT_STORE:
+                    result["document_drafts"] = deepcopy(_DRAFT_STORE[client_reference])
+                for seeded in SEEDED_CLIENTS:
+                    if seeded["client_reference"] == client_reference:
+                        result["generated_documents"] = deepcopy(seeded.get("generated_documents", []))
+                        break
+                return result
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return None
+
+
+def get_client(client_reference: str) -> dict[str, object] | None:
+    db_result = _try_db_client_lookup(client_reference)
+    if db_result is not None:
+        return db_result
+
+    for client in SEEDED_CLIENTS:
+        if client["client_reference"] == client_reference:
+            return {
+                "client_reference": client["client_reference"],
+                "first_name": client["first_name"],
+                "surname": client["surname"],
+                "full_name": client["full_name"],
+                "title": client["title"],
+                "status": client["status"].value,
+                "created_by": client["created_by"],
+                "updated_by": client["updated_by"],
+                "created_at": client["created_at"],
+                "updated_at": client["updated_at"],
+                "email": client["email"],
+                "mobile_number": client["mobile_number"],
+                "work_phone": client["work_phone"],
+                "date_of_birth": client["date_of_birth"],
+                "marital_status": client["marital_status"],
+                "home_address_line_1": client["home_address_line_1"],
+                "home_address_line_2": client["home_address_line_2"],
+                "town_city": client["town_city"],
+                "county": client["county"],
+                "eircode": client["eircode"],
+                "partner_name": client["partner_name"],
+                "partner_address": client["partner_address"],
+                "general_notes": client["general_notes"],
+                "dependants": deepcopy(client["dependants"]),
+                "document_drafts": deepcopy(client.get("document_drafts", _default_generated_document_drafts())),
+                "generated_documents": deepcopy(client.get("generated_documents", [])),
+            }
+    return None
+
+
+def get_client_generated_document_draft(client_reference: str, document_type: str) -> dict[str, object] | None:
+    if client_reference in _DRAFT_STORE:
+        draft = _DRAFT_STORE[client_reference].get(document_type)
+        if draft:
+            return deepcopy(draft)
+    for client in SEEDED_CLIENTS:
+        if client["client_reference"] != client_reference:
+            continue
+        drafts = client.get("document_drafts", {})
+        draft = drafts.get(document_type)
+        return deepcopy(draft) if draft else None
+    return None
+
+
+def save_generated_document_draft(
+    *,
+    client_reference: str,
+    document_type: str,
+    template_id: str,
+    title: str,
+    summary: str,
+    sections: list[dict[str, object]],
+    warnings: list[str],
+    generated_html: str,
+    integration_requests: list[dict[str, object]],
+) -> dict[str, object] | None:
+    generated_at = datetime.now(UTC).date().isoformat()
+    draft = {
+        "document_type": document_type,
+        "template_id": template_id,
+        "title": title,
+        "summary": summary,
+        "sections": deepcopy(sections),
+        "warnings": deepcopy(warnings),
+        "generated_html": generated_html,
+        "integration_requests": deepcopy(integration_requests),
+        "generation_status": "completed",
+    }
+
+    _DRAFT_STORE.setdefault(client_reference, {})[document_type] = draft
+
+    for client in SEEDED_CLIENTS:
+        if client["client_reference"] != client_reference:
+            continue
+        client.setdefault("document_drafts", _default_generated_document_drafts())
+        client["document_drafts"][document_type] = draft
+        generated_docs = client.setdefault("generated_documents", [])
+        next_version = sum(1 for item in generated_docs if item.get("document_type") == document_type) + 1
+        generated_docs.insert(
+            0,
+            {
+                "id": f"DOC-{len(generated_docs) + 1:04d}",
+                "document_type": document_type,
+                "document_name": _build_generated_document_name(
+                    str(client.get("full_name", client_reference)),
+                    document_type,
+                    generated_at,
+                    next_version,
+                ),
+                "version": f"Version {next_version}",
+                "status": "Preview saved",
+                "generated_at": generated_at,
+                "preview_title": title,
+                "preview_html": generated_html,
+            },
+        )
+        return deepcopy(draft)
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Stub functions (keep for later phases)
+# ---------------------------------------------------------------------------
 
 def get_user(email: str) -> UserRecord | None:
     return SEEDED_USERS.get(email.lower())
@@ -219,7 +363,6 @@ def create_user(
     normalized_email = email.lower()
     if normalized_email in SEEDED_USERS:
         raise ValueError("User already exists")
-
     user = UserRecord(
         first_name=first_name,
         last_name=last_name,
@@ -242,7 +385,6 @@ def disable_user(email: str) -> dict[str, str] | None:
     user = SEEDED_USERS.get(email.lower())
     if not user:
         return None
-
     user.status = UserStatus.DISABLED
     return {
         "first_name": user.first_name,
@@ -263,7 +405,6 @@ def update_user(
     user = SEEDED_USERS.get(email.lower())
     if not user:
         return None
-
     user.first_name = first_name
     user.last_name = last_name
     user.role = role
@@ -317,107 +458,6 @@ def latest_backup_run() -> dict[str, str] | None:
 
 def get_security_summary() -> dict[str, str]:
     return deepcopy(SECURITY_SUMMARY_TEMPLATE)
-
-
-def get_client(client_reference: str) -> dict[str, object] | None:
-    for client in SEEDED_CLIENTS:
-        if client["client_reference"] == client_reference:
-            _ensure_generated_document_state(client)
-            return {
-                "client_reference": client["client_reference"],
-                "first_name": client["first_name"],
-                "surname": client["surname"],
-                "full_name": client["full_name"],
-                "title": client["title"],
-                "status": client["status"].value,
-                "created_by": client["created_by"],
-                "updated_by": client["updated_by"],
-                "created_at": client["created_at"],
-                "updated_at": client["updated_at"],
-                "email": client["email"],
-                "mobile_number": client["mobile_number"],
-                "work_phone": client["work_phone"],
-                "date_of_birth": client["date_of_birth"],
-                "marital_status": client["marital_status"],
-                "home_address_line_1": client["home_address_line_1"],
-                "home_address_line_2": client["home_address_line_2"],
-                "town_city": client["town_city"],
-                "county": client["county"],
-                "eircode": client["eircode"],
-                "partner_name": client["partner_name"],
-                "partner_address": client["partner_address"],
-                "general_notes": client["general_notes"],
-                "dependants": deepcopy(client["dependants"]),
-                "document_drafts": deepcopy(client["document_drafts"]),
-                "generated_documents": deepcopy(client["generated_documents"]),
-            }
-    return None
-
-
-def get_client_generated_document_draft(client_reference: str, document_type: str) -> dict[str, object] | None:
-    for client in SEEDED_CLIENTS:
-        if client["client_reference"] != client_reference:
-            continue
-        _ensure_generated_document_state(client)
-        draft = client["document_drafts"].get(document_type)
-        return deepcopy(draft) if draft else None
-    return None
-
-
-def save_generated_document_draft(
-    *,
-    client_reference: str,
-    document_type: str,
-    template_id: str,
-    title: str,
-    summary: str,
-    sections: list[dict[str, object]],
-    warnings: list[str],
-    generated_html: str,
-    integration_requests: list[dict[str, object]],
-) -> dict[str, object] | None:
-    for client in SEEDED_CLIENTS:
-        if client["client_reference"] != client_reference:
-            continue
-
-        _ensure_generated_document_state(client)
-        generated_at = datetime.now(UTC).date().isoformat()
-        draft = {
-            "document_type": document_type,
-            "template_id": template_id,
-            "title": title,
-            "summary": summary,
-            "sections": deepcopy(sections),
-            "warnings": deepcopy(warnings),
-            "generated_html": generated_html,
-            "integration_requests": deepcopy(integration_requests),
-            "generation_status": "completed",
-        }
-        client["document_drafts"][document_type] = draft
-
-        generated_documents = client["generated_documents"]
-        next_version = sum(1 for item in generated_documents if item.get("document_type") == document_type) + 1
-        generated_documents.insert(
-            0,
-            {
-                "id": f"DOC-{len(generated_documents) + 1:04d}",
-                "document_type": document_type,
-                "document_name": _build_generated_document_name(
-                    str(client["full_name"]),
-                    document_type,
-                    generated_at,
-                    next_version,
-                ),
-                "version": f"Version {next_version}",
-                "status": "Preview saved",
-                "generated_at": generated_at,
-                "preview_title": title,
-                "preview_html": generated_html,
-            },
-        )
-        return deepcopy(draft)
-
-    return None
 
 
 def create_client(

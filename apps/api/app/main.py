@@ -7,25 +7,17 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
+from app.db import get_engine, get_session
 from app.document_generation import generate_document
 from app.domain.users import UserRole, UserStatus
-from app.security import is_session_expired, verify_password
+from app.repositories.clients import ClientRepository
+from app.repositories.users import UserRepository
+from app.security import hash_password, is_session_expired, verify_password
 from app.store import (
-    archive_client,
     create_backup_run,
-    create_client,
-    create_user,
-    disable_user,
-    get_client,
     get_security_summary,
-    get_user,
     list_audit_logs,
-    list_clients,
-    list_users,
-    update_client,
-    update_user,
 )
-
 
 settings = get_settings(
     DATABASE_URL="postgresql://placeholder",
@@ -38,6 +30,60 @@ settings = get_settings(
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
 app.add_middleware(SessionMiddleware, secret_key=settings.session_secret)
+
+
+# ---------------------------------------------------------------------------
+# Startup: verify DB and bootstrap default users
+# ---------------------------------------------------------------------------
+
+
+@app.on_event("startup")
+def _startup_db_check() -> None:
+    """Verify database connectivity and seed default admin/staff users."""
+    import logging
+    from sqlalchemy import text
+
+    logger = logging.getLogger("omega.startup")
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection verified.")
+
+        db = get_session()
+        try:
+            repo = UserRepository(db)
+
+            if not repo.get_by_email(settings.admin_email):
+                repo.create(
+                    first_name="Omega",
+                    last_name="Admin",
+                    email=settings.admin_email,
+                    password_hash=hash_password(settings.admin_password),
+                    role=UserRole.ADMIN,
+                )
+                logger.info("Bootstrap admin user created: %s", settings.admin_email)
+
+            if not repo.get_by_email(settings.staff_email):
+                repo.create(
+                    first_name="Office",
+                    last_name="Staff",
+                    email=settings.staff_email,
+                    password_hash=hash_password(settings.staff_password),
+                    role=UserRole.STAFF,
+                )
+                logger.info("Bootstrap staff user created: %s", settings.staff_email)
+
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        logger.warning("Database not available — continuing with in-memory store.", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Request models
+# ---------------------------------------------------------------------------
 
 
 class LoginRequest(BaseModel):
@@ -92,6 +138,11 @@ class DocumentGenerationRequest(BaseModel):
     workflow_snapshot: dict[str, object]
 
 
+# ---------------------------------------------------------------------------
+# Auth helpers (DB-backed)
+# ---------------------------------------------------------------------------
+
+
 def _current_user(request: Request) -> dict[str, str]:
     email = request.session.get("user_email")
     if not email:
@@ -101,23 +152,22 @@ def _current_user(request: Request) -> dict[str, str]:
         request.session.clear()
         raise HTTPException(status_code=401, detail="Session expired")
 
-    user = get_user(email)
-    if not user:
-        request.session.clear()
-        raise HTTPException(status_code=401, detail="Authentication required")
-    if user.status != UserStatus.ACTIVE:
-        request.session.clear()
-        raise HTTPException(status_code=403, detail="User account disabled")
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        user_model = repo.get_by_email(email)
+        if not user_model:
+            request.session.clear()
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if user_model.status != UserStatus.ACTIVE.value:
+            request.session.clear()
+            raise HTTPException(status_code=403, detail="User account disabled")
 
-    request.session["last_seen_at"] = datetime.now(UTC).isoformat()
-
-    return {
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "email": user.email,
-        "role": user.role.value,
-        "status": user.status.value,
-    }
+        request.session["last_seen_at"] = datetime.now(UTC).isoformat()
+        db.commit()
+        return repo.to_response(user_model)
+    finally:
+        db.close()
 
 
 def _require_admin(request: Request) -> dict[str, str]:
@@ -127,30 +177,38 @@ def _require_admin(request: Request) -> dict[str, str]:
     return user
 
 
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+
 @app.get("/health")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok", "app_url": settings.app_url}
 
 
+# ---------------------------------------------------------------------------
+# Auth routes (DB-backed)
+# ---------------------------------------------------------------------------
+
+
 @app.post("/auth/login")
 def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
-    user = get_user(payload.email)
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if user.status != UserStatus.ACTIVE:
-        raise HTTPException(status_code=403, detail="User account disabled")
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        user_model = repo.get_by_email(payload.email)
+        if not user_model or not verify_password(payload.password, user_model.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if user_model.status != UserStatus.ACTIVE.value:
+            raise HTTPException(status_code=403, detail="User account disabled")
 
-    request.session["user_email"] = user.email
-    request.session["last_seen_at"] = datetime.now(UTC).isoformat()
-    return {
-        "user": {
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "role": user.role.value,
-            "status": user.status.value,
-        }
-    }
+        request.session["user_email"] = user_model.email
+        request.session["last_seen_at"] = datetime.now(UTC).isoformat()
+        db.commit()
+        return {"user": repo.to_response(user_model)}
+    finally:
+        db.close()
 
 
 @app.post("/auth/logout")
@@ -164,57 +222,100 @@ def me(request: Request) -> dict[str, dict[str, str]]:
     return {"user": _current_user(request)}
 
 
+# ---------------------------------------------------------------------------
+# Client routes (DB-backed)
+# ---------------------------------------------------------------------------
+
+
 @app.get("/clients")
 def clients() -> dict[str, list[dict[str, object]]]:
-    return {"items": list_clients()}
+    db = get_session()
+    try:
+        repo = ClientRepository(db)
+        all_clients = repo.list_all()
+        items = [repo._to_list_item(c) for c in all_clients]
+        db.commit()
+        return {"items": items}
+    finally:
+        db.close()
 
 
 @app.post("/clients", status_code=201)
 def create_client_record(payload: ClientCreateRequest, request: Request) -> dict[str, dict[str, object]]:
     user = _current_user(request)
-    item = create_client(
-        first_name=payload.first_name,
-        surname=payload.surname,
-        email=payload.email,
-        mobile_number=payload.mobile_number,
-        marital_status=payload.marital_status,
-        date_of_birth=payload.date_of_birth,
-        title=payload.title,
-        town_city=payload.town_city,
-        county=payload.county,
-        dependants=payload.dependants,
-        created_by=user["email"],
-    )
-    return {"item": item}
+    db = get_session()
+    try:
+        repo = ClientRepository(db)
+        item = repo.create(
+            first_name=payload.first_name,
+            surname=payload.surname,
+            email=payload.email,
+            mobile_number=payload.mobile_number,
+            marital_status=payload.marital_status,
+            date_of_birth=payload.date_of_birth,
+            title=payload.title,
+            town_city=payload.town_city,
+            county=payload.county,
+            dependants=payload.dependants,
+            created_by_email=user["email"],
+        )
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
 
 
 @app.get("/clients/{client_reference}")
 def client_detail(client_reference: str) -> dict[str, dict[str, object]]:
-    client = get_client(client_reference)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return {"item": client}
+    db = get_session()
+    try:
+        repo = ClientRepository(db)
+        client = repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        item = repo._to_detail_response(client)
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
 
 
 @app.patch("/clients/{client_reference}")
 def update_client_record(
     client_reference: str, payload: ClientUpdateRequest, request: Request
 ) -> dict[str, dict[str, object]]:
-    _current_user(request)
-    updates = {key: value for key, value in payload.model_dump().items() if value is not None}
-    item = update_client(client_reference, updates, _current_user(request)["email"])
-    if not item:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return {"item": item}
+    user = _current_user(request)
+    db = get_session()
+    try:
+        repo = ClientRepository(db)
+        updates = {key: value for key, value in payload.model_dump().items() if value is not None}
+        item = repo.update(client_reference, updates, updated_by_email=user["email"])
+        if not item:
+            raise HTTPException(status_code=404, detail="Client not found")
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
 
 
 @app.patch("/clients/{client_reference}/archive")
 def archive_client_record(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
     user = _require_admin(request)
-    item = archive_client(client_reference, user["email"])
-    if not item:
-        raise HTTPException(status_code=404, detail="Client not found")
-    return {"item": item}
+    db = get_session()
+    try:
+        repo = ClientRepository(db)
+        item = repo.archive(client_reference, updated_by_email=user["email"])
+        if not item:
+            raise HTTPException(status_code=404, detail="Client not found")
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Documents (store.py-backed — Phase 5 will replace)
+# ---------------------------------------------------------------------------
 
 
 @app.post("/documents/generate")
@@ -232,10 +333,80 @@ def generate_document_record(
     return {"item": item}
 
 
+# ---------------------------------------------------------------------------
+# Admin routes (DB-backed for users; store.py for audit/backup/security)
+# ---------------------------------------------------------------------------
+
+
 @app.get("/admin/users")
 def admin_users(request: Request) -> dict[str, list[dict[str, str]]]:
     _require_admin(request)
-    return {"items": list_users()}
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        items = [repo.to_response(u) for u in repo.list_all()]
+        db.commit()
+        return {"items": items}
+    finally:
+        db.close()
+
+
+@app.post("/admin/users", status_code=201)
+def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict[str, dict[str, str]]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        item = repo.create(
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=payload.email,
+            password_hash=hash_password(payload.password),
+            role=payload.role,
+        )
+        db.commit()
+        return {"item": item}
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    finally:
+        db.close()
+
+
+@app.patch("/admin/users/{email}/disable")
+def admin_disable_user(email: str, request: Request) -> dict[str, dict[str, str]]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        item = repo.disable(email)
+        if not item:
+            raise HTTPException(status_code=404, detail="User not found")
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
+
+
+@app.patch("/admin/users/{email}")
+def admin_update_user(
+    email: str, payload: AdminUserUpdateRequest, request: Request
+) -> dict[str, dict[str, str]]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        item = repo.update(
+            email,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            role=payload.role,
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="User not found")
+        db.commit()
+        return {"item": item}
+    finally:
+        db.close()
 
 
 @app.get("/admin/audit-logs")
@@ -254,44 +425,3 @@ def admin_run_backup(request: Request) -> dict[str, dict[str, str]]:
 def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
     _require_admin(request)
     return {"item": get_security_summary()}
-
-
-@app.post("/admin/users", status_code=201)
-def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict[str, dict[str, str]]:
-    _require_admin(request)
-    try:
-        item = create_user(
-            first_name=payload.first_name,
-            last_name=payload.last_name,
-            email=payload.email,
-            password=payload.password,
-            role=payload.role,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return {"item": item}
-
-
-@app.patch("/admin/users/{email}/disable")
-def admin_disable_user(email: str, request: Request) -> dict[str, dict[str, str]]:
-    _require_admin(request)
-    item = disable_user(email)
-    if not item:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"item": item}
-
-
-@app.patch("/admin/users/{email}")
-def admin_update_user(
-    email: str, payload: AdminUserUpdateRequest, request: Request
-) -> dict[str, dict[str, str]]:
-    _require_admin(request)
-    item = update_user(
-        email,
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        role=payload.role,
-    )
-    if not item:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"item": item}

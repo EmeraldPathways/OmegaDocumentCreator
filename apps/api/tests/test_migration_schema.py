@@ -41,3 +41,11 @@ class MigrationSchemaTests(unittest.TestCase):
         for column_definition in required_columns:
             self.assertIn(column_definition, sql)
 
+    def test_phase_1_followup_migration_defines_backup_runs_and_document_snapshot_fields(self) -> None:
+        migration = Path(__file__).resolve().parents[1] / "migrations" / "0002_backup_runs_document_snapshots.sql"
+        sql = migration.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE backup_runs (", sql)
+        self.assertIn("CREATE INDEX idx_backup_runs_created_at ON backup_runs (created_at);", sql)
+        self.assertIn("ADD COLUMN preview_title TEXT,", sql)
+        self.assertIn("ADD COLUMN preview_html TEXT;", sql)

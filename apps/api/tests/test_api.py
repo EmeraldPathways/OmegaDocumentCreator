@@ -1,17 +1,384 @@
+"""Phase 2 DB-backed API tests.
+
+Requires a running PostgreSQL instance reachable via TEST_DATABASE_URL
+or DATABASE_URL.  Falls back to postgresql://postgres:postgres@localhost:5432/omega_test.
+"""
+
+from __future__ import annotations
+
 import unittest
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
 
-from app.main import app
+# Import test helpers from the tests package
+import db_test_helpers  # noqa: E402
+
+import app.db  # noqa: E402
+
+from app.main import app  # noqa: E402
 
 
+def _db_is_available() -> bool:
+    try:
+        engine = db_test_helpers._build_test_engine()
+        with engine.connect():
+            return True
+    except Exception:
+        return False
+
+
+_DB_AVAILABLE = _db_is_available()
+_test_engine = db_test_helpers.setup_test_db() if _DB_AVAILABLE else None
+
+if _test_engine is not None:
+    app.db._engine = _test_engine
+    app.db._SessionLocal = sessionmaker(bind=_test_engine, autoflush=False, autocommit=False)
+
+
+@unittest.skipUnless(_DB_AVAILABLE, "PostgreSQL not available for Phase 2 tests")
 class ApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if _test_engine is not None:
+            db_test_helpers.teardown_test_db(_test_engine)
+
     def setUp(self) -> None:
+        assert _test_engine is not None
+        db = db_test_helpers.new_test_session(_test_engine)
+        try:
+            db_test_helpers.truncate_all(db)
+            db_test_helpers.seed_default_users(db)
+            db_test_helpers.seed_default_clients(db)
+            db.commit()
+        finally:
+            db.close()
+
         from app.store import reset_store
 
         reset_store()
+
         self.client = TestClient(app)
+
+    # ------------------------------------------------------------------
+    # Auth tests
+    # ------------------------------------------------------------------
+
+    def test_login_returns_seeded_user_profile(self) -> None:
+        response = self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["user"]["email"], "admin@omega.local")
+        self.assertEqual(payload["user"]["role"], "admin")
+
+    def test_login_works_for_staff_user(self) -> None:
+        response = self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["role"], "staff")
+
+    def test_login_fails_with_bad_password(self) -> None:
+        response = self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "WrongPassword!"},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_me_requires_login(self) -> None:
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 401)
+
+    def test_me_returns_logged_in_user(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["role"], "staff")
+
+    # ------------------------------------------------------------------
+    # Client tests (DB-backed)
+    # ------------------------------------------------------------------
+
+    def test_clients_returns_seeded_client(self) -> None:
+        response = self.client.get("/clients")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        refs = [c["client_reference"] for c in items]
+        self.assertIn("CLI-2026-0001", refs)
+        self.assertIn("CLI-2026-0002", refs)
+
+    def test_client_detail_returns_full_seeded_profile(self) -> None:
+        response = self.client.get("/clients/CLI-2026-0002")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["client_reference"], "CLI-2026-0002")
+        self.assertEqual(payload["full_name"], "Jamie Murphy")
+        self.assertEqual(payload["email"], "jamie.murphy@example.com")
+        self.assertEqual(payload["mobile_number"], "0870000002")
+
+    def test_admin_can_create_client_record(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.post(
+            "/clients",
+            json={
+                "first_name": "Patrick",
+                "surname": "Byrne",
+                "email": "patrick.byrne@example.com",
+                "mobile_number": "0871000001",
+                "marital_status": "Married",
+                "date_of_birth": "1982-05-14",
+                "title": "Mr",
+                "town_city": "Dublin",
+                "county": "Dublin",
+                "dependants": [
+                    {"name": "Anna Byrne", "date_of_birth": "2014-03-02", "notes": "Child"},
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["full_name"], "Patrick Byrne")
+        self.assertEqual(payload["status"], "draft")
+        self.assertEqual(payload["created_by"], "admin@omega.local")
+        self.assertEqual(payload["updated_by"], "admin@omega.local")
+        self.assertEqual(payload["title"], "Mr")
+        self.assertEqual(payload["town_city"], "Dublin")
+        self.assertEqual(len(payload["dependants"]), 1)
+        self.assertEqual(payload["dependants"][0]["name"], "Anna Byrne")
+
+    def test_staff_can_edit_client_record(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.patch(
+            "/clients/CLI-2026-0001",
+            json={
+                "marital_status": "Single",
+                "mobile_number": "0877777777",
+                "dependants": [{"name": "Chris Client", "date_of_birth": "2010-01-01", "notes": "Child"}],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["marital_status"], "Single")
+        self.assertEqual(payload["mobile_number"], "0877777777")
+        self.assertEqual(payload["updated_by"], "staff@omega.local")
+        self.assertEqual(payload["dependants"][0]["name"], "Chris Client")
+
+    def test_admin_can_archive_client_record(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.patch("/clients/CLI-2026-0001/archive")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["item"]["status"], "archived")
+
+    # ------------------------------------------------------------------
+    # Admin user management (DB-backed)
+    # ------------------------------------------------------------------
+
+    def test_admin_users_requires_admin_session(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/admin/users")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_create_staff_user(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Nora",
+                "last_name": "Kelly",
+                "email": "nora.kelly@omega.local",
+                "password": "StrongPass123!",
+                "role": "staff",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["email"], "nora.kelly@omega.local")
+        self.assertEqual(payload["status"], "active")
+
+    def test_disabled_user_cannot_log_in(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Nora",
+                "last_name": "Kelly",
+                "email": "nora.kelly@omega.local",
+                "password": "StrongPass123!",
+                "role": "staff",
+            },
+        )
+        disable_response = self.client.patch("/admin/users/nora.kelly@omega.local/disable")
+        login_response = self.client.post(
+            "/auth/login",
+            json={"email": "nora.kelly@omega.local", "password": "StrongPass123!"},
+        )
+        self.assertEqual(disable_response.status_code, 200)
+        self.assertEqual(disable_response.json()["item"]["status"], "disabled")
+        self.assertEqual(login_response.status_code, 403)
+
+    def test_admin_can_edit_staff_user(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Nora",
+                "last_name": "Kelly",
+                "email": "nora.kelly@omega.local",
+                "password": "StrongPass123!",
+                "role": "staff",
+            },
+        )
+        response = self.client.patch(
+            "/admin/users/nora.kelly@omega.local",
+            json={"first_name": "Norah", "last_name": "Kelly", "role": "staff"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["item"]["first_name"], "Norah")
+
+    def test_new_user_persists_across_requests(self) -> None:
+        """Verify DB-backed persistence: user created by admin survives a fresh login."""
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Nora",
+                "last_name": "Kelly",
+                "email": "nora.kelly@omega.local",
+                "password": "StrongPass123!",
+                "role": "staff",
+            },
+        )
+        self.client.post("/auth/logout")
+        login_response = self.client.post(
+            "/auth/login",
+            json={"email": "nora.kelly@omega.local", "password": "StrongPass123!"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        self.assertEqual(login_response.json()["user"]["first_name"], "Nora")
+
+    def test_new_client_persists_across_requests(self) -> None:
+        """Verify DB-backed persistence: created client is retrievable."""
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        create_resp = self.client.post(
+            "/clients",
+            json={
+                "first_name": "Patrick",
+                "surname": "Byrne",
+                "email": "patrick.byrne@example.com",
+                "mobile_number": "0871000001",
+                "marital_status": "Married",
+                "date_of_birth": "1982-05-14",
+            },
+        )
+        ref = create_resp.json()["item"]["client_reference"]
+        detail_resp = self.client.get(f"/clients/{ref}")
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertEqual(detail_resp.json()["item"]["full_name"], "Patrick Byrne")
+
+    # ------------------------------------------------------------------
+    # Admin non-DB routes (still store.py)
+    # ------------------------------------------------------------------
+
+    def test_admin_audit_logs_requires_admin_session(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/admin/audit-logs")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_view_seeded_audit_logs(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/admin/audit-logs")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["items"]
+        self.assertGreaterEqual(len(payload), 1)
+        self.assertEqual(payload[0]["action"], "document_generated")
+        self.assertEqual(payload[0]["entity_type"], "document")
+
+    def test_admin_backup_run_requires_admin_session(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.post("/admin/backups/run")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_trigger_seeded_backup_run(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.post("/admin/backups/run")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["triggered_by"], "admin@omega.local")
+
+    def test_admin_security_summary_requires_admin_session(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/admin/security-summary")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_view_security_summary(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/admin/security-summary")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["item"]
+        self.assertEqual(payload["remote_access"], "cloudflare_tunnel_recommended")
+        self.assertEqual(payload["public_port_exposure"], "disabled")
+
+    # ------------------------------------------------------------------
+    # Document generation (store.py-backed, Phase 5 will migrate)
+    # ------------------------------------------------------------------
 
     def _login_as_staff(self) -> None:
         self.client.post(
@@ -54,269 +421,6 @@ class ApiTests(unittest.TestCase):
             },
         }
 
-    def test_login_returns_seeded_user_profile(self) -> None:
-        response = self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["user"]["email"], "admin@omega.local")
-        self.assertEqual(payload["user"]["role"], "admin")
-
-    def test_me_requires_login(self) -> None:
-        response = self.client.get("/auth/me")
-
-        self.assertEqual(response.status_code, 401)
-
-    def test_me_returns_logged_in_user(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/auth/me")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["user"]["role"], "staff")
-
-    def test_clients_returns_seeded_client(self) -> None:
-        response = self.client.get("/clients")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["items"][0]["client_reference"], "CLI-2026-0001")
-
-    def test_client_detail_returns_full_seeded_profile(self) -> None:
-        response = self.client.get("/clients/CLI-2026-0002")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()["item"]
-        self.assertEqual(payload["client_reference"], "CLI-2026-0002")
-        self.assertEqual(payload["full_name"], "Jamie Murphy")
-        self.assertEqual(payload["email"], "jamie.murphy@example.com")
-        self.assertEqual(payload["mobile_number"], "0870000002")
-
-    def test_admin_users_requires_admin_session(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/admin/users")
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_admin_audit_logs_requires_admin_session(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/admin/audit-logs")
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_admin_can_view_seeded_audit_logs(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/admin/audit-logs")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()["items"]
-        self.assertGreaterEqual(len(payload), 1)
-        self.assertEqual(payload[0]["action"], "document_generated")
-        self.assertEqual(payload[0]["entity_type"], "document")
-
-    def test_admin_backup_run_requires_admin_session(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.post("/admin/backups/run")
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_admin_can_trigger_seeded_backup_run(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.post("/admin/backups/run")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()["item"]
-        self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["triggered_by"], "admin@omega.local")
-
-    def test_admin_security_summary_requires_admin_session(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/admin/security-summary")
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_admin_can_view_security_summary(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.get("/admin/security-summary")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()["item"]
-        self.assertEqual(payload["remote_access"], "cloudflare_tunnel_recommended")
-        self.assertEqual(payload["public_port_exposure"], "disabled")
-
-    def test_admin_can_create_staff_user(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.post(
-            "/admin/users",
-            json={
-                "first_name": "Nora",
-                "last_name": "Kelly",
-                "email": "nora.kelly@omega.local",
-                "password": "StrongPass123!",
-                "role": "staff",
-            },
-        )
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()["item"]
-        self.assertEqual(payload["email"], "nora.kelly@omega.local")
-        self.assertEqual(payload["status"], "active")
-
-    def test_disabled_user_cannot_log_in(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-        self.client.post(
-            "/admin/users",
-            json={
-                "first_name": "Nora",
-                "last_name": "Kelly",
-                "email": "nora.kelly@omega.local",
-                "password": "StrongPass123!",
-                "role": "staff",
-            },
-        )
-
-        disable_response = self.client.patch("/admin/users/nora.kelly@omega.local/disable")
-        login_response = self.client.post(
-            "/auth/login",
-            json={"email": "nora.kelly@omega.local", "password": "StrongPass123!"},
-        )
-
-        self.assertEqual(disable_response.status_code, 200)
-        self.assertEqual(disable_response.json()["item"]["status"], "disabled")
-        self.assertEqual(login_response.status_code, 403)
-
-    def test_admin_can_edit_staff_user(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-        self.client.post(
-            "/admin/users",
-            json={
-                "first_name": "Nora",
-                "last_name": "Kelly",
-                "email": "nora.kelly@omega.local",
-                "password": "StrongPass123!",
-                "role": "staff",
-            },
-        )
-
-        response = self.client.patch(
-            "/admin/users/nora.kelly@omega.local",
-            json={"first_name": "Norah", "last_name": "Kelly", "role": "staff"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["item"]["first_name"], "Norah")
-
-    def test_admin_can_create_client_record(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.post(
-            "/clients",
-            json={
-                "first_name": "Patrick",
-                "surname": "Byrne",
-                "email": "patrick.byrne@example.com",
-                "mobile_number": "0871000001",
-                "marital_status": "Married",
-                "date_of_birth": "1982-05-14",
-                "title": "Mr",
-                "town_city": "Dublin",
-                "county": "Dublin",
-                "dependants": [
-                    {"name": "Anna Byrne", "date_of_birth": "2014-03-02", "notes": "Child"},
-                ],
-            },
-        )
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()["item"]
-        self.assertEqual(payload["full_name"], "Patrick Byrne")
-        self.assertEqual(payload["status"], "draft")
-        self.assertEqual(payload["created_by"], "admin@omega.local")
-        self.assertEqual(payload["updated_by"], "admin@omega.local")
-        self.assertEqual(payload["title"], "Mr")
-        self.assertEqual(payload["town_city"], "Dublin")
-        self.assertEqual(len(payload["dependants"]), 1)
-
-    def test_staff_can_edit_client_record(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.patch(
-            "/clients/CLI-2026-0001",
-            json={
-                "marital_status": "Single",
-                "mobile_number": "0877777777",
-                "dependants": [{"name": "Chris Client", "date_of_birth": "2010-01-01", "notes": "Child"}],
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()["item"]
-        self.assertEqual(payload["marital_status"], "Single")
-        self.assertEqual(payload["mobile_number"], "0877777777")
-        self.assertEqual(payload["updated_by"], "staff@omega.local")
-        self.assertEqual(payload["dependants"][0]["name"], "Chris Client")
-
-    def test_admin_can_archive_client_record(self) -> None:
-        self.client.post(
-            "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
-        )
-
-        response = self.client.patch("/clients/CLI-2026-0001/archive")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["item"]["status"], "archived")
-
     def test_document_generation_requires_login(self) -> None:
         response = self.client.post(
             "/documents/generate",
@@ -331,14 +435,11 @@ class ApiTests(unittest.TestCase):
                 },
             },
         )
-
         self.assertEqual(response.status_code, 401)
 
     def test_logged_in_user_can_generate_document_with_seeded_ai_fallback(self) -> None:
         self._login_as_staff()
-
         response = self.client.post("/documents/generate", json=self._document_generation_payload())
-
         self.assertEqual(response.status_code, 200)
         payload = response.json()["item"]
         self.assertEqual(payload["client_reference"], "CLI-2026-0002")
@@ -357,7 +458,6 @@ class ApiTests(unittest.TestCase):
 
     def test_statement_generation_includes_phi_request_artifact_when_phi_call_succeeds(self) -> None:
         self._login_as_staff()
-
         phi_result = {
             "provider": "BestAdvice",
             "request_type": "Phi",
@@ -378,10 +478,8 @@ class ApiTests(unittest.TestCase):
             ],
             "errors": [],
         }
-
         with patch("app.document_generation.submit_phi_request", return_value=phi_result):
             response = self.client.post("/documents/generate", json=self._statement_generation_payload_with_phi_fields())
-
         self.assertEqual(response.status_code, 200)
         payload = response.json()["item"]
         self.assertEqual(payload["document_type"], "Statement of Suitability")
@@ -392,10 +490,8 @@ class ApiTests(unittest.TestCase):
 
     def test_statement_generation_returns_failed_phi_artifact_and_warning_when_phi_call_fails(self) -> None:
         self._login_as_staff()
-
         with patch("app.document_generation.submit_phi_request", side_effect=RuntimeError("service unavailable")):
             response = self.client.post("/documents/generate", json=self._statement_generation_payload_with_phi_fields())
-
         self.assertEqual(response.status_code, 200)
         payload = response.json()["item"]
         self.assertEqual(payload["document_type"], "Statement of Suitability")
@@ -408,9 +504,7 @@ class ApiTests(unittest.TestCase):
         from app.store import get_client, get_client_generated_document_draft
 
         self._login_as_staff()
-
         response = self.client.post("/documents/generate", json=self._document_generation_payload())
-
         self.assertEqual(response.status_code, 200)
         saved_draft = get_client_generated_document_draft("CLI-2026-0002", "Statement of Suitability")
         self.assertIsNotNone(saved_draft)
@@ -434,7 +528,6 @@ class ApiTests(unittest.TestCase):
         from app.main import settings
 
         self._login_as_staff()
-
         original_ai_enabled = settings.ai_enabled
         original_ai_provider = settings.ai_provider
         original_ai_api_key = settings.ai_api_key
@@ -462,7 +555,6 @@ class ApiTests(unittest.TestCase):
         from app.main import settings
 
         self._login_as_staff()
-
         original_ai_enabled = settings.ai_enabled
         original_ai_provider = settings.ai_provider
         original_ai_api_key = settings.ai_api_key

@@ -530,6 +530,21 @@ The biggest remaining gaps are:
 - generated-document history is not database-backed
 - no live remote-access infrastructure wiring
 
+## Delivery Plan
+
+The remaining work is now organized into eight implementation phases for agent execution:
+
+1. Persistence foundation
+2. Client and auth persistence cutover
+3. Workflow persistence
+4. File uploads and client folders
+5. Generated document storage and history
+6. Audit logging
+7. Backups
+8. Remote-access infrastructure
+
+Detailed agent handoff plan: `docs/superpowers/plans/2026-06-21-omega-persistence-roadmap.md`
+
 ## Immediate Priorities
 
 The correct next implementation order is:
