@@ -33,9 +33,17 @@ The persistence roadmap is complete through Phase 16.
 ## Remaining partial areas
 
 - restore workflow exists, but still needs broader operator hardening
-- expired session cleanup exists, but is not automatically scheduled
+- ~~expired session cleanup exists, but is not automatically scheduled~~ → session cleanup runs on startup
 - document pack only includes stored artifacts, not preview-only rows
 - frontend delete UI for files/documents is still missing
+
+## Post-fix updates (2026-06)
+- Session cleanup is now called on startup
+- File upload size limit enforced via max_upload_size_bytes config (default 50MB)
+- Migration runner (migrate.py) tracks applied migrations with `_migrations` table
+- CSRF origin validation added for state-changing routes
+- Remaining: document pack still excludes preview-only rows
+- Remaining: frontend delete UI for files/documents still missing
 
 ## Entry points
 

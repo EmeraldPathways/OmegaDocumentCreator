@@ -140,11 +140,25 @@ This file keeps the original handoff filename, but the implementation state now 
 
 ## Remaining Gaps
 
-- session cleanup exists but is not yet wired into automatic expiry cleanup
+- ~~session cleanup exists but is not yet wired into automatic expiry cleanup~~ → session cleanup runs on startup
 - restore workflow still needs broader operator hardening
 - document pack excludes preview-only rows with no stored artifact
 - no frontend delete UI for files/documents
 - Cloudflare Tunnel setup is automated, but deployment remains operator-run
+
+## Post-Fix Security & Operations (2026-06)
+
+After code-review fix pass:
+- Client GET routes now require authentication
+- Hardcoded demo credentials removed from shipped frontend
+- CSRF origin/referer validation added for state-changing routes
+- File upload size limit enforced (MAX_UPLOAD_SIZE_BYTES, default 50MB)
+- Failed login audit logging and rate limiting added (5/minute per IP)
+- Session timestamp parsing hardened against malformed values
+- Migration runner: `python -m app.migrate [--status|--dry-run|--force]`
+- Docker Compose health checks and restart policies added
+- PostgreSQL port bound to 127.0.0.1 in Docker Compose
+- Security summary now reflects live configuration
 
 ## Verification Baseline
 

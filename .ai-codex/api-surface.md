@@ -18,9 +18,9 @@
 ### Clients
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `GET` | `/clients` | none in route | returns `{ items }` |
+| `GET` | `/clients` | session | returns `{ items }` |
 | `POST` | `/clients` | session | create client |
-| `GET` | `/clients/{client_reference}` | none in route | returns `{ item }` |
+| `GET` | `/clients/{client_reference}` | session | returns `{ item }` |
 | `PATCH` | `/clients/{client_reference}` | session | update client |
 | `PATCH` | `/clients/{client_reference}/archive` | admin | archive client |
 
@@ -93,3 +93,5 @@
 | `/files` | files page |
 | `/settings` | settings page |
 | `/admin` | admin page wrapped in `RequireAdmin` |
+
+**Post-fix (2026-06):** Client routes now require authentication. CSRF protection validates Origin/Referer for state-changing endpoints. Upload size limited by MAX_UPLOAD_SIZE_BYTES config. Migration runner available via `python -m app.migrate`.

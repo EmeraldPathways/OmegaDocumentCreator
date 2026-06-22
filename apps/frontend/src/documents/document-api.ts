@@ -11,10 +11,6 @@ type GenerateDocumentRequest = {
   workflowSnapshot: Record<string, unknown>;
 };
 
-const DEMO_PASSWORD = "ChangeMe123!";
-const DEMO_STAFF_EMAIL = "staff@omega.local";
-const SESSION_STORAGE_KEY = "omega-session-user";
-
 type GenerateDocumentResponseItem = {
   title: string;
   summary: string;
@@ -214,16 +210,12 @@ export async function generateDocument({
     }),
   };
 
-  let response = await fetch("/documents/generate", requestInit);
-
-  if (response.status === 401) {
-    const reauthenticated = await tryRestoreApiSession();
-    if (reauthenticated) {
-      response = await fetch("/documents/generate", requestInit);
-    }
-  }
+  const response = await fetch("/documents/generate", requestInit);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Session expired. Please log in again.");
+    }
     throw new Error(`Document generation failed with status ${response.status}`);
   }
 
@@ -240,37 +232,4 @@ export async function generateDocument({
     generatedHtml: sanitizeGeneratedHtml(payload.item.generated_html ?? ""),
     integrationRequests: normalizeIntegrationRequests(payload.item.integration_requests),
   };
-}
-
-async function tryRestoreApiSession() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const storedValue = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-  let email = DEMO_STAFF_EMAIL;
-
-  try {
-    if (storedValue) {
-      const sessionUser = JSON.parse(storedValue) as { email?: string };
-      if (sessionUser.email) {
-        email = sessionUser.email;
-      }
-    }
-
-    const response = await fetch("/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password: DEMO_PASSWORD,
-      }),
-    });
-
-    return response.ok;
-  } catch {
-    return false;
-  }
 }

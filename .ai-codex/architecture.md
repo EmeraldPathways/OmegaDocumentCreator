@@ -83,6 +83,16 @@ Income Protection UI
 ## Remaining gaps
 
 - restore workflow still needs broader operator hardening
-- expired session cleanup is implemented but not automatically scheduled
+- ~~expired session cleanup is implemented but not automatically scheduled~~ → session cleanup runs on startup
 - no frontend delete UI for files/documents
 - Cloudflare Tunnel setup is scripted, but deployment remains operator-driven
+
+## Post-fix updates (2026-06)
+- Client GET routes now require session auth
+- Shipped frontend credentials removed
+- CSRF origin/referer validation added for state-changing routes
+- Upload size limit added (max_upload_size_bytes, default 50MB)
+- Session cleanup runs on startup
+- Migration runner (migrate.py) added with tracking table
+- Docker Compose health checks and restart policies added
+- Remaining gap: monolithic income-protection-page.tsx (deferred)

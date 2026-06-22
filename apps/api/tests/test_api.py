@@ -59,10 +59,6 @@ class ApiTests(unittest.TestCase):
         finally:
             db.close()
 
-        from app.store import reset_store
-
-        reset_store()
-
         self.client = TestClient(app)
 
     # ------------------------------------------------------------------
@@ -823,7 +819,7 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/admin/security-summary")
         self.assertEqual(response.status_code, 200)
         payload = response.json()["item"]
-        self.assertEqual(payload["remote_access"], "cloudflare_tunnel_recommended")
+        self.assertEqual(payload["remote_access"], "local_only")
         self.assertEqual(payload["public_port_exposure"], "disabled")
 
     # ------------------------------------------------------------------

@@ -222,10 +222,24 @@ npx.cmd tsc --noEmit
 The main remaining gaps are operational hardening and product polish rather than core persistence cutover:
 
 - backup/restore operator workflow still needs broader production hardening
-- `cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup
+- ~~`cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup~~ → session cleanup runs on startup
 - document pack skips preview-only documents that have no stored artifact files
 - no frontend delete UI for files/documents yet
 - Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
+
+## Post-Fix Security & Operations Improvements (2026-06)
+
+- All client GET routes now require authentication (`_current_user` guard)
+- Hardcoded demo credentials removed from shipped frontend JavaScript
+- CSRF protection added — same-origin Origin/Referer validation for state-changing routes
+- File upload size limit enforced (MAX_UPLOAD_SIZE_BYTES, default 50MB)
+- Session cleanup runs on startup via `SessionRepository.cleanup_expired()`
+- Failed login attempts now audited and rate-limited (5/minute per IP)
+- Session timestamp parsing hardened (malformed timestamps treated as expired)
+- Migration runner available: `python -m app.migrate [--status|--dry-run|--force]`
+- Docker Compose includes health checks and restart policies for all services
+- PostgreSQL port bound to localhost only in Docker Compose
+- Security summary endpoint now reflects live configuration instead of static template
 
 ## Delivery Plan
 

@@ -91,18 +91,8 @@ class ClientRepository:
             return None
         return date.fromisoformat(normalized)
 
-    def _phase_2_artifacts(self, client_reference: str) -> tuple[dict[str, object], list[dict[str, object]]]:
-        from copy import deepcopy
-
-        from app.store import SEEDED_CLIENTS, _DRAFT_STORE, _default_generated_document_drafts
-
-        document_drafts = deepcopy(_DRAFT_STORE.get(client_reference, _default_generated_document_drafts()))
-        generated_documents: list[dict[str, object]] = []
-        for seeded in SEEDED_CLIENTS:
-            if seeded["client_reference"] == client_reference:
-                generated_documents = deepcopy(seeded.get("generated_documents", []))
-                break
-        return document_drafts, generated_documents
+    def _phase_2_artifacts(self, _client_reference: str) -> tuple[dict[str, object], list[dict[str, object]]]:
+        return {}, []
 
     # ------------------------------------------------------------------
     # Response builders (match store.py contract shapes)

@@ -110,7 +110,7 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 ## Migration reality
 
 - `apps/api/migrations/0001_initial.sql` defines users, clients, dependants, employment/protection tables, documents, terms of business, statement of suitability, files, and audit logs.
-- There is no `sessions` table in the migration.
+- The sessions table is created in migration `0004_sessions.sql`.
 
 ## Known drift to avoid
 
@@ -118,3 +118,6 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 - Do not describe Terms of Business as a live Income Protection tab unless `moduleTabs` is changed.
 - Do not describe `/clients` as supporting `?search=` unless backend code adds it.
 - Do not describe audit logs or backups as seeded/in-memory — both are now PostgreSQL-backed.
+- Do not describe CSRF as absent — same-origin Origin/Referer header validation exists.
+- Do not describe client routes as public — `GET /clients` and `GET /clients/{ref}` now require session auth.
+- Do not describe audit entries as success-only — failed logins are now audited.

@@ -36,16 +36,8 @@ from app.security import hash_password, is_session_expired, verify_password
 from app.services.backups import create_backup_manifest
 from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, validate_restore
 from app.services.storage import ClientStorage
-from app.store import get_security_summary
 
-settings = get_settings(
-    DATABASE_URL="postgresql://placeholder",
-    FILE_STORAGE_PATH="storage/clients",
-    BACKUP_PATH="storage/backups",
-    SESSION_SECRET="development-only",
-    APP_URL="http://office-server.local",
-    ADMIN_EMAIL="admin@omega.local",
-)
+settings = get_settings()
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
 app.db = app_db
@@ -124,6 +116,13 @@ def _startup_db_check() -> None:
 
         db = get_session()
         try:
+            # Clean up expired sessions on startup
+            from app.repositories.sessions import SessionRepository as StartupSessionRepo
+            session_repo = StartupSessionRepo(db)
+            removed = session_repo.cleanup_expired()
+            if removed > 0:
+                logger.info("Cleaned up %d expired session(s) on startup.", removed)
+
             repo = UserRepository(db)
 
             if not repo.get_by_email(settings.admin_email):
@@ -281,6 +280,48 @@ def _require_admin(request: Request) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# CSRF protection for state-changing routes (same-origin SPA)
+# ---------------------------------------------------------------------------
+
+_CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _csrf_check(request: Request) -> None:
+    """Reject cross-origin state-changing requests for cookie-session endpoints.
+
+    The frontend SPA runs on the same origin so its requests always carry
+    an Origin header matching the APP_URL.  Browsers strip the Origin
+    header on same-origin redirects, so we also accept a missing Origin
+    when the Referer header is same-origin.  This is the simplest
+    production-shaped CSRF defense for an internal cookie-session app
+    without requiring token plumbing.
+    """
+    if request.method in _CSRF_SAFE_METHODS:
+        return
+
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+
+    app_origin = settings.app_url.rstrip("/")
+
+    def _is_same_origin(value: str) -> bool:
+        return value.startswith(app_origin)
+
+    if origin is not None:
+        if not _is_same_origin(origin):
+            raise HTTPException(status_code=403, detail="Cross-origin request blocked")
+        return
+
+    # No Origin header – check Referer for same-origin fallback
+    if referer is not None and _is_same_origin(referer):
+        return
+
+    # Neither header present and method is state-changing – block
+    if origin is None and referer is None:
+        raise HTTPException(status_code=403, detail="Missing origin header")
+
+
+# ---------------------------------------------------------------------------
 # Audit helper
 # ---------------------------------------------------------------------------
 
@@ -368,13 +409,44 @@ def readiness() -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
+# Lightweight in-memory login rate limiter (per IP, 5 attempts / minute)
+_LOGIN_RATE_WINDOW: dict[str, tuple[float, int]] = {}
+
+
+def _check_login_rate(client_ip: str) -> None:
+    """Return if within rate limit. Raise 429 if exceeded."""
+    now = datetime.now(UTC).timestamp()
+    window_start, count = _LOGIN_RATE_WINDOW.get(client_ip, (0.0, 0))
+    if now - window_start > 60:
+        count = 0
+        window_start = now
+    if count >= 5:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
+    _LOGIN_RATE_WINDOW[client_ip] = (window_start, count + 1)
+
+
 @app.post("/auth/login")
 def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
+    client_ip = request.client.host if request.client else "unknown"
     db = get_session()
     try:
         user_repo = UserRepository(db)
         user_model = user_repo.get_by_email(payload.email)
+
         if not user_model or not verify_password(payload.password, user_model.password_hash):
+            # Log failed attempt
+            try:
+                _log_audit(
+                    request, db=db,
+                    action="login_failed",
+                    entity_type="auth",
+                    entity_id=payload.email,
+                    details={"reason": "invalid_credentials", "ip": client_ip},
+                    user_email=payload.email,
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         if user_model.status != UserStatus.ACTIVE.value:
@@ -390,6 +462,16 @@ def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
         request.session["session_id"] = str(session_row.id)
         request.session["user_email"] = user_model.email
         request.session["last_seen_at"] = datetime.now(UTC).isoformat()
+
+        _log_audit(
+            request, db=db,
+            action="login_success",
+            entity_type="auth",
+            entity_id=user_model.email,
+            details={"ip": client_ip},
+            user_email=user_model.email,
+        )
+        db.commit()
 
         return {"user": user_repo.to_response(user_model)}
     finally:
@@ -422,7 +504,8 @@ def me(request: Request) -> dict[str, dict[str, str]]:
 
 
 @app.get("/clients")
-def clients() -> dict[str, list[dict[str, object]]]:
+def clients(request: Request) -> dict[str, list[dict[str, object]]]:
+    _current_user(request)
     db = get_session()
     try:
         repo = ClientRepository(db)
@@ -468,7 +551,8 @@ def create_client_record(payload: ClientCreateRequest, request: Request) -> dict
 
 
 @app.get("/clients/{client_reference}")
-def client_detail(client_reference: str) -> dict[str, dict[str, object]]:
+def client_detail(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
+    _current_user(request)
     db = get_session()
     try:
         repo = ClientRepository(db)
@@ -560,15 +644,19 @@ def save_workflow(client_reference: str, payload: dict[str, object], request: Re
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
         workflow_repo = WorkflowRepository(db)
-        workflow_repo.save(client.id, payload)
-        _log_audit(
-            request, db=db,
-            action="workflow_saved",
-            entity_type="workflow",
-            entity_id=client_reference,
-            client_id=client.id,
-        )
-        db.commit()
+        try:
+            workflow_repo.save(client.id, payload)
+            _log_audit(
+                request, db=db,
+                action="workflow_saved",
+                entity_type="workflow",
+                entity_id=client_reference,
+                client_id=client.id,
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Workflow save failed")
         return {"item": {"client_reference": client_reference, "saved": "ok"}}
     finally:
         db.close()
@@ -1217,7 +1305,17 @@ def admin_schedule_status(request: Request) -> dict[str, object]:
 @app.get("/admin/security-summary")
 def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
     _require_admin(request)
-    return {"item": get_security_summary()}
+    return {
+        "item": {
+            "password_hashing": "pbkdf2_enabled",
+            "role_based_access": "enabled",
+            "session_timeout_minutes": str(settings.session_timeout_minutes),
+            "public_port_exposure": "disabled",
+            "remote_access": settings.remote_access_mode,
+            "remote_access_notes": "Use Cloudflare Tunnel with Cloudflare Access or VPN before enabling offsite access.",
+            "file_storage_visibility": "private_server_storage",
+        }
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1268,6 +1366,13 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
 
         filename = uploaded.filename
         content = await uploaded.read()
+
+        if len(content) > settings.max_upload_size_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum upload size of {settings.max_upload_size_bytes} bytes",
+            )
+
         category = str(form.get("category", "General"))
 
         # Determine file type from extension

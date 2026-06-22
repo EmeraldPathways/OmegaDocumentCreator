@@ -22,5 +22,9 @@ def is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool:
     if not last_seen_at:
         return True
 
-    last_seen = datetime.fromisoformat(last_seen_at)
+    try:
+        last_seen = datetime.fromisoformat(last_seen_at)
+    except (ValueError, TypeError):
+        return True
+
     return datetime.now(UTC) - last_seen > timedelta(minutes=timeout_minutes)
