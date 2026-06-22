@@ -49,3 +49,13 @@ class MigrationSchemaTests(unittest.TestCase):
         self.assertIn("CREATE INDEX idx_backup_runs_created_at ON backup_runs (created_at);", sql)
         self.assertIn("ADD COLUMN preview_title TEXT,", sql)
         self.assertIn("ADD COLUMN preview_html TEXT;", sql)
+
+    def test_restore_attempts_migration_defines_table_and_index(self) -> None:
+        migration = Path(__file__).resolve().parents[1] / "migrations" / "0003_restore_attempts.sql"
+        sql = migration.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE restore_attempts (", sql)
+        self.assertIn("backup_run_id UUID NOT NULL REFERENCES backup_runs(id) ON DELETE CASCADE", sql)
+        self.assertIn("status TEXT NOT NULL", sql)
+        self.assertIn("mode TEXT NOT NULL", sql)
+        self.assertIn("CREATE INDEX idx_restore_attempts_backup_run_id ON restore_attempts (backup_run_id);", sql)

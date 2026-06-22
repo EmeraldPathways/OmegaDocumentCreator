@@ -56,10 +56,53 @@ python -m pytest tests\test_api.py -k "test_login_creates_persisted or test_auth
 All skipped (PostgreSQL not available)
 ```
 
+---
+
+## Prompt 7: Remove Frontend localStorage As Primary Source of Truth
+
+### Commands
+
+```
+Set-Location "D:\GOOGLE DRIVE\EMERALD PATHWAYS\WEB WORK\AI CODING\VS CODE\work\Omega Document Creator"
+npx tsc --noEmit -p apps/frontend/tsconfig.app.json 2>&1 | Select-String "error TS"
+```
+
+### Verification Result
+
+```
+Frontend typecheck: no new TS errors introduced
+Backend suite: unaffected (frontend-only change)
+```
+
 ### Key Facts
-- All 6 tests target the exact cookie-backed persisted session row (not user-wide queries)
-- **Logout test**: captures `session_id` from cookie, asserts `get_valid_by_id(session_id)` returns None
-- **Deleted row test**: captures `session_id` from cookie, deletes only that row via `delete_by_id`, asserts 401
-- **Expired row test**: captures `session_id` from cookie, expires only the matching row by ID, asserts 401
-- **Two-session test**: validates independent invalidation with cookie restore
-- No refactoring of unrelated code; auth route contracts preserved
+- `ClientDataProvider` no longer reads or writes to `localStorage` at any point — client state is pure React with seeded defaults
+- `IncomeProtectionPage` no longer reads or writes to `localStorage` — `SELECTED_CLIENT_STORAGE_KEY` removed entirely
+- `persistDraft()` writes to backend only via `saveWorkflow()` — no dual-write to local state
+- Generated documents tab shows backend data only (`backendGeneratedDocuments`) — no fallback to `resolvedDraft.generatedDocuments`
+- Save/generate/export flows preserved; all save labels updated to reflect backend-only persistence
+
+---
+
+## Prompt 8: Remote Access / Cloudflare Tunnel Automation
+
+### Commands
+
+```
+Set-Location "D:\GOOGLE DRIVE\EMERALD PATHWAYS\WEB WORK\AI CODING\VS CODE\work\Omega Document Creator\apps\api"
+python -m pytest --collect-only -q 2>&1 | Select-String "test_" | Select-Object -First 3
+```
+
+### Verification Result
+
+```
+Backend test collection: unaffected (no backend code changed)
+Frontend typecheck: unaffected (no frontend code changed)
+```
+
+### Key Facts
+- **Config template**: `infra/cloudflared/config.yaml.example` with `YOUR_TUNNEL_UUID` placeholder, ingress rules for `omega-api.yourdomain.com` → `api:8000` and `omega.yourdomain.com` → `frontend:3000`
+- **Setup script**: `infra/cloudflared/setup-tunnel.sh` — interactive, creates tunnel, copies credentials, generates config.yaml, sets DNS records
+- **Env instructions match config model**: `ENVIRONMENT=production` + `REMOTE_ACCESS_MODE=remote` (matches `config.py` which reads `ENVIRONMENT` for deployment mode and `REMOTE_ACCESS_MODE` for `local_only` vs `remote`)
+- **Docker compose**: commented-out cloudflared sidecar with clear 4-step enablement comments and `YOUR_TUNNEL_UUID` placeholder
+- **Secrets protection**: `.gitignore` excludes `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml`
+- All 8 prompts verified — no regressions in backend test collection or frontend typecheck

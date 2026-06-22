@@ -24,9 +24,6 @@ type ClientDataContextValue = {
   ) => void;
 };
 
-const STORAGE_KEY = "omega-client-records";
-const STORAGE_VERSION_KEY = "omega-client-records-version";
-const STORAGE_VERSION = "3";
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
 
 function isPristineDraft(draft?: Partial<GeneratedDocumentDraft>) {
@@ -96,38 +93,8 @@ function normalizeClients(clients: Record<string, SeededClientProfile>) {
   ) as Record<string, SeededClientProfile>;
 }
 
-function readStoredClients() {
-  if (typeof window === "undefined") {
-    return createSeededClientProfiles();
-  }
-
-  const storedVersion = window.localStorage.getItem(STORAGE_VERSION_KEY);
-  if (storedVersion !== STORAGE_VERSION) {
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
-    return createSeededClientProfiles();
-  }
-
-  const storedValue = window.localStorage.getItem(STORAGE_KEY);
-  if (!storedValue) {
-    return createSeededClientProfiles();
-  }
-
-  try {
-    const parsedValue = JSON.parse(storedValue) as Record<string, SeededClientProfile>;
-    return Object.keys(parsedValue).length > 0 ? normalizeClients(parsedValue) : createSeededClientProfiles();
-  } catch {
-    return createSeededClientProfiles();
-  }
-}
-
 export function ClientDataProvider({ children }: PropsWithChildren) {
-  const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() => readStoredClients());
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-  }, [clients]);
+  const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() => createSeededClientProfiles());
 
   function saveClient(client: SeededClientProfile) {
     setClients((currentClients) => ({

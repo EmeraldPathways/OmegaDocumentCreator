@@ -26,6 +26,10 @@ class AppSettings:
     environment: str = "development"
     remote_access_mode: str = "local_only"
     pdf_converter_bin: str = "soffice"
+    pg_dump_bin: str = "pg_dump"
+    pg_restore_bin: str = "pg_restore"
+    backup_schedule_enabled: bool = False
+    backup_schedule_interval_minutes: int = 1440
     local_ai_enabled: bool = False
     local_ai_provider: str = "disabled"
     local_ai_model: str = ""
@@ -84,6 +88,15 @@ def get_settings(**overrides: str) -> AppSettings:
         "environment": overrides.get("ENVIRONMENT") or os.getenv("ENVIRONMENT", "development"),
         "remote_access_mode": overrides.get("REMOTE_ACCESS_MODE") or os.getenv("REMOTE_ACCESS_MODE", "local_only"),
         "pdf_converter_bin": overrides.get("PDF_CONVERTER_BIN") or os.getenv("PDF_CONVERTER_BIN", "soffice"),
+        "pg_dump_bin": overrides.get("PG_DUMP_BIN") or os.getenv("PG_DUMP_BIN", "pg_dump"),
+        "pg_restore_bin": overrides.get("PG_RESTORE_BIN") or os.getenv("PG_RESTORE_BIN", "pg_restore"),
+        "backup_schedule_enabled": (
+            overrides.get("BACKUP_SCHEDULE_ENABLED") or os.getenv("BACKUP_SCHEDULE_ENABLED", "false")
+        ).lower() == "true",
+        "backup_schedule_interval_minutes": int(
+            overrides.get("BACKUP_SCHEDULE_INTERVAL_MINUTES")
+            or os.getenv("BACKUP_SCHEDULE_INTERVAL_MINUTES", "1440")
+        ),
         "local_ai_enabled": local_ai_enabled_value.lower() == "true",
         "local_ai_provider": overrides.get("LOCAL_AI_PROVIDER") or os.getenv("LOCAL_AI_PROVIDER", "disabled"),
         "local_ai_model": overrides.get("LOCAL_AI_MODEL") or os.getenv("LOCAL_AI_MODEL", ""),

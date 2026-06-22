@@ -60,8 +60,6 @@ const moduleTabs = [
   { id: "generated-documents", label: "Generated Documents", icon: Download },
 ] as const;
 
-const SELECTED_CLIENT_STORAGE_KEY = "omega-selected-income-protection-client";
-
 const employmentStatusOptions = [
   { value: "", label: "Select employment status" },
   { value: "Employed", label: "Employed" },
@@ -297,12 +295,7 @@ export function IncomeProtectionPage() {
     useClientData();
   const clients = listClients();
   const pendingGeneratedDocumentVersionsRef = useRef<Record<string, Set<number>>>({});
-  const [selectedClientReference, setSelectedClientReference] = useState(() => {
-    if (typeof window === "undefined") {
-      return clients[0]?.clientReference ?? "";
-    }
-    return window.localStorage.getItem(SELECTED_CLIENT_STORAGE_KEY) ?? clients[0]?.clientReference ?? "";
-  });
+  const [selectedClientReference, setSelectedClientReference] = useState(() => clients[0]?.clientReference ?? "");
   const client = getClient(selectedClientReference);
   const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(moduleTabs[0].id);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
@@ -362,7 +355,6 @@ export function IncomeProtectionPage() {
   useEffect(() => {
     if (!selectedClientReference && clients[0]?.clientReference) {
       setSelectedClientReference(clients[0].clientReference);
-      window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, clients[0].clientReference);
     }
   }, [clients, selectedClientReference]);
 
@@ -419,7 +411,6 @@ export function IncomeProtectionPage() {
       updatedBy: actorLabel,
     };
     setDraft(normalizedDraft);
-    saveClient(normalizedDraft);
 
     try {
       await saveWorkflow(normalizedDraft.clientReference, normalizedDraft);
@@ -429,7 +420,7 @@ export function IncomeProtectionPage() {
       return { draft: normalizedDraft, savedRemotely: true };
     } catch {
       if (options?.showToast) {
-        addToast("Saved locally - server unavailable", "info");
+        addToast("Save failed - server unavailable", "error");
       }
       return { draft: normalizedDraft, savedRemotely: false };
     }
@@ -2287,22 +2278,7 @@ export function IncomeProtectionPage() {
     }
 
     // Generated Documents tab (Phase 5: backend-backed)
-    const displayDocuments = hasLoadedBackendGeneratedDocuments
-      ? backendGeneratedDocuments
-      : resolvedDraft.generatedDocuments.map((d) => ({
-          id: d.id,
-          client_id: "",
-          document_type: d.documentType,
-          document_name: d.documentName,
-          docx_file_path: null,
-          pdf_file_path: null,
-          generated_by: null,
-          generated_at: d.generatedAt,
-          version: d.version,
-          status: d.status,
-          preview_title: d.previewTitle ?? null,
-          preview_html: d.previewHtml ?? null,
-        }));
+    const displayDocuments = backendGeneratedDocuments;
 
     const resolvedPreviewDocument = previewDocument
       ? {
@@ -2511,7 +2487,6 @@ export function IncomeProtectionPage() {
               onChange={(event) => {
                 if (event.target.value) {
                   setSelectedClientReference(event.target.value);
-                  window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, event.target.value);
                 }
               }}
               value={resolvedDraft.clientReference}

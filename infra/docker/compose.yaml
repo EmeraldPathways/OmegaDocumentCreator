@@ -34,5 +34,23 @@ services:
     depends_on:
       - api
 
+  # --- Cloudflare Tunnel (optional — enable for remote access) ---
+  # 1. Run infra/cloudflared/setup-tunnel.sh to create your tunnel
+  # 2. Set ENVIRONMENT=production and REMOTE_ACCESS_MODE=remote in .env
+  # 3. Uncomment the cloudflared service block below
+  # 4. Replace YOUR_TUNNEL_UUID with the actual UUID from setup-tunnel.sh
+  #    (the credentials JSON file is at infra/cloudflared/YOUR_TUNNEL_UUID.json)
+  #
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   command: tunnel --config /etc/cloudflared/config.yaml run
+  #   volumes:
+  #     - ../cloudflared/config.yaml:/etc/cloudflared/config.yaml:ro
+  #     - ../cloudflared/YOUR_TUNNEL_UUID.json:/etc/cloudflared/YOUR_TUNNEL_UUID.json:ro
+  #   depends_on:
+  #     - api
+  #     - frontend
+  #   # No ports exposed — cloudflared connects outbound to Cloudflare
+
 volumes:
   postgres_data:

@@ -72,6 +72,7 @@ def truncate_all(session: Session) -> None:
         "life_serious_illness_details",
         "protection_details",
         "employment_details",
+        "restore_attempts",
         "backup_runs",
         "clients",
         "users",

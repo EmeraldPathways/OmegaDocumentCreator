@@ -1,166 +1,163 @@
-# Omega Phases 1-8 Handoff
+# Omega Phases 1-16 Handoff
 
-This file is the compact implementation handoff for the persistence and infrastructure roadmap in `docs/superpowers/plans/2026-06-21-omega-persistence-roadmap.md`.
+This file keeps the original handoff filename, but the implementation state now covers the full Phase 1-16 runway.
 
-Use it before starting the next phase so work does not repeat or regress earlier cutovers.
+## Status
 
-## Phase Status
+- Phases 1-16: complete
 
-- Phase 1: complete
-- Phase 2: complete
-- Phase 3: complete
-- Phase 4: complete
-- Phase 5: complete
-- Phase 6: complete
-- Phase 7: complete
-- Phase 8: complete
+## Completed Phases
 
-## Phase 1: Persistence Foundation
+### Phase 1: Persistence Foundation
 
-Completed:
-- Added runtime SQLAlchemy database plumbing in `apps/api/app/db.py`
-- Added SQLAlchemy model coverage for the MVP schema in `apps/api/app/models.py`
-- Added repository seams under `apps/api/app/repositories/`
-- Wired config usage for `DATABASE_URL`
-- Kept visible app behavior unchanged while persistence foundations landed
+- SQLAlchemy database plumbing added
+- models and repository seams added
+- runtime config wired for PostgreSQL and storage paths
 
-Notes:
-- Cookie-session auth remains in place
-- PostgreSQL is the target source of truth for structured data
-- `store.py` still existed as the live source for non-cutover areas after Phase 1
+### Phase 2: Client and Auth Persistence Cutover
 
-## Phase 2: Client and Auth Persistence Cutover
+- users moved from `store.py` to PostgreSQL
+- client CRUD moved from `store.py` to PostgreSQL
+- admin user CRUD moved to PostgreSQL
+- login/logout/current-user routes cut over to repository-backed auth
 
-Completed:
-- Rewired auth routes in `apps/api/app/main.py` to PostgreSQL-backed repositories
-- Rewired admin user CRUD to PostgreSQL-backed repositories
-- Rewired client list/detail/create/update/archive to PostgreSQL-backed repositories
-- Added bootstrap seeding for default admin and staff users on startup
-- Preserved cookie-session auth and disabled-user login blocking
-- Added DB-backed API tests and helpers in `apps/api/tests/`
+### Phase 3: Workflow Persistence
 
-Important fixes already made:
-- Restored FastAPI `app.db` compatibility for the test harness
-- Fixed client repository `UTC` import/runtime bug
-- Kept API contracts stable while moving users and clients off in-memory seeded state
+- `GET /clients/{client_reference}/workflow`
+- `PUT /clients/{client_reference}/workflow`
+- workflow fields persisted across fact find, statement, terms, employment, and protection tables
 
-Current Phase 2 state:
-- Users and clients are PostgreSQL-backed
-- `store.py` is no longer authoritative for users or clients
+### Phase 4: Files and Client Folders
 
-## Phase 3: Workflow Persistence
+- file uploads stored on disk under client folders
+- file metadata persisted in PostgreSQL
+- backend file list/download APIs live
+- frontend Files tab uses real backend APIs
 
-Completed:
-- Added workflow endpoints in `apps/api/app/main.py`:
-  - `GET /clients/{client_reference}/workflow`
-  - `PUT /clients/{client_reference}/workflow`
-- Added normalized workflow persistence in `apps/api/app/repositories/workflows.py`
-- Persisted workflow data across:
-  - fact find
-  - terms of business
-  - statement of suitability
-  - employment details
-  - protection details
-  - life / serious illness details
-- Frontend workflow page now loads backend workflow data on client change
-- Manual save path now writes to backend and reports backend failure honestly
-- Added backend workflow persistence coverage in `apps/api/tests/test_api.py`
+### Phase 5: Generated Documents and Artifacts
 
-Important fixes already made:
-- Removed conflicting workflow field ownership across tables
-- Removed conditional upsert behavior that left stale rows behind on clearing
-- Restored `recommendedCover` handling as free text so real advisor-facing values round-trip correctly
-- Fixed frontend save handlers so they no longer claim success when backend persistence fails
-- Fixed async workflow-page handler issues introduced by the save-path changes
+- generated document metadata persisted in PostgreSQL
+- preview HTML snapshots persisted
+- PDF/DOCX artifact upload and download live
+- frontend generated-doc history uses backend data
 
-Current Phase 3 state:
-- Workflow persistence is backend-backed
-- Browser/local state is still used for immediate UX, but workflow saves are no longer reported as successful if the backend write fails
-- Terms of Business is persisted through the workflow endpoint even though it is not a standalone top-level route
+### Phase 6: Audit Logging
 
-## Phase 4: Files and Client Folders
+- key write actions persist audit rows in PostgreSQL
+- admin audit log route reads from PostgreSQL
 
-Completed:
-- Added disk-backed client storage service in `apps/api/app/services/storage.py`
-- Added backend file routes in `apps/api/app/main.py`:
-  - `POST /clients/{client_reference}/files`
-  - `GET /clients/{client_reference}/files`
-  - `GET /clients/{client_reference}/files/{file_id}/download`
-- Persisted file metadata in PostgreSQL through `apps/api/app/repositories/files.py`
-- Cut the frontend Files tab over to real backend upload/list/download behavior
-- Added backend test coverage for file upload, listing, and download
+### Phase 7: Backups
 
-Important fixes already made:
-- File downloads now read the persisted relative file path instead of recomputing a mutable client slug
-- Storage roots in config are normalized relative to the repo root
-- Backend-backed file rows survive client name/detail changes without breaking download
-- Removed the misleading frontend delete affordance for backend files because no delete route exists yet
+- backup runs persisted in PostgreSQL
+- manifest artifacts written to disk
+- admin backup list/create routes cut over
 
-Current Phase 4 state:
-- Uploaded files are durable in PostgreSQL plus disk storage
-- Per-client folders are created on disk under the configured storage root
-- Backend file listing and download are live
+### Phase 8: Remote-Access Runtime Wiring
 
-## Phase 5: Generated Documents and Exported Artifacts
+- health/readiness endpoints expanded
+- cookie/CORS/runtime remote-access settings added
+- startup validation and storage checks added
 
-Completed:
-- Persisted generated document metadata and preview snapshots in PostgreSQL
-- Added backend document routes in `apps/api/app/main.py`:
-  - `POST /documents/generate`
-  - `GET /clients/{client_reference}/documents`
-  - `POST /clients/{client_reference}/documents`
-  - `GET /clients/{client_reference}/documents/{document_id}/download`
-- Added multipart document artifact upload support for PDF and DOCX exports
-- Added blob-producing frontend export helpers in:
-  - `apps/frontend/src/documents/pdf-export.ts`
-  - `apps/frontend/src/documents/word-export.ts`
-- Rewired the frontend generated-documents flow to upload exported artifacts to the backend after local export
-- Added backend tests for document persistence, artifact upload, and download
+### Phase 9: Backup Dump and Restore Foundations
 
-Important fixes already made:
-- Document downloads now read persisted relative artifact paths from the database
-- The document-create route now flushes before updating artifact paths
-- The frontend no longer treats “backend returned an empty document list” as “backend unavailable”
-- Fixed generated-document download button logic that was wrong because of `&&` / `||` precedence
-- Preserved local export behavior while adding durable backend artifact storage
+- `pg_dump` integration added when configured
+- restore validation and dry-run services added
+- restore attempt persistence added
 
-Current Phase 5 state:
-- Generated document history is durable in PostgreSQL
-- Exported PDF/DOCX artifacts are durable on disk and downloadable from the backend
-- Preview HTML snapshots survive restarts
-- Browser/local history still exists for UX, but backend history is now the durable source once loaded
+### Phase 10: Restore Execution
 
-## Current Source-of-Truth Boundaries (Post-Phase 8)
+- explicit restore execution endpoint added
+- confirmation gate enforced
+- restore failures persisted and surfaced correctly
 
-Structured data in PostgreSQL:
+### Phase 11: Backup Scheduling
+
+- lightweight scheduler service added
+- startup/shutdown scheduler wiring added
+- schedule status endpoint added
+
+### Phase 12: Document Pack ZIP Download
+
+- `GET /clients/{client_reference}/documents/pack` added
+- both PDF and DOCX artifacts included when present
+- duplicate ZIP names deduplicated with suffixes
+
+### Phase 13: File and Document Deletion
+
+- `DELETE /clients/{client_reference}/files/{file_id}`
+- `DELETE /clients/{client_reference}/documents/{document_id}`
+- DB rows and disk artifacts deleted together
+- audit entries created for deletions
+
+### Phase 14: PostgreSQL Session Persistence
+
+- `sessions` table added
+- cookie now carries exact `session_id`
+- login creates a persisted session row
+- logout invalidates only the calling session row
+
+### Phase 15: Remove Frontend localStorage As Source of Truth
+
+- workflow/client persistence no longer uses `localStorage`
+- generated-document view no longer falls back to browser-persisted state
+- backend is the authority for workflow, files, and generated history
+
+### Phase 16: Cloudflare Tunnel Automation
+
+- `infra/cloudflared/config.yaml.example` added
+- `infra/cloudflared/setup-tunnel.sh` added
+- `infra/docker/compose.yaml` includes cloudflared sidecar guidance
+- `.gitignore` protects tunnel credentials and generated config
+
+## Current Source of Truth
+
+### PostgreSQL
+
 - users
 - clients
 - dependants
-- workflow-related tables used by Phase 3
+- workflow tables
 - file metadata
-- generated document metadata and preview snapshots
+- generated document metadata
+- preview snapshots
 - audit logs
 - backup runs
+- restore attempts
+- sessions
 
-Durable on disk:
+### Disk
+
 - uploaded client files
-- exported generated-document artifacts (PDF/DOCX)
-- backup manifest artifacts
-- per-client folder structure
+- exported PDF/DOCX artifacts
+- backup manifests
+- optional database dump artifacts
 
-Not yet implemented / partial:
-- Database dump/restore (backup manifests record metadata only; no pg_dump integration)
-- Backup scheduling
-- Restore operations
-- Session table in PostgreSQL
+### Cookie Session
+
+- `session_id`
+- `user_email`
+- `last_seen_at`
+
+## Remaining Gaps
+
+- session cleanup exists but is not yet wired into automatic expiry cleanup
+- restore workflow still needs broader operator hardening
+- document pack excludes preview-only rows with no stored artifact
+- no frontend delete UI for files/documents
+- Cloudflare Tunnel setup is automated, but deployment remains operator-run
 
 ## Verification Baseline
 
 Backend:
-- `cd "apps/api"; .\.venv\Scripts\python -m unittest discover -s tests`
+
+```powershell
+cd "apps/api"
+.\.venv\Scripts\python -m unittest discover -s tests
+```
 
 Frontend:
-- `cd "apps/frontend"; npx.cmd tsc --noEmit`
 
-Current result (post-Phase 8):
-- backend test suite passes: 67 tests
+```powershell
+cd "apps/frontend"
+npx.cmd tsc --noEmit
+```

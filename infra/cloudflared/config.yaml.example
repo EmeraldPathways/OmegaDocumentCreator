@@ -1,0 +1,15 @@
+# Cloudflare Tunnel configuration template.
+# Copy to config.yaml and fill in your values, or run setup-tunnel.sh to generate.
+# See: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  - hostname: omega-api.yourdomain.com
+    service: http://api:8000
+  - hostname: omega.yourdomain.com
+    service: http://frontend:3000
+
+  # Catch-all: deny everything else
+  - service: http_status:404

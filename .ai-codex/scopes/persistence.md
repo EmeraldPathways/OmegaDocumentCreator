@@ -1,49 +1,61 @@
 # Scope: Persistence
 
-Use this scope when working with data storage, repositories, or the PostgreSQL cutover.
+Use this scope when working with data storage, repositories, backups, restore, sessions, or the remaining post-cutover hardening work.
 
 ## Goal
 
-Replace `store.py` seeded data and frontend browser storage with real backend persistence.
+Maintain the PostgreSQL-backed implementation and avoid regressing any of the completed cutovers.
 
-## Current status (post-Phase 8)
+## Current status
 
-All previously in-memory/seeded layers have been cut over to PostgreSQL:
+The persistence roadmap is complete through Phase 16.
 
-| Layer | Pre-cutover | Post-cutover | Phase |
-|-------|-------------|-------------|-------|
-| Users | In-memory (`store.py`) | PostgreSQL via `UserRepository` | 2 |
-| Clients | In-memory (`store.py`) | PostgreSQL via `ClientRepository` | 2 |
-| Workflow drafts | Browser storage | PostgreSQL via `WorkflowRepository` | 3 |
-| Uploaded files | Browser storage + seeded | Disk + PostgreSQL via `FileRepository` | 4 |
-| Generated document history | In-memory + browser | PostgreSQL via `DocumentRepository` | 5 |
-| Exported artifacts (PDF/DOCX) | None | Disk under FILE_STORAGE_PATH | 5 |
-| Audit logs | In-memory seeded | PostgreSQL via `AuditLogRepository` | 6 |
-| Backup runs | In-memory seeded | PostgreSQL via `BackupRepository` + manifest artifacts on disk | 7 |
+| Layer | Current source of truth | Phase |
+|-------|-------------------------|-------|
+| Users | PostgreSQL via `UserRepository` | 2 |
+| Clients | PostgreSQL via `ClientRepository` | 2 |
+| Workflow drafts | PostgreSQL via `WorkflowRepository` | 3 |
+| Uploaded files | Disk + PostgreSQL via `FileRepository` | 4 |
+| Generated document history | PostgreSQL via `DocumentRepository` | 5 |
+| Exported artifacts (PDF/DOCX) | Disk under `FILE_STORAGE_PATH` | 5 |
+| Audit logs | PostgreSQL via `AuditLogRepository` | 6 |
+| Backup runs | PostgreSQL + disk manifests via `BackupRepository` / `create_backup_manifest()` | 7 |
+| Restore attempts | PostgreSQL via `RestoreAttempt` | 9-10 follow-up |
+| Sessions | PostgreSQL via `SessionRepository` plus cookie session | 14 |
 
-## Remaining partially-implemented or intentionally not implemented
+## What is no longer true
 
-- **Database dump/restore**: Backup manifests record metadata only; no `pg_dump` integration. Restore operations not implemented.
-- **Backup scheduling**: No automated/scheduled backup mechanism.
-- **Session table in DB**: Session stored in cookie only; no `sessions` table in PostgreSQL.
-- **store.py cleanup**: `SEEDED_USERS`, `SEEDED_CLIENTS`, `_DRAFT_STORE`, and related templates remain in `store.py` for backward compatibility with `ClientRepository._to_detail_response()` and frontend seeded-client fallback paths. `list_audit_logs`, `create_backup_run`, and `latest_backup_run` have been removed (superceded by PostgreSQL).
-- **Frontend `localStorage`**: Still used by `client-data-context.tsx` for immediate UX caching; workflow saves are backed by `PUT /clients/{ref}/workflow`.
+- workflow persistence is not browser-backed anymore
+- generated document history is not browser-backed anymore
+- file upload/download is not placeholder behavior anymore
+- session identity is not cookie-only anymore
+
+## Remaining partial areas
+
+- restore workflow exists, but still needs broader operator hardening
+- expired session cleanup exists, but is not automatically scheduled
+- document pack only includes stored artifacts, not preview-only rows
+- frontend delete UI for files/documents is still missing
 
 ## Entry points
 
 - `apps/api/app/main.py` - route imports and live call sites
-- `apps/api/app/config.py` - `DATABASE_URL`, storage paths, remote-access settings
-- `apps/api/app/repositories/` - all DB-backed repository implementations
-- `apps/api/app/services/` - storage service, backup service
+- `apps/api/app/config.py` - `DATABASE_URL`, storage paths, restore, scheduler, and remote-access settings
 - `apps/api/app/models.py` - SQLAlchemy model definitions
-- `apps/frontend/src/data/client-data-context.tsx` - frontend workflow caching (localStorage with backend-backed saves)
-- `apps/frontend/src/data/file-api.ts` - file upload/download API client
-- `apps/frontend/src/documents/generated-document-api.ts` - document list/create/download API client
+- `apps/api/app/repositories/` - all DB-backed repositories
+- `apps/api/app/services/backups.py` - manifest and optional `pg_dump`
+- `apps/api/app/services/restore.py` - validate/dry-run/execute restore logic
+- `apps/api/app/services/scheduler.py` - scheduled backup lifecycle
+- `apps/api/app/services/storage.py` - disk storage and safe deletion
+- `apps/frontend/src/data/workflow-api.ts` - workflow persistence client
+- `apps/frontend/src/data/file-api.ts` - file API client
+- `apps/frontend/src/documents/generated-document-api.ts` - document API client
 
 ## Constraints
 
-- Preserve current route contracts unless the API is intentionally expanded.
-- Keep `client_reference` as the external client identifier.
-- Keep file storage rooted under `FILE_STORAGE_PATH`; backup artifacts under `BACKUP_PATH`.
-- Cookie-session auth should stay cookie-based unless explicitly redesigned.
-- Do not expose raw filesystem paths to clients — use relative paths.
+- preserve current route contracts unless the API is intentionally expanded
+- keep `client_reference` as the external client identifier
+- keep file storage rooted under `FILE_STORAGE_PATH`
+- keep backup artifacts rooted under `BACKUP_PATH`
+- do not expose raw filesystem paths to clients
+- do not reintroduce browser `localStorage` as workflow or generated-document authority

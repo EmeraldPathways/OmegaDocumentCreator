@@ -2,28 +2,24 @@
 
 ## Overview
 
-Omega Document Creator is a secure internal office web application for Omega Financial Management.
+Omega Document Creator is an internal office web application for Omega Financial Management.
 
-It is intended to run on a Windows-based office server and be accessed by office staff over the local network through a browser. Remote access is a later concern and must only be introduced behind a protected HTTPS setup such as VPN or Cloudflare Tunnel.
+The live implementation now covers:
 
-Version 1 is an internal office workflow tool for:
-
-- secure login
+- secure login with persisted PostgreSQL session rows
 - staff/admin role separation
-- client record management
-- Income Protection workflows
-- AI-assisted document generation
-- local file storage
-- audit logging
-- backups
-
-Version 1 now includes AI-backed draft generation for Income Protection documents with a seeded fallback when live AI is unavailable.
+- PostgreSQL-backed users, clients, workflows, documents, audit logs, backups, restore attempts, and sessions
+- Income Protection workflow persistence
+- AI-assisted document generation with persisted preview snapshots
+- durable file upload/download storage
+- generated document history, artifact upload, download, pack download, and deletion
+- audit logging for key write actions
+- backup manifest creation, restore validation, dry-run, execution, and scheduler wiring
+- remote-access automation guidance via Cloudflare Tunnel
 
 ## Product Scope
 
 ### Primary module
-
-The first core module is:
 
 - `Income Protection`
 
@@ -39,24 +35,25 @@ The first core module is:
 
 #### Admin
 
-- create, edit, disable, and delete staff accounts
+- create, edit, disable, and manage staff accounts
 - view all clients
 - create, edit, and archive client records
-- manage document templates
-- generate Word and PDF documents
-- view audit logs
-- manage backup settings
+- review audit logs
+- create and review backup runs
+- validate, dry-run, and execute restores
+- review scheduler status
+- access security summary
 
 #### Staff
 
 - log in securely
 - create and edit client records
-- complete Income Protection forms
-- upload client files
-- generate AI-backed draft documents
-- review and edit generated document content
-- export Word and PDF documents from the generated preview
-- view client records and files they are permitted to access
+- complete Income Protection workflow fields
+- upload, download, and delete client files
+- generate AI-backed document drafts
+- review and edit generated content
+- export PDF and DOCX artifacts
+- view and download generated document history
 
 ## Technical Direction
 
@@ -64,23 +61,11 @@ The first core module is:
 
 - Frontend: React + TypeScript
 - Backend: FastAPI + Python
-- Database: PostgreSQL
+- Database: PostgreSQL via SQLAlchemy
 - File storage: local server filesystem
-- Auth: server-side cookie session auth
-- AI generation: Google Gemini (`gemini-2.0-flash`, `temperature=0.3`) with seeded fallback
-- Document composition: styled HTML preview reused for review and export
-- PDF generation: frontend HTML-to-PDF export
-- DOCX generation: frontend structured DOCX export
-- Deployment: Docker Compose
-
-### Design direction
-
-- Omega-style burgundy, grey, and white
-- top navigation
-- top client search
-- clear page headings
-- large action buttons
-- office-friendly, non-flashy UI
+- Auth: cookie session auth plus PostgreSQL session table
+- AI generation: Google Gemini with seeded fallback
+- Deployment: Windows-first local scripts plus Docker Compose
 
 ## Repository Structure
 
@@ -89,280 +74,72 @@ apps/
   api/
   frontend/
 infra/
+  cloudflared/
   docker/
 storage/
   clients/
   backups/
 templates/
   docx/
+.ai-codex/
+.agent-handoff/
 AGENTS.md
 PROJECT.md
-STAGE4_HANDOFF.md
+phase1-8.md
 ```
 
 ## Current Implementation Status
 
-### Stage 1
-
-Implemented in scaffold form:
-
-- frontend app scaffold
-- backend API scaffold
-- Docker Compose file
-- local storage directories
-- env template
-- migration stub
-- seed data
-- client list page
-- client profile page
-
-### Stage 2
-
-Implemented in the current in-memory scaffold:
-
-- login endpoint
-- logout endpoint
-- current user endpoint
-- admin-only user listing
-- admin user creation
-- admin user update
-- admin user disable
-- password hashing using PBKDF2
-- password verification
-- session last-seen tracking
-- session timeout checks
-- disabled-user login blocking
-
-Important note:
-
-- Stage 2 is logically implemented, but persistence is still in-memory.
-- PostgreSQL-backed users and sessions are not implemented yet.
-
-### Stage 3
-
-Implemented in the current in-memory scaffold:
-
-- client list endpoint
-- client detail endpoint
-- client create endpoint
-- client update endpoint
-- client archive endpoint
-- client list page
-- client profile page
-- client create page
-- client edit page
-
-Important note:
-
-- Stage 3 is also currently in-memory.
-- The current client schema covers the main profile fields needed for the scaffold, but not the full final production schema from the spec.
-
-### Stage 4
-
-Implemented in the live workflow:
-
-- `/income-protection` is the live workflow route
-- selected workflow client is managed inside the page, not in the route
-- client-bound Income Protection workflow tabs exist for:
-  - Client Details
-  - Fact Find
-  - Terms of Business
-  - Statement of Suitability
-  - Files
-  - Generated Documents
-- shared client data is reused across workflow sections
-- current workflow client can be changed using:
-  - search field
-  - dropdown selector
-  - `Add Client`
-
-Important note:
-
-- Stage 4 is complete and now tied into real document-generation actions.
-
-### Stages 5 to 17
-
-Stage 5 is implemented in persisted frontend form:
-
-- Fact Find renders all major sections
-- draft save is available from the tab
-- missing-field validation blocks final generation when essential fields are missing
-- draft values persist in browser storage through the shared client data store
-- AI-generated Fact Find drafts are saved back into client draft state
-- generated preview content can be edited inline before export
-
-Important note:
-
-- draft persistence is still browser-backed, not database-backed.
-
-Stage 6 is implemented in persisted frontend form:
-
-- Terms of Business tab renders a draft tracking view
-- seeded values cover version, issued-by, delivery method, and notes
-- local issue status can be saved through the shared client data store
-- Terms of Business AI generation now produces a styled preview
-- preview export creates generated-document history rows and files metadata
-
-Stage 7 is implemented in persisted frontend form:
-
-- Statement of Suitability tab renders a draft recommendation view
-- seeded values cover statement type, provider, product type, cover summary, and letter date
-- local document status can be saved through the shared client data store
-- Statement of Suitability AI generation now produces a styled preview
-- preview export creates generated-document history rows and files metadata
-
-Important note:
-
-- live draft generation exists through the backend `/documents/generate` endpoint.
-- generated history is still backed by seeded/browser data, not a database or filesystem store.
-
-Stage 8 has now started in persisted frontend form:
-
-- Files tab renders a client-files view inside the Income Protection module
-- seeded client folder layout is shown for the expected local storage structure
-- seeded file metadata is listed in a tracked files table
-- Upload File currently creates a placeholder saved file record in browser storage
-
-Important note:
-
-- Stage 8 is currently frontend-only scaffold work.
-- real uploads, local filesystem writes, folder creation, and backend file metadata persistence are not implemented yet.
-
-Stage 9 is implemented in persisted frontend form:
-
-- Generated Documents tab renders a generated-history view inside the Income Protection module
-- generated document records are listed with type, filename, version, status, and generated date
-- individual generated documents have row-level download actions
-- history rows preserve the frozen preview HTML used for export
-- Download Document Pack is still a placeholder status action
-
-Important note:
-
-- ZIP pack export, filesystem saves, and database-backed document persistence are not implemented yet.
-
-Stage 10 has now started in backend schema form:
-
-- the initial SQL migration now defines the wider MVP table set for users, clients, dependants, employment details, protection details, life and serious illness details, fact find, terms of business, statement of suitability, files, documents, and audit logs
-- foreign-key relationships and a small set of supporting indexes are included in the migration stub
-- backend tests now verify that the Stage 10 table set and critical columns remain present in the migration
-
-Important note:
-
-- Stage 10 is currently schema-definition work only.
-- the running application still uses in-memory seeded data, and these tables are not wired into repositories or runtime persistence yet.
-
-Stage 11 has now started in frontend validation form:
-
-- Fact Find now keeps Save Draft available while adding Generate DOCX and Generate PDF placeholder actions
-- Fact Find final generation shows a missing-field checklist and blocks generation when essential fields are missing
-- Statement of Suitability final generation now also shows a missing-field checklist and blocks generation when essential fields are missing
-- frontend tests cover non-blocking draft save behavior and blocked final-generation behavior for incomplete seeded data
-
-Important note:
-
-- Stage 11 is currently frontend-only validation scaffold work.
-- autosave, persistence-backed validation, and full required-field coverage across all workflow sections are not implemented yet.
-
-Stage 12 has now started in seeded audit-log form:
-
-- backend now exposes an admin-only `GET /admin/audit-logs` endpoint backed by seeded in-memory audit log records
-- frontend Admin page now includes an Audit Logs table with seeded entries for generated documents and uploaded files
-- backend and frontend tests cover the admin-only audit log surface
-
-Important note:
-
-- Stage 12 is currently scaffolded with seeded in-memory data only.
-- comprehensive action tracking, persistence-backed audit logging, and client-specific audit history views are not implemented yet.
-
-Stage 13 has now started in seeded backup form:
-
-- backend now exposes an admin-only `POST /admin/backups/run` endpoint backed by an in-memory seeded backup run list
-- frontend Admin page now includes a Backups panel with last successful backup details and a manual `Run Backup Now` placeholder action
-- backend and frontend tests cover the admin-only backup trigger and visible backup status
-
-Important note:
-
-- Stage 13 is currently scaffolded with seeded in-memory backup data only.
-- real PostgreSQL dumps, filesystem archive creation, scheduled backups, and persisted backup history are not implemented yet.
-
-Stage 14 has now started in seeded security-summary form:
-
-- backend now exposes an admin-only `GET /admin/security-summary` endpoint backed by an in-memory security summary
-- frontend Admin page now includes a Security panel covering password hashing, role-based access, session timeout, private file storage, and public-port posture
-- remote access guidance now explicitly recommends `Cloudflare Tunnel with Cloudflare Access` instead of exposing public ports directly
-- `.env.example` now includes `REMOTE_ACCESS_MODE=local_only` to keep the default deployment posture office-local first
-
-Important note:
-
-- Stage 14 is currently a scaffolded security summary, not a full infrastructure lock-down implementation.
-- file-upload validation, HTTPS termination, live Cloudflare tunnel creation, and complete runtime hardening are not implemented yet.
-
-Stage 15 has now started in frontend UI form:
-
-- dashboard homepage now presents a module roadmap strip with `Income Protection` as the active V1 module
-- homepage now also reserves `Pensions` and `Investments` spaces beside the Income Protection action for planned V2 and V3 releases
-- dashboard copy now distinguishes the live module from future workflow areas without exposing unfinished routes
-
-Important note:
-
-- Stage 15 is currently a dashboard and module-entry UI slice only.
-- full UX refinement across long forms, progress indicators, autosave affordances, and broader responsive polish are not implemented yet.
-
-Stage 16 is implemented in live-AI configuration form:
-
-- frontend now has a real `Settings` page instead of sending `Settings` navigation back to `Login`
-- backend config now supports live AI generation settings
-- Gemini is the active provider path for document generation
-- frontend login now creates a real backend session cookie instead of only local browser state
-
-Important note:
-
-- local model runners, embeddings, RAG indexing, and broader AI assistants are still not implemented.
-
-Stage 17 is implemented in AI document generation form:
-
-- backend exposes `POST /documents/generate`
-- generation service builds prompts from workflow data and client context
-- Gemini-backed generation returns structured `title`, `summary`, `sections`, `warnings`, and `generated_html`
-- seeded fallback content is returned when AI is disabled, missing, or fails
-- generated drafts are saved into seeded client records so the latest version can be reopened
-- frontend preview/export flow reuses the composed styled document instead of plain field dumps
+### Stages 1-16
+
+Stages 1-16 are complete in the current codebase.
+
+That includes:
+
+- runtime PostgreSQL wiring
+- SQLAlchemy models and repositories
+- auth and client persistence cutover
+- workflow persistence
+- file upload/download storage and client folders
+- generated document persistence and artifact storage
+- audit logging
+- backup manifests and backup history
+- restore validation, dry-run, execution, and restore-attempt persistence
+- backup scheduling wiring
+- generated document pack ZIP download
+- file and document deletion endpoints
+- PostgreSQL-backed exact-row session persistence
+- removal of workflow/client `localStorage` persistence as the source of truth
+- Cloudflare Tunnel automation and remote-access setup guidance
+
+### Stage 17
+
+Stage 17 is also live:
+
+- `POST /documents/generate`
+- Gemini-backed document generation
+- seeded fallback when AI is unavailable
+- persisted preview HTML snapshots
+- frontend preview/edit/export flow
 
 ## Backend Details
 
 ### Current auth model
 
-Current auth is session-cookie based using Starlette `SessionMiddleware`.
+Auth is cookie-session based using Starlette `SessionMiddleware` plus a persisted PostgreSQL `sessions` table.
 
 Session keys currently used:
 
+- `session_id`
 - `user_email`
 - `last_seen_at`
-
-### Current backend behavior
-
-Current seeded backend behavior is provided from:
-
-- `apps/api/app/store.py`
-
-This file currently holds mutable seeded users and clients in process memory.
-
-### Current security utilities
-
-Password hashing and session timeout logic live in:
-
-- `apps/api/app/security.py`
-
-Current password scheme:
-
-- PBKDF2-HMAC-SHA256 with random salt
 
 ### Current API surface
 
 Implemented:
 
-- `GET /health` — status + environment info
-- `GET /ready` — DB + storage availability check
+- `GET /health`
+- `GET /ready`
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
@@ -371,32 +148,30 @@ Implemented:
 - `GET /clients/{client_reference}`
 - `PATCH /clients/{client_reference}`
 - `PATCH /clients/{client_reference}/archive`
-- `GET /clients/{client_reference}/workflow` — DB-backed
-- `PUT /clients/{client_reference}/workflow` — DB-backed
-- `POST /clients/{client_reference}/files` — multipart upload
-- `GET /clients/{client_reference}/files`
-- `GET /clients/{client_reference}/files/{file_id}/download`
+- `GET /clients/{client_reference}/workflow`
+- `PUT /clients/{client_reference}/workflow`
 - `POST /documents/generate`
 - `GET /clients/{client_reference}/documents`
-- `POST /clients/{client_reference}/documents` — with optional artifact upload
+- `POST /clients/{client_reference}/documents`
 - `GET /clients/{client_reference}/documents/{document_id}/download`
+- `GET /clients/{client_reference}/documents/pack`
+- `DELETE /clients/{client_reference}/documents/{document_id}`
+- `POST /clients/{client_reference}/files`
+- `GET /clients/{client_reference}/files`
+- `GET /clients/{client_reference}/files/{file_id}/download`
+- `DELETE /clients/{client_reference}/files/{file_id}`
 - `GET /admin/users`
 - `POST /admin/users`
-- `PATCH /admin/users/{email}`
-- `PATCH /admin/users/{email}/disable`
-- `GET /admin/audit-logs` — DB-backed
-- `GET /admin/backups` — DB-backed
-- `POST /admin/backups` — DB-backed + manifest artifact
+- `PATCH /admin/users/{user_id}`
+- `GET /admin/backups`
+- `POST /admin/backups`
+- `POST /admin/backups/{backup_id}/validate-restore`
+- `POST /admin/backups/{backup_id}/dry-run-restore`
+- `POST /admin/backups/{backup_id}/restore`
+- `GET /admin/backups/{backup_id}/restore-attempts`
+- `GET /admin/backups/schedule-status`
+- `GET /admin/audit-logs`
 - `GET /admin/security-summary`
-
-Not yet implemented:
-
-- Database dump/restore (pg_dump)
-- Restore operations
-- Backup scheduling
-- Document pack ZIP download
-- File/document deletion endpoints
-- Session table in PostgreSQL
 
 ## Frontend Details
 
@@ -409,172 +184,62 @@ Not yet implemented:
 - `/clients/:clientReference`
 - `/clients/:clientReference/edit`
 - `/clients/:clientReference/income-protection`
-  - redirect helper into `/income-protection`
 - `/income-protection`
 - `/documents`
-  - redirects to `/clients`
 - `/documents/:clientReference`
-  - redirects to `/clients/:clientReference`
 - `/files`
 - `/settings`
 - `/admin`
 
-### Current frontend pages
+### Current workflow behavior
 
-- login page
-- settings page
-- clients page
-- client profile page with client-owned documents/files area
-- Income Protection workflow page on `/income-protection`
-- Fact Find workflow draft view with AI generation, preview, edit, and export
-- Terms of Business draft view with AI generation, preview, edit, and export
-- Statement of Suitability draft view with AI generation, preview, edit, and export
-- Client Files draft view inside the Income Protection module
-- Generated Documents history view with reopenable preview exports
-- client create page
-- client edit page
-- admin page
-
-### Not yet implemented
-
-- backend-backed persistence for the workflow/client state
-- autosave timers
-- real file upload/download APIs
-- real generated document storage/download APIs
-- real document pack ZIP download
-- backend-backed settings persistence
+- backend workflow persistence is authoritative
+- no workflow/client `localStorage` persistence remains
+- generated document history is backend-backed
+- Files tab uses real backend upload/list/download
+- Generated Documents tab uses real backend history/download/pack APIs
 
 ## Testing
 
 ### Backend
-
-Backend uses a repo-local virtual environment:
-
-- `apps/api/.venv`
-
-Verification command:
 
 ```powershell
 cd "apps/api"
 .\.venv\Scripts\python -m unittest discover -s tests
 ```
 
+Additional targeted validation in the handoff flow uses `pytest --collect-only` for DB-gated API slices and unit coverage for backup/restore services.
+
 ### Frontend
 
-Frontend verification command:
-
 ```powershell
 cd "apps/frontend"
-npm.cmd test
+npx.cmd tsc --noEmit
 ```
-
-Frontend run command for this repo:
-
-```powershell
-cd "apps/frontend"
-.\run-frontend.cmd
-```
-
-Backend run command for this repo:
-
-```powershell
-cd "apps/api"
-.\run-api.cmd
-```
-
-Combined startup command from repo root:
-
-```powershell
-.\run-omega.cmd
-```
-
-This starts the Omega frontend with:
-
-- `apps/frontend/vite.run.config.ts`
-- host `127.0.0.1`
-- port `3007`
-- cache dir `.vite-run-cache`
-
-Important note:
-
-- port `3000` may already be in use by a different local app on this machine
-- use `http://127.0.0.1:3007` for Omega Document Creator
-- `run-frontend.cmd` is the preferred local run path because it avoids the Vite cache/port confusion seen during setup
-- `run-api.cmd` is the preferred backend run path on `127.0.0.1:8007`
-- `run-omega.cmd` starts both frontend and backend in separate Windows shells
-
-Memory-first workflow note:
-
-- before broad repo reads, prefer stored project context from `.ai-codex`, Agentmemory, and Token Savior
-- saved Token Savior entries currently cover:
-  - the Omega frontend run path on `127.0.0.1:3007`
-  - the PDF/DOCX export integration boundary in the frontend document utilities and Income Protection page
-
-### Current known warnings
-
-Backend:
-
-- `fastapi.testclient` currently emits a Starlette deprecation warning about `httpx`
-
-Frontend:
-
-- React Router future-flag warnings appear in tests
-
-These are not blocking the current scaffold.
 
 ## Gaps Between Current Code and Final Product
 
-The biggest remaining gaps are:
+The main remaining gaps are operational hardening and product polish rather than core persistence cutover:
 
-- PostgreSQL database dump/restore (backup manifests record metadata only; no pg_dump integration)
-- Restore operations from backup manifests
-- Automated backup scheduling
-- Document pack ZIP download
-- File/document deletion endpoints
-- Session table in PostgreSQL
-- Frontend `localStorage` still used for immediate UX caching (backend-backed on save)
-- Remote access is config/runtime wiring only — no full Cloudflare Tunnel or VPN automation
+- backup/restore operator workflow still needs broader production hardening
+- `cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup
+- document pack skips preview-only documents that have no stored artifact files
+- no frontend delete UI for files/documents yet
+- Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
 
 ## Delivery Plan
 
-The remaining work is now organized into eight implementation phases for agent execution:
-
-1. Persistence foundation
-2. Client and auth persistence cutover
-3. Workflow persistence
-4. File uploads and client folders
-5. Generated document storage and history
-6. Audit logging
-7. Backups
-8. Remote-access infrastructure
-
-Detailed agent handoff plan: `docs/superpowers/plans/2026-06-21-omega-persistence-roadmap.md`
-
-## Immediate Priorities
-
-The correct next implementation order is:
-
-1. Replace browser-only client/workflow persistence with backend persistence
-2. Add real generated-document storage and download endpoints
-3. Add real file uploads and client folder workflow
-4. Add audit logging on workflow/file/document actions
-5. Add backups
+The original persistence roadmap is complete. Any next roadmap should be framed as post-cutover hardening and UX follow-up rather than core Phase 1-16 implementation.
 
 ## Constraints
 
 - Keep changes small and surgical
 - Match `AGENTS.md`
-- Prefer production-shaped code over demo shortcuts where feasible
+- Prefer production-shaped code over demo shortcuts
 - Use the smallest relevant verification command after each slice
 - Use `apply_patch` for manual edits
 
 ## Environment
-
-### Current env template
-
-Defined in:
-
-- `.env.example`
 
 Important variables:
 
@@ -582,16 +247,20 @@ Important variables:
 - `FILE_STORAGE_PATH`
 - `BACKUP_PATH`
 - `SESSION_SECRET`
-- `APP_URL`
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-- `STAFF_EMAIL`
-- `STAFF_PASSWORD`
-- `PDF_CONVERTER_BIN`
+- `SESSION_TIMEOUT_MINUTES`
+- `COOKIE_SECURE`
+- `COOKIE_SAMESITE`
+- `ENVIRONMENT`
+- `REMOTE_ACCESS_MODE`
+- `CORS_ORIGINS`
+- `TRUSTED_PROXY_COUNT`
+- `PG_DUMP_BIN`
+- `PG_RESTORE_BIN`
+- `BACKUP_SCHEDULE_ENABLED`
+- `BACKUP_SCHEDULE_INTERVAL_MINUTES`
 - `AI_ENABLED`
 - `AI_PROVIDER`
 - `AI_API_KEY`
-- `GEMINI_API_KEY`
 - `AI_MODEL`
 - `AI_TEMPERATURE`
 
@@ -600,64 +269,49 @@ Important variables:
 Backend:
 
 - `apps/api/app/main.py`
-- `apps/api/app/ai.py`
-- `apps/api/app/document_generation.py`
-- `apps/api/app/store.py`
-- `apps/api/app/security.py`
 - `apps/api/app/config.py`
+- `apps/api/app/models.py`
+- `apps/api/app/db.py`
+- `apps/api/app/document_generation.py`
+- `apps/api/app/repositories/`
+- `apps/api/app/services/`
+- `apps/api/migrations/`
 - `apps/api/tests/test_api.py`
-- `apps/api/tests/test_security.py`
-- `apps/api/migrations/0001_initial.sql`
+- `apps/api/tests/test_backup_restore.py`
 
 Frontend:
 
 - `apps/frontend/src/App.tsx`
-- `apps/frontend/src/components/app-shell.tsx`
 - `apps/frontend/src/auth/auth-context.tsx`
 - `apps/frontend/src/data/client-data-context.tsx`
-- `apps/frontend/src/data/seeded-clients.ts`
-- `apps/frontend/src/documents/document-api.ts`
-- `apps/frontend/src/documents/document-composer.ts`
-- `apps/frontend/src/documents/document-preview.tsx`
-- `apps/frontend/src/documents/document-templates.ts`
-- `apps/frontend/src/documents/document-types.ts`
-- `apps/frontend/src/documents/export-generated-document.ts`
-- `apps/frontend/src/documents/pdf-export.ts`
-- `apps/frontend/src/documents/template-picker.tsx`
-- `apps/frontend/src/documents/word-export.ts`
-- `apps/frontend/src/pages/clients-page.tsx`
-- `apps/frontend/src/pages/client-profile-page.tsx`
-- `apps/frontend/src/pages/client-form-page.tsx`
+- `apps/frontend/src/data/file-api.ts`
+- `apps/frontend/src/data/workflow-api.ts`
+- `apps/frontend/src/documents/generated-document-api.ts`
 - `apps/frontend/src/pages/income-protection-page.tsx`
 - `apps/frontend/src/pages/admin-page.tsx`
-- `apps/frontend/src/pages/login-page.tsx`
-- `apps/frontend/src/pages/settings-page.tsx`
-- `apps/frontend/src/styles.css`
-- `apps/frontend/src/app.test.tsx`
+
+Infrastructure:
+
+- `infra/docker/compose.yaml`
+- `infra/cloudflared/config.yaml.example`
+- `infra/cloudflared/setup-tunnel.sh`
 
 ## Stage Status Summary
 
-- Stage 1: scaffolded
-- Stage 2: functionally scaffolded, not persistent
-- Stage 3: frontend/browser-persistent, not backend-persistent
-- Stage 4: complete as a frontend workflow shell
-- Stage 5: partially implemented in frontend/browser-persistent draft form
-- Stage 6: partially implemented in frontend/browser-persistent draft form
-- Stage 7: partially implemented in frontend/browser-persistent draft form
-- Stage 8: partially implemented in frontend/browser-persistent draft form
-- Stage 9: partially implemented in frontend/browser-persistent draft form
-- Stage 10: schema defined, not wired into runtime persistence
-- Stage 11: partially scaffolded in frontend validation form
-- Stage 12: partially scaffolded with seeded audit logs
-- Stage 13: partially scaffolded with seeded backups
-- Stage 14: partially scaffolded with seeded security guidance
-- Stage 15: partially scaffolded in frontend dashboard/UI form
-- Stage 16: implemented with live Gemini-backed generation plus seeded fallback
-- Stage 17: implemented for AI document generation, preview, edit, and export flow
-- Later stages: not implemented
-
-## Handoff
-
-For the next agent continuing beyond the Stage 4 shell, use:
-
-- `STAGE4_HANDOFF.md`
+- Stage 1: complete
+- Stage 2: complete
+- Stage 3: complete
+- Stage 4: complete
+- Stage 5: complete
+- Stage 6: complete
+- Stage 7: complete
+- Stage 8: complete
+- Stage 9: complete
+- Stage 10: complete
+- Stage 11: complete
+- Stage 12: complete
+- Stage 13: complete
+- Stage 14: complete
+- Stage 15: complete
+- Stage 16: complete
+- Stage 17: complete

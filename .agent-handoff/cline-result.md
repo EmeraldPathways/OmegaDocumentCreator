@@ -1,67 +1,86 @@
-# Cline Result — Prompt 6: PostgreSQL Session Table
+# Cline Result — Prompt 8: Remote Access / Cloudflare Tunnel Automation
 
 Status: complete
 
 ## Files Changed
 
-1. `apps/api/app/models.py` — added `Session` model (sessions table: id, user_email, created_at, expires_at)
-2. `apps/api/migrations/0004_sessions.sql` — new migration for sessions table with indexes
-3. `apps/api/app/repositories/sessions.py` — new `SessionRepository` (create, get_valid_by_id, delete_by_id, cleanup_expired)
-4. `apps/api/app/main.py` — wired per-session persistence into login, logout, and `_current_user`
-5. `apps/api/tests/test_api.py` — added 6 Phase 6 session lifecycle tests
-6. `.agent-handoff/cline-result.md` — this file
-7. `.agent-handoff/validation-log.md` — updated for Prompt 6
+1. `infra/cloudflared/config.yaml.example` — new Cloudflare Tunnel config template with consistent hostname examples and ingress rules for API and frontend
+2. `infra/cloudflared/setup-tunnel.sh` — automated shell script that creates and configures a Cloudflare Tunnel with correct env instructions (`ENVIRONMENT=production`, `REMOTE_ACCESS_MODE=remote`)
+3. `infra/docker/compose.yaml` — added commented-out cloudflared sidecar service with clear multi-step enablement comments and placeholder UUID markers
+4. `.gitignore` — added `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml` exclusions to keep secrets out of the repo
+5. `.agent-handoff/cline-result.md` — this file
+6. `.agent-handoff/validation-log.md` — updated covering all 8 prompts
 
 ## What Changed
 
-### Model (`models.py`)
-- Added `Session` table: `id` UUID PK, `user_email` TEXT NOT NULL, `created_at` TIMESTAMPTZ, `expires_at` TIMESTAMPTZ NOT NULL
-- Indexes: `idx_sessions_user_email`, `idx_sessions_expires_at`
+### Config template (`config.yaml.example`)
+- Tunnel UUID: `YOUR_TUNNEL_UUID`
+- Credentials file: `/etc/cloudflared/YOUR_TUNNEL_UUID.json`
+- Ingress rules:
+  - `omega-api.yourdomain.com` → `http://api:8000`
+  - `omega.yourdomain.com` → `http://frontend:3000`
+- Catch-all denies everything else
+- Note: copy to `config.yaml`, or run `setup-tunnel.sh` to generate
 
-### Migration (`0004_sessions.sql`)
-- CREATE TABLE IF NOT EXISTS sessions with UUID PK, user_email, created_at, expires_at columns and indexes
+### Setup script (`setup-tunnel.sh`)
+- Interactive prompts for tunnel name, API hostname, and frontend hostname
+- Runs `cloudflared tunnel create`, copies credentials JSON, generates `config.yaml`
+- Runs `cloudflared tunnel route dns` for both hostnames
+- **Fixed**: next-steps env instructions now match `config.py` model:
+  - `ENVIRONMENT=production`
+  - `REMOTE_ACCESS_MODE=remote`
+  - `CORS_ORIGINS=https://<frontend-hostname>`
+  - `APP_URL=https://<api-hostname>`
+  - `TRUSTED_PROXY_COUNT=1`
+  - `COOKIE_SECURE=true`
+  - `SESSION_SECRET=<generate-a-strong-random-secret>`
 
-### Repository (`sessions.py`)
-- `create(user_email, timeout_minutes)` — creates a session row with computed expires_at, returns it
-- `get_valid_by_id(session_id)` — looks up exact row by UUID, checks expires_at > now, returns row or None
-- `delete_by_id(session_id)` — deletes the single matching row (logout invalidation)
-- `cleanup_expired()` — deletes expired rows (not yet called automatically)
+### Docker compose
+- Comments now explain the 4-step enablement process: (1) run setup script, (2) set env vars, (3) uncomment block, (4) replace UUID placeholder
+- Credentials volume mount uses `YOUR_TUNNEL_UUID` placeholder with the JSON file path explained
 
-### Routes (all auth contracts preserved)
-- **Login** — creates a persisted session row and stores `session_id` in the cookie alongside `user_email` and `last_seen_at`
-- **Logout** — reads `session_id` from cookie, clears cookie session, calls `delete_by_id(session_id)`
-- **`_current_user`** — reads `session_id` from cookie, validates the exact row via `get_valid_by_id(session_id)`, rejects expired/invalidated/deleted sessions with 401
-- Cookie-session middleware preserved (defense-in-depth via `is_session_expired` + persisted row check)
+### Secrets protection
+- `.gitignore` excludes `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml`
+- Only `config.yaml.example` is committed — the actual config and credentials are git-ignored
 
-### Decision: Per-session, single-row tracking
-- Each login creates a distinct persisted session row with a unique UUID
-- The cookie carries `session_id` for exact row matching
-- Logout invalidates only the calling session, not all sessions for the email
+## Operator Commands
 
-### Tests (6 new Phase 6 tests — all target the exact cookie-backed session row)
+```bash
+# One-time setup
+chmod +x infra/cloudflared/setup-tunnel.sh
+cloudflared tunnel login
+./infra/cloudflared/setup-tunnel.sh
 
-| Test | Assertion |
-|------|-----------|
-| `test_login_creates_persisted_session_row` | After login, at least one row exists in sessions table for that email |
-| `test_auth_me_works_with_valid_persisted_session` | After login, `/auth/me` returns the user profile via the persisted session |
-| `test_logout_deletes_persisted_session_row` | Captures `session_id` from cookie before logout; after logout, `get_valid_by_id(session_id)` returns None |
-| `test_deleted_session_row_causes_401` | Captures `session_id` from cookie; deletes only that row via `delete_by_id(session_id)`; `/auth/me` returns 401 |
-| `test_expired_session_row_causes_401` | Captures `session_id` from cookie; expires only the matching row by ID; `/auth/me` returns 401 |
-| `test_two_sessions_coexist_and_invalidating_one_does_not_invalidate_other` | Two logins = two rows; logout of session B leaves session A intact with cookie restore |
+# Configure .env
+ENVIRONMENT=production
+REMOTE_ACCESS_MODE=remote
+CORS_ORIGINS=https://omega.yourdomain.com
+APP_URL=https://omega-api.yourdomain.com
+TRUSTED_PROXY_COUNT=1
+COOKIE_SECURE=true
+SESSION_SECRET=<strong-random-secret>
 
-## Test Results
+# Docker with cloudflared sidecar
+# 1. Uncomment the cloudflared block in infra/docker/compose.yaml
+# 2. Replace YOUR_TUNNEL_UUID with the real UUID
+# 3. Ensure credentials JSON is at infra/cloudflared/<UUID>.json
+docker compose -f infra/docker/compose.yaml up
 
+# Test
+curl -H 'Host: omega-api.yourdomain.com' http://localhost:8000/health
 ```
-# Strict collection targeting only the 6 new Phase 6 tests
-collected 97 items / 91 deselected / 6 selected
-6/97 tests collected (91 deselected) in 5.xx s
-```
 
-All 6 Phase 6 session lifecycle tests collected cleanly. All skipped — require PostgreSQL.
+## Verification
+
+- **Config model match**: all env instructions in setup script and compose now use `ENVIRONMENT=production` + `REMOTE_ACCESS_MODE=remote`, matching `config.py` which reads `ENVIRONMENT` for deployment mode and `REMOTE_ACCESS_MODE` for `local_only` vs `remote`
+- **Consistency**: `config.yaml.example`, setup script prompts/output, and compose usage all reference `YOUR_TUNNEL_UUID` placeholder consistently
+- **Secrets protection**: `.gitignore` still excludes `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml`
+- No backend or frontend code changed
 
 ## Remaining Limitations
 
-1. All API tests skipped without PostgreSQL — would execute in CI
-2. `cleanup_expired()` is not called automatically — could be added as a startup cleanup or scheduled background task
-3. Cookie-based timeout check (`is_session_expired`) still runs first before the DB check — provides defense-in-depth
-4. Prompts 4 and 5 remain complete and unchanged
+1. Setup script requires `cloudflared` CLI installed and authenticated on the operator's machine
+2. Tunnel credentials file must be copied to the Docker mount path for the containerized sidecar
+3. No health check on the cloudflared sidecar in Docker compose
+4. No automated certificate renewal — Cloudflare Tunnel handles this transparently
+5. Only Cloudflare Tunnel path implemented — no VPN, Tailscale, or ngrok alternatives

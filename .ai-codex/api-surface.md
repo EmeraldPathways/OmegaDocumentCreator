@@ -2,12 +2,18 @@
 
 ## Backend endpoints
 
+### Health
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `GET` | `/health` | public | returns app URL, environment, remote-access mode |
+| `GET` | `/ready` | public | returns DB/storage readiness |
+
 ### Auth
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `POST` | `/auth/login` | public | body: `{ email, password }`; returns `{ user }` |
-| `POST` | `/auth/logout` | session | clears session |
-| `GET` | `/auth/me` | session | returns `{ user }` |
+| `POST` | `/auth/login` | public | body: `{ email, password }`; creates persisted session row |
+| `POST` | `/auth/logout` | session | clears cookie and invalidates exact session row |
+| `GET` | `/auth/me` | session | validates persisted `session_id`; returns `{ user }` |
 
 ### Clients
 | Method | Path | Auth | Notes |
@@ -21,43 +27,44 @@
 ### Workflow
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `GET` | `/clients/{client_reference}/workflow` | session | Phase 3 DB-backed |
-| `PUT` | `/clients/{client_reference}/workflow` | session | Phase 3 DB-backed |
+| `GET` | `/clients/{client_reference}/workflow` | session | returns persisted workflow fields |
+| `PUT` | `/clients/{client_reference}/workflow` | session | saves persisted workflow fields |
 
 ### Files
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | `POST` | `/clients/{client_reference}/files` | session | multipart upload |
 | `GET` | `/clients/{client_reference}/files` | session | list files |
-| `GET` | `/clients/{client_reference}/files/{file_id}/download` | session | download file |
+| `GET` | `/clients/{client_reference}/files/{file_id}/download` | session | download stored file |
+| `DELETE` | `/clients/{client_reference}/files/{file_id}` | session | delete DB row plus disk artifact |
 
 ### Documents
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | `POST` | `/documents/generate` | session | body: `{ client_reference, document_type, template_id, workflow_snapshot }` |
 | `GET` | `/clients/{client_reference}/documents` | session | list generated documents |
-| `POST` | `/clients/{client_reference}/documents` | session | create document record + optional artifact upload |
-| `GET` | `/clients/{client_reference}/documents/{document_id}/download` | session | download PDF/DOCX artifact |
+| `POST` | `/clients/{client_reference}/documents` | session | create document record plus optional artifact upload |
+| `GET` | `/clients/{client_reference}/documents/{document_id}/download` | session | download stored PDF/DOCX artifact |
+| `GET` | `/clients/{client_reference}/documents/pack` | session | download ZIP of stored artifacts |
+| `DELETE` | `/clients/{client_reference}/documents/{document_id}` | session | delete DB row plus disk artifacts |
 
 ### Admin
-| Method | Path | Auth |
-|--------|------|------|
-| `GET` | `/admin/users` | admin |
-| `POST` | `/admin/users` | admin |
-| `PATCH` | `/admin/users/{email}` | admin |
-| `PATCH` | `/admin/users/{email}/disable` | admin |
-| `GET` | `/admin/audit-logs` | admin |
-| `GET` | `/admin/backups` | admin |
-| `POST` | `/admin/backups` | admin |
-| `GET` | `/admin/security-summary` | admin |
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `GET` | `/admin/users` | admin | list users |
+| `POST` | `/admin/users` | admin | create user |
+| `PATCH` | `/admin/users/{user_id}` | admin | update user |
+| `GET` | `/admin/audit-logs` | admin | list DB-backed audit rows |
+| `GET` | `/admin/backups` | admin | list backup runs |
+| `POST` | `/admin/backups` | admin | create backup manifest and optional dump |
+| `POST` | `/admin/backups/{backup_id}/validate-restore` | admin | validate manifest/dump restore prerequisites |
+| `POST` | `/admin/backups/{backup_id}/dry-run-restore` | admin | `pg_restore --list` style check |
+| `POST` | `/admin/backups/{backup_id}/restore` | admin | explicit destructive restore with confirmation |
+| `GET` | `/admin/backups/{backup_id}/restore-attempts` | admin | list restore attempts |
+| `GET` | `/admin/backups/schedule-status` | admin | scheduler status |
+| `GET` | `/admin/security-summary` | admin | current security summary payload |
 
-### Health / Readiness
-| Method | Path | Auth |
-|--------|------|------|
-| `GET` | `/health` | public |
-| `GET` | `/ready` | public |
-
-## Document types in live frontend/backend flow
+## Document types in live flow
 
 - `Fact Find`
 - `Terms of Business`
@@ -65,6 +72,7 @@
 
 ## Backend session keys
 
+- `session_id`
 - `user_email`
 - `last_seen_at`
 
@@ -72,16 +80,16 @@
 
 | Path | Behavior |
 |------|----------|
-| `/` | Redirects to `/income-protection` |
-| `/login` | Login page |
-| `/clients` | Clients page |
-| `/clients/new` | Client form page |
-| `/clients/:clientReference` | Client profile page |
-| `/clients/:clientReference/edit` | Client form page |
-| `/clients/:clientReference/income-protection` | Redirect helper to `/income-protection` |
-| `/income-protection` | Live workflow page |
-| `/documents` | Redirects to `/clients` |
-| `/documents/:clientReference` | Redirects to `/clients/:clientReference` |
-| `/files` | Files page |
-| `/settings` | Settings page |
-| `/admin` | Admin page, wrapped in `RequireAdmin` |
+| `/` | redirects to `/income-protection` |
+| `/login` | login page |
+| `/clients` | clients page |
+| `/clients/new` | client form page |
+| `/clients/:clientReference` | client profile page |
+| `/clients/:clientReference/edit` | client form page |
+| `/clients/:clientReference/income-protection` | redirect helper to `/income-protection` |
+| `/income-protection` | live workflow page |
+| `/documents` | redirects to `/clients` |
+| `/documents/:clientReference` | redirects to `/clients/:clientReference` |
+| `/files` | files page |
+| `/settings` | settings page |
+| `/admin` | admin page wrapped in `RequireAdmin` |
