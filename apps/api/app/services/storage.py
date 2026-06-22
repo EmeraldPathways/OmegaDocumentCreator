@@ -73,3 +73,17 @@ class ClientStorage:
         if not filepath.is_file():
             return None
         return filepath.read_bytes()
+
+    def delete_relative_file(self, relative_path: str) -> bool:
+        """Delete a stored file using its persisted relative path.
+
+        Returns True if the file was deleted, False if it didn't exist.
+        Never deletes outside the configured storage root.
+        """
+        filepath = self._root / relative_path
+        if not filepath.resolve().is_relative_to(self._root.resolve()):
+            return False
+        if not filepath.is_file():
+            return False
+        filepath.unlink()
+        return True

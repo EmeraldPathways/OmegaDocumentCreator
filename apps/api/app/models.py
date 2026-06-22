@@ -26,6 +26,17 @@ def _utcnow() -> datetime:
 # ---------------------------------------------------------------------------
 
 
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    user_email: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("idx_sessions_user_email", "user_email"), Index("idx_sessions_expires_at", "expires_at"))
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -277,3 +288,23 @@ class BackupRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     __table_args__ = (Index("idx_backup_runs_created_at", "created_at"),)
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 migration follow-up: restore_attempts table
+# ---------------------------------------------------------------------------
+
+
+class RestoreAttempt(Base):
+    __tablename__ = "restore_attempts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    backup_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("backup_runs.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)  # "dry_run_passed", "executed", "failed"
+    mode: Mapped[str] = mapped_column(Text, nullable=False)  # "dry_run" or "execute"
+    started_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    dump_file: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (Index("idx_restore_attempts_backup_run_id", "backup_run_id"),)

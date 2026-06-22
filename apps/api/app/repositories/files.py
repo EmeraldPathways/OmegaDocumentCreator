@@ -33,5 +33,13 @@ class FileRepository:
     def add(self, file_obj: File) -> None:
         self._db.add(file_obj)
 
+    def delete(self, file_id: uuid.UUID) -> File | None:
+        """Delete a file by ID. Returns the deleted row or None if not found."""
+        file_obj = self.get_by_id(file_id)
+        if file_obj is None:
+            return None
+        self._db.delete(file_obj)
+        return file_obj
+
     def flush(self) -> None:
         self._db.flush()

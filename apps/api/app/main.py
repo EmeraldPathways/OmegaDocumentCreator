@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import uuid
+import zipfile
 from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,17 +20,21 @@ from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_
 from app.domain.users import UserRole, UserStatus
 from app.models import AuditLog
 from app.models import BackupRun as BackupRunModel
+from app.models import RestoreAttempt as RestoreAttemptModel
 from app.models import Document as DocumentModel
 from app.models import File as FileModel
+from app.models import Session as SessionModel
 from app.repositories.audit_logs import AuditLogRepository
 from app.repositories.backups import BackupRepository
 from app.repositories.clients import ClientRepository
 from app.repositories.documents import DocumentRepository
 from app.repositories.files import FileRepository
+from app.repositories.sessions import SessionRepository
 from app.repositories.users import UserRepository
 from app.repositories.workflows import WorkflowRepository
 from app.security import hash_password, is_session_expired, verify_password
 from app.services.backups import create_backup_manifest
+from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, validate_restore
 from app.services.storage import ClientStorage
 from app.store import get_security_summary
 
@@ -74,13 +80,13 @@ if settings.trusted_proxy_count > 0:
 # or TRUSTED_PROXY_COUNT / FORWARDED_ALLOW_IPS via uvicorn config.
 
 # ---------------------------------------------------------------------------
-# Startup: verify DB and bootstrap default users
+# Startup / shutdown events
 # ---------------------------------------------------------------------------
 
 
 @app.on_event("startup")
 def _startup_db_check() -> None:
-    """Verify database connectivity and seed default admin/staff users."""
+    """Verify database connectivity, seed default users, and start scheduler if enabled."""
     import logging
 
     logger = logging.getLogger("omega.startup")
@@ -146,6 +152,26 @@ def _startup_db_check() -> None:
     except Exception:
         logger.warning("Database not available — continuing with in-memory store.", exc_info=True)
 
+    # Start backup scheduler if configured
+    if settings.backup_schedule_enabled:
+        from app.services.scheduler import start_scheduler
+
+        start_scheduler(
+            interval_minutes=settings.backup_schedule_interval_minutes,
+            backup_path=settings.backup_path,
+            file_storage_path=settings.file_storage_path,
+            database_url=settings.database_url,
+            pg_dump_bin=settings.pg_dump_bin,
+        )
+
+
+@app.on_event("shutdown")
+def _shutdown_scheduler() -> None:
+    """Stop the backup scheduler when the app shuts down."""
+    from app.services.scheduler import stop_scheduler
+
+    stop_scheduler()
+
 
 # ---------------------------------------------------------------------------
 # Request models
@@ -204,14 +230,18 @@ class DocumentGenerationRequest(BaseModel):
     workflow_snapshot: dict[str, object]
 
 
+class RestoreConfirmRequest(BaseModel):
+    confirm: str  # must be "yes-do-restore-now" to proceed
+
+
 # ---------------------------------------------------------------------------
 # Auth helpers (DB-backed)
 # ---------------------------------------------------------------------------
 
 
 def _current_user(request: Request) -> dict[str, str]:
-    email = request.session.get("user_email")
-    if not email:
+    session_id = request.session.get("session_id")
+    if not session_id:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     if is_session_expired(request.session.get("last_seen_at"), settings.session_timeout_minutes):
@@ -220,8 +250,15 @@ def _current_user(request: Request) -> dict[str, str]:
 
     db = get_session()
     try:
+        # Validate exact persisted session row
+        session_repo = SessionRepository(db)
+        session_row = session_repo.get_valid_by_id(session_id)
+        if session_row is None:
+            request.session.clear()
+            raise HTTPException(status_code=401, detail="Session expired or invalidated")
+
         repo = UserRepository(db)
-        user_model = repo.get_by_email(email)
+        user_model = repo.get_by_email(session_row.user_email)
         if not user_model:
             request.session.clear()
             raise HTTPException(status_code=401, detail="Authentication required")
@@ -327,7 +364,7 @@ def readiness() -> dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
-# Auth routes (DB-backed)
+# Auth routes (DB-backed users; cookie-session login)
 # ---------------------------------------------------------------------------
 
 
@@ -335,47 +372,42 @@ def readiness() -> dict[str, object]:
 def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
     db = get_session()
     try:
-        repo = UserRepository(db)
-        user_model = repo.get_by_email(payload.email)
+        user_repo = UserRepository(db)
+        user_model = user_repo.get_by_email(payload.email)
         if not user_model or not verify_password(payload.password, user_model.password_hash):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+
         if user_model.status != UserStatus.ACTIVE.value:
             raise HTTPException(status_code=403, detail="User account disabled")
 
+        user_repo.record_login(user_model)
+
+        # Persist a server-side session row and store its ID in the cookie
+        session_repo = SessionRepository(db)
+        session_row = session_repo.create(user_model.email, settings.session_timeout_minutes)
+        db.commit()
+
+        request.session["session_id"] = str(session_row.id)
         request.session["user_email"] = user_model.email
         request.session["last_seen_at"] = datetime.now(UTC).isoformat()
-        _log_audit(
-            request, db=db,
-            action="auth_login_success",
-            entity_type="user",
-            entity_id=str(user_model.id),
-            user_email=user_model.email,
-        )
-        db.commit()
-        return {"user": repo.to_response(user_model)}
+
+        return {"user": user_repo.to_response(user_model)}
     finally:
         db.close()
 
 
 @app.post("/auth/logout")
 def logout(request: Request) -> dict[str, str]:
-    email = request.session.get("user_email")
-    if email:
+    session_id = request.session.get("session_id")
+    request.session.clear()
+    if session_id:
         db = get_session()
         try:
-            _log_audit(
-                request, db=db,
-                action="auth_logout",
-                entity_type="user",
-                entity_id=email,
-                user_email=email,
-            )
+            session_repo = SessionRepository(db)
+            session_repo.delete_by_id(session_id)
             db.commit()
-        except Exception:
-            pass
         finally:
             db.close()
-    request.session.clear()
     return {"status": "logged_out"}
 
 
@@ -751,6 +783,116 @@ def download_document(client_reference: str, document_id: str, request: Request)
         db.close()
 
 
+@app.get("/clients/{client_reference}/documents/pack")
+def download_document_pack(client_reference: str, request: Request) -> object:
+    """Return a ZIP containing all generated document artifacts for a client."""
+    _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        doc_repo = DocumentRepository(db)
+        docs = doc_repo.list_by_client(client.id)
+
+        storage = ClientStorage(settings.file_storage_path)
+        zip_buffer = io.BytesIO()
+        packed = 0
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            seen: set[str] = set()
+            for doc in docs:
+                for artifact_path in (doc.pdf_file_path, doc.docx_file_path):
+                    if not artifact_path:
+                        continue
+                    content = storage.read_relative_file(artifact_path)
+                    if content is None:
+                        continue
+                    # Determine filename inside ZIP, avoiding collisions
+                    if artifact_path.endswith(".pdf"):
+                        base = f"{doc.document_name}.pdf"
+                    elif artifact_path.endswith(".docx"):
+                        base = f"{doc.document_name}.docx"
+                    else:
+                        base = doc.document_name
+                    zip_name = base
+                    counter = 1
+                    while zip_name in seen:
+                        stem, _, ext = base.rpartition(".")
+                        zip_name = f"{stem}_{counter}.{ext}" if ext else f"{base}_{counter}"
+                        counter += 1
+                    seen.add(zip_name)
+                    zf.writestr(zip_name, content)
+                    packed += 1
+
+        if packed == 0:
+            raise HTTPException(status_code=404, detail="No packable document artifacts found")
+
+        from fastapi.responses import Response
+
+        _log_audit(
+            request, db=db,
+            action="document_pack_downloaded",
+            entity_type="document_pack",
+            entity_id=client_reference,
+            client_id=client.id,
+            details={"packed_count": packed},
+        )
+        db.commit()
+
+        zip_filename = f"{client_reference.replace(' ', '_')}_documents.zip"
+        return Response(
+            content=zip_buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
+        )
+    finally:
+        db.close()
+
+
+@app.delete("/clients/{client_reference}/documents/{document_id}")
+def delete_document(client_reference: str, document_id: str, request: Request) -> dict[str, object]:
+    """Delete a generated document — DB row and all disk artifacts."""
+    _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        doc_repo = DocumentRepository(db)
+        doc = doc_repo.get_by_id(document_id)
+        if not doc or doc.client_id != client.id:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Remove disk artifacts (graceful if missing)
+        storage = ClientStorage(settings.file_storage_path)
+        for path in (doc.pdf_file_path, doc.docx_file_path):
+            if path:
+                storage.delete_relative_file(path)
+
+        document_name = doc.document_name
+        deleted = doc_repo.delete(document_id)
+        if deleted is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        _log_audit(
+            request, db=db,
+            action="document_deleted",
+            entity_type="document",
+            entity_id=document_id,
+            client_id=client.id,
+            details={"document_name": document_name},
+        )
+        db.commit()
+        return {"deleted": True, "document_id": document_id}
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Admin routes (DB-backed for users; store.py for audit/backup/security)
 # ---------------------------------------------------------------------------
@@ -775,90 +917,62 @@ def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict
     db = get_session()
     try:
         repo = UserRepository(db)
-        item = repo.create(
+        if repo.get_by_email(payload.email):
+            raise HTTPException(status_code=409, detail="Email already exists")
+
+        user_model = repo.create(
             first_name=payload.first_name,
             last_name=payload.last_name,
             email=payload.email,
             password_hash=hash_password(payload.password),
             role=payload.role,
         )
+
         _log_audit(
             request, db=db,
-            action="admin_user_created",
+            action="user_created",
             entity_type="user",
-            entity_id=payload.email,
-            details={"role": payload.role, "first_name": payload.first_name, "last_name": payload.last_name},
+            entity_id=str(user_model.id),
+            details={"email": payload.email, "role": payload.role.value},
         )
         db.commit()
-        return {"item": item}
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"item": repo.to_response(user_model)}
     finally:
         db.close()
 
 
-@app.patch("/admin/users/{email}/disable")
-def admin_disable_user(email: str, request: Request) -> dict[str, dict[str, str]]:
-    _require_admin(request)
-    db = get_session()
-    try:
-        repo = UserRepository(db)
-        item = repo.disable(email)
-        if not item:
-            raise HTTPException(status_code=404, detail="User not found")
-        _log_audit(
-            request, db=db,
-            action="admin_user_disabled",
-            entity_type="user",
-            entity_id=email,
-        )
-        db.commit()
-        return {"item": item}
-    finally:
-        db.close()
-
-
-@app.patch("/admin/users/{email}")
+@app.patch("/admin/users/{user_id}")
 def admin_update_user(
-    email: str, payload: AdminUserUpdateRequest, request: Request
+    user_id: str, payload: AdminUserUpdateRequest, request: Request
 ) -> dict[str, dict[str, str]]:
     _require_admin(request)
     db = get_session()
     try:
         repo = UserRepository(db)
-        item = repo.update(
-            email,
-            first_name=payload.first_name,
-            last_name=payload.last_name,
-            role=payload.role,
-        )
-        if not item:
+        user_model = repo.get_by_id(user_id)
+        if not user_model:
             raise HTTPException(status_code=404, detail="User not found")
+
+        user_model.first_name = payload.first_name
+        user_model.last_name = payload.last_name
+        user_model.role = payload.role
+        db.commit()
+
         _log_audit(
             request, db=db,
-            action="admin_user_updated",
+            action="user_updated",
             entity_type="user",
-            entity_id=email,
-            details={"role": payload.role, "first_name": payload.first_name, "last_name": payload.last_name},
+            entity_id=user_id,
+            details={"new_role": payload.role.value},
         )
-        db.commit()
-        return {"item": item}
+        return {"item": repo.to_response(user_model)}
     finally:
         db.close()
 
 
-@app.get("/admin/audit-logs")
-def admin_audit_logs(request: Request) -> dict[str, list[dict[str, object]]]:
-    _require_admin(request)
-    db = get_session()
-    try:
-        audit_repo = AuditLogRepository(db)
-        entries = audit_repo.list_recent()
-        items = [AuditLogRepository.to_response(e) for e in entries]
-        db.commit()
-        return {"items": items}
-    finally:
-        db.close()
+# ---------------------------------------------------------------------------
+# Admin backup routes
+# ---------------------------------------------------------------------------
 
 
 @app.get("/admin/backups")
@@ -866,9 +980,9 @@ def admin_list_backups(request: Request) -> dict[str, list[dict[str, object]]]:
     _require_admin(request)
     db = get_session()
     try:
-        backup_repo = BackupRepository(db)
-        runs = backup_repo.list_recent()
-        items = [BackupRepository.to_response(r) for r in runs]
+        repo = BackupRepository(db)
+        runs = repo.list_all()
+        items = [repo.to_response(r) for r in runs]
         db.commit()
         return {"items": items}
     finally:
@@ -877,41 +991,227 @@ def admin_list_backups(request: Request) -> dict[str, list[dict[str, object]]]:
 
 @app.post("/admin/backups", status_code=201)
 def admin_create_backup(request: Request) -> dict[str, dict[str, object]]:
-    user = _require_admin(request)
+    _require_admin(request)
     db = get_session()
     try:
-        user_repo = UserRepository(db)
-        user_model = user_repo.get_by_email(user["email"])
+        repo = BackupRepository(db)
 
-        try:
-            result = create_backup_manifest(
-                backup_path=settings.backup_path,
-                file_storage_path=settings.file_storage_path,
-                triggered_by_email=user["email"],
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Backup failed: {exc}") from exc
-
-        backup_repo = BackupRepository(db)
-        run = BackupRunModel(
-            status=result["status"],
-            triggered_by=user_model.id if user_model else None,
-            database_backup=result.get("database_backup"),
-            files_backup=result.get("files_backup"),
-            documents_backup=result.get("documents_backup"),
-            error_message=result.get("error_message"),
+        manifest = create_backup_manifest(
+            backup_root=settings.backup_path,
+            file_storage_path=settings.file_storage_path,
+            database_url=settings.database_url,
+            pg_dump_bin=settings.pg_dump_bin,
         )
-        backup_repo.add(run)
+
+        run = BackupRunModel(
+            status=manifest["status"],
+            database_backup=manifest.get("database_backup"),
+            files_backup=manifest.get("files_backup"),
+            manifest_path=manifest.get("manifest_path"),
+            total_size_bytes=manifest.get("total_size_bytes"),
+            error_message=manifest.get("error"),
+        )
+        repo.add(run)
+
         _log_audit(
             request, db=db,
             action="backup_created",
             entity_type="backup_run",
             entity_id=str(run.id),
+            details={"status": manifest["status"]},
         )
         db.commit()
-        return {"item": BackupRepository.to_response(run)}
+        return {"item": repo.to_response(run)}
     finally:
         db.close()
+
+
+@app.post("/admin/backups/{backup_id}/dry-run-restore")
+def admin_dry_run_restore(backup_id: str, request: Request) -> dict[str, object]:
+    """Perform a dry-run restore check (pg_restore --list) on a backup's dump file.
+
+    Admin-only. Does NOT execute any destructive restore. Returns
+    success if the dump artifact exists and is readable by pg_restore.
+    """
+    _require_admin(request)
+    db = get_session()
+    try:
+        backup_repo = BackupRepository(db)
+        run = backup_repo.get_by_id(backup_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Backup run not found")
+
+        if not run.database_backup:
+            raise HTTPException(status_code=400, detail="Backup has no database dump artifact")
+
+        error = dry_run_restore(
+            backup_root=settings.backup_path,
+            dump_relative_path=run.database_backup,
+            pg_restore_bin=settings.pg_restore_bin,
+        )
+
+        _log_audit(
+            request, db=db,
+            action="restore_dry_run",
+            entity_type="backup_run",
+            entity_id=backup_id,
+            details={"dump_file": run.database_backup, "passed": error is None},
+        )
+        db.commit()
+
+        if error is not None:
+            return {"passed": False, "error": error}
+
+        return {"passed": True, "dump_file": run.database_backup}
+    finally:
+        db.close()
+
+
+@app.post("/admin/backups/{backup_id}/restore")
+def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, request: Request) -> dict[str, object]:
+    """Execute a database restore from a backup dump file.
+
+    Admin-only. **Destructive** — requires explicit confirmation payload
+    ``{"confirm": "yes-do-restore-now"}``.  Also validates manifest and
+    dump artifacts before proceeding.
+    """
+    user = _require_admin(request)
+    db = get_session()
+    try:
+        backup_repo = BackupRepository(db)
+        run = backup_repo.get_by_id(backup_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Backup run not found")
+
+        # Pre-validate manifest
+        if not run.files_backup:
+            raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
+        manifest_path = Path(settings.backup_path) / run.files_backup
+        try:
+            validation = validate_restore(
+                backup_root=settings.backup_path,
+                manifest_path=manifest_path,
+            )
+        except RestoreValidationError as exc:
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message=str(exc),
+            )
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        if not validation["valid"]:
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="validation-failed",
+            )
+            raise HTTPException(status_code=400, detail=f"Restore validation failed: {validation['warnings']}")
+
+        if not run.database_backup:
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=None,
+                error_message="No database dump artifact in backup",
+            )
+            raise HTTPException(status_code=400, detail="Backup has no database dump artifact")
+
+        if payload.confirm != "yes-do-restore-now":
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="Restore not confirmed",
+            )
+            db.commit()
+            raise HTTPException(status_code=400, detail="Restore not confirmed — explicit confirmation required")
+
+        # Attempt real restore — only with correct confirmation marker
+        try:
+            execute_restore(
+                backup_root=settings.backup_path,
+                dump_relative_path=run.database_backup,
+                database_url=settings.database_url,
+                pg_restore_bin=settings.pg_restore_bin,
+                confirm=payload.confirm,
+            )
+        except RestoreValidationError as exc:
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message=str(exc),
+            )
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        _persist_restore_attempt(
+            backup_repo, run.id, user, "executed",
+            mode="execute", dump_file=run.database_backup,
+        )
+        _log_audit(
+            request, db=db,
+            action="restore_executed",
+            entity_type="backup_run",
+            entity_id=backup_id,
+            details={"dump_file": run.database_backup},
+        )
+        db.commit()
+        return {"restored": True, "dump_file": run.database_backup}
+    finally:
+        db.close()
+
+
+@app.get("/admin/backups/{backup_id}/restore-attempts")
+def admin_list_restore_attempts(backup_id: str, request: Request) -> dict[str, list[dict[str, object]]]:
+    """List restore attempts for a given backup run. Admin-only."""
+    _require_admin(request)
+    db = get_session()
+    try:
+        backup_repo = BackupRepository(db)
+        run = backup_repo.get_by_id(backup_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Backup run not found")
+
+        attempts = backup_repo.list_restore_attempts(backup_id)
+        items = [BackupRepository.restore_attempt_to_response(a) for a in attempts]
+        db.commit()
+        return {"items": items}
+    finally:
+        db.close()
+
+
+def _persist_restore_attempt(
+    backup_repo: BackupRepository,
+    backup_run_id: object,
+    user: dict[str, str],
+    status: str,
+    *,
+    mode: str,
+    dump_file: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    """Persist a RestoreAttempt record for the given backup run."""
+    from app.models import RestoreAttempt as RestoreAttemptModel
+    from app.repositories.users import UserRepository
+    user_repo = UserRepository(backup_repo._db)
+
+    user_model = user_repo.get_by_email(user["email"])
+    attempt = RestoreAttemptModel(
+        backup_run_id=backup_run_id,
+        status=status,
+        mode=mode,
+        started_by=user_model.id if user_model else None,
+        dump_file=dump_file,
+        error_message=error_message,
+    )
+    backup_repo.add_restore_attempt(attempt)
+
+
+@app.get("/admin/backups/schedule-status")
+def admin_schedule_status(request: Request) -> dict[str, object]:
+    """Return the backup scheduler status (enabled, running, last/next run). Admin-only."""
+    _require_admin(request)
+    from app.services.scheduler import get_scheduler_status
+    return get_scheduler_status()
 
 
 @app.get("/admin/security-summary")
@@ -1064,5 +1364,44 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
             media_type="application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{file_model.original_filename}"'},
         )
+    finally:
+        db.close()
+
+
+@app.delete("/clients/{client_reference}/files/{file_id}")
+def delete_file(client_reference: str, file_id: str, request: Request) -> dict[str, object]:
+    """Delete a client file — DB row and disk artifact."""
+    _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        file_repo = FileRepository(db)
+        file_model = file_repo.get_by_id(uuid.UUID(file_id))
+        if not file_model or file_model.client_id != client.id:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Remove disk artifact (graceful if missing)
+        storage = ClientStorage(settings.file_storage_path)
+        storage.delete_relative_file(file_model.file_path)
+
+        original_filename = file_model.original_filename
+        deleted = file_repo.delete(uuid.UUID(file_id))
+        if deleted is None:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        _log_audit(
+            request, db=db,
+            action="file_deleted",
+            entity_type="file",
+            entity_id=file_id,
+            client_id=client.id,
+            details={"filename": original_filename},
+        )
+        db.commit()
+        return {"deleted": True, "file_id": file_id}
     finally:
         db.close()

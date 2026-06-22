@@ -102,6 +102,36 @@ export async function downloadDocument(
   anchor.href = url;
   anchor.download = filename;
   document.body.appendChild(anchor);
+      anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadDocumentPack(
+  clientReference: string,
+): Promise<void> {
+  const response = await fetch(
+    `/clients/${encodeURIComponent(clientReference)}/documents/pack`,
+    { credentials: "same-origin" },
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("No packable document artifacts found");
+    }
+    throw new Error(`Download pack failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+  const filename = filenameMatch?.[1] ?? `${clientReference}_documents.zip`;
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);

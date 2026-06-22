@@ -108,6 +108,175 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.json()["user"]["role"], "staff")
 
     # ------------------------------------------------------------------
+    # Phase 6: PostgreSQL session persistence tests
+    # ------------------------------------------------------------------
+
+    def test_login_creates_persisted_session_row(self) -> None:
+        """Login writes a row to the sessions table."""
+        from app.db import get_session
+        from app.models import Session as SessionModel
+
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        db = get_session()
+        try:
+            rows = (
+                db.query(SessionModel)
+                .filter(SessionModel.user_email == "admin@omega.local")
+                .all()
+            )
+            self.assertGreaterEqual(len(rows), 1, "Expected at least 1 persisted session row after login")
+            db.commit()
+        finally:
+            db.close()
+
+    def test_auth_me_works_with_valid_persisted_session(self) -> None:
+        """After login, /auth/me returns user profile using the persisted session."""
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["role"], "staff")
+
+    def test_logout_deletes_persisted_session_row(self) -> None:
+        """Logout removes the exact persisted session row from the cookie."""
+        from app.db import get_session
+        from app.repositories.sessions import SessionRepository
+
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        # Capture the exact session_id from the cookie
+        session_id = self.client.cookies.get("session_id")
+        self.assertIsNotNone(session_id, "Cookie must contain session_id after login")
+
+        self.client.post("/auth/logout")
+
+        # The exact persisted row should be gone
+        db = get_session()
+        try:
+            session_repo = SessionRepository(db)
+            row = session_repo.get_valid_by_id(session_id)
+            self.assertIsNone(row, "Expected exact persisted session row to be deleted after logout")
+            db.commit()
+        finally:
+            db.close()
+
+    def test_deleted_session_row_causes_401(self) -> None:
+        """If the exact persisted session row from the cookie is deleted, /auth/me returns 401."""
+        from app.db import get_session
+        from app.repositories.sessions import SessionRepository
+
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        # Capture the exact session_id from the cookie
+        session_id = self.client.cookies.get("session_id")
+        self.assertIsNotNone(session_id, "Cookie must contain session_id after login")
+
+        # Delete only the exact row referenced by the cookie
+        db = get_session()
+        try:
+            session_repo = SessionRepository(db)
+            session_repo.delete_by_id(session_id)
+            db.commit()
+        finally:
+            db.close()
+
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 401)
+
+    def test_expired_session_row_causes_401(self) -> None:
+        """If the exact persisted session row from the cookie is expired, /auth/me returns 401."""
+        from app.db import get_session
+        from datetime import UTC, datetime, timedelta
+        from app.models import Session as SessionModel
+
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        # Capture the exact session_id from the cookie
+        session_id = self.client.cookies.get("session_id")
+        self.assertIsNotNone(session_id, "Cookie must contain session_id after login")
+
+        # Expire only the exact row referenced by the cookie
+        db = get_session()
+        try:
+            expired_time = datetime.now(UTC) - timedelta(minutes=1)
+            row = (
+                db.query(SessionModel)
+                .filter(SessionModel.id == session_id)
+                .first()
+            )
+            self.assertIsNotNone(row, "Expected to find the exact session row by ID")
+            row.expires_at = expired_time
+            db.commit()
+        finally:
+            db.close()
+
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 401)
+
+    def test_two_sessions_coexist_and_invalidating_one_does_not_invalidate_other(self) -> None:
+        """Two login sessions for the same user can coexist; logout only invalidates one."""
+        from app.db import get_session
+        from datetime import UTC, datetime
+
+        # Login as admin (session A)
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        # Capture session A
+        client_a_cookies = dict(self.client.cookies)
+
+        # Login again as admin (session B, overwrites current cookie)
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+
+        # Verify two unexpired persisted session rows exist
+        db = get_session()
+        try:
+            from app.models import Session as SessionModel
+            rows = (
+                db.query(SessionModel)
+                .filter(
+                    SessionModel.user_email == "admin@omega.local",
+                    SessionModel.expires_at > datetime.now(UTC),
+                )
+                .all()
+            )
+            self.assertEqual(len(rows), 2, f"Expected 2 unexpired session rows, got {len(rows)}")
+            db.commit()
+        finally:
+            db.close()
+
+        # Logout (invalidates session B only)
+        self.client.post("/auth/logout")
+
+        # Session B invalidated — /auth/me should fail
+        response_b = self.client.get("/auth/me")
+        self.assertEqual(response_b.status_code, 401)
+
+        # Restore cookie A and verify session A still works
+        self.client.cookies.clear()
+        for key, value in client_a_cookies.items():
+            self.client.cookies.set(key, value)
+
+        response_a = self.client.get("/auth/me")
+        self.assertEqual(response_a.status_code, 200)
+        self.assertEqual(response_a.json()["user"]["role"], "admin")
+
+    # ------------------------------------------------------------------
     # Phase 8: Health/readiness tests
     # ------------------------------------------------------------------
 
@@ -512,6 +681,140 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/admin/security-summary")
         self.assertEqual(response.status_code, 403)
 
+    # ------------------------------------------------------------------
+    # Restore validation tests
+    # ------------------------------------------------------------------
+
+    def test_restore_validate_rejects_missing_backup(self) -> None:
+        self._login_as_admin()
+        response = self.client.post("/admin/backups/00000000-0000-0000-0000-000000000000/validate-restore")
+        self.assertEqual(response.status_code, 404)
+
+    def test_restore_validate_succeeds_for_valid_backup(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        self.assertEqual(create_resp.status_code, 201)
+        backup_id = create_resp.json()["item"]["id"]
+
+        response = self.client.post(f"/admin/backups/{backup_id}/validate-restore")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("valid", payload)
+        self.assertIn("manifest", payload)
+        self.assertIsInstance(payload["warnings"], list)
+
+    def test_restore_validate_requires_admin(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        self.assertEqual(create_resp.status_code, 201)
+        backup_id = create_resp.json()["item"]["id"]
+        self.client.post("/auth/logout")
+
+        self._login_as_staff()
+        response = self.client.post(f"/admin/backups/{backup_id}/validate-restore")
+        self.assertEqual(response.status_code, 403)
+
+    def test_restore_validate_rejects_unauthorized(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+        self.client.post("/auth/logout")
+
+        response = self.client.post(f"/admin/backups/{backup_id}/validate-restore")
+        self.assertEqual(response.status_code, 401)
+
+    def test_restore_dry_run_rejects_missing_backup(self) -> None:
+        self._login_as_admin()
+        response = self.client.post("/admin/backups/00000000-0000-0000-0000-000000000000/dry-run-restore")
+        self.assertEqual(response.status_code, 404)
+
+    def test_restore_dry_run_returns_400_when_no_dump_artifact(self) -> None:
+        """Dry-run restore should return 400 if the backup has no database dump."""
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        response = self.client.post(f"/admin/backups/{backup_id}/dry-run-restore")
+        # With 'placeholder' DATABASE_URL, no pg_dump runs — so no dump artifact
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("no database dump artifact", response.json()["detail"].lower())
+
+    def test_restore_dry_run_requires_admin(self) -> None:
+        self._login_as_staff()
+        response = self.client.post("/admin/backups/some-id/dry-run-restore")
+        self.assertEqual(response.status_code, 403)
+
+    def test_restore_dry_run_requires_login(self) -> None:
+        response = self.client.post("/admin/backups/some-id/dry-run-restore")
+        self.assertEqual(response.status_code, 401)
+
+    def test_restore_execute_requires_admin(self) -> None:
+        self._login_as_staff()
+        response = self.client.post(
+            "/admin/backups/some-id/restore",
+            json={"confirm": "yes-do-restore-now"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_restore_execute_requires_login(self) -> None:
+        response = self.client.post(
+            "/admin/backups/some-id/restore",
+            json={"confirm": "yes-do-restore-now"},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_restore_execute_rejects_missing_backup(self) -> None:
+        self._login_as_admin()
+        response = self.client.post(
+            "/admin/backups/00000000-0000-0000-0000-000000000000/restore",
+            json={"confirm": "yes-do-restore-now"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_restore_execute_rejects_wrong_confirm(self) -> None:
+        """Restore requires explicit confirmation payload."""
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        response = self.client.post(
+            f"/admin/backups/{backup_id}/restore",
+            json={"confirm": "nope"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_restore_attempts_requires_admin(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/admin/backups/some-id/restore-attempts")
+        self.assertEqual(response.status_code, 403)
+
+    def test_restore_attempts_returns_empty_list_for_no_attempts(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        response = self.client.get(f"/admin/backups/{backup_id}/restore-attempts")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["items"], [])
+
+    def test_restore_attempts_returns_404_for_missing_backup(self) -> None:
+        self._login_as_admin()
+        response = self.client.get("/admin/backups/00000000-0000-0000-0000-000000000000/restore-attempts")
+        self.assertEqual(response.status_code, 404)
+
+    def test_schedule_status_requires_admin(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/admin/backups/schedule-status")
+        self.assertEqual(response.status_code, 403)
+
+    def test_schedule_status_returns_disabled_by_default(self) -> None:
+        self._login_as_admin()
+        response = self.client.get("/admin/backups/schedule-status")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data["enabled"])
+        self.assertFalse(data["running"])
+
     def test_admin_can_view_security_summary(self) -> None:
         self.client.post(
             "/auth/login",
@@ -785,6 +1088,251 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     # ------------------------------------------------------------------
+    # Document pack ZIP download tests
+    # ------------------------------------------------------------------
+
+    def test_document_pack_requires_auth(self) -> None:
+        response = self.client.get("/clients/CLI-2026-0002/documents/pack")
+        self.assertEqual(response.status_code, 401)
+
+    def test_document_pack_unknown_client_returns_404(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/clients/CLI-UNKNOWN/documents/pack")
+        self.assertEqual(response.status_code, 404)
+
+    def test_document_pack_no_artifacts_returns_404(self) -> None:
+        """A client with generated documents but no persisted artifacts returns 404."""
+        self._login_as_staff()
+        # Generate a document (no artifact upload)
+        self.client.post("/documents/generate", json=self._document_generation_payload())
+        response = self.client.get("/clients/CLI-2026-0002/documents/pack")
+        self.assertEqual(response.status_code, 404)
+
+    def test_document_pack_returns_zip_with_expected_files(self) -> None:
+        self._login_as_staff()
+        # Upload a document with a PDF artifact
+        resp = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Statement of Suitability",
+                "document_name": "Statement_for_Jamie",
+                "version": "Version 1",
+                "status": "PDF ready",
+            },
+            files={"artifact": ("Statement_for_Jamie.pdf", b"pdf-content", "application/pdf")},
+        )
+        self.assertEqual(resp.status_code, 201)
+        doc_id = resp.json()["item"]["id"]
+
+        # Upload a second document with a DOCX artifact
+        resp2 = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Fact Find",
+                "document_name": "Fact_Find_Jamie",
+                "version": "1",
+                "status": "DOCX ready",
+            },
+            files={"artifact": ("Fact_Find_Jamie.docx", b"docx-content", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        self.assertEqual(resp2.status_code, 201)
+
+        # Download the pack
+        pack_response = self.client.get("/clients/CLI-2026-0002/documents/pack")
+        self.assertEqual(pack_response.status_code, 200)
+        self.assertEqual(pack_response.headers["content-type"], "application/zip")
+
+        # Verify ZIP contents
+        import io, zipfile
+        zip_file = zipfile.ZipFile(io.BytesIO(pack_response.content))
+        names = sorted(zip_file.namelist())
+        self.assertEqual(len(names), 2)
+        self.assertIn("Statement_for_Jamie.pdf", names)
+        self.assertIn("Fact_Find_Jamie.docx", names)
+        self.assertEqual(zip_file.read("Statement_for_Jamie.pdf"), b"pdf-content")
+        self.assertEqual(zip_file.read("Fact_Find_Jamie.docx"), b"docx-content")
+
+    def test_document_pack_includes_both_artifacts_when_doc_has_pdf_and_docx(self) -> None:
+        """A single document row with both PDF and DOCX artifacts packs both."""
+        from app.db import get_session
+        from app.repositories.documents import DocumentRepository
+        from app.main import settings as app_settings
+        from app.services.storage import ClientStorage
+
+        self._login_as_staff()
+
+        # Upload a DOCX artifact via the API
+        resp = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Statement of Suitability",
+                "document_name": "Statement_for_Jamie",
+                "version": "Version 1",
+                "status": "DOCX ready",
+            },
+            files={"artifact": ("Statement_for_Jamie.docx", b"docx-bytes", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        self.assertEqual(resp.status_code, 201)
+        item = resp.json()["item"]
+        doc_id = item["id"]
+        self.assertIsNotNone(item["docx_file_path"])
+        self.assertIsNone(item["pdf_file_path"])
+
+        # Now manually add a PDF artifact via the repository + storage
+        from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_slug
+        from app.repositories.clients import ClientRepository
+
+        db = get_session()
+        try:
+            client_repo = ClientRepository(db)
+            client_model = client_repo.get_by_reference("CLI-2026-0002")
+            record = ClientRecord(
+                first_name=client_model.first_name or "",
+                surname=client_model.surname or "",
+                status=ClientStatus(client_model.status) if client_model.status else ClientStatus.DRAFT,
+            )
+            slug = build_client_storage_slug("CLI-2026-0002", record)
+            storage = ClientStorage(app_settings.file_storage_path)
+            filepath = storage.save_file(slug, "Statement_for_Jamie.pdf", b"pdf-bytes")
+            relative = str(filepath.relative_to(app_settings.file_storage_path))
+
+            doc_repo = DocumentRepository(db)
+            updated = doc_repo.update_artifact_paths(doc_id, pdf_path=relative)
+            self.assertIsNotNone(updated)
+            db.commit()
+
+            # Now the doc row has both docx_file_path and pdf_file_path
+            doc = doc_repo.get_by_id(doc_id)
+            self.assertIsNotNone(doc.docx_file_path)
+            self.assertIsNotNone(doc.pdf_file_path)
+        finally:
+            db.close()
+
+        # Download pack — should contain both artifacts
+        pack_response = self.client.get("/clients/CLI-2026-0002/documents/pack")
+        self.assertEqual(pack_response.status_code, 200)
+
+        import io, zipfile
+        zip_file = zipfile.ZipFile(io.BytesIO(pack_response.content))
+        names = sorted(zip_file.namelist())
+        self.assertEqual(len(names), 2)
+        self.assertIn("Statement_for_Jamie.docx", names)
+        self.assertIn("Statement_for_Jamie.pdf", names)
+        self.assertEqual(zip_file.read("Statement_for_Jamie.docx"), b"docx-bytes")
+        self.assertEqual(zip_file.read("Statement_for_Jamie.pdf"), b"pdf-bytes")
+
+    def test_document_pack_avoids_duplicate_zip_entries(self) -> None:
+        """When two docs have the same document_name, ZIP entries get deduplicated suffixes."""
+        self._login_as_staff()
+
+        # Upload two documents with the same document_name
+        for i, content in enumerate((b"first", b"second")):
+            resp = self.client.post(
+                "/clients/CLI-2026-0002/documents",
+                data={
+                    "document_type": "Fact Find",
+                    "document_name": "Duplicate_Name",
+                    "version": str(i + 1),
+                    "status": "PDF ready",
+                },
+                files={"artifact": ("Duplicate_Name.pdf", content, "application/pdf")},
+            )
+            self.assertEqual(resp.status_code, 201)
+
+        pack_response = self.client.get("/clients/CLI-2026-0002/documents/pack")
+        self.assertEqual(pack_response.status_code, 200)
+
+        import io, zipfile
+        zip_file = zipfile.ZipFile(io.BytesIO(pack_response.content))
+        names = sorted(zip_file.namelist())
+        self.assertEqual(len(names), 2)
+        # First entry uses the base name; second gets _1 suffix
+        self.assertIn("Duplicate_Name.pdf", names)
+        self.assertIn("Duplicate_Name_1.pdf", names)
+
+    # ------------------------------------------------------------------
+    # Document deletion tests
+    # ------------------------------------------------------------------
+
+    def test_delete_document_requires_auth(self) -> None:
+        response = self.client.delete("/clients/CLI-2026-0002/documents/00000000-0000-0000-0000-000000000000")
+        self.assertEqual(response.status_code, 401)
+
+    def test_delete_document_returns_404_for_unknown_document(self) -> None:
+        self._login_as_staff()
+        response = self.client.delete("/clients/CLI-2026-0002/documents/00000000-0000-0000-0000-000000000000")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_document_removes_db_row_and_disk_artifacts(self) -> None:
+        """Deleting a document removes the DB row and disk file."""
+        from pathlib import Path
+        from app.main import settings as app_settings
+
+        self._login_as_staff()
+
+        # Upload a document with a PDF artifact
+        resp = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Statement of Suitability",
+                "document_name": "Delete_Test_Doc",
+                "version": "Version 1",
+                "status": "PDF ready",
+            },
+            files={"artifact": ("Delete_Test_Doc.pdf", b"delete-me", "application/pdf")},
+        )
+        self.assertEqual(resp.status_code, 201)
+        doc_id = resp.json()["item"]["id"]
+        pdf_path = resp.json()["item"]["pdf_file_path"]
+        self.assertIsNotNone(pdf_path)
+
+        # Verify file on disk
+        full_path = Path(app_settings.file_storage_path) / pdf_path
+        self.assertTrue(full_path.is_file(), f"File not found at {full_path}")
+
+        # Delete the document
+        del_resp = self.client.delete(f"/clients/CLI-2026-0002/documents/{doc_id}")
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertTrue(del_resp.json()["deleted"])
+        self.assertEqual(del_resp.json()["document_id"], doc_id)
+
+        # DB row should be gone
+        from app.db import get_session
+        from app.repositories.documents import DocumentRepository
+        db = get_session()
+        try:
+            doc_repo = DocumentRepository(db)
+            self.assertIsNone(doc_repo.get_by_id(doc_id))
+            db.commit()
+        finally:
+            db.close()
+
+        # Disk artifact should be gone
+        self.assertFalse(full_path.is_file(), f"File still exists at {full_path}")
+
+    def test_repeated_delete_document_returns_404(self) -> None:
+        self._login_as_staff()
+        resp = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Fact Find",
+                "document_name": "Twice_Delete",
+                "version": "1",
+                "status": "DOCX ready",
+            },
+            files={"artifact": ("Twice_Delete.docx", b"delete-me-too", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        doc_id = resp.json()["item"]["id"]
+
+        # First delete succeeds
+        r1 = self.client.delete(f"/clients/CLI-2026-0002/documents/{doc_id}")
+        self.assertEqual(r1.status_code, 200)
+
+        # Second delete returns 404
+        r2 = self.client.delete(f"/clients/CLI-2026-0002/documents/{doc_id}")
+        self.assertEqual(r2.status_code, 404)
+
+    # ------------------------------------------------------------------
     # Phase 4: File upload / list / download tests
     # ------------------------------------------------------------------
 
@@ -874,6 +1422,137 @@ class ApiTests(unittest.TestCase):
         self._login_as_admin()
         response = self.client.get("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000/download")
         self.assertEqual(response.status_code, 404)
+
+    # ------------------------------------------------------------------
+    # File deletion tests
+    # ------------------------------------------------------------------
+
+    def test_delete_file_requires_auth(self) -> None:
+        response = self.client.delete("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000")
+        self.assertEqual(response.status_code, 401)
+
+    def test_delete_file_returns_404_for_unknown_file(self) -> None:
+        self._login_as_admin()
+        response = self.client.delete("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_file_removes_db_row_and_disk_artifact(self) -> None:
+        """Deleting a file removes the DB row and disk artifact."""
+        from pathlib import Path
+        from app.main import settings as app_settings
+
+        self._login_as_admin()
+
+        # Upload a file
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("delete_me.pdf", b"delete-me-content", "application/pdf")},
+        )
+        self.assertEqual(upload_resp.status_code, 201)
+        file_id = upload_resp.json()["item"]["id"]
+
+        # Verify file on disk via listing
+        from app.db import get_session
+        from app.repositories.files import FileRepository
+        db = get_session()
+        try:
+            file_repo = FileRepository(db)
+            file_model = file_repo.get_by_id(uuid.UUID(file_id))
+            self.assertIsNotNone(file_model)
+            file_path = file_model.file_path
+            full_path = Path(app_settings.file_storage_path) / file_path
+            self.assertTrue(full_path.is_file(), f"File not found at {full_path}")
+            db.commit()
+        finally:
+            db.close()
+
+        # Delete the file
+        del_resp = self.client.delete(f"/clients/CLI-2026-0002/files/{file_id}")
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertTrue(del_resp.json()["deleted"])
+        self.assertEqual(del_resp.json()["file_id"], file_id)
+
+        # DB row should be gone
+        db2 = get_session()
+        try:
+            file_repo2 = FileRepository(db2)
+            self.assertIsNone(file_repo2.get_by_id(uuid.UUID(file_id)))
+            db2.commit()
+        finally:
+            db2.close()
+
+        # Disk artifact should be gone
+        self.assertFalse(full_path.is_file(), f"File still exists at {full_path}")
+
+    def test_repeated_delete_file_returns_404(self) -> None:
+        self._login_as_admin()
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("twice_delete.pdf", b"twice", "application/pdf")},
+        )
+        file_id = upload_resp.json()["item"]["id"]
+
+        # First delete succeeds
+        r1 = self.client.delete(f"/clients/CLI-2026-0002/files/{file_id}")
+        self.assertEqual(r1.status_code, 200)
+
+        # Second delete returns 404
+        r2 = self.client.delete(f"/clients/CLI-2026-0002/files/{file_id}")
+        self.assertEqual(r2.status_code, 404)
+
+    def test_delete_document_creates_audit_entry(self) -> None:
+        """Deleting a document writes a 'document_deleted' audit row."""
+        self._login_as_staff()
+        resp = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Fact Find",
+                "document_name": "Audit_Doc",
+                "version": "1",
+                "status": "PDF ready",
+            },
+            files={"artifact": ("Audit_Doc.pdf", b"audit-me", "application/pdf")},
+        )
+        doc_id = resp.json()["item"]["id"]
+        self.client.delete(f"/clients/CLI-2026-0002/documents/{doc_id}")
+        self.client.post("/auth/logout")
+
+        # Admin can see the audit entry
+        self._login_as_admin()
+        audit_resp = self.client.get("/admin/audit-logs")
+        self.assertEqual(audit_resp.status_code, 200)
+        items = audit_resp.json()["items"]
+        deletions = [
+            entry for entry in items
+            if entry.get("action") == "document_deleted"
+            and entry.get("entity_id") == doc_id
+        ]
+        self.assertEqual(len(deletions), 1, f"Expected 1 document_deleted audit row, got {len(deletions)}")
+        self.assertEqual(deletions[0]["entity_type"], "document")
+        self.assertIn("Audit_Doc", str(deletions[0].get("details", {})))
+
+    def test_delete_file_creates_audit_entry(self) -> None:
+        """Deleting a file writes a 'file_deleted' audit row."""
+        self._login_as_admin()
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("audit_file.pdf", b"audit-file", "application/pdf")},
+        )
+        file_id = upload_resp.json()["item"]["id"]
+        self.client.delete(f"/clients/CLI-2026-0002/files/{file_id}")
+
+        # Check audit logs
+        audit_resp = self.client.get("/admin/audit-logs")
+        self.assertEqual(audit_resp.status_code, 200)
+        items = audit_resp.json()["items"]
+        deletions = [
+            entry for entry in items
+            if entry.get("action") == "file_deleted"
+            and entry.get("entity_id") == file_id
+        ]
+        self.assertEqual(len(deletions), 1, f"Expected 1 file_deleted audit row, got {len(deletions)}")
+        self.assertEqual(deletions[0]["entity_type"], "file")
+        self.assertIn("audit_file.pdf", str(deletions[0].get("details", {})))
 
     # ------------------------------------------------------------------
     # Document generation tests (store.py-backed)

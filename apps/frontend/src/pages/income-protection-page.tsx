@@ -23,7 +23,7 @@ import {
 
 import { fetchWorkflow, saveWorkflow } from "../data/workflow-api";
 import { downloadFile, listFiles, uploadFile, type BackendFile } from "../data/file-api";
-import { createDocument, downloadDocument, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
+import { createDocument, downloadDocument, downloadDocumentPack, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type {
@@ -1077,9 +1077,17 @@ export function IncomeProtectionPage() {
 
   async function handleDownloadPack() {
     setDocumentPackStatus("Pack: Preparing pack...");
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setDocumentPackStatus("Pack: Downloaded");
-    addToast("Document pack downloaded", "success");
+    try {
+      await downloadDocumentPack(selectedClientReference);
+      setDocumentPackStatus("Pack: Downloaded");
+      addToast("Document pack downloaded", "success");
+    } catch (error) {
+      setDocumentPackStatus("Pack: Failed");
+      addToast(
+        error instanceof Error ? error.message : "Document pack download failed",
+        "error",
+      );
+    }
   }
 
   const filteredFiles = resolvedDraft.files.filter((file) =>

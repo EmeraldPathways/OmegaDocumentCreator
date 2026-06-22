@@ -46,5 +46,13 @@ class DocumentRepository:
     def get_statement(self, client_id: str) -> StatementOfSuitability | None:
         return self._db.query(StatementOfSuitability).filter(StatementOfSuitability.client_id == client_id).first()
 
+    def delete(self, document_id: str) -> Document | None:
+        """Delete a document by ID. Returns the deleted row or None if not found."""
+        doc = self.get_by_id(document_id)
+        if doc is None:
+            return None
+        self._db.delete(doc)
+        return doc
+
     def flush(self) -> None:
         self._db.flush()
