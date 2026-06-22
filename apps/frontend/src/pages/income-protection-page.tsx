@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ClipboardList,
@@ -16,13 +16,14 @@ import {
   RefreshCw,
   Search,
   Send,
-  Trash2,
   File,
   FileType2,
   Edit,
 } from "lucide-react";
 
 import { fetchWorkflow, saveWorkflow } from "../data/workflow-api";
+import { downloadFile, listFiles, uploadFile, type BackendFile } from "../data/file-api";
+import { createDocument, downloadDocument, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type {
@@ -319,6 +320,10 @@ export function IncomeProtectionPage() {
   const [documentDownloadStatus, setDocumentDownloadStatus] = useState("Download: No document downloaded yet");
   const [fileFilter, setFileFilter] = useState("");
   const [previewDocument, setPreviewDocument] = useState<SeededGeneratedDocument | null>(null);
+  const [backendFiles, setBackendFiles] = useState<BackendFile[]>([]);
+  const [backendGeneratedDocuments, setBackendGeneratedDocuments] = useState<BackendGeneratedDocument[]>([]);
+  const [hasLoadedBackendGeneratedDocuments, setHasLoadedBackendGeneratedDocuments] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const factFindWorkspaceAccordion = useAccordionState(["fact-find-form"]);
   const factFindAccordion = useAccordionState(["personal-details"]);
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
@@ -407,7 +412,7 @@ export function IncomeProtectionPage() {
   }
 
   // Phase 3: persist to backend alongside localStorage
-  function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
+  async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
     const normalizedDraft = {
       ...nextDraft,
       fullName: buildFullName(nextDraft.firstName, nextDraft.surname),
@@ -415,11 +420,19 @@ export function IncomeProtectionPage() {
     };
     setDraft(normalizedDraft);
     saveClient(normalizedDraft);
-    saveWorkflow(normalizedDraft.clientReference, normalizedDraft).catch(() => {});
-    if (options?.showToast) {
-      addToast("Changes saved", "success");
+
+    try {
+      await saveWorkflow(normalizedDraft.clientReference, normalizedDraft);
+      if (options?.showToast) {
+        addToast("Changes saved", "success");
+      }
+      return { draft: normalizedDraft, savedRemotely: true };
+    } catch {
+      if (options?.showToast) {
+        addToast("Saved locally - server unavailable", "info");
+      }
+      return { draft: normalizedDraft, savedRemotely: false };
     }
-    return normalizedDraft;
   }
 
   function updateField(field: keyof SeededClientProfile, value: string) {
@@ -517,14 +530,14 @@ export function IncomeProtectionPage() {
     );
   }
 
-  function saveFactFindDraft() {
-    persistDraft(resolvedDraft);
-    setFactFindDraftSavedLabel("Saved just now");
+  async function saveFactFindDraft() {
+    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
+    setFactFindDraftSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
-  function saveFactFindUpdateDraft() {
-    persistDraft(resolvedDraft);
-    setFactFindUpdateSavedLabel("Saved just now");
+  async function saveFactFindUpdateDraft() {
+    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
+    setFactFindUpdateSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
   function renderAssetRow(
@@ -814,7 +827,36 @@ export function IncomeProtectionPage() {
     const versionNumber = reserveGeneratedDocumentVersion(documentType);
     const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
     try {
-      await exportGeneratedDocument(resolvedDraft, documentType, extension, nextDocument.documentName, previewArtifact);
+      const artifactBlob = await exportGeneratedDocument(
+        resolvedDraft,
+        documentType,
+        extension,
+        nextDocument.documentName,
+        previewArtifact,
+      );
+
+      const persisted = await createDocument(
+        resolvedDraft.clientReference,
+        {
+          document_type: documentType,
+          document_name: nextDocument.documentName.replace(/\.(pdf|docx)$/i, ""),
+          version: nextDocument.version,
+          status: nextDocument.status,
+          preview_title: nextDocument.previewTitle,
+          preview_html: nextDocument.previewHtml,
+        },
+        {
+          blob: artifactBlob,
+          filename: nextDocument.documentName,
+          contentType:
+            extension === "pdf"
+              ? "application/pdf"
+              : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+      );
+
+      setBackendGeneratedDocuments((current) => [persisted, ...current.filter((doc) => doc.id !== persisted.id)]);
+      setHasLoadedBackendGeneratedDocuments(true);
       upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
       upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
       addToast(`${documentType} exported`, "success");
@@ -832,7 +874,7 @@ export function IncomeProtectionPage() {
       return;
     }
     setShowFactFindValidation(false);
-    saveFactFindDraft();
+    await saveFactFindDraft();
     setFactFindGenerationStatus("Generation: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", { generationStatus: "generating" });
     try {
@@ -858,13 +900,13 @@ export function IncomeProtectionPage() {
     }
   }
 
-  function saveStatementDraft() {
-    persistDraft(resolvedDraft);
-    setStatementSaveStatus("Saved just now");
+  async function saveStatementDraft() {
+    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
+    setStatementSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
   async function handleFactFindUpdateGenerate() {
-    saveFactFindUpdateDraft();
+    await saveFactFindUpdateDraft();
     setFactFindUpdateGenerationStatus("Generation: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "generating" });
     try {
@@ -897,7 +939,7 @@ export function IncomeProtectionPage() {
       return;
     }
     setShowStatementValidation(false);
-    saveStatementDraft();
+    await saveStatementDraft();
     setStatementDocumentStatus("Document: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "generating" });
     try {
@@ -923,35 +965,76 @@ export function IncomeProtectionPage() {
     }
   }
 
-  async function handleUploadFile() {
-    setUploadProgress(0);
-    setFileUploadStatus("Upload: Uploading...");
-    const interval = setInterval(() => {
-      setUploadProgress((current) => {
-        if (current >= 90) {
-          clearInterval(interval);
-          return current;
+  // Phase 4: load backend files when client changes
+  useEffect(() => {
+    if (!selectedClientReference) return;
+    let cancelled = false;
+    listFiles(selectedClientReference)
+      .then((files) => {
+        if (!cancelled) setBackendFiles(files);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClientReference]);
+
+  // Phase 5: load backend generated documents when client changes
+  useEffect(() => {
+    if (!selectedClientReference) return;
+    let cancelled = false;
+    setHasLoadedBackendGeneratedDocuments(false);
+    listDocuments(selectedClientReference)
+      .then((docs) => {
+        if (!cancelled) {
+          setBackendGeneratedDocuments(docs);
+          setHasLoadedBackendGeneratedDocuments(true);
         }
-        return current + 10;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBackendGeneratedDocuments([]);
+        }
       });
-    }, 150);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedClientReference]);
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    clearInterval(interval);
-    setUploadProgress(100);
+  function handleFileSelect() {
+    fileInputRef.current?.click();
+  }
 
-    const nextFile = {
-      id: `FILE-${Date.now()}`,
-      category: "Uploads",
-      originalFilename: `${resolvedDraft.surname || "Client"}_${resolvedDraft.firstName || "Record"}_uploaded_note.txt`,
-      status: "Pending review",
-      uploadedBy: actorLabel,
-      uploadedAt: new Date().toISOString().slice(0, 10),
-    } satisfies SeededClientFile;
+  async function handleRealFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    persistDraft({ ...resolvedDraft, files: [nextFile, ...resolvedDraft.files] });
-    setFileUploadStatus("Upload: File saved");
-    addToast("File uploaded successfully", "success");
+    setFileUploadStatus("Upload: Uploading...");
+    setUploadProgress(50);
+
+    try {
+      const uploaded = await uploadFile(selectedClientReference, file);
+      setUploadProgress(100);
+      setFileUploadStatus("Upload: File saved");
+      setBackendFiles((current) => [uploaded, ...current]);
+      addToast("File uploaded successfully", "success");
+    } catch {
+      setUploadProgress(0);
+      setFileUploadStatus("Upload: Upload failed");
+      addToast("Upload failed", "error");
+    } finally {
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleBackendFileDownload(fileId: string, filename: string) {
+    try {
+      await downloadFile(selectedClientReference, fileId, filename);
+      addToast("File downloaded", "success");
+    } catch {
+      addToast("Download failed", "error");
+    }
   }
 
   function handleDownloadDocument(document: SeededGeneratedDocument) {
@@ -999,13 +1082,11 @@ export function IncomeProtectionPage() {
     addToast("Document pack downloaded", "success");
   }
 
-  function handleDeleteFile(fileId: string) {
-    persistDraft({ ...resolvedDraft, files: resolvedDraft.files.filter((file) => file.id !== fileId) });
-    addToast("File deleted", "success");
-  }
-
   const filteredFiles = resolvedDraft.files.filter((file) =>
     toLower(file.originalFilename).includes(fileFilter.toLowerCase()),
+  );
+  const filteredBackendFiles = backendFiles.filter((file) =>
+    toLower(file.original_filename).includes(fileFilter.toLowerCase()),
   );
 
   const summaryContact = resolvedDraft.email || resolvedDraft.mobileNumber || "Not recorded";
@@ -1743,7 +1824,7 @@ export function IncomeProtectionPage() {
               </Accordion>
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{factFindDraftSavedLabel}</span>
-                <Button onClick={saveFactFindDraft} variant="primary">
+                <Button onClick={() => void saveFactFindDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find
                 </Button>
@@ -1878,7 +1959,7 @@ export function IncomeProtectionPage() {
               </Accordion>
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{factFindUpdateSavedLabel}</span>
-                <Button onClick={saveFactFindUpdateDraft} variant="primary">
+                <Button onClick={() => void saveFactFindUpdateDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find Update
                 </Button>
@@ -1987,8 +2068,11 @@ export function IncomeProtectionPage() {
               <Input
                 id="sos-recommendedCover"
                 label={requiredLabel("Recommended cover")}
+                onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("recommendedCover", event.target.value)}
-                type="text"
+                prefix="EUR"
+                step="0.01"
+                type="number"
                 value={resolvedDraft.recommendedCover}
               />
               <Select
@@ -2040,7 +2124,7 @@ export function IncomeProtectionPage() {
           </section>
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{statementSaveStatus}</span>
-                <Button onClick={saveStatementDraft} variant="primary">
+                <Button onClick={() => void saveStatementDraft()} variant="primary">
                   <Save size={18} />
                   Save Statement
                 </Button>
@@ -2084,7 +2168,7 @@ export function IncomeProtectionPage() {
               <h2>Client Files</h2>
             </div>
             <div className="page-actions">
-              <Button onClick={handleUploadFile} variant="primary">
+              <Button onClick={handleFileSelect} variant="primary">
                 <Upload size={18} />
                 Upload File
               </Button>
@@ -2100,13 +2184,26 @@ export function IncomeProtectionPage() {
             </div>
           ) : null}
 
+          <input
+            accept="*/*"
+            aria-label="Select file to upload"
+            onChange={(event) => { void handleRealFileUpload(event); }}
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            type="file"
+          />
+
           <div
             className="upload-zone"
-            onClick={handleUploadFile}
+            onClick={handleFileSelect}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
-              void handleUploadFile();
+              const dt = event.dataTransfer;
+              if (dt?.files?.[0]) {
+                const fakeEvent = { target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
+                void handleRealFileUpload(fakeEvent);
+              }
             }}
             role="button"
             tabIndex={0}
@@ -2136,7 +2233,7 @@ export function IncomeProtectionPage() {
               </div>
             </div>
 
-            {filteredFiles.length === 0 ? (
+            {filteredBackendFiles.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">
                   <FolderOpen size={28} />
@@ -2145,34 +2242,31 @@ export function IncomeProtectionPage() {
                 <p className="empty-state-description">
                   {fileFilter ? "No files match your filter." : "Upload supporting documents for this client."}
                 </p>
-                <Button onClick={handleUploadFile} variant="primary">
+                <Button onClick={handleFileSelect} variant="primary">
                   <Upload size={18} />
                   Upload File
                 </Button>
               </div>
             ) : (
               <div className="file-list" style={{ marginTop: "var(--space-4)" }}>
-                {filteredFiles.map((file) => (
+                {filteredBackendFiles.map((file) => (
                   <div className="file-item" key={file.id}>
-                    <div className="file-icon">{getFileIcon(file.originalFilename)}</div>
+                    <div className="file-icon">{getFileIcon(file.original_filename)}</div>
                     <div className="file-info">
-                      <div className="file-name">{file.originalFilename}</div>
+                      <div className="file-name">{file.original_filename}</div>
                       <div className="file-meta">
-                        {file.category} · {formatFileSize(file.originalFilename.length * 1024)} · {file.uploadedBy}
+                        {file.category} · {file.file_type ?? ""} · {file.uploaded_at ? formatDisplayDate(file.uploaded_at) : ""}
                       </div>
                     </div>
                     <Badge variant={toLower(file.status).includes("approved") ? "approved" : "draft"}>
                       {file.status ?? "Uploaded"}
                     </Badge>
                     <div className="file-actions">
-                      <Button className="btn-sm" onClick={() => handleDownloadDocument(file as unknown as SeededGeneratedDocument)} variant="secondary">
+                      <Button className="btn-sm" onClick={() => { void handleBackendFileDownload(file.id, file.original_filename); }} variant="secondary">
                         <Download size={14} />
                       </Button>
-                      <Button className="btn-sm" onClick={handleUploadFile} variant="secondary">
+                      <Button className="btn-sm" onClick={handleFileSelect} variant="secondary">
                         <RefreshCw size={14} />
-                      </Button>
-                      <Button className="btn-sm" onClick={() => handleDeleteFile(file.id)} variant="danger">
-                        <Trash2 size={14} />
                       </Button>
                     </div>
                   </div>
@@ -2184,7 +2278,31 @@ export function IncomeProtectionPage() {
       );
     }
 
-    // Generated Documents tab
+    // Generated Documents tab (Phase 5: backend-backed)
+    const displayDocuments = hasLoadedBackendGeneratedDocuments
+      ? backendGeneratedDocuments
+      : resolvedDraft.generatedDocuments.map((d) => ({
+          id: d.id,
+          client_id: "",
+          document_type: d.documentType,
+          document_name: d.documentName,
+          docx_file_path: null,
+          pdf_file_path: null,
+          generated_by: null,
+          generated_at: d.generatedAt,
+          version: d.version,
+          status: d.status,
+          preview_title: d.previewTitle ?? null,
+          preview_html: d.previewHtml ?? null,
+        }));
+
+    const resolvedPreviewDocument = previewDocument
+      ? {
+          ...previewDocument,
+          generated_at: previewDocument.generatedAt,
+        }
+      : null;
+
     return (
       <div className="page-stack">
         <div className="page-heading page-heading-compact">
@@ -2210,7 +2328,7 @@ export function IncomeProtectionPage() {
           </div>
         </div>
 
-        {resolvedDraft.generatedDocuments.length === 0 ? (
+        {displayDocuments.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <Download size={28} />
@@ -2236,39 +2354,107 @@ export function IncomeProtectionPage() {
                 </tr>
               </thead>
               <tbody>
-                {resolvedDraft.generatedDocuments.map((document) => (
-                  <tr key={document.id}>
-                    <td>{document.documentType}</td>
-                    <td className="font-medium">{document.documentName}</td>
-                    <td>{document.version}</td>
+                {displayDocuments.map((doc) => {
+                  const hasBackendArtifact = hasLoadedBackendGeneratedDocuments && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
+                  return (
+                  <tr key={doc.id}>
+                    <td>{doc.document_type}</td>
+                    <td className="font-medium">{doc.document_name}</td>
+                    <td>{doc.version ?? "—"}</td>
                     <td>
-                      <Badge variant={getDocumentStatusVariant(document.status)}>{document.status ?? "Draft"}</Badge>
+                      <Badge variant={getDocumentStatusVariant(doc.status)}>{doc.status ?? "Draft"}</Badge>
                     </td>
-                    <td>{document.generatedAt}</td>
+                    <td>{doc.generated_at ? formatDisplayDate(doc.generated_at) : "—"}</td>
                     <td>
                       <div className="generated-doc-actions">
-                        <Button className="btn-sm" onClick={() => setPreviewDocument(document)} variant="secondary">
+                        <Button
+                          className="btn-sm"
+                          onClick={() => {
+                            const previewPayload: SeededGeneratedDocument = {
+                              id: doc.id,
+                              documentType: doc.document_type,
+                              documentName: doc.document_name,
+                              version: doc.version ?? "Version 1",
+                              status: doc.status,
+                              generatedAt: doc.generated_at ?? "",
+                              previewHtml: doc.preview_html ?? undefined,
+                              previewTitle: doc.preview_title ?? undefined,
+                            };
+                            setPreviewDocument(previewPayload);
+                          }}
+                          variant="secondary"
+                        >
                           <Eye size={14} />
                           Preview
                         </Button>
-                        <Button className="btn-sm" onClick={() => handleDownloadDocument(document)} variant="secondary">
-                          <Download size={14} />
-                          Download
-                        </Button>
-                        {document.documentType !== "Terms of Business" ? (
-                          <Button className="btn-sm" onClick={() => handleRegenerateDocument(document)} variant="text">
+                        {hasBackendArtifact ? (
+                          <Button
+                            className="btn-sm"
+                            onClick={() => {
+                              const filename = doc.document_name;
+                              void downloadDocument(selectedClientReference, doc.id, filename).then(
+                                () => addToast(`${doc.document_name} downloaded`, "success"),
+                                () => addToast("Download failed", "error"),
+                              );
+                            }}
+                            variant="secondary"
+                          >
+                            <Download size={14} />
+                            Download
+                          </Button>
+                        ) : (
+                          <Button
+                            className="btn-sm"
+                            onClick={() => handleDownloadDocument({
+                              id: doc.id,
+                              documentType: doc.document_type,
+                              documentName: doc.document_name,
+                              version: doc.version ?? "Version 1",
+                              status: doc.status,
+                              generatedAt: doc.generated_at ?? "",
+                              previewHtml: doc.preview_html ?? undefined,
+                              previewTitle: doc.preview_title ?? undefined,
+                            })}
+                            variant="secondary"
+                          >
+                            <Download size={14} />
+                            Download
+                          </Button>
+                        )}
+                        {doc.document_type !== "Terms of Business" ? (
+                          <Button
+                            className="btn-sm"
+                            onClick={() => handleRegenerateDocument({
+                              id: doc.id,
+                              documentType: doc.document_type,
+                              documentName: doc.document_name,
+                              version: doc.version ?? "Version 1",
+                              status: doc.status,
+                              generatedAt: doc.generated_at ?? "",
+                              previewHtml: doc.preview_html ?? undefined,
+                              previewTitle: doc.preview_title ?? undefined,
+                            })}
+                            variant="text"
+                          >
                             <RefreshCw size={14} />
                             Regenerate
                           </Button>
                         ) : null}
-                        <Button className="btn-sm" onClick={() => handleSendDocument(document)} variant="text">
+                        <Button
+                          className="btn-sm"
+                          onClick={() => {
+                            addToast(`${doc.document_name} sent to client`, "success");
+                          }}
+                          variant="text"
+                        >
                           <Send size={14} />
                           Send
                         </Button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

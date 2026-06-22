@@ -11,7 +11,11 @@ from fastapi import HTTPException
 
 from app.ai import build_document_prompt, generate_document_content
 from app.config import AppSettings
-from app.store import get_client, save_generated_document_draft
+from app.db import get_session
+from app.models import Document as DocumentModel
+from app.repositories.clients import ClientRepository
+from app.repositories.documents import DocumentRepository
+from app.repositories.users import UserRepository
 
 
 def _get_snapshot_value(workflow_snapshot: dict[str, Any], *keys: str) -> str:
@@ -146,54 +150,73 @@ def generate_document(
     template_id: str,
     workflow_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
-    client = get_client(client_reference)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client_model = client_repo.get_by_reference(client_reference)
+        if not client_model:
+            raise HTTPException(status_code=404, detail="Client not found")
 
-    client_name = str(
-        workflow_snapshot.get("full_name")
-        or workflow_snapshot.get("fullName")
-        or client.get("full_name")
-        or f"{client.get('first_name', '')} {client.get('surname', '')}".strip()
-        or client_reference
-    )
-    prompt = build_document_prompt(
-        client_name=client_name,
-        client_reference=client_reference,
-        document_type=document_type,
-        template_id=template_id,
-        workflow_snapshot=workflow_snapshot,
-    )
-    ai_result = generate_document_content(settings=settings, prompt=prompt)
-    generated_document = ai_result or _seeded_document(
-        client_name=client_name,
-        client_reference=client_reference,
-        document_type=document_type,
-        template_id=template_id,
-        workflow_snapshot=workflow_snapshot,
-    )
-    generated_document["sections"] = _normalize_sections(generated_document.get("sections"))
-    warnings = [str(warning) for warning in generated_document.get("warnings", [])]
-    integration_requests = _build_integration_requests(
-        settings=settings,
-        document_type=document_type,
-        workflow_snapshot=workflow_snapshot,
-        warnings=warnings,
-    )
-    generated_document["warnings"] = warnings
-    generated_document["integration_requests"] = integration_requests
-    save_generated_document_draft(
-        client_reference=client_reference,
-        document_type=document_type,
-        template_id=template_id,
-        title=str(generated_document.get("title") or document_type),
-        summary=str(generated_document.get("summary") or ""),
-        sections=generated_document["sections"],
-        warnings=warnings,
-        generated_html=str(generated_document.get("generated_html") or ""),
-        integration_requests=integration_requests,
-    )
-    return generated_document
+        client_name = str(
+            workflow_snapshot.get("full_name")
+            or workflow_snapshot.get("fullName")
+            or getattr(client_model, "full_name", None)
+            or f"{getattr(client_model, 'first_name', '')} {getattr(client_model, 'surname', '')}".strip()
+            or client_reference
+        )
+        prompt = build_document_prompt(
+            client_name=client_name,
+            client_reference=client_reference,
+            document_type=document_type,
+            template_id=template_id,
+            workflow_snapshot=workflow_snapshot,
+        )
+        ai_result = generate_document_content(settings=settings, prompt=prompt)
+        generated_document = ai_result or _seeded_document(
+            client_name=client_name,
+            client_reference=client_reference,
+            document_type=document_type,
+            template_id=template_id,
+            workflow_snapshot=workflow_snapshot,
+        )
+        generated_document["sections"] = _normalize_sections(generated_document.get("sections"))
+        warnings = [str(warning) for warning in generated_document.get("warnings", [])]
+        integration_requests = _build_integration_requests(
+            settings=settings,
+            document_type=document_type,
+            workflow_snapshot=workflow_snapshot,
+            warnings=warnings,
+        )
+        generated_document["warnings"] = warnings
+        generated_document["integration_requests"] = integration_requests
+
+        # Persist generated document metadata + frozen HTML snapshot
+        doc_repo = DocumentRepository(db)
+        preview_title = str(generated_document.get("title") or document_type)
+        preview_html = str(generated_document.get("generated_html") or "")
+        doc_name = f"{client_name}_{replace_spaces(document_type, '_')}"
+
+        doc_model = DocumentModel(
+            client_id=client_model.id,
+            document_type=document_type,
+            document_name=doc_name,
+            status="draft",
+            version="1",
+            preview_title=preview_title,
+            preview_html=preview_html,
+            generated_by=None,
+        )
+        doc_repo.add(doc_model)
+        db.commit()
+        generated_document["document_id"] = str(doc_model.id)
+
+        return generated_document
+    finally:
+        db.close()
+
+
+def replace_spaces(value: str, replacement: str) -> str:
+    return value.replace(" ", replacement)
 
 
 def _build_integration_requests(

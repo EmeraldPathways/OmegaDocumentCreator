@@ -327,7 +327,7 @@ function createParagraphs(blocks: WordExportBlock[]) {
   });
 }
 
-export async function exportHtmlToWord(
+export async function buildWordBlobFromHtml(
   html: string,
   filename: string,
   options: { title?: string; author?: string; subject?: string } = {},
@@ -344,6 +344,15 @@ export async function exportHtmlToWord(
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
+  return Packer.toBlob(doc);
+}
+
+export async function exportHtmlToWord(
+  html: string,
+  filename: string,
+  options: { title?: string; author?: string; subject?: string } = {},
+) {
+  const blob = await buildWordBlobFromHtml(html, filename, options);
   saveAs(blob, filename);
+  return blob;
 }

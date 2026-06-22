@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 
 @dataclass(slots=True)
 class AppSettings:
@@ -17,6 +19,12 @@ class AppSettings:
     staff_email: str = "staff@omega.local"
     staff_password: str = "ChangeMe123!"
     session_timeout_minutes: int = 30
+    cors_origins: list[str] | None = None
+    trusted_proxy_count: int = 0
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+    environment: str = "development"
+    remote_access_mode: str = "local_only"
     pdf_converter_bin: str = "soffice"
     local_ai_enabled: bool = False
     local_ai_provider: str = "disabled"
@@ -36,6 +44,10 @@ class AppSettings:
     def __post_init__(self) -> None:
         self.file_storage_path = Path(self.file_storage_path)
         self.backup_path = Path(self.backup_path)
+        if not self.file_storage_path.is_absolute():
+            self.file_storage_path = (_PROJECT_ROOT / self.file_storage_path).resolve()
+        if not self.backup_path.is_absolute():
+            self.backup_path = (_PROJECT_ROOT / self.backup_path).resolve()
 
 
 def ensure_storage_directories(settings: AppSettings) -> None:
@@ -46,6 +58,10 @@ def ensure_storage_directories(settings: AppSettings) -> None:
 def get_settings(**overrides: str) -> AppSettings:
     local_ai_enabled_value = overrides.get("LOCAL_AI_ENABLED") or os.getenv("LOCAL_AI_ENABLED", "false")
     ai_enabled_value = overrides.get("AI_ENABLED") or os.getenv("AI_ENABLED", "false")
+
+    cors_origins_raw = overrides.get("CORS_ORIGINS") or os.getenv("CORS_ORIGINS", "")
+    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()] if cors_origins_raw else None
+
     values = {
         "database_url": overrides.get("DATABASE_URL") or os.getenv("DATABASE_URL", "postgresql://placeholder"),
         "file_storage_path": overrides.get("FILE_STORAGE_PATH") or os.getenv("FILE_STORAGE_PATH", "storage/clients"),
@@ -59,6 +75,14 @@ def get_settings(**overrides: str) -> AppSettings:
         "session_timeout_minutes": int(
             overrides.get("SESSION_TIMEOUT_MINUTES") or os.getenv("SESSION_TIMEOUT_MINUTES", "30")
         ),
+        "cors_origins": cors_origins,
+        "trusted_proxy_count": int(
+            overrides.get("TRUSTED_PROXY_COUNT") or os.getenv("TRUSTED_PROXY_COUNT", "0")
+        ),
+        "cookie_secure": (overrides.get("COOKIE_SECURE") or os.getenv("COOKIE_SECURE", "false")).lower() == "true",
+        "cookie_samesite": overrides.get("COOKIE_SAMESITE") or os.getenv("COOKIE_SAMESITE", "lax"),
+        "environment": overrides.get("ENVIRONMENT") or os.getenv("ENVIRONMENT", "development"),
+        "remote_access_mode": overrides.get("REMOTE_ACCESS_MODE") or os.getenv("REMOTE_ACCESS_MODE", "local_only"),
         "pdf_converter_bin": overrides.get("PDF_CONVERTER_BIN") or os.getenv("PDF_CONVERTER_BIN", "soffice"),
         "local_ai_enabled": local_ai_enabled_value.lower() == "true",
         "local_ai_provider": overrides.get("LOCAL_AI_PROVIDER") or os.getenv("LOCAL_AI_PROVIDER", "disabled"),

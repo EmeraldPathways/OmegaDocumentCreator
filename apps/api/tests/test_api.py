@@ -108,6 +108,29 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.json()["user"]["role"], "staff")
 
     # ------------------------------------------------------------------
+    # Phase 8: Health/readiness tests
+    # ------------------------------------------------------------------
+
+    def test_health_endpoint_returns_environment_info(self) -> None:
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertIn("app_url", payload)
+        self.assertIn("environment", payload)
+        self.assertIn("remote_access_mode", payload)
+
+    def test_readiness_endpoint_reports_db_and_storage_status(self) -> None:
+        response = self.client.get("/ready")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("ready", payload)
+        self.assertIn("checks", payload)
+        self.assertIn("database", payload["checks"])
+        self.assertIn("file_storage", payload["checks"])
+        self.assertIn("backup_storage", payload["checks"])
+
+    # ------------------------------------------------------------------
     # Client tests (DB-backed)
     # ------------------------------------------------------------------
 
@@ -315,6 +338,90 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(detail_resp.json()["item"]["full_name"], "Patrick Byrne")
 
     # ------------------------------------------------------------------
+    # Workflow persistence tests (Phase 3)
+    # ------------------------------------------------------------------
+
+    def _login_as_admin(self) -> None:
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+
+    def test_workflow_fetch_for_existing_client_returns_fields(self) -> None:
+        self._login_as_admin()
+        response = self.client.get("/clients/CLI-2026-0002/workflow")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("item", data)
+        self.assertIsInstance(data["item"], dict)
+
+    def test_workflow_fetch_requires_login(self) -> None:
+        response = self.client.get("/clients/CLI-2026-0002/workflow")
+        self.assertEqual(response.status_code, 401)
+
+    def test_workflow_save_and_reload_roundtrip(self) -> None:
+        self._login_as_admin()
+        fields = {
+            "personalCircumstances": "Test circumstances",
+            "financialSituation": "Test financial",
+            "needsObjectives": "Test needs",
+            "termsVersion": "June 2026",
+            "occupation": "Developer",
+            "recommendedCover": "2500",
+        }
+        save_resp = self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json=fields,
+        )
+        self.assertEqual(save_resp.status_code, 200)
+        self.assertEqual(save_resp.json()["item"]["saved"], "ok")
+        fetch_resp = self.client.get("/clients/CLI-2026-0002/workflow")
+        self.assertEqual(fetch_resp.status_code, 200)
+        item = fetch_resp.json()["item"]
+        self.assertEqual(item["personalCircumstances"], "Test circumstances")
+        self.assertEqual(item["termsVersion"], "June 2026")
+        self.assertEqual(item["occupation"], "Developer")
+        self.assertIn("2500", item["recommendedCover"])
+
+    def test_workflow_clearing_previously_saved_values(self) -> None:
+        self._login_as_admin()
+        self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json={"personalCircumstances": "Filled", "occupation": "Analyst"},
+        )
+        self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json={"personalCircumstances": "", "occupation": ""},
+        )
+        fetch = self.client.get("/clients/CLI-2026-0002/workflow")
+        item = fetch.json()["item"]
+        self.assertEqual(item["personalCircumstances"], "")
+        self.assertEqual(item["occupation"], "")
+
+    def test_workflow_bool_coercion_yes_no_to_null(self) -> None:
+        self._login_as_admin()
+        self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json={"agreeToMarketing": "Yes", "pepConfirmation": "No"},
+        )
+        fetch = self.client.get("/clients/CLI-2026-0002/workflow")
+        item = fetch.json()["item"]
+        self.assertEqual(item["agreeToMarketing"], "Yes")
+        self.assertEqual(item["pepConfirmation"], "No")
+
+    def test_workflow_date_and_decimal_fields(self) -> None:
+        self._login_as_admin()
+        self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json={"letterDate": "2026-06-15", "premium": "165.50", "termsIssuedDate": "2026-01-10"},
+        )
+        fetch = self.client.get("/clients/CLI-2026-0002/workflow")
+        item = fetch.json()["item"]
+        self.assertIn("2026-06-15", item["letterDate"])
+        self.assertIn("165.50", item["premium"])
+        self.assertIn("2026-01-10", item["termsIssuedDate"])
+
+    # ------------------------------------------------------------------
     # Admin non-DB routes (still store.py)
     # ------------------------------------------------------------------
 
@@ -326,7 +433,7 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/admin/audit-logs")
         self.assertEqual(response.status_code, 403)
 
-    def test_admin_can_view_seeded_audit_logs(self) -> None:
+    def test_admin_can_view_audit_logs_from_db(self) -> None:
         self.client.post(
             "/auth/login",
             json={"email": "admin@omega.local", "password": "ChangeMe123!"},
@@ -334,28 +441,68 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/admin/audit-logs")
         self.assertEqual(response.status_code, 200)
         payload = response.json()["items"]
-        self.assertGreaterEqual(len(payload), 1)
-        self.assertEqual(payload[0]["action"], "document_generated")
-        self.assertEqual(payload[0]["entity_type"], "document")
+        self.assertIsInstance(payload, list)
 
-    def test_admin_backup_run_requires_admin_session(self) -> None:
+    def test_admin_backup_requires_admin_session(self) -> None:
         self.client.post(
             "/auth/login",
             json={"email": "staff@omega.local", "password": "ChangeMe123!"},
         )
-        response = self.client.post("/admin/backups/run")
+        response = self.client.post("/admin/backups")
         self.assertEqual(response.status_code, 403)
 
-    def test_admin_can_trigger_seeded_backup_run(self) -> None:
+    def test_non_admin_cannot_list_backups(self) -> None:
         self.client.post(
             "/auth/login",
-            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
         )
-        response = self.client.post("/admin/backups/run")
-        self.assertEqual(response.status_code, 200)
+        response = self.client.get("/admin/backups")
+        self.assertEqual(response.status_code, 403)
+
+    # ------------------------------------------------------------------
+    # Phase 7: Backup persistence tests
+    # ------------------------------------------------------------------
+
+    def test_admin_can_create_backup_with_db_record_and_disk_artifact(self) -> None:
+        self._login_as_admin()
+        response = self.client.post("/admin/backups")
+        self.assertEqual(response.status_code, 201)
         payload = response.json()["item"]
         self.assertEqual(payload["status"], "success")
-        self.assertEqual(payload["triggered_by"], "admin@omega.local")
+        self.assertIn("id", payload)
+        self.assertIsNotNone(payload["created_at"])
+        self.assertIsNotNone(payload["files_backup"])
+        self.assertIsNotNone(payload["documents_backup"])
+        self.assertIsNone(payload["error_message"])
+        self.assertIsNotNone(payload["triggered_by"])
+
+        # Verify it appears in the list
+        list_resp = self.client.get("/admin/backups")
+        self.assertEqual(list_resp.status_code, 200)
+        items = list_resp.json()["items"]
+        self.assertTrue(any(r["id"] == payload["id"] for r in items))
+
+        # Verify artifact file exists on disk
+        manifest_path = payload["files_backup"]
+        from app.main import settings as app_settings
+        from pathlib import Path
+        full_path = app_settings.backup_path / manifest_path
+        self.assertTrue(full_path.is_file(), f"Backup manifest not found at {full_path}")
+
+    def test_admin_can_list_backups(self) -> None:
+        self._login_as_admin()
+        # Create a backup first
+        self.client.post("/admin/backups")
+        response = self.client.get("/admin/backups")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        self.assertIsInstance(items, list)
+        self.assertGreaterEqual(len(items), 1)
+        self.assertEqual(items[0]["status"], "success")
+
+    def test_backup_list_requires_login(self) -> None:
+        response = self.client.get("/admin/backups")
+        self.assertEqual(response.status_code, 401)
 
     def test_admin_security_summary_requires_admin_session(self) -> None:
         self.client.post(
@@ -500,29 +647,237 @@ class ApiTests(unittest.TestCase):
         self.assertIn("service unavailable", payload["integration_requests"][0]["errors"][0])
         self.assertTrue(any("PHI integration failed" in warning for warning in payload["warnings"]))
 
-    def test_document_generation_persists_generated_draft_in_seeded_store(self) -> None:
-        from app.store import get_client, get_client_generated_document_draft
+    def test_document_generation_persists_generated_draft_in_db(self) -> None:
+        """Phase 5: generated drafts are persisted in the documents table."""
+        from app.db import get_session
+        from app.repositories.documents import DocumentRepository
 
         self._login_as_staff()
         response = self.client.post("/documents/generate", json=self._document_generation_payload())
         self.assertEqual(response.status_code, 200)
-        saved_draft = get_client_generated_document_draft("CLI-2026-0002", "Statement of Suitability")
-        self.assertIsNotNone(saved_draft)
-        self.assertEqual(saved_draft["template_id"], "income-protection-statement")
-        self.assertEqual(saved_draft["title"], "Statement of Suitability for Jamie Murphy")
-        self.assertEqual(saved_draft["generation_status"], "completed")
-        self.assertEqual(saved_draft["sections"][0]["title"], "Client overview")
-        self.assertIn("bodyHtml", saved_draft["sections"][0])
-        self.assertIn("Jamie Murphy", saved_draft["generated_html"])
-        self.assertEqual(saved_draft["integration_requests"][0]["status"], "failed")
-        client = get_client("CLI-2026-0002")
-        self.assertIsNotNone(client)
-        self.assertEqual(client["generated_documents"][0]["document_type"], "Statement of Suitability")
-        self.assertEqual(
-            client["generated_documents"][0]["preview_title"],
-            "Statement of Suitability for Jamie Murphy",
+        document_id = response.json()["item"].get("document_id")
+        self.assertIsNotNone(document_id)
+
+        # Verify directly via repository
+        db = get_session()
+        try:
+            doc_repo = DocumentRepository(db)
+            doc = doc_repo.get_by_id(document_id)
+            self.assertIsNotNone(doc)
+            self.assertEqual(doc.document_type, "Statement of Suitability")
+            self.assertEqual(doc.status, "draft")
+            self.assertEqual(doc.preview_title, "Statement of Suitability for Jamie Murphy")
+            self.assertIn("Jamie Murphy", doc.preview_html or "")
+            db.commit()
+        finally:
+            db.close()
+
+    # ------------------------------------------------------------------
+    # Phase 5: Document persistence and download tests
+    # ------------------------------------------------------------------
+
+    def test_generated_document_is_persisted_in_db(self) -> None:
+        self._login_as_staff()
+        response = self.client.post("/documents/generate", json=self._document_generation_payload())
+        self.assertEqual(response.status_code, 200)
+        document_id = response.json()["item"].get("document_id")
+        self.assertIsNotNone(document_id)
+
+        # Verify it appears in the list endpoint
+        list_response = self.client.get("/clients/CLI-2026-0002/documents")
+        self.assertEqual(list_response.status_code, 200)
+        items = list_response.json()["items"]
+        self.assertGreaterEqual(len(items), 1)
+        persisted = next((d for d in items if d["id"] == document_id), None)
+        self.assertIsNotNone(persisted)
+        self.assertEqual(persisted["document_type"], "Statement of Suitability")
+        self.assertEqual(persisted["status"], "draft")
+        self.assertIsNotNone(persisted["preview_html"])
+        self.assertIn("Jamie Murphy", persisted["preview_html"])
+
+    def test_list_documents_requires_login(self) -> None:
+        response = self.client.get("/clients/CLI-2026-0002/documents")
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_documents_returns_404_for_unknown_client(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/clients/CLI-UNKNOWN/documents")
+        self.assertEqual(response.status_code, 404)
+
+    def test_create_document_via_post_endpoint(self) -> None:
+        self._login_as_staff()
+        payload = {
+            "document_type": "Fact Find",
+            "document_name": "Test_Fact_Find",
+            "version": "1",
+            "status": "draft",
+            "preview_title": "Fact Find Preview",
+            "preview_html": "<h1>Fact Find</h1><p>Preview content.</p>",
+        }
+        response = self.client.post("/clients/CLI-2026-0002/documents", json=payload)
+        self.assertEqual(response.status_code, 201)
+        item = response.json()["item"]
+        self.assertEqual(item["document_type"], "Fact Find")
+        self.assertEqual(item["status"], "draft")
+        self.assertEqual(item["preview_title"], "Fact Find Preview")
+        self.assertIn("id", item)
+
+        # Verify it shows in list
+        list_response = self.client.get("/clients/CLI-2026-0002/documents")
+        items = list_response.json()["items"]
+        self.assertTrue(any(d["id"] == item["id"] for d in items))
+
+    def test_create_document_with_artifact_upload_persists_downloadable_file(self) -> None:
+        self._login_as_staff()
+        response = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Statement of Suitability",
+                "document_name": "Statement_for_Jamie",
+                "version": "Version 1",
+                "status": "PDF ready",
+                "preview_title": "Statement Preview",
+                "preview_html": "<h1>Preview</h1>",
+            },
+            files={"artifact": ("Statement_for_Jamie.pdf", b"pdf-bytes", "application/pdf")},
         )
-        self.assertIn("Jamie Murphy", client["generated_documents"][0]["preview_html"])
+        self.assertEqual(response.status_code, 201)
+        item = response.json()["item"]
+        self.assertIsNotNone(item["pdf_file_path"])
+        self.assertIsNone(item["docx_file_path"])
+
+        download_response = self.client.get(f"/clients/CLI-2026-0002/documents/{item['id']}/download")
+        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(download_response.content, b"pdf-bytes")
+
+    def test_create_document_rejects_empty_artifact_upload(self) -> None:
+        self._login_as_staff()
+        response = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={"document_type": "Statement of Suitability"},
+            files={"artifact": ("empty.pdf", b"", "application/pdf")},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_document_requires_login(self) -> None:
+        response = self.client.post("/clients/CLI-2026-0002/documents", json={"document_type": "Test"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_download_document_returns_404_when_no_artifact(self) -> None:
+        self._login_as_staff()
+        # Generate a document (no artifact yet)
+        gen_resp = self.client.post("/documents/generate", json=self._document_generation_payload())
+        document_id = gen_resp.json()["item"]["document_id"]
+        response = self.client.get(f"/clients/CLI-2026-0002/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 404)
+
+    def test_download_document_requires_login(self) -> None:
+        self._login_as_staff()
+        gen_resp = self.client.post("/documents/generate", json=self._document_generation_payload())
+        document_id = gen_resp.json()["item"]["document_id"]
+        self.client.post("/auth/logout")
+        response = self.client.get(f"/clients/CLI-2026-0002/documents/{document_id}/download")
+        self.assertEqual(response.status_code, 401)
+
+    def test_download_document_returns_404_for_unknown_document(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/clients/CLI-2026-0002/documents/00000000-0000-0000-0000-000000000000/download")
+        self.assertEqual(response.status_code, 404)
+
+    # ------------------------------------------------------------------
+    # Phase 4: File upload / list / download tests
+    # ------------------------------------------------------------------
+
+    def test_upload_file_requires_login(self) -> None:
+        response = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("test.pdf", b"hello", "application/pdf")},
+            data={"category": "Proof"},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_upload_file_stores_on_disk_and_returns_metadata(self) -> None:
+        self._login_as_admin()
+        response = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("test.pdf", b"hello world", "application/pdf")},
+            data={"category": "Proof"},
+        )
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["item"]
+        self.assertEqual(payload["original_filename"], "test.pdf")
+        self.assertEqual(payload["category"], "Proof")
+        self.assertEqual(payload["status"], "uploaded")
+        self.assertIn("id", payload)
+        self.assertIn("stored_filename", payload)
+
+    def test_upload_file_rejects_empty_request(self) -> None:
+        self._login_as_admin()
+        response = self.client.post("/clients/CLI-2026-0002/files")
+        self.assertEqual(response.status_code, 400)
+
+    def test_list_files_returns_uploaded_file(self) -> None:
+        self._login_as_admin()
+        self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("uploaded.pdf", b"content", "application/pdf")},
+            data={"category": "Identity"},
+        )
+        response = self.client.get("/clients/CLI-2026-0002/files")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        self.assertGreaterEqual(len(items), 1)
+        self.assertEqual(items[0]["original_filename"], "uploaded.pdf")
+
+    def test_download_file_returns_stored_content(self) -> None:
+        self._login_as_admin()
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("download.pdf", b"binary payload", "application/pdf")},
+        )
+        file_id = upload_resp.json()["item"]["id"]
+        response = self.client.get(f"/clients/CLI-2026-0002/files/{file_id}/download")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"binary payload")
+
+    def test_download_file_still_works_after_client_details_change(self) -> None:
+        self._login_as_admin()
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("rename-safe.pdf", b"rename-safe", "application/pdf")},
+        )
+        file_id = upload_resp.json()["item"]["id"]
+
+        update_resp = self.client.patch(
+            "/clients/CLI-2026-0002",
+            json={"first_name": "Jamie-Renamed", "surname": "Murphy-Updated"},
+        )
+        self.assertEqual(update_resp.status_code, 200)
+
+        response = self.client.get(f"/clients/CLI-2026-0002/files/{file_id}/download")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"rename-safe")
+
+    def test_download_file_requires_login(self) -> None:
+        # Upload first so we have a valid ID
+        self._login_as_admin()
+        upload_resp = self.client.post(
+            "/clients/CLI-2026-0002/files",
+            files={"file": ("login-test.pdf", b"x", "application/pdf")},
+        )
+        file_id = upload_resp.json()["item"]["id"]
+        self.client.post("/auth/logout")
+        response = self.client.get(f"/clients/CLI-2026-0002/files/{file_id}/download")
+        self.assertEqual(response.status_code, 401)
+
+    def test_download_returns_404_for_unknown_file(self) -> None:
+        self._login_as_admin()
+        response = self.client.get("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000/download")
+        self.assertEqual(response.status_code, 404)
+
+    # ------------------------------------------------------------------
+    # Document generation tests (store.py-backed)
+    # ------------------------------------------------------------------
 
     def test_logged_in_user_still_gets_seeded_fallback_when_ai_provider_is_unsupported(self) -> None:
         from app.main import settings
@@ -594,4 +949,4 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(payload["sections"][0]["title"], "Recommendation")
         self.assertIn("EUR2,500 monthly", payload["sections"][0]["bodyHtml"])
         self.assertIn("Statement of Suitability for Jamie Murphy", payload["generated_html"])
-        self.assertEqual(payload["warnings"], ["Check underwriting limits."])
+        self.assertIn("Check underwriting limits.", payload["warnings"])

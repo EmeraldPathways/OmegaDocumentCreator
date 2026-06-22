@@ -8,10 +8,9 @@ __all__ = ["AuditLogRepository"]
 
 
 class AuditLogRepository:
-    """Repository seam for audit log persistence.
+    """DB-backed audit log repository.
 
-    Not yet wired into routes — Phase 2+ cutover will replace store.py audit
-    operations with this repository.
+    Replaces store.py seeded audit log reads and writes.
     """
 
     def __init__(self, db: Session) -> None:
@@ -38,3 +37,17 @@ class AuditLogRepository:
 
     def flush(self) -> None:
         self._db.flush()
+
+    @staticmethod
+    def to_response(entry: AuditLog) -> dict[str, object]:
+        return {
+            "id": str(entry.id),
+            "user_id": str(entry.user_id) if entry.user_id else None,
+            "client_id": str(entry.client_id) if entry.client_id else None,
+            "action": entry.action,
+            "entity_type": entry.entity_type,
+            "entity_id": entry.entity_id,
+            "details": entry.details,
+            "ip_address": entry.ip_address,
+            "created_at": entry.created_at.isoformat() if entry.created_at else None,
+        }

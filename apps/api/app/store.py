@@ -432,30 +432,6 @@ def list_clients() -> list[dict[str, str]]:
     ]
 
 
-def list_audit_logs() -> list[dict[str, str]]:
-    return deepcopy(SEEDED_AUDIT_LOGS)
-
-
-def create_backup_run(*, triggered_by: str) -> dict[str, str]:
-    item = {
-        "id": f"BKP-{len(SEEDED_BACKUP_RUNS) + 1:04d}",
-        "status": "success",
-        "triggered_by": triggered_by,
-        "database_backup": "database/omega-2026-06-06.sql",
-        "files_backup": "files/clients-2026-06-06.zip",
-        "documents_backup": "documents/generated-2026-06-06.zip",
-        "created_at": "2026-06-06T15:00:00+00:00",
-    }
-    SEEDED_BACKUP_RUNS.insert(0, item)
-    return deepcopy(item)
-
-
-def latest_backup_run() -> dict[str, str] | None:
-    if not SEEDED_BACKUP_RUNS:
-        return None
-    return deepcopy(SEEDED_BACKUP_RUNS[0])
-
-
 def get_security_summary() -> dict[str, str]:
     return deepcopy(SECURITY_SUMMARY_TEMPLATE)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.models import File
@@ -17,10 +19,15 @@ class FileRepository:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def list_by_client(self, client_id: str) -> list[File]:
-        return self._db.query(File).filter(File.client_id == client_id).order_by(File.uploaded_at.desc()).all()
+    def list_by_client(self, client_id: uuid.UUID) -> list[File]:
+        return (
+            self._db.query(File)
+            .filter(File.client_id == client_id)
+            .order_by(File.uploaded_at.desc())
+            .all()
+        )
 
-    def get_by_id(self, file_id: str) -> File | None:
+    def get_by_id(self, file_id: uuid.UUID) -> File | None:
         return self._db.query(File).filter(File.id == file_id).first()
 
     def add(self, file_obj: File) -> None:

@@ -8,10 +8,9 @@ __all__ = ["BackupRepository"]
 
 
 class BackupRepository:
-    """Repository seam for backup run persistence.
+    """DB-backed backup run repository.
 
-    Not yet wired into routes — Phase 2+ cutover will use this for persistent
-    backup history.
+    Replaces store.py seeded backup run storage.
     """
 
     def __init__(self, db: Session) -> None:
@@ -30,3 +29,16 @@ class BackupRepository:
 
     def flush(self) -> None:
         self._db.flush()
+
+    @staticmethod
+    def to_response(run: BackupRun) -> dict[str, object]:
+        return {
+            "id": str(run.id),
+            "status": run.status,
+            "triggered_by": str(run.triggered_by) if run.triggered_by else None,
+            "database_backup": run.database_backup,
+            "files_backup": run.files_backup,
+            "documents_backup": run.documents_backup,
+            "error_message": run.error_message,
+            "created_at": run.created_at.isoformat() if run.created_at else None,
+        }

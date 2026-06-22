@@ -255,6 +255,17 @@ export function paginatePdfContent(htmlContent: string) {
   return splitContentIntoPages(htmlContent);
 }
 
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 function buildPageHtml(content: string, pageNumber: number, totalPages: number) {
   return `
     <div class="pdf-page" style="
@@ -302,14 +313,13 @@ function canRenderCanvas() {
   );
 }
 
-export async function exportHtmlToPdf(html: string, filename: string) {
+export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
   if (!canRenderCanvas()) {
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const text = stripHtml(html);
     const lines = pdf.splitTextToSize(text, 170);
     pdf.text(lines, 20, 20);
-    pdf.save(filename);
-    return;
+    return pdf.output("blob");
   }
 
   const parsedContent = buildPdfStyledHtml(html, true);
@@ -416,8 +426,14 @@ export async function exportHtmlToPdf(html: string, filename: string) {
       }
     }
 
-    pdf.save(filename);
+    return pdf.output("blob");
   } finally {
     document.body.removeChild(container);
   }
+}
+
+export async function exportHtmlToPdf(html: string, filename: string) {
+  const blob = await buildPdfBlobFromHtml(html);
+  downloadBlob(blob, filename);
+  return blob;
 }

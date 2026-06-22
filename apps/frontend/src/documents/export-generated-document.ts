@@ -1,7 +1,7 @@
 import type { SeededClientProfile } from "../data/seeded-clients";
 import { sanitizeGeneratedHtml } from "./document-api";
-import { exportHtmlToPdf } from "./pdf-export";
-import { exportHtmlToWord } from "./word-export";
+import { buildPdfBlobFromHtml, exportHtmlToPdf } from "./pdf-export";
+import { buildWordBlobFromHtml, exportHtmlToWord } from "./word-export";
 import { buildWorkflowDocument, type WorkflowDocumentType } from "./workflow-document-builders";
 import { resolveDraftPreviewHtml } from "./document-preview";
 
@@ -211,11 +211,30 @@ export async function exportGeneratedDocument(
   const document = resolveExportDocument(profile, documentType, override);
 
   if (extension === "pdf") {
-    await exportHtmlToPdf(document.html, filename);
-    return;
+    return exportHtmlToPdf(document.html, filename);
   }
 
-  await exportHtmlToWord(document.html, filename, {
+  return exportHtmlToWord(document.html, filename, {
+    title: document.title,
+    author: "Omega Financial Management",
+    subject: document.title,
+  });
+}
+
+export async function buildGeneratedDocumentBlob(
+  profile: SeededClientProfile,
+  documentType: WorkflowDocumentType,
+  extension: "docx" | "pdf",
+  filename: string,
+  override?: ExportDocumentArtifact,
+) {
+  const document = resolveExportDocument(profile, documentType, override);
+
+  if (extension === "pdf") {
+    return buildPdfBlobFromHtml(document.html);
+  }
+
+  return buildWordBlobFromHtml(document.html, filename, {
     title: document.title,
     author: "Omega Financial Management",
     subject: document.title,

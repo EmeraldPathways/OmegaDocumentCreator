@@ -359,9 +359,10 @@ Current password scheme:
 
 ### Current API surface
 
-Implemented now:
+Implemented:
 
-- `GET /health`
+- `GET /health` — status + environment info
+- `GET /ready` — DB + storage availability check
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
@@ -370,22 +371,32 @@ Implemented now:
 - `GET /clients/{client_reference}`
 - `PATCH /clients/{client_reference}`
 - `PATCH /clients/{client_reference}/archive`
+- `GET /clients/{client_reference}/workflow` — DB-backed
+- `PUT /clients/{client_reference}/workflow` — DB-backed
+- `POST /clients/{client_reference}/files` — multipart upload
+- `GET /clients/{client_reference}/files`
+- `GET /clients/{client_reference}/files/{file_id}/download`
+- `POST /documents/generate`
+- `GET /clients/{client_reference}/documents`
+- `POST /clients/{client_reference}/documents` — with optional artifact upload
+- `GET /clients/{client_reference}/documents/{document_id}/download`
 - `GET /admin/users`
-- `GET /admin/audit-logs`
-- `GET /admin/security-summary`
-- `POST /admin/backups/run`
 - `POST /admin/users`
 - `PATCH /admin/users/{email}`
 - `PATCH /admin/users/{email}/disable`
-- `POST /documents/generate`
+- `GET /admin/audit-logs` — DB-backed
+- `GET /admin/backups` — DB-backed
+- `POST /admin/backups` — DB-backed + manifest artifact
+- `GET /admin/security-summary`
 
 Not yet implemented:
 
-- persistent DB-backed repositories
-- files endpoints
-- documents download/save endpoints beyond generation
-- backup endpoints
-- dedicated Income Protection persistence endpoints
+- Database dump/restore (pg_dump)
+- Restore operations
+- Backup scheduling
+- Document pack ZIP download
+- File/document deletion endpoints
+- Session table in PostgreSQL
 
 ## Frontend Details
 
@@ -515,20 +526,14 @@ These are not blocking the current scaffold.
 
 The biggest remaining gaps are:
 
-- PostgreSQL persistence is not wired into the running app
-- migrations are defined for the MVP schema but not wired into runtime repositories
-- no SQLAlchemy models or repositories yet
-- no persisted audit logs
-- no file uploads
-- no client folder management
-- no persisted Income Protection workflows
-- no persisted Terms of Business workflow
-- no persisted Statement of Suitability workflow
-- no persisted file upload workflow
-- no durable filesystem/database storage for generated documents
-- no real backups
-- generated-document history is not database-backed
-- no live remote-access infrastructure wiring
+- PostgreSQL database dump/restore (backup manifests record metadata only; no pg_dump integration)
+- Restore operations from backup manifests
+- Automated backup scheduling
+- Document pack ZIP download
+- File/document deletion endpoints
+- Session table in PostgreSQL
+- Frontend `localStorage` still used for immediate UX caching (backend-backed on save)
+- Remote access is config/runtime wiring only — no full Cloudflare Tunnel or VPN automation
 
 ## Delivery Plan
 

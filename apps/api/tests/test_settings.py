@@ -4,6 +4,8 @@ import unittest
 
 from app.config import AppSettings, ensure_storage_directories
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 
 class SettingsTests(unittest.TestCase):
     def test_environment_values_are_loaded_and_normalized(self) -> None:
@@ -17,8 +19,8 @@ class SettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.database_url, "postgresql://db")
-        self.assertEqual(settings.file_storage_path, Path("storage/clients"))
-        self.assertEqual(settings.backup_path, Path("storage/backups"))
+        self.assertEqual(settings.file_storage_path, (PROJECT_ROOT / "storage/clients").resolve())
+        self.assertEqual(settings.backup_path, (PROJECT_ROOT / "storage/backups").resolve())
         self.assertEqual(settings.session_timeout_minutes, 30)
 
     def test_storage_directories_are_created(self) -> None:

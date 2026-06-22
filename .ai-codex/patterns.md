@@ -5,6 +5,7 @@
 - Backend sets the cookie on `POST /auth/login`.
 - Frontend validates an existing session with `GET /auth/me`.
 - No Bearer token flow exists.
+- Audit entries are created for login success and logout (not failed attempts).
 
 ```ts
 await fetch("/auth/me");
@@ -29,15 +30,61 @@ await fetch("/auth/me");
 }
 ```
 
-3. `document_generation.py` builds the prompt and fallback/integration behavior.
+3. `document_generation.py` builds the prompt, runs AI/fallback, and persists metadata + frozen HTML snapshot in PostgreSQL via `DocumentRepository`.
 4. `document-api.ts` normalizes the backend response into camelCase fields.
 5. `workflow-document-builders.ts` + `document-composer.ts` produce the styled exportable HTML.
+
+## DB-backed repository pattern (all Phases 2-7)
+
+Every live route uses this pattern:
+
+```python
+db = get_session()
+try:
+    repo = SomeRepository(db)
+    # operate, then db.commit()
+    return result
+finally:
+    db.close()
+```
+
+Repositories accept a `Session`, return models or dicts, and do not own session lifecycle.
+
+## Persisted relative-path download pattern (Phases 4-5)
+
+1. File/document artifacts stored on disk under `FILE_STORAGE_PATH` via `ClientStorage.save_file()`
+2. Relative path from `FILE_STORAGE_PATH` persisted in DB
+3. Download endpoints resolve via `ClientStorage.read_relative_file()` with path traversal guard
+4. Raw filesystem paths never exposed to clients
+
+## Audit logging pattern (Phase 6)
+
+```python
+_log_audit(request, db=db, action="client_created", entity_type="client",
+           entity_id=client_ref, details={"full_name": name})
+```
+- Called after successful actions only (not before, not on failure)
+- Admin audit-logs route reads from PostgreSQL via `AuditLogRepository.list_recent()`
+
+## Backup manifest pattern (Phase 7)
+
+- `POST /admin/backups` calls `create_backup_manifest()` which writes a JSON manifest under `BACKUP_PATH/manifests/`
+- Backup run persisted in DB via `BackupRepository` with manifest path in `files_backup`/`documents_backup`
+- No external binaries required; scans filesystem for stats
+
+## Health/readiness pattern (Phase 8)
+
+- `/health` — `{ status, app_url, environment, remote_access_mode }`
+- `/ready` — `{ ready: bool, checks: { database, file_storage, backup_storage } }`
+- CORS middleware applied only when `CORS_ORIGINS` is explicitly set
+- Cookie security: `https_only` from `COOKIE_SECURE`, `same_site` from `COOKIE_SAMESITE`
+- Startup validates SESSION_SECRET, APP_URL, CORS_ORIGINS for non-dev environments
 
 ## Session handling
 
 - Backend session keys in live code: `user_email`, `last_seen_at`
 - No `role` session key is stored directly.
-- Admin checks happen after `_current_user()` resolves the user record from `store.py`.
+- Admin checks happen after `_current_user()` resolves the user record from PostgreSQL (via `UserRepository`).
 
 ## Password helpers
 
@@ -49,8 +96,9 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 
 ## Frontend workflow persistence
 
-- `client-data-context.tsx` is the only frontend workflow persistence layer.
-- It writes browser state to `localStorage` under `omega-client-records`.
+- `client-data-context.tsx` writes browser state to `localStorage` under `omega-client-records`.
+- Workflow saves are backed by `PUT /clients/{ref}/workflow` (PostgreSQL via `WorkflowRepository`).
+- Frontend loads workflow from backend on client change via `fetchWorkflow()`.
 - Selected auth user is mirrored separately in `sessionStorage`.
 
 ## Local run paths
@@ -69,3 +117,4 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 - Do not document unused routed pages as live UX.
 - Do not describe Terms of Business as a live Income Protection tab unless `moduleTabs` is changed.
 - Do not describe `/clients` as supporting `?search=` unless backend code adds it.
+- Do not describe audit logs or backups as seeded/in-memory — both are now PostgreSQL-backed.

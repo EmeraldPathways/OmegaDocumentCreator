@@ -8,10 +8,9 @@ __all__ = ["DocumentRepository"]
 
 
 class DocumentRepository:
-    """Repository seam for document persistence.
+    """Repository for generated document persistence.
 
-    Not yet wired into routes — Phase 2+ cutover will replace store.py document
-    operations with this repository.
+    Replaces store.py draft storage and seeded generated-document history.
     """
 
     def __init__(self, db: Session) -> None:
@@ -30,6 +29,16 @@ class DocumentRepository:
 
     def add(self, document: Document) -> None:
         self._db.add(document)
+
+    def update_artifact_paths(self, document_id: str, *, docx_path: str | None = None, pdf_path: str | None = None) -> Document | None:
+        doc = self.get_by_id(document_id)
+        if doc is None:
+            return None
+        if docx_path is not None:
+            doc.docx_file_path = docx_path
+        if pdf_path is not None:
+            doc.pdf_file_path = pdf_path
+        return doc
 
     def get_terms(self, client_id: str) -> TermsOfBusiness | None:
         return self._db.query(TermsOfBusiness).filter(TermsOfBusiness.client_id == client_id).first()

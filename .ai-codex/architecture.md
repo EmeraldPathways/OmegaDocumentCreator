@@ -3,25 +3,26 @@
 ## Stack
 
 - Frontend: React + TypeScript, Vite, React Router
-- Backend: FastAPI + Python, Starlette `SessionMiddleware`
-- Database: PostgreSQL migration exists; runtime still uses seeded in-memory stores
+- Backend: FastAPI + Python, Starlette `SessionMiddleware`, PostgreSQL via SQLAlchemy
+- Database: PostgreSQL (live); SQLAlchemy models full-coverage; repositories wired into all routes
 - Auth: Session cookie with `user_email` and `last_seen_at`
 - AI: Gemini transport via `ai.py`; seeded fallback decided in `document_generation.py`
 - Documents: workflow builders + document composer -> preview/edit -> PDF/DOCX export
 - Deployment: Windows-first local run scripts plus Docker Compose files
 
-## Current persistence state
+## Current persistence state (PostgreSQL-backed)
 
 | Layer | Status |
 |-------|--------|
-| Users | In-memory (`store.py`) |
+| Users | PostgreSQL via `UserRepository` |
 | Session identity | Cookie session middleware |
-| Clients | In-memory (`store.py`) |
-| Workflow drafts | Browser storage via `client-data-context.tsx` |
-| File metadata | Browser storage + seeded defaults |
-| Generated document history | In-memory backend copies plus browser-backed frontend state |
-| Audit logs | In-memory seeded |
-| Backup runs | In-memory seeded |
+| Clients | PostgreSQL via `ClientRepository` |
+| Workflow drafts | PostgreSQL via `WorkflowRepository` (/clients/*/workflow) |
+| Uploaded files | Disk + PostgreSQL via `FileRepository` |
+| Generated document history | PostgreSQL via `DocumentRepository` |
+| Exported artifacts (PDF/DOCX) | Disk under FILE_STORAGE_PATH with relative paths in DB |
+| Audit logs | PostgreSQL via `AuditLogRepository` |
+| Backup runs | PostgreSQL via `BackupRepository` with manifest artifacts on disk under BACKUP_PATH |
 
 ## Live boundaries
 
@@ -29,13 +30,18 @@
 Frontend
   -> /auth/*
   -> /clients/*
-  -> /admin/*
+  -> /clients/{ref}/workflow
+  -> /clients/{ref}/files
+  -> /clients/{ref}/documents
   -> /documents/generate
+  -> /admin/*
+  -> /health, /ready
 
-/documents/generate
+/document/generate
   -> document_generation.py
   -> ai.py
-  -> store.py save_generated_document_draft()
+  -> DocumentRepository -> PostgreSQL (document records + frozen HTML)
+  -> ClientRepository -> PostgreSQL (client lookup)
 
 Income Protection UI
   -> generated-output-workspace.tsx
@@ -52,6 +58,16 @@ Income Protection UI
 4. The live local startup ports are `127.0.0.1:3007` for frontend and `127.0.0.1:8007` for backend.
 5. Client references use the `CLI-YYYY-NNNN` format from `domain/clients.py`.
 
+## Remote-access wiring (Phase 8)
+
+- CORS middleware applied when `CORS_ORIGINS` env var is set; `allow_credentials=True`
+- Session cookie security: `https_only` from `COOKIE_SECURE`, `same_site` from `COOKIE_SAMESITE`
+- Proxy-aware handling documented; uvicorn `--proxy-headers` recommended for production
+- Startup validates SESSION_SECRET, APP_URL, CORS_ORIGINS, TRUSTED_PROXY_COUNT for non-dev environments
+- Startup checks FILE_STORAGE_PATH and BACKUP_PATH directory existence
+- `/health` returns status + environment + remote_access_mode
+- `/ready` returns ready boolean + per-check DB and storage availability
+
 ## Useful implementation notes
 
 - `App.tsx` routes `/` directly to `/income-protection`; dashboard/document hub pages exist but are not wired.
@@ -60,9 +76,8 @@ Income Protection UI
 
 ## Not yet implemented
 
-- Runtime PostgreSQL repositories
-- Backend workflow persistence APIs
-- Real file upload/download
-- Durable generated-document storage/download
-- Real backup execution
+- Full PostgreSQL dump/restore operations (backup manifest records metadata only; no pg_dump integration)
+- Restore functionality from backup manifests
 - Document pack ZIP download
+- Automated backup scheduling
+- Session table in DB (session stored in cookie only)
