@@ -22,6 +22,7 @@ import {
   Edit,
 } from "lucide-react";
 
+import { fetchWorkflow, saveWorkflow } from "../data/workflow-api";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type {
@@ -323,6 +324,17 @@ export function IncomeProtectionPage() {
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
 
+  // Phase 3: load workflow from backend on client selection change
+  useEffect(() => {
+    if (!selectedClientReference) return;
+    let cancelled = false;
+    fetchWorkflow(selectedClientReference).then((fields) => {
+      if (cancelled) return;
+      setDraft((current) => current ? { ...current, ...fields } : current);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedClientReference]);
+
   useEffect(() => {
     setDraft(client ?? null);
   }, [client]);
@@ -394,6 +406,7 @@ export function IncomeProtectionPage() {
     return resolvedDraft.documentDrafts[documentType];
   }
 
+  // Phase 3: persist to backend alongside localStorage
   function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
     const normalizedDraft = {
       ...nextDraft,
@@ -402,6 +415,7 @@ export function IncomeProtectionPage() {
     };
     setDraft(normalizedDraft);
     saveClient(normalizedDraft);
+    saveWorkflow(normalizedDraft.clientReference, normalizedDraft).catch(() => {});
     if (options?.showToast) {
       addToast("Changes saved", "success");
     }

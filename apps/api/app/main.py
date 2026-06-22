@@ -12,6 +12,7 @@ from app.document_generation import generate_document
 from app.domain.users import UserRole, UserStatus
 from app.repositories.clients import ClientRepository
 from app.repositories.users import UserRepository
+from app.repositories.workflows import WorkflowRepository
 from app.security import hash_password, is_session_expired, verify_password
 from app.store import (
     create_backup_run,
@@ -309,6 +310,45 @@ def archive_client_record(client_reference: str, request: Request) -> dict[str, 
             raise HTTPException(status_code=404, detail="Client not found")
         db.commit()
         return {"item": item}
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Workflow routes (Phase 3 DB-backed)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/clients/{client_reference}/workflow")
+def get_workflow(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
+    _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        workflow_repo = WorkflowRepository(db)
+        fields = workflow_repo.get(client.id)
+        db.commit()
+        return {"item": fields}
+    finally:
+        db.close()
+
+
+@app.put("/clients/{client_reference}/workflow")
+def save_workflow(client_reference: str, payload: dict[str, object], request: Request) -> dict[str, dict[str, str]]:
+    _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(client_reference)
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        workflow_repo = WorkflowRepository(db)
+        workflow_repo.save(client.id, payload)
+        db.commit()
+        return {"item": {"client_reference": client_reference, "saved": "ok"}}
     finally:
         db.close()
 
