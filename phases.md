@@ -123,6 +123,20 @@ It now serves two purposes:
 - Gemini-backed generation plus seeded fallback exists
 - persisted preview HTML snapshots and generated document history exist
 
+#### Stage 22: Lifecycle And CI Hardening
+
+- deprecated `@app.on_event` replaced with lifespan context manager
+- `.github/workflows/ci.yml` added (backend pytest + frontend tsc + vitest)
+- `scripts/validate.ps1` added (one-command local validation)
+- full backend test suite (166 tests) runs against PostgreSQL
+
+#### Stage 23: Admin Audit Completion
+
+- admin user update audit now includes old/new role and name
+- admin user disable audit now includes `new_status: "disabled"`
+- 2 targeted backend tests added
+- frontend decomposition deferred — `income-protection-page.tsx` remains monolithic at 2549 lines
+
 ## Current Source Of Truth
 
 ### PostgreSQL
@@ -157,7 +171,7 @@ It now serves two purposes:
 - restore workflow still needs broader operator hardening
 - document pack excludes preview-only rows with no stored artifact
 - Cloudflare Tunnel setup is automated, but deployment remains operator-run
-- `income-protection-page.tsx` remains monolithic at ~2600 lines — further decomposition deferred
+- `income-protection-page.tsx` remains monolithic at 2549 lines — further decomposition deferred
 
 ## Post-Fix Security And Operations (2026-06)
 
@@ -280,6 +294,6 @@ Current results:
 
 | Gate | Result |
 |------|--------|
-| Backend pytest (PostgreSQL) | 117 passed, 0 failed |
 | Frontend TypeScript | 0 errors |
 | Frontend vitest | 7 files, 80 tests, 0 failed |
+| Backend (full suite) | 166 passed, 0 failed |

@@ -228,9 +228,9 @@ Current results:
 
 | Gate | Result |
 |------|--------|
-| Backend pytest (PostgreSQL) | 117 passed, 0 failed |
 | Frontend TypeScript | 0 errors |
 | Frontend vitest | 7 files, 80 tests, 0 failed |
+| Backend (full suite) | 166 passed, 0 failed |
 
 ## Gaps Between Current Code and Final Product
 
@@ -240,7 +240,7 @@ The main remaining gaps are operational hardening and product polish rather than
 - ~~`cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup~~ → session cleanup runs on startup
 - document pack skips preview-only documents that have no stored artifact files
 - Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
-- `income-protection-page.tsx` remains monolithic at ~2600 lines — further decomposition deferred
+- `income-protection-page.tsx` remains monolithic at 2549 lines — further decomposition deferred
 
 ## Post-Fix Security & Operations Improvements (2026-06)
 
@@ -349,3 +349,4 @@ Infrastructure:
 - Stage 20: complete
 - Stage 21: complete
 - Stage 22: complete
+- Stage 23: complete (admin-audit-only pass; frontend decomposition deferred)

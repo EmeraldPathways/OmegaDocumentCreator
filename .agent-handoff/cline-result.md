@@ -1,53 +1,41 @@
-# Stage 22: Lifecycle And CI Hardening
+# Stage 23: Frontend Decomposition And Admin Audit Completion
 
 ## Verdict
-**Stage 22 is complete with the required fix pass applied.** Deprecated `@app.on_event` hooks replaced with lifespan. CI automation added. Full backend test suite wired. Vitest runs as a hard gate. All doc claims about localStorage corrected to match current frontend code. Verification passes across all gates.
+**Stage 23 completed as an admin-audit-only pass.** Frontend decomposition was not delivered in this stage. No frontend behavior was changed.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `apps/api/app/main.py` | Replaced deprecated `@app.on_event("startup")` / `@app.on_event("shutdown")` with `@asynccontextmanager` lifespan. All startup/shutdown behaviors preserved. |
-| `.github/workflows/ci.yml` | New — GitHub Actions CI: backend pytest (PostgreSQL 16, full `tests/` suite) + frontend tsc + vitest |
-| `scripts/validate.ps1` | New — one-command local validation: migrations → pytest (full suite) → tsc → vitest (hard gate) |
-| `.clinerules` | New — commands that don't work in this PowerShell/Windows environment |
-| `.agent-handoff/cline-result.md` | Updated |
+| `apps/api/app/main.py` | Admin audit hardening: `user_updated` records `old_role`, `new_role`, `old_name`, `new_name`. `user_disabled` records `new_status: "disabled"`. Audit logging remains before commit. |
+| `apps/api/tests/test_api.py` | Added 2 targeted tests for admin audit detail payload shape |
+| `.agent-handoff/cline-result.md` | This file |
 | `.agent-handoff/validation-log.md` | Updated |
-| `phases.md` | Updated — corrected localStorage claims, verification baseline, test counts |
-| `PROJECT.md` | Updated — corrected localStorage claims, stage status, testing section |
-| `.ai-codex/index.md` | Updated — `client-data-context.tsx` description corrected |
-| `.ai-codex/architecture.md` | Updated — persistence state corrected |
-| `.ai-codex/patterns.md` | Updated — frontend workflow persistence description corrected |
-| `.ai-codex/scopes/persistence.md` | Updated — constraint corrected |
-| `.ai-codex/scopes/income-protection.md` | Updated — selected client state description corrected |
+| `phases.md` | Updated |
+| `PROJECT.md` | Updated |
 
 ## What Changed
 
-### 1. FastAPI lifespan migration
-- Removed `@app.on_event("startup")` and `@app.on_event("shutdown")` decorators (deprecated in FastAPI)
-- Extracted `_startup_db_check()` and `_shutdown_scheduler()` as plain functions
-- Wired via `@asynccontextmanager async def _app_lifespan(inner_app)` assigned to `app.router.lifespan_context`
-- All behaviors preserved: DB check, bootstrap seeding, session cleanup, storage checks, deploy-critical settings validation, scheduler start/stop
+### Admin audit consistency gap fixed
+- `PATCH /admin/users/{user_id}` audit details now include `old_role`, `new_role`, `old_name`, `new_name`
+- `PATCH /admin/users/{user_id}/disable` audit details now include `new_status: "disabled"`
 
-### 2. CI automation
-- `.github/workflows/ci.yml`: backend job with PostgreSQL 16 service runs `pytest tests/ -v` (full suite), frontend job runs `tsc --noEmit` + `vitest run`
-- Triggers on push/PR to main
+### 2 targeted tests
+- `test_admin_user_update_audit_includes_old_and_new_values`
+- `test_admin_user_disable_audit_includes_status`
 
-### 3. One-command local validation
-- `scripts/validate.ps1`: runs DB migrations → `pytest tests/ -v` → `tsc --noEmit` → `vitest run`
-- All gates are hard failures
-- Supports `-SkipFrontend` / `-SkipBackend` flags
-
-### 4. Doc drift fix
-The frontend code has always used `localStorage` in `client-data-context.tsx` (for client record caching) and `income-protection-page.tsx` (for selected client reference). Previous docs claimed "no localStorage persistence remains" which was incorrect. All `.ai-codex/*`, `PROJECT.md`, `phases.md`, and handoff files now accurately describe the current state: backend is authoritative for workflow persistence, client records are cached in `localStorage` for quick rehydration.
+### Frontend scope
+- `income-protection-page.tsx` remains monolithic at 2549 lines
+- frontend decomposition deferred out of this pass
+- no frontend code or behavior changed in Stage 23
 
 ## Verification Results
 
 | Gate | Result |
 |------|--------|
-| Backend pytest (full suite, PostgreSQL) | **164 passed, 0 failed** |
-| Frontend TypeScript | **0 errors** |
-| Frontend vitest | **7 files, 80 tests, 0 failed** |
+| Backend pytest (full suite, PostgreSQL) | **166 passed, 0 failed** |
+| Frontend TypeScript | **0 errors** (unchanged) |
+| Frontend vitest | **7 files, 80 tests, 0 failed** (unchanged) |
 
 ## Verification Commands
 
@@ -55,19 +43,14 @@ The frontend code has always used `localStorage` in `client-data-context.tsx` (f
 # Full backend test suite
 $env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests -v
 
-# One-command validation
-.\scripts\validate.ps1
-
-# Frontend typecheck
+# Frontend typecheck (unchanged)
 Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
 
-# Frontend tests
-Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
+# Frontend vitest (unchanged)
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
 ```
 
 ## Remaining Limitations
 
-- `income-protection-page.tsx` remains monolithic at ~2600 lines
-- `app.router.lifespan_context` assignment works; `FastAPI(lifespan=...)` constructor param would be cleaner for a future pass
-- CI requires GitHub Actions runner with Docker (PostgreSQL service container)
-- Frontend uses `localStorage` for client record caching and selected client reference; not a regression, just documentation was previously inaccurate
+- `income-protection-page.tsx` remains monolithic at 2549 lines — decomposition deferred to a future stage
+- no frontend behavior was changed in Stage 23

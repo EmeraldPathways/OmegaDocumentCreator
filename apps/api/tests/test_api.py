@@ -446,6 +446,79 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(payload["email"], "nora.kelly@omega.local")
         self.assertEqual(payload["status"], "active")
 
+    def test_admin_user_update_audit_includes_old_and_new_values(self) -> None:
+        """PATCH /admin/users/{user_id} audit details include old/new role and name."""
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        # Create a staff user
+        create_resp = self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Audit",
+                "last_name": "Target",
+                "email": "audit-target@omega.local",
+                "password": "ChangeMe123!",
+                "role": "staff",
+            },
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        user_email = create_resp.json()["item"]["email"]
+
+        # Edit the user — change role from staff to admin and rename
+        patch_resp = self.client.patch(
+            f"/admin/users/{user_email}",
+            json={
+                "first_name": "Audited",
+                "last_name": "User",
+                "role": "admin",
+            },
+        )
+        self.assertEqual(patch_resp.status_code, 200, f"PATCH failed: {patch_resp.status_code} {patch_resp.text}")
+
+        # Check audit log for the user_updated entry
+        audit_resp = self.client.get("/admin/audit-logs")
+        entries = audit_resp.json()["items"]
+        update_entries = [e for e in entries if e["action"] == "user_updated" and e["entity_id"] == user_email]
+        self.assertGreaterEqual(len(update_entries), 1, "Expected at least 1 user_updated audit entry")
+        details = update_entries[0]["details"]
+        self.assertEqual(details["old_role"], "staff")
+        self.assertEqual(details["new_role"], "admin")
+        self.assertEqual(details["old_name"], "Audit Target")
+        self.assertEqual(details["new_name"], "Audited User")
+
+    def test_admin_user_disable_audit_includes_status(self) -> None:
+        """PATCH /admin/users/{user_id}/disable audit details include new_status."""
+        self.client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        # Create a staff user
+        create_resp = self.client.post(
+            "/admin/users",
+            json={
+                "first_name": "Disable",
+                "last_name": "Target",
+                "email": "disable-target@omega.local",
+                "password": "ChangeMe123!",
+                "role": "staff",
+            },
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        user_email = create_resp.json()["item"]["email"]
+
+        # Disable the user
+        self.client.patch(f"/admin/users/{user_email}/disable")
+
+        # Check audit log for user_disabled entry
+        audit_resp = self.client.get("/admin/audit-logs")
+        entries = audit_resp.json()["items"]
+        disable_entries = [e for e in entries if e["action"] == "user_disabled" and e["entity_id"] == user_email]
+        self.assertGreaterEqual(len(disable_entries), 1, "Expected at least 1 user_disabled audit entry")
+        details = disable_entries[0]["details"]
+        self.assertEqual(details["new_status"], "disabled")
+
     def test_disabled_user_cannot_log_in(self) -> None:
         self.client.post(
             "/auth/login",

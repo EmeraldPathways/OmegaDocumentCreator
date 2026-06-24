@@ -1,44 +1,40 @@
-# Stage 22 Validation Log (Fix Pass)
+# Stage 23 Validation Log
 
 ## Date: 2026-06-24
 
 ## Objective
-Fix three issues from initial Stage 22 delivery:
-1. Make vitest a hard gate in `scripts/validate.ps1`
-2. Expand CI and local validation to run the full backend test suite (`apps/api/tests/`)
-3. Fix doc drift: frontend uses `localStorage` in `client-data-context.tsx` and `income-protection-page.tsx`
+Deliver Stage 23 as an admin-audit-only pass:
+1. harden admin user audit detail payloads
+2. add targeted backend tests for the new audit fields
+3. leave frontend behavior unchanged
 
 ## Changes Validated
 
-### Fix 1: Vitest hard gate
-- `scripts/validate.ps1`: vitest failures now throw instead of emitting a warning. Removed stale "pre-existing known issues" comment.
+### Admin audit consistency
+- `PATCH /admin/users/{user_id}` audit details now include:
+  - `old_role`
+  - `new_role`
+  - `old_name`
+  - `new_name`
+- `PATCH /admin/users/{user_id}/disable` audit details now include:
+  - `new_status: "disabled"`
 
-### Fix 2: Full backend test suite
-- `scripts/validate.ps1`: pytest target changed from `tests/test_api.py` to `tests` (full suite)
-- `.github/workflows/ci.yml`: backend job now runs `pytest tests/ -v` instead of `pytest tests/test_api.py -v`
+### Targeted backend tests
+- `test_admin_user_update_audit_includes_old_and_new_values`
+- `test_admin_user_disable_audit_includes_status`
 
-### Fix 3: Doc drift correction
-- `client-data-context.tsx` uses `localStorage` (`STORAGE_KEY = "omega-client-records"`) for client record caching
-- `income-protection-page.tsx` uses `localStorage` (`SELECTED_CLIENT_STORAGE_KEY`) for selected client reference
-- Updated 8 files: `.ai-codex/index.md`, `.ai-codex/architecture.md`, `.ai-codex/patterns.md`, `.ai-codex/scopes/persistence.md`, `.ai-codex/scopes/income-protection.md`, `PROJECT.md`, `phases.md`, `.agent-handoff/cline-result.md`
+### Frontend scope
+- No frontend behavior changes shipped in Stage 23
+- `income-protection-page.tsx` remains monolithic at 2549 lines
+- frontend decomposition deferred to a future stage
 
 ## Verification Results
 
 | Gate | Result |
 |------|--------|
-| Backend pytest (full suite, PostgreSQL) | **164 passed, 0 failed** |
-| Frontend TypeScript | **0 errors** |
-| Frontend vitest | **7 files, 80 tests, 0 failed** |
-
-### Backend test modules
-| Module | Tests | Result |
-|--------|-------|--------|
-| `test_api.py` | 117 | passed |
-| `test_backup_restore.py` | 39 | passed |
-| `test_clients.py` | 2 | passed |
-| `test_migration_schema.py` | 4 | passed |
-| `test_security.py` | 2 | passed |
-| `test_settings.py` | 2 | passed |
+| Backend pytest (full suite, PostgreSQL) | **166 passed, 0 failed** |
+| Frontend TypeScript | **0 errors** (unchanged) |
+| Frontend vitest | **7 files, 80 tests, 0 failed** (unchanged) |
 
 ## Verification Commands
 
@@ -46,16 +42,14 @@ Fix three issues from initial Stage 22 delivery:
 # Full backend test suite
 $env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests -v
 
-# Frontend typecheck
+# Frontend typecheck (unchanged)
 Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
 
-# Frontend vitest
-Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
+# Frontend vitest (unchanged)
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
 ```
 
 ## Remaining Limitations
 
-- `income-protection-page.tsx` remains monolithic at ~2600 lines
-- `app.router.lifespan_context` assignment works; `FastAPI(lifespan=...)` constructor param would be cleaner
-- CI requires GitHub Actions runner with Docker (PostgreSQL service container)
-- Frontend uses `localStorage` for client record caching and selected client reference; backend is authoritative for workflow persistence
+- `income-protection-page.tsx` remains monolithic at 2549 lines
+- No frontend behavior was changed in Stage 23

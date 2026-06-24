@@ -1,0 +1,199 @@
+# Cline Rules for Omega Document Creator
+
+These rules exist to stop repeated false starts, false completion claims, stale docs, partial test runs, and Windows shell mistakes.
+
+## 1. Environment
+
+- Shell is PowerShell on Windows.
+- Do not write bash-style command chains.
+- Do not use `cmd.exe` syntax unless explicitly required.
+- Prefer direct PowerShell commands and repo-local scripts.
+
+Wrong:
+- `cd apps/api && python -m pytest`
+- `set VAR=value & python app.py`
+- `pytest --timeout=60`
+
+Correct:
+- `Push-Location apps\api; .venv\Scripts\python -m pytest tests -v`
+- `$env:VAR="value"; .venv\Scripts\python app.py`
+- `python -m pytest tests -v`
+
+## 2. Required Read Order At Start Of Every New Stage
+
+Before making claims or edits, read these first:
+
+1. `AGENTS.md`
+2. `.agent-handoff/codex-task.md`
+3. `.agent-handoff/cline-result.md`
+4. `.agent-handoff/validation-log.md`
+5. `phases.md`
+6. `PROJECT.md`
+7. `.ai-codex/index.md`
+
+Then read only the relevant `.ai-codex` scope files for the stage.
+
+Do not skip this.
+
+## 3. No False Completion Claims
+
+Do not say a stage is complete unless all of these are true:
+
+- code changes are actually present in the repo
+- runtime wiring is actually connected, not just helper functions added
+- verification commands were actually run
+- docs match the current code
+- the handoff files match the current code and test results
+
+If something was only structurally reviewed but not executed, say so explicitly.
+
+Never claim:
+- "complete"
+- "all tests pass"
+- "verified"
+- "no regressions"
+
+unless you actually ran the relevant commands and checked the output.
+
+## 4. Verification Is Mandatory
+
+For Omega, verification is not optional.
+
+### Backend
+
+Always prefer the full backend suite, not a single test file, unless the prompt explicitly says to narrow scope.
+
+Use:
+- `$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests -v`
+
+Do not use this as your only backend check unless explicitly told to:
+- `apps/api/tests/test_api.py`
+
+### Frontend
+
+Always run both:
+- `Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json`
+- `Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache`
+
+Use `--no-cache` for Vitest in this repo because Google Drive/Windows cache behavior can be flaky.
+
+### One-command validation
+
+If `scripts/validate.ps1` exists, prefer it for full validation:
+- `.\scripts\validate.ps1`
+
+But still inspect what it actually runs before claiming broad coverage.
+
+## 5. Full Test Scope Discipline
+
+Do not quietly narrow test scope.
+
+If CI or validation runs only part of the backend suite, say exactly that.
+
+Bad:
+- "backend pytest passes" when only `test_api.py` was run
+
+Good:
+- "backend API suite passes" if only `test_api.py` was run
+- "full backend suite passes" only if `apps/api/tests` was run
+
+## 6. Documentation Must Match Live Code
+
+This repo has repeatedly drifted between docs and implementation.
+
+Before marking a stage complete, check:
+
+- `.agent-handoff/cline-result.md`
+- `.agent-handoff/validation-log.md`
+- `phases.md`
+- `PROJECT.md`
+- relevant `.ai-codex/*` files
+
+against the actual code that changed.
+
+If frontend behavior uses `localStorage`, docs must say so.
+If Vitest now passes, remove claims about pre-existing failures.
+If a route is live, do not leave docs saying it is missing.
+
+## 7. Runtime Wiring Must Be Checked
+
+Do not stop at "helper exists".
+
+Examples of required checks:
+
+- if `_csrf_check()` exists, verify it is called by middleware
+- if rate limiting helper exists, verify login route actually calls it
+- if lifespan/startup helper exists, verify app actually uses it
+- if delete/download APIs exist, verify frontend uses them where claimed
+- if a scheduler exists, verify startup and shutdown are wired
+
+## 8. Frontend Rules For This Repo
+
+- `income-protection-page.tsx` is fragile and large; make surgical changes only
+- preserve existing route/UI behavior unless explicitly changing it
+- do not remove `localStorage` behavior unless the stage explicitly requires it
+- when fixing tests, prefer restoring honest existing behavior over rewriting large test surfaces
+
+If you change frontend state behavior, re-check:
+- `client-data-context.tsx`
+- `App.tsx`
+- `income-protection-page.tsx`
+- `app.test.tsx`
+
+## 9. Handoff File Discipline
+
+If you touched a file, list it in `.agent-handoff/cline-result.md`.
+
+If you ran verification, record:
+- exact command
+- exact result
+- exact scope
+
+in `.agent-handoff/validation-log.md`.
+
+Do not leave stale counts like:
+- old Vitest totals
+- old pytest totals
+- old failure descriptions
+
+## 10. Local Artifact And Git Rules
+
+Do not commit local/generated artifacts unless explicitly requested.
+
+Usually exclude:
+- `apps/vitest-app.txt`
+- ad hoc scratch files
+- editor-only local files
+- logs
+
+If `.clinerules` or another local control file is changed intentionally, include it only if requested.
+
+Before commit/push:
+- check `git status --short`
+- confirm staged scope
+- do not sweep unrelated changes into the commit
+
+## 11. Current Known Good Commands
+
+### Full backend tests
+- `$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests -v`
+
+### Frontend typecheck
+- `Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json`
+
+### Frontend tests
+- `Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache`
+
+### Full validation
+- `.\scripts\validate.ps1`
+
+## 12. Response Quality Rules
+
+When reporting back:
+
+- separate what was changed from what was only reviewed
+- do not compress uncertainty into confident wording
+- if something remains open, say it plainly
+- if the stage is not clean, produce a fix-pass result instead of pretending it is done
+
+This repo prefers strict truth over optimistic summaries.

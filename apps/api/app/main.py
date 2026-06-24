@@ -1063,18 +1063,20 @@ def admin_update_user(
         if not user_model:
             raise HTTPException(status_code=404, detail="User not found")
 
+        old_role = user_model.role.value if hasattr(user_model.role, "value") else str(user_model.role)
+        old_name = f"{user_model.first_name} {user_model.last_name}"
         user_model.first_name = payload.first_name
         user_model.last_name = payload.last_name
         user_model.role = payload.role
-        db.commit()
 
         _log_audit(
             request, db=db,
             action="user_updated",
             entity_type="user",
             entity_id=user_id,
-            details={"new_role": payload.role.value},
+            details={"old_role": old_role, "new_role": payload.role.value, "old_name": old_name, "new_name": f"{payload.first_name} {payload.last_name}"},
         )
+        db.commit()
         return {"item": repo.to_response(user_model)}
     finally:
         db.close()
@@ -1382,6 +1384,7 @@ def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, st
             action="user_disabled",
             entity_type="user",
             entity_id=user_id,
+            details={"new_status": "disabled"},
         )
         db.commit()
         return {"item": result}
