@@ -33,6 +33,7 @@ Read this before broader repo exploration.
 | `data/file-api.ts` | Backend file upload/list/download API client |
 | `documents/generated-document-api.ts` | Backend document list/create/download/pack API client |
 | `pages/income-protection-page.tsx` | Live Income Protection workflow, files, generated documents |
+| `pages/income-protection-helpers.tsx` | Pure helpers, config, and types extracted from income protection page |
 | `pages/admin-page.tsx` | Users, audit logs, backups, security panels |
 
 ## Infrastructure

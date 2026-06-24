@@ -137,6 +137,15 @@ It now serves two purposes:
 - 2 targeted backend tests added
 - frontend decomposition deferred — `income-protection-page.tsx` remains monolithic at 2549 lines
 
+#### Stage 24: Frontend Decomposition Hardening
+
+- pure helpers and static config blocks extracted from `income-protection-page.tsx` into colocated `income-protection-helpers.tsx` (helper module now 282 lines)
+- moduleTabs, option arrays, utility functions, UI helpers, `useAccordionState`, `PENSION_SECTION_CONFIGS` moved to helpers
+- main page reduced to 2316 lines after helper extraction
+- Generated Documents and Files tabs deferred — too many closure dependencies for safe extraction
+- all 80 frontend tests pass; TypeScript 0 errors
+- no backend changes
+
 ## Current Source Of Truth
 
 ### PostgreSQL
@@ -171,7 +180,7 @@ It now serves two purposes:
 - restore workflow still needs broader operator hardening
 - document pack excludes preview-only rows with no stored artifact
 - Cloudflare Tunnel setup is automated, but deployment remains operator-run
-- `income-protection-page.tsx` remains monolithic at 2549 lines — further decomposition deferred
+- `income-protection-page.tsx` partially decomposed (helpers extracted, 2316 lines); tabs still inline — deeper decomposition deferred
 
 ## Post-Fix Security And Operations (2026-06)
 

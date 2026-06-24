@@ -1,56 +1,64 @@
-# Stage 23: Frontend Decomposition And Admin Audit Completion
+# Stage 24: Frontend Decomposition Hardening
 
 ## Verdict
-**Stage 23 completed as an admin-audit-only pass.** Frontend decomposition was not delivered in this stage. No frontend behavior was changed.
+**Stage 24 delivered one safe extraction.** Pure helpers and static config blocks were extracted from `income-protection-page.tsx` into a colocated `income-protection-helpers.tsx` module. All behavior preserved. TypeScript and Vitest both pass with zero failures.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `apps/api/app/main.py` | Admin audit hardening: `user_updated` records `old_role`, `new_role`, `old_name`, `new_name`. `user_disabled` records `new_status: "disabled"`. Audit logging remains before commit. |
-| `apps/api/tests/test_api.py` | Added 2 targeted tests for admin audit detail payload shape |
+| `apps/frontend/src/pages/income-protection-page.tsx` | Removed inline helpers/config/types; replaced them with named imports from `./income-protection-helpers`. 2316 lines after extraction. No JSX/behavior changes. |
+| `apps/frontend/src/pages/income-protection-helpers.tsx` | **New file.** Contains extracted pure helpers, static config blocks, `moduleTabs`, option arrays, `SeededClientStringKey` type, `useAccordionState` hook, `PENSION_SECTION_CONFIGS`, `getSectionProgress`, and `formatFileSize`. 282 lines. |
 | `.agent-handoff/cline-result.md` | This file |
 | `.agent-handoff/validation-log.md` | Updated |
 | `phases.md` | Updated |
 | `PROJECT.md` | Updated |
+| `.ai-codex/index.md` | Updated |
 
 ## What Changed
 
-### Admin audit consistency gap fixed
-- `PATCH /admin/users/{user_id}` audit details now include `old_role`, `new_role`, `old_name`, `new_name`
-- `PATCH /admin/users/{user_id}/disable` audit details now include `new_status: "disabled"`
+### Pure helpers and static config extracted
+- `moduleTabs`, all option arrays (`employmentStatusOptions`, `genderOptions`, etc.)
+- `SELECTED_CLIENT_STORAGE_KEY`, `SeededClientStringKey` type
+- `hasValue`, `toLower`, `isPresent`, `resolveActorLabel`, `buildFullName`, `replaceSpaces`, `formatCurrency`, `isAffirmative`, `formatDisplayDate`
+- `getDocumentStatusVariant`, `getDraftStatusDotClass`, `getFileIcon`, `getFileCategoryClass`
+- `buildExportFilename`, `getGeneratedDraftStatusLabel`, `getGenerationHeaderStatus`
+- `useAccordionState` hook
+- `PENSION_SECTION_CONFIGS`
+- `getSectionProgress`, `formatFileSize`
+- helper module size: 282 lines
+- main page size after extraction: 2316 lines
 
-### 2 targeted tests
-- `test_admin_user_update_audit_includes_old_and_new_values`
-- `test_admin_user_disable_audit_includes_status`
+### No behavior changed
+- No JSX was altered — only imports were replaced
+- `localStorage` cache behavior unchanged
+- Backend not touched in this stage
+- All existing tests continue to pass with zero changes
 
-### Frontend scope
-- `income-protection-page.tsx` remains monolithic at 2549 lines
-- frontend decomposition deferred out of this pass
-- no frontend code or behavior changed in Stage 23
+### No tab extraction
+- Generated Documents tab and Files tab remain inline in the main page
+- Extracting those tabs would require passing 15+ closure dependencies as props — deferred as too risky for this stage
 
 ## Verification Results
 
 | Gate | Result |
 |------|--------|
-| Backend pytest (full suite, PostgreSQL) | **166 passed, 0 failed** |
-| Frontend TypeScript | **0 errors** (unchanged) |
-| Frontend vitest | **7 files, 80 tests, 0 failed** (unchanged) |
+| Frontend TypeScript | **0 errors** |
+| Frontend vitest | **7 files, 80 tests, 0 failed** |
+| Backend pytest | Not run (no backend files touched) |
 
 ## Verification Commands
 
 ```powershell
-# Full backend test suite
-$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests -v
-
-# Frontend typecheck (unchanged)
+# Frontend typecheck
 Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
 
-# Frontend vitest (unchanged)
+# Frontend vitest
 Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
 ```
 
 ## Remaining Limitations
 
-- `income-protection-page.tsx` remains monolithic at 2549 lines — decomposition deferred to a future stage
-- no frontend behavior was changed in Stage 23
+- `income-protection-page.tsx` is still large at 2316 lines (tabs remain inline)
+- Generated Documents tab and Files tab have too many closure dependencies for safe extraction in this stage
+- Further decomposition requires prop-threading or context-based state sharing
