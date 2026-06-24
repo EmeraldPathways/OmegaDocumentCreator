@@ -2395,6 +2395,34 @@ button {
   font-weight: var(--font-weight-semibold);
 }
 
+.generation-requirements {
+  align-items: flex-start;
+}
+
+.generation-requirements-active {
+  border-width: 2px;
+}
+
+.generation-requirements-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.generation-requirements-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--font-size-small);
+}
+
+.generation-requirements-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* Sticky action bar */
 .sticky-action-bar {
   position: sticky;

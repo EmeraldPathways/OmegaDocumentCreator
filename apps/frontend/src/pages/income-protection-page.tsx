@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ClipboardList,
@@ -214,6 +214,47 @@ export function IncomeProtectionPage() {
     !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
 
+  const factFindGenerationRequirements = [
+    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
+    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
+    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
+    { label: "Occupation", complete: hasValue(resolvedDraft.occupation), location: "Fact Find" },
+    { label: "Income / salary", complete: hasValue(resolvedDraft.income), location: "Fact Find" },
+    { label: "Email or phone", complete: hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber), location: "Fact Find" },
+    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Fact Find" },
+  ];
+
+  const statementGenerationRequirements = [
+    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
+    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
+    { label: "Statement type", complete: hasValue(resolvedDraft.statementType), location: "Statement" },
+    { label: "Provider recommended", complete: hasValue(resolvedDraft.provider), location: "Statement or Fact Find" },
+    { label: "Product recommended", complete: hasValue(resolvedDraft.productType), location: "Statement" },
+    { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
+    { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
+    { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
+    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
+    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
+    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
+    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
+    { label: "Gross monthly premium", complete: hasValue(resolvedDraft.premium), location: "Statement or Fact Find" },
+    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Statement or Fact Find" },
+    { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
+  ];
+
+  const factFindUpdateGenerationRequirements = [
+    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
+    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
+    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
+    { label: "Occupation", complete: hasValue(resolvedDraft.occupation), location: "Fact Find" },
+    { label: "Income / salary", complete: hasValue(resolvedDraft.income), location: "Fact Find" },
+    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Fact Find" },
+    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
+    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
+    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
+    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
+  ];
+
   function getDocumentDraft(documentType: SupportedDocumentType) {
     return resolvedDraft.documentDrafts[documentType];
   }
@@ -289,7 +330,7 @@ export function IncomeProtectionPage() {
     );
   }
 
-  function renderTextInput(id: string, label: string, field: SeededClientStringKey, type = "text") {
+  function renderTextInput(id: string, label: ReactNode, field: SeededClientStringKey, type = "text") {
     return (
       <Input
         id={id}
@@ -301,7 +342,7 @@ export function IncomeProtectionPage() {
     );
   }
 
-  function renderCurrencyInput(id: string, label: string, field: SeededClientStringKey) {
+  function renderCurrencyInput(id: string, label: ReactNode, field: SeededClientStringKey) {
     return (
       <Input
         id={id}
@@ -316,7 +357,7 @@ export function IncomeProtectionPage() {
     );
   }
 
-  function renderTextarea(id: string, label: string, field: SeededClientStringKey, rows = 4, className?: string) {
+  function renderTextarea(id: string, label: ReactNode, field: SeededClientStringKey, rows = 4, className?: string) {
     return (
       <Textarea
         className={className}
@@ -1002,6 +1043,40 @@ export function IncomeProtectionPage() {
     );
   }
 
+  function renderGenerationRequirements(
+    title: string,
+    requirements: Array<{ label: string; complete: boolean; location: string }>,
+    missingFields: string[],
+    options?: { explainSharedFields?: boolean; emphasiseMissing?: boolean },
+  ) {
+    const incompleteCount = requirements.filter((item) => !item.complete).length;
+
+    return (
+      <div className={`validation-banner generation-requirements${options?.emphasiseMissing ? " generation-requirements-active" : ""}`}>
+        <AlertTriangle size={18} />
+        <div className="generation-requirements-copy">
+          <strong>{title}</strong>
+          <div className="generation-requirements-meta">
+            <span>* Required for generation</span>
+            <span>{incompleteCount === 0 ? "All required fields are complete." : `Still missing: ${missingFields.join(", ")}`}</span>
+          </div>
+          {options?.explainSharedFields ? (
+            <span className="text-small">
+              Some shared required fields live outside this section. Complete them in Fact Find or client details before generating.
+            </span>
+          ) : null}
+          <div className="generation-requirements-list">
+            {requirements.map((item) => (
+              <Badge key={item.label} variant={item.complete ? "ready" : "pending"}>
+                {item.label} - {item.complete ? "ready" : `fill in ${item.location}`}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderTabPanel() {
     if (activeTab.id === "fact-find") {
       const factFindDraft = getDocumentDraft("Fact Find");
@@ -1014,12 +1089,10 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          {showFactFindValidation ? (
-            <div className="validation-banner">
-              <AlertTriangle size={18} />
-              <span>Missing required fields: {factFindMissingFields.join(", ")}</span>
-            </div>
-          ) : null}
+          {renderGenerationRequirements("Fact Find generation requirements", factFindGenerationRequirements, factFindMissingFields, {
+            explainSharedFields: true,
+            emphasiseMissing: showFactFindValidation,
+          })}
 
           <Accordion flush>
             <AccordionItem
@@ -1065,7 +1138,7 @@ export function IncomeProtectionPage() {
                   title="Personal Details"
                 >
                   <div className="form-grid">
-                    {renderTextInput("ff-fullName", "Name", "fullName")}
+                    {renderTextInput("ff-fullName", requiredLabel("Name"), "fullName")}
                     <Select
                       id="ff-maritalStatus"
                       label="Marital status"
@@ -1089,16 +1162,16 @@ export function IncomeProtectionPage() {
                     {renderTextInput("ff-workAddress2", "Work address line 2", "clientWorkAddressLine2")}
                     {renderTextInput("ff-workAddress3", "Work address line 3", "clientWorkAddressLine3")}
                     {renderTextInput("ff-workAddress4", "Work address line 4", "clientWorkAddressLine4")}
-                    {renderTextInput("ff-dob", "Date of Birth", "dateOfBirth", "date")}
+                    {renderTextInput("ff-dob", requiredLabel("Date of Birth"), "dateOfBirth", "date")}
                     <Select
                       id="ff-gender"
-                      label="Gender"
+                      label={requiredLabel("Gender")}
                       onChange={(event) => updateField("gender", event.target.value)}
                       options={genderOptions}
                       value={resolvedDraft.gender}
                     />
                     {renderTextInput("ff-email", "Email", "email", "email")}
-                    {renderTextInput("ff-phone", "Home / Mobile", "mobileNumber", "tel")}
+                    {renderTextInput("ff-phone", requiredLabel("Home / Mobile"), "mobileNumber", "tel")}
                     {renderTextInput("ff-workPhone", "Work Phone", "workPhone", "tel")}
                     {renderTextInput("ff-partnerName", "Partner Name", "partnerName")}
                     {renderTextInput("ff-partnerDob", "Partner Date of Birth", "partnerDateOfBirth", "date")}
@@ -1120,7 +1193,7 @@ export function IncomeProtectionPage() {
               title="Employment Details"
             >
               <div className="form-grid">
-                {renderTextInput("ff-occupation", "Occupation", "occupation")}
+                {renderTextInput("ff-occupation", requiredLabel("Occupation"), "occupation")}
                 <Select
                   id="ff-employmentStatus"
                   label="Employment status"
@@ -1130,7 +1203,7 @@ export function IncomeProtectionPage() {
                 />
                 <Input
                   id="ff-income"
-                  label="Income / salary"
+                  label={requiredLabel("Income / salary")}
                   onBlur={(event) => updateField("income", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("income", event.target.value)}
                   prefix="£"
@@ -1140,7 +1213,7 @@ export function IncomeProtectionPage() {
                 />
                 <Input
                   id="ff-advisorName"
-                  label="Advisor name"
+                  label={requiredLabel("Advisor name")}
                   onChange={(event) => updateField("advisorName", event.target.value)}
                   type="text"
                   value={resolvedDraft.advisorName}
@@ -1168,21 +1241,21 @@ export function IncomeProtectionPage() {
               <div className="form-grid">
                 <Input
                   id="ff-provider"
-                  label="Provider"
+                  label={requiredLabel("Provider")}
                   onChange={(event) => updateField("provider", event.target.value)}
                   type="text"
                   value={resolvedDraft.provider}
                 />
                 <Input
                   id="ff-recommendedCover"
-                  label="Recommended cover"
+                  label={requiredLabel("Recommended cover")}
                   onChange={(event) => updateField("recommendedCover", event.target.value)}
                   type="text"
                   value={resolvedDraft.recommendedCover}
                 />
                 <Input
                   id="ff-premium"
-                  label="Monthly premium"
+                  label={requiredLabel("Monthly premium")}
                   onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("premium", event.target.value)}
                   prefix="£"
@@ -1192,35 +1265,35 @@ export function IncomeProtectionPage() {
                 />
                 <Select
                   id="ff-deferredPeriod"
-                  label="Deferred period"
+                  label={requiredLabel("Deferred period")}
                   onChange={(event) => updateField("deferredPeriod", event.target.value)}
                   options={deferredPeriodOptions}
                   value={resolvedDraft.deferredPeriod}
                 />
                 <Select
                   id="ff-coverAge"
-                  label="Cover to age"
+                  label={requiredLabel("Cover to age")}
                   onChange={(event) => updateField("coverAge", event.target.value)}
                   options={coverAgeOptions}
                   value={resolvedDraft.coverAge}
                 />
                 <Select
                   id="ff-smokerStatus"
-                  label="Smoker status"
+                  label={requiredLabel("Smoker status")}
                   onChange={(event) => updateField("smokerStatus", event.target.value)}
                   options={smokerStatusOptions}
                   value={resolvedDraft.smokerStatus}
                 />
                 <Select
                   id="ff-phiOccupationalClass"
-                  label="PHI occupational class"
+                  label={requiredLabel("PHI occupational class")}
                   onChange={(event) => updateField("phiOccupationalClass", event.target.value)}
                   options={phiOccupationalClassOptions}
                   value={resolvedDraft.phiOccupationalClass}
                 />
                 <Select
                   id="ff-phiIndexation"
-                  label="PHI indexation"
+                  label={requiredLabel("PHI indexation")}
                   onChange={(event) => updateField("phiIndexation", event.target.value)}
                   options={phiIndexationOptions}
                   value={resolvedDraft.phiIndexation}
@@ -1739,6 +1812,13 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
+          {renderGenerationRequirements(
+            "Fact Find Update generation requirements",
+            factFindUpdateGenerationRequirements,
+            factFindUpdateGenerationRequirements.filter((item) => !item.complete).map((item) => item.label),
+            { explainSharedFields: true },
+          )}
+
           <Accordion flush>
             <AccordionItem
               indicator={tabProgress["fact-find-update"]}
@@ -1875,12 +1955,10 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          {showStatementValidation ? (
-            <div className="validation-banner">
-              <AlertTriangle size={18} />
-              <span>Missing required fields: {statementMissingFields.join(", ")}</span>
-            </div>
-          ) : null}
+          {renderGenerationRequirements("Statement of Suitability generation requirements", statementGenerationRequirements, statementMissingFields, {
+            explainSharedFields: true,
+            emphasiseMissing: showStatementValidation,
+          })}
 
           <Accordion flush>
             <AccordionItem
