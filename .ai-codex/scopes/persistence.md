@@ -66,4 +66,4 @@ The persistence roadmap is complete through Phase 16.
 - keep file storage rooted under `FILE_STORAGE_PATH`
 - keep backup artifacts rooted under `BACKUP_PATH`
 - do not expose raw filesystem paths to clients
-- do not reintroduce browser `localStorage` as workflow or generated-document authority
+- client records may use `localStorage` for quick rehydration; backend workflow persistence remains authoritative

@@ -104,11 +104,11 @@ It now serves two purposes:
 - login creates a persisted session row
 - logout invalidates only the calling session row
 
-#### Phase 15: Remove Frontend localStorage As Source Of Truth
+#### Phase 15: Reduce Frontend localStorage Usage
 
-- workflow/client persistence no longer uses `localStorage`
 - generated-document view no longer falls back to browser-persisted state
 - backend is the authority for workflow, files, and generated history
+- client record cache still uses `localStorage` for quick rehydration
 
 #### Phase 16: Cloudflare Tunnel Automation
 
@@ -156,9 +156,8 @@ It now serves two purposes:
 
 - restore workflow still needs broader operator hardening
 - document pack excludes preview-only rows with no stored artifact
-- no frontend delete UI for files/documents
 - Cloudflare Tunnel setup is automated, but deployment remains operator-run
-- full live PostgreSQL-backed validation is still the key next risk-reduction step
+- `income-protection-page.tsx` remains monolithic at ~2600 lines — further decomposition deferred
 
 ## Post-Fix Security And Operations (2026-06)
 
@@ -255,16 +254,32 @@ Read `AGENTS.md`, `.agent-handoff/codex-task.md`, `phases.md`, `PROJECT.md`, and
 
 ## Verification Baseline
 
-Backend:
+One-command validation:
 
 ```powershell
-cd "apps/api"
-.\.venv\Scripts\python -m unittest discover -s tests
+.\scripts\validate.ps1
 ```
 
-Frontend:
+Individual gates:
 
 ```powershell
-cd "apps/frontend"
-npx.cmd tsc --noEmit
+# Backend tests
+$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests/test_api.py -v
+
+# Frontend typecheck
+Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+
+# Frontend vitest
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
+
+# CI (GitHub Actions)
+.github/workflows/ci.yml — backend pytest + frontend tsc + frontend vitest on push/PR to main
 ```
+
+Current results:
+
+| Gate | Result |
+|------|--------|
+| Backend pytest (PostgreSQL) | 117 passed, 0 failed |
+| Frontend TypeScript | 0 errors |
+| Frontend vitest | 7 files, 80 tests, 0 failed |

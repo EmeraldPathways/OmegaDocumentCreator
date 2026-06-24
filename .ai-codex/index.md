@@ -28,7 +28,7 @@ Read this before broader repo exploration.
 |------|---------|
 | `App.tsx` | Live React Router routes |
 | `auth/auth-context.tsx` | Login/logout calls, `/auth/me` validation, sessionStorage mirror for auth only |
-| `data/client-data-context.tsx` | Shared client/workflow state without `localStorage` persistence |
+| `data/client-data-context.tsx` | Shared client/workflow state with `localStorage` client record cache |
 | `data/workflow-api.ts` | Backend workflow load/save API client |
 | `data/file-api.ts` | Backend file upload/list/download API client |
 | `documents/generated-document-api.ts` | Backend document list/create/download/pack API client |

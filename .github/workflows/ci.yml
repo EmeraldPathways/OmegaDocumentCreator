@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: omega
+          POSTGRES_PASSWORD: omega
+          POSTGRES_DB: omega
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install pytest
+
+      - name: Run migrations
+        working-directory: apps/api
+        run: .venv/bin/python -m app.migrate --force
+        env:
+          DATABASE_URL: postgresql://omega:omega@localhost:5432/omega
+          PYTHONPATH: .
+
+      - name: Run backend tests
+        working-directory: apps/api
+        run: .venv/bin/python -m pytest tests/ -v
+        env:
+          DATABASE_URL: postgresql://omega:omega@localhost:5432/omega
+          PYTHONPATH: .
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: apps/frontend
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: apps/frontend
+        run: npx tsc --noEmit --project tsconfig.app.json
+
+      - name: Vitest
+        working-directory: apps/frontend
+        run: npx vitest run

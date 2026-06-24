@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import uuid
 import zipfile
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Request
@@ -83,11 +84,10 @@ async def _csrf_middleware(request: Request, call_next: object) -> object:
 
 
 # ---------------------------------------------------------------------------
-# Startup / shutdown events
+# Startup / shutdown helpers (wired via lifespan below)
 # ---------------------------------------------------------------------------
 
 
-@app.on_event("startup")
 def _startup_db_check() -> None:
     """Verify database connectivity, seed default users, and start scheduler if enabled."""
     import logging
@@ -175,12 +175,22 @@ def _startup_db_check() -> None:
         )
 
 
-@app.on_event("shutdown")
 def _shutdown_scheduler() -> None:
     """Stop the backup scheduler when the app shuts down."""
     from app.services.scheduler import stop_scheduler
 
     stop_scheduler()
+
+
+@asynccontextmanager
+async def _app_lifespan(inner_app: FastAPI) -> None:  # type: ignore[valid-type]
+    """Lifespan context manager replacing deprecated @app.on_event hooks."""
+    _startup_db_check()
+    yield
+    _shutdown_scheduler()
+
+
+app.router.lifespan_context = _app_lifespan
 
 
 # ---------------------------------------------------------------------------

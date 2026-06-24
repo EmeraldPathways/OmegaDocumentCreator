@@ -109,7 +109,7 @@ That includes:
 - generated document pack ZIP download
 - file and document deletion endpoints
 - PostgreSQL-backed exact-row session persistence
-- removal of workflow/client `localStorage` persistence as the source of truth
+- backend workflow persistence as the source of truth; client record cache uses `localStorage` for quick rehydration
 - Cloudflare Tunnel automation and remote-access setup guidance
 
 ### Stage 17
@@ -194,28 +194,43 @@ Implemented:
 ### Current workflow behavior
 
 - backend workflow persistence is authoritative
-- no workflow/client `localStorage` persistence remains
+- client record cache uses `localStorage` for quick rehydration; workflow fields are backend-backed
 - generated document history is backend-backed
 - Files tab uses real backend upload/list/download
 - Generated Documents tab uses real backend history/download/pack APIs
 
 ## Testing
 
+### One-command validation
+
+```powershell
+.\scripts\validate.ps1
+```
+
 ### Backend
 
 ```powershell
-cd "apps/api"
-.\.venv\Scripts\python -m unittest discover -s tests
+$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests/test_api.py -v
 ```
-
-Additional targeted validation in the handoff flow uses `pytest --collect-only` for DB-gated API slices and unit coverage for backup/restore services.
 
 ### Frontend
 
 ```powershell
-cd "apps/frontend"
-npx.cmd tsc --noEmit
+Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
 ```
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`): backend pytest (PostgreSQL) + frontend tsc + vitest on push/PR to main.
+
+Current results:
+
+| Gate | Result |
+|------|--------|
+| Backend pytest (PostgreSQL) | 117 passed, 0 failed |
+| Frontend TypeScript | 0 errors |
+| Frontend vitest | 7 files, 80 tests, 0 failed |
 
 ## Gaps Between Current Code and Final Product
 
@@ -224,8 +239,8 @@ The main remaining gaps are operational hardening and product polish rather than
 - backup/restore operator workflow still needs broader production hardening
 - ~~`cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup~~ → session cleanup runs on startup
 - document pack skips preview-only documents that have no stored artifact files
-- no frontend delete UI for files/documents yet
 - Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
+- `income-protection-page.tsx` remains monolithic at ~2600 lines — further decomposition deferred
 
 ## Post-Fix Security & Operations Improvements (2026-06)
 
@@ -329,3 +344,8 @@ Infrastructure:
 - Stage 15: complete
 - Stage 16: complete
 - Stage 17: complete
+- Stage 18: complete
+- Stage 19: complete
+- Stage 20: complete
+- Stage 21: complete
+- Stage 22: complete

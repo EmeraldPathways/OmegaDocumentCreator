@@ -18,7 +18,7 @@ Use this scope when editing the live workflow page or its backend-backed state f
 ## Important state flow
 
 - shared client/workflow data comes from `client-data-context.tsx`
-- selected workflow client is local page state only, not persisted to `localStorage`
+- selected workflow client is persisted to `localStorage` via `SELECTED_CLIENT_STORAGE_KEY`
 - workflow persistence uses `fetchWorkflow()` and `saveWorkflow()`
 - files use `file-api.ts`
 - generated documents use `generated-document-api.ts`

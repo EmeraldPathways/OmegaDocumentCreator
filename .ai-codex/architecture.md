@@ -57,7 +57,7 @@ Income Protection UI
 ## Key decisions reflected in code
 
 1. Auth authority is server-side. Frontend only mirrors auth in `sessionStorage`.
-2. Workflow/client persistence no longer uses `localStorage`.
+2. Backend workflow persistence is authoritative; client records are cached in `localStorage` for quick rehydration.
 3. Generated document history in the workflow UI is backend-backed only.
 4. Admin access is enforced in `main.py` via `_require_admin()`.
 5. The live local startup ports are `127.0.0.1:3007` for frontend and `127.0.0.1:8007` for backend.

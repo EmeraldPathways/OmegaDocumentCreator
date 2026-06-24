@@ -99,7 +99,7 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 
 ## Frontend workflow persistence
 
-- `client-data-context.tsx` holds client/workflow state in React context (not localStorage).
+- `client-data-context.tsx` holds client/workflow state in React context, backed by `localStorage` for client record caching.
 - Workflow saves are backed by `PUT /clients/{ref}/workflow` (PostgreSQL via `WorkflowRepository`).
 - Frontend loads workflow from backend on client change via `fetchWorkflow()`.
 - Selected auth user is mirrored in `sessionStorage` only for UI convenience.
