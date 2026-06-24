@@ -48,6 +48,7 @@ class AppSettings:
     phi_password: str = ""
     phi_request_from: str = ""
     phi_request_from_code: str = ""
+    csrf_trusted_origins: list[str] | None = None
 
     max_upload_size_bytes: int = 50_000_000  # 50 MB default
 
@@ -68,6 +69,12 @@ def ensure_storage_directories(settings: AppSettings) -> None:
 def _env_or(env_key: str, default: str) -> str:
     """Return env var value if set, otherwise the default."""
     return os.getenv(env_key, default)
+
+
+def _parse_origin_list(raw: str) -> list[str] | None:
+    """Parse comma-separated origin list; return None if empty."""
+    cleaned = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    return cleaned if cleaned else None
 
 
 def get_settings(**overrides: str) -> AppSettings:
@@ -122,6 +129,7 @@ def get_settings(**overrides: str) -> AppSettings:
         "phi_password": overrides.get("PHI_PASSWORD") or _env_or("PHI_PASSWORD", ""),
         "phi_request_from": overrides.get("PHI_REQUEST_FROM") or _env_or("PHI_REQUEST_FROM", ""),
         "phi_request_from_code": overrides.get("PHI_REQUEST_FROM_CODE") or _env_or("PHI_REQUEST_FROM_CODE", ""),
+        "csrf_trusted_origins": _parse_origin_list(_env_or("CSRF_TRUSTED_ORIGINS", "")),
         "max_upload_size_bytes": int(
             overrides.get("MAX_UPLOAD_SIZE_BYTES") or _env_or("MAX_UPLOAD_SIZE_BYTES", "50000000")
         ),

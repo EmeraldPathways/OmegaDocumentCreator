@@ -1,55 +1,58 @@
-# Stage 24 Validation Log
+# Validation Log - Frontend Proxy / CSRF / Test DB Isolation
 
-## Date: 2026-06-24
+**Date**: 2026-06-24
 
-## Objective
-Deliver Stage 24: Frontend Decomposition Hardening. Extract one or two safe, high-signal modules from `income-protection-page.tsx` without changing behavior.
-
-## Changes Validated
-
-### Pure helpers and static config extracted
-- Extracted pure functions, config blocks, types, and hook into `income-protection-helpers.tsx`
-- `moduleTabs`, all option arrays, `SELECTED_CLIENT_STORAGE_KEY`, `SeededClientStringKey` type
-- All pure utility functions: `hasValue`, `toLower`, `isPresent`, `resolveActorLabel`, `buildFullName`, `replaceSpaces`, `formatCurrency`, `isAffirmative`, `formatDisplayDate`
-- All UI status helpers: `getDocumentStatusVariant`, `getDraftStatusDotClass`, `getFileIcon`, `getFileCategoryClass`
-- Export/generation helpers: `buildExportFilename`, `getGeneratedDraftStatusLabel`, `getGenerationHeaderStatus`
-- Hook: `useAccordionState`
-- Config: `PENSION_SECTION_CONFIGS`
-- Bottom helpers: `getSectionProgress`, `formatFileSize`
-- Main page now measures 2316 lines
-- Helper module now measures 282 lines
-
-### No behavior changed
-- Zero JSX changes
-- `localStorage` behavior unchanged
-- No backend changes
-- All 80 existing vitest tests pass
-
-### No tab extraction
-- Generated Documents tab and Files tab have 15+ closure dependencies each
-- Extracting them would require extensive prop threading or context refactoring
-- Deferred as too risky for this stage
-
-## Verification Results
-
-| Gate | Result |
-|------|--------|
-| Frontend TypeScript | **0 errors** |
-| Frontend vitest | **7 files, 80 tests, 0 failed** |
-| Backend pytest | Not run (no backend files touched) |
-
-## Verification Commands
+## Backend pytest
 
 ```powershell
-# Frontend typecheck
-Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+$env:PYTHONPATH="apps\api"
+$env:TEST_DATABASE_URL="postgresql://omega:omega_dev_password@127.0.0.1:5432/omega_test"
+apps\api\.venv\Scripts\python -m pytest apps/api/tests -q
+```
 
-# Frontend vitest
+**Result**: 168 passed, 0 failed, warnings only
+
+## Frontend TypeScript
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+```
+
+**Result**: 0 errors
+
+## Frontend vitest
+
+```powershell
 Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
 ```
 
-## Remaining Limitations
+**Result**: 7 files, 80 tests, 0 failed
 
-- `income-protection-page.tsx` remains large at 2316 lines (tabs are still inline)
-- Generated Documents and Files tabs have too many closure dependencies for safe extraction
-- Further decomposition requires prop-threading or context-based state sharing
+## Live 3007 Proxy Smoke Test
+
+```powershell
+$base='http://127.0.0.1:3007'
+$origin='http://127.0.0.1:3007'
+$session=New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$loginBody=@{email='andrew@omegafinancial.ie'; password='Omega123'} | ConvertTo-Json
+Invoke-WebRequest -UseBasicParsing -Uri "$base/auth/login" -Method POST -WebSession $session -Headers @{Origin=$origin;'Content-Type'='application/json'} -Body $loginBody
+Invoke-WebRequest -UseBasicParsing -Uri "$base/clients/CLI-2026-0002/workflow" -WebSession $session
+Invoke-WebRequest -UseBasicParsing -Uri "$base/clients/CLI-2026-0002/workflow" -Method PUT -WebSession $session -Headers @{Origin=$origin;'Content-Type'='application/json'} -Body (@{ letterDate='2026-06-24'; premium='165.50'; termsIssuedDate='2026-01-10'; fullName='Jamie Murphy'; provider='Aviva'; productType='Income Protection'; recommendedCover='EUR2,500 monthly'; needsObjectives='Protect monthly income during illness.' } | ConvertTo-Json)
+Invoke-WebRequest -UseBasicParsing -Uri "$base/documents/generate" -Method POST -WebSession $session -Headers @{Origin=$origin;'Content-Type'='application/json'} -Body (@{ client_reference='CLI-2026-0002'; document_type='Statement of Suitability'; template_id='income-protection-statement'; workflow_snapshot=@{ full_name='Jamie Murphy'; provider='Aviva'; product_type='Income Protection'; recommended_cover='EUR2,500 monthly'; needs_objectives='Protect monthly income during illness.' } } | ConvertTo-Json -Depth 6)
+```
+
+**Result**:
+- `POST /auth/login` via `3007`: 200
+- `GET /clients/CLI-2026-0002/workflow` via `3007`: 200
+- `PUT /clients/CLI-2026-0002/workflow` via `3007`: 200
+- `POST /documents/generate` via `3007`: 200
+
+## Summary
+
+| Gate | Result |
+|------|--------|
+| Backend pytest | 168 passed |
+| Frontend TypeScript | 0 errors |
+| Frontend vitest | 80 passed |
+| Live 3007 workflow proxy | PASS |
+| Live 3007 document generate | PASS |

@@ -773,6 +773,41 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+    def test_csrf_allows_trusted_frontend_origin(self) -> None:
+        """State-changing POST from CSRF_TRUSTED_ORIGINS (frontend dev port) succeeds."""
+        trusted_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"})
+        trusted_client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        response = trusted_client.post(
+            "/clients",
+            json={
+                "first_name": "Frontend",
+                "surname": "Origin",
+                "email": "frontend@omega.local",
+                "mobile_number": "087",
+                "marital_status": "S",
+                "date_of_birth": "1990-01-01",
+            },
+        )
+        self.assertEqual(response.status_code, 201,
+                         f"Expected 201 for trusted origin, got {response.status_code}: {response.text}")
+
+    def test_csrf_rejection_returns_proper_json_not_500(self) -> None:
+        """CSRF rejection returns 403 JSON, not a 500 Internal Server Error."""
+        evil_client = TestClient(app, headers={"Origin": "https://evil.example.com"},
+                                 raise_server_exceptions=False)
+        response = evil_client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.assertEqual(response.status_code, 403,
+                         f"Expected 403, got {response.status_code}: {response.text}")
+        payload = response.json()
+        self.assertIn("detail", payload)
+        self.assertIn("Cross-origin", payload["detail"])
+
     def test_login_rate_limit_returns_429_after_5_failures(self) -> None:
         """Six rapid failed logins from same IP should trigger 429."""
         for _ in range(5):

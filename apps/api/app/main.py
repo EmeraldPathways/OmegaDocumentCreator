@@ -79,7 +79,11 @@ if settings.trusted_proxy_count > 0:
 
 @app.middleware("http")
 async def _csrf_middleware(request: Request, call_next: object) -> object:
-    _csrf_check(request)
+    from fastapi.responses import JSONResponse
+    try:
+        _csrf_check(request)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     return await call_next(request)
 
 
@@ -310,12 +314,12 @@ _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 def _csrf_check(request: Request) -> None:
     """Reject cross-origin state-changing requests for cookie-session endpoints.
 
-    The frontend SPA runs on the same origin so its requests always carry
-    an Origin header matching the APP_URL.  Browsers strip the Origin
-    header on same-origin redirects, so we also accept a missing Origin
-    when the Referer header is same-origin.  This is the simplest
-    production-shaped CSRF defense for an internal cookie-session app
-    without requiring token plumbing.
+    By default only APP_URL is trusted.  CSRF_TRUSTED_ORIGINS allows
+    additional origins (e.g. a Vite dev-server proxy on a different port
+    during local development).  The frontend SPA normally runs on the same
+    origin so its requests carry an Origin header matching APP_URL.
+    Browsers strip the Origin header on same-origin redirects, so we also
+    accept a missing Origin when the Referer header is same-origin.
     """
     if request.method in _CSRF_SAFE_METHODS:
         return
@@ -323,18 +327,21 @@ def _csrf_check(request: Request) -> None:
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
 
-    app_origin = settings.app_url.rstrip("/")
+    trusted_origins: list[str] = [settings.app_url.rstrip("/")]
+    if settings.csrf_trusted_origins:
+        trusted_origins.extend(settings.csrf_trusted_origins)
 
-    def _is_same_origin(value: str) -> bool:
-        return value.startswith(app_origin)
+    def _is_trusted_origin(value: str) -> bool:
+        v = value.rstrip("/")
+        return any(v == t or v.startswith(t + "/") or v.startswith(t + ":") for t in trusted_origins)
 
     if origin is not None:
-        if not _is_same_origin(origin):
+        if not _is_trusted_origin(origin):
             raise HTTPException(status_code=403, detail="Cross-origin request blocked")
         return
 
     # No Origin header – check Referer for same-origin fallback
-    if referer is not None and _is_same_origin(referer):
+    if referer is not None and _is_trusted_origin(referer):
         return
 
     # Neither header present and method is state-changing – block

@@ -34,6 +34,8 @@ Read this before broader repo exploration.
 | `documents/generated-document-api.ts` | Backend document list/create/download/pack API client |
 | `pages/income-protection-page.tsx` | Live Income Protection workflow, files, generated documents |
 | `pages/income-protection-helpers.tsx` | Pure helpers, config, and types extracted from income protection page |
+| `pages/income-protection-files-tab.tsx` | Extracted Files tab component (upload, filter, download, delete) |
+| `pages/income-protection-generated-documents-tab.tsx` | Extracted Generated Documents tab component (list, preview, pack, regenerate, delete) |
 | `pages/admin-page.tsx` | Users, audit logs, backups, security panels |
 
 ## Infrastructure

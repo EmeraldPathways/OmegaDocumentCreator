@@ -142,7 +142,13 @@ It now serves two purposes:
 - pure helpers and static config blocks extracted from `income-protection-page.tsx` into colocated `income-protection-helpers.tsx` (helper module now 282 lines)
 - moduleTabs, option arrays, utility functions, UI helpers, `useAccordionState`, `PENSION_SECTION_CONFIGS` moved to helpers
 - main page reduced to 2316 lines after helper extraction
-- Generated Documents and Files tabs deferred — too many closure dependencies for safe extraction
+- Generated Documents and Files tabs initially deferred — too many closure dependencies for safe extraction
+
+#### Stage 25: Files And Generated Documents Tab Extraction
+
+- Files tab extracted into `income-protection-files-tab.tsx` (179 lines, 10 props)
+- Generated Documents tab extracted into `income-protection-generated-documents-tab.tsx` (228 lines, 15 props)
+- main page reduced from ~2,437 to 2,178 lines (cumulative from ~2,704 pre-decomposition)
 - all 80 frontend tests pass; TypeScript 0 errors
 - no backend changes
 

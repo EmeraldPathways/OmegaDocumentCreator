@@ -64,7 +64,6 @@ import {
   getDocumentStatusVariant,
   getDraftStatusDotClass,
   getFileCategoryClass,
-  getFileIcon,
   getGeneratedDraftStatusLabel,
   getGenerationHeaderStatus,
   getSectionProgress,
@@ -84,6 +83,8 @@ import {
   toLower,
   useAccordionState,
 } from "./income-protection-helpers";
+import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
+import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
 
 export function IncomeProtectionPage() {
   const { user } = useAuth();
@@ -2029,305 +2030,45 @@ export function IncomeProtectionPage() {
 
     if (activeTab.id === "files") {
       return (
-        <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Client Files</h2>
-            </div>
-            <div className="page-actions">
-              <Button onClick={handleFileSelect} variant="primary">
-                <Upload size={18} />
-                Upload File
-              </Button>
-              <Badge variant={uploadProgress === 100 ? "saved" : uploadProgress > 0 ? "draft" : "default"}>
-                {fileUploadStatus.replace("Upload: ", "")}
-              </Badge>
-            </div>
-          </div>
-
-          {uploadProgress > 0 && uploadProgress < 100 ? (
-            <div className="upload-progress">
-              <div className="upload-progress-bar" style={{ width: `${uploadProgress}%` }} />
-            </div>
-          ) : null}
-
-          <input
-            accept="*/*"
-            aria-label="Select file to upload"
-            onChange={(event) => { void handleRealFileUpload(event); }}
-            ref={fileInputRef}
-            style={{ display: "none" }}
-            type="file"
-          />
-
-          <div
-            className="upload-zone"
-            onClick={handleFileSelect}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              const dt = event.dataTransfer;
-              if (dt?.files?.[0]) {
-                const fakeEvent = { target: { files: dt.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
-                void handleRealFileUpload(fakeEvent);
-              }
-            }}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="upload-zone-icon">
-              <Upload size={32} />
-            </div>
-            <div className="upload-zone-title">Drop files here</div>
-            <div className="upload-zone-hint">or click to browse</div>
-          </div>
-
-          <section className="section-divided">
-            <div className="section-header">
-              <h3 className="section-title">Tracked client files</h3>
-              <div style={{ maxWidth: "260px", width: "100%" }}>
-                <div className="field-input-wrap">
-                  <Search size={16} style={{ marginLeft: "12px", color: "var(--color-text-muted)" }} />
-                  <input
-                    aria-label="Filter files"
-                    className="field-input"
-                    onChange={(event) => setFileFilter(event.target.value)}
-                    placeholder="Filter files by name"
-                    type="search"
-                    value={fileFilter}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {filteredDisplayFiles.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">
-                  <FolderOpen size={28} />
-                </div>
-                <div className="empty-state-title">No files yet</div>
-                <p className="empty-state-description">
-                  {fileFilter ? "No files match your filter." : "Upload supporting documents for this client."}
-                </p>
-                <Button onClick={handleFileSelect} variant="primary">
-                  <Upload size={18} />
-                  Upload File
-                </Button>
-              </div>
-            ) : (
-              <div className="file-list" style={{ marginTop: "var(--space-4)" }}>
-                {filteredDisplayFiles.map((file) => (
-                  <div className="file-item" key={file.id}>
-                    <div className="file-icon">{getFileIcon(file.original_filename)}</div>
-                    <div className="file-info">
-                      <div className="file-name">{file.original_filename}</div>
-                      <div className="file-meta">
-                        {file.category} · {file.file_type ?? ""} · {file.uploaded_at ? formatDisplayDate(file.uploaded_at) : ""}
-                      </div>
-                    </div>
-                    <Badge variant={toLower(file.status).includes("approved") ? "approved" : "draft"}>
-                      {file.status ?? "Uploaded"}
-                    </Badge>
-                    <div className="file-actions">
-                      <Button className="btn-sm" onClick={() => { void handleBackendFileDownload(file.id, file.original_filename); }} variant="secondary">
-                        <Download size={14} />
-                      </Button>
-                      <Button className="btn-sm" onClick={() => { void handleBackendFileDelete(file.id, file.original_filename); }} variant="secondary">
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+        <IncomeProtectionFilesTab
+          fileFilter={fileFilter}
+          fileInputRef={fileInputRef}
+          fileUploadStatus={fileUploadStatus}
+          filteredFiles={filteredDisplayFiles}
+          onFileDelete={(fileId, filename) => { void handleBackendFileDelete(fileId, filename); }}
+          onFileDownload={(fileId, filename) => { void handleBackendFileDownload(fileId, filename); }}
+          onFileFilterChange={(value) => setFileFilter(value)}
+          onFileSelect={handleFileSelect}
+          onFileUpload={(event) => { void handleRealFileUpload(event); }}
+          uploadProgress={uploadProgress}
+        />
       );
     }
 
-    const resolvedPreviewDocument = previewDocument
-      ? {
-          ...previewDocument,
-          generated_at: previewDocument.generatedAt,
-        }
-      : null;
-
     return (
-      <div className="page-stack">
-        <div className="page-heading page-heading-compact">
-          <div>
-            <h2>Generated Documents</h2>
-          </div>
-          <div className="page-actions">
-            <Button
-              isLoading={documentPackStatus === "Pack: Preparing pack..."}
-              onClick={handleDownloadPack}
-              variant="primary"
-            >
-              <Download size={18} />
-              Download Pack
-            </Button>
-            <Badge variant={documentPackStatus.includes("Downloaded") ? "saved" : "default"}>
-              {documentPackStatus.replace("Pack: ", "")}
-            </Badge>
-            <span
-              className={`status-dot ${documentDownloadStatus !== "Download: No document downloaded yet" ? "status-dot-green" : "status-dot-grey"}`}
-              data-testid="generated-documents-download-status-dot"
-            />
-          </div>
-        </div>
-
-        {displayDocuments.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <Download size={28} />
-            </div>
-            <div className="empty-state-title">No documents generated yet</div>
-            <p className="empty-state-description">Generate your first draft from the Fact Find or Statement of Suitability tabs.</p>
-            <Button onClick={() => setActiveTabId("fact-find")} variant="primary">
-              <FileDown size={18} />
-              Generate your first draft
-            </Button>
-          </div>
-        ) : (
-          <div className="table-wrap-flush">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Document Type</th>
-                  <th scope="col">Document Name</th>
-                  <th scope="col">Version</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Generated At</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayDocuments.map((doc) => {
-                  const hasBackendArtifact = canUseBackend
-                    && hasLoadedBackendGeneratedDocuments
-                    && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
-                  return (
-                  <tr key={doc.id ?? `${doc.document_name}-${doc.version ?? ""}`}>
-                    <td>{doc.document_type}</td>
-                    <td className="font-medium">{doc.document_name}</td>
-                    <td>{doc.version ?? "—"}</td>
-                    <td>
-                      <Badge variant={getDocumentStatusVariant(doc.status)}>{doc.status ?? "Draft"}</Badge>
-                    </td>
-                    <td>{doc.generated_at ? formatDisplayDate(doc.generated_at) : "—"}</td>
-                    <td>
-                      <div className="generated-doc-actions">
-                        <Button
-                          className="btn-sm"
-                          onClick={() => {
-                            const previewPayload: SeededGeneratedDocument = {
-                              id: doc.id,
-                              documentType: doc.document_type,
-                              documentName: doc.document_name,
-                              version: doc.version ?? "Version 1",
-                              status: doc.status,
-                              generatedAt: doc.generated_at ?? "",
-                              previewHtml: doc.preview_html ?? undefined,
-                              previewTitle: doc.preview_title ?? undefined,
-                            };
-                            setPreviewDocument(previewPayload);
-                          }}
-                          variant="secondary"
-                        >
-                          <Eye size={14} />
-                          Preview
-                        </Button>
-                        {hasBackendArtifact ? (
-                          <Button
-                            className="btn-sm"
-                            onClick={() => {
-                              const filename = doc.document_name;
-                              void downloadDocument(selectedClientReference, doc.id, filename).then(
-                                () => addToast(`${doc.document_name} downloaded`, "success"),
-                                () => addToast("Download failed", "error"),
-                              );
-                            }}
-                            variant="secondary"
-                          >
-                            <Download size={14} />
-                            Download
-                          </Button>
-                        ) : (
-                          <Button
-                            className="btn-sm"
-                            onClick={() => handleDownloadDocument({
-                              id: doc.id,
-                              documentType: doc.document_type,
-                              documentName: doc.document_name,
-                              version: doc.version ?? "Version 1",
-                              status: doc.status,
-                              generatedAt: doc.generated_at ?? "",
-                              previewHtml: doc.preview_html ?? undefined,
-                              previewTitle: doc.preview_title ?? undefined,
-                            })}
-                            variant="secondary"
-                          >
-                            <Download size={14} />
-                            Download
-                          </Button>
-                        )}
-                        {doc.document_type !== "Terms of Business" ? (
-                          <Button
-                            className="btn-sm"
-                            onClick={() => handleRegenerateDocument({
-                              id: doc.id,
-                              documentType: doc.document_type,
-                              documentName: doc.document_name,
-                              version: doc.version ?? "Version 1",
-                              status: doc.status,
-                              generatedAt: doc.generated_at ?? "",
-                              previewHtml: doc.preview_html ?? undefined,
-                              previewTitle: doc.preview_title ?? undefined,
-                            })}
-                            variant="text"
-                          >
-                            <RefreshCw size={14} />
-                            Regenerate
-                          </Button>
-                        ) : null}
-                        {canUseBackend ? (
-                          <Button
-                            className="btn-sm"
-                            onClick={() => { void handleBackendDocumentDelete(doc.id, doc.document_name); }}
-                            variant="text"
-                          >
-                            <Trash2 size={14} />
-                            Delete
-                          </Button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <Modal
-          isOpen={Boolean(previewDocument)}
-          onClose={() => setPreviewDocument(null)}
-          size="large"
-          title={previewDocument?.documentName ?? "Document Preview"}
-        >
-          {previewDocument?.previewHtml ? (
-            <iframe
-              className="document-preview-iframe"
-              srcDoc={previewDocument.previewHtml}
-              title={previewDocument.documentName}
-            />
-          ) : (
-            <p className="text-muted">No preview available for this document.</p>
-          )}
-        </Modal>
-      </div>
+      <IncomeProtectionGeneratedDocumentsTab
+        addToast={addToast}
+        canUseBackend={canUseBackend}
+        displayDocuments={displayDocuments}
+        documentDownloadStatus={documentDownloadStatus}
+        documentPackStatus={documentPackStatus}
+        downloadDocument={downloadDocument}
+        hasLoadedBackendGeneratedDocuments={hasLoadedBackendGeneratedDocuments}
+        onBackendDelete={(docId, docName) => { void handleBackendDocumentDelete(docId, docName); }}
+        onBackendDownload={(docId, docName) => {
+          void downloadDocument(selectedClientReference, docId, docName).then(
+            () => addToast(`${docName} downloaded`, "success"),
+            () => addToast("Download failed", "error"),
+          );
+        }}
+        onDownloadPack={handleDownloadPack}
+        onFallbackDownload={(doc) => handleDownloadDocument(doc)}
+        onNavigateToGenerate={() => setActiveTabId("fact-find")}
+        onPreviewDocument={(doc) => setPreviewDocument(doc)}
+        onRegenerate={(doc) => handleRegenerateDocument(doc)}
+        previewDocument={previewDocument}
+        selectedClientReference={selectedClientReference}
+      />
     );
   }
 

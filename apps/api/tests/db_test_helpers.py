@@ -1,24 +1,68 @@
 """Shared helpers for Phase 2+ DB-backed API tests.
 
-Requires a running PostgreSQL instance reachable via DATABASE_URL.
-If DATABASE_URL is not set, defaults to a local test database.
+Requires TEST_DATABASE_URL pointing to a dedicated test database.
+Tests will NOT fall back to DATABASE_URL — the guardrail rejects
+destructive operations on the live application database.
 """
+
+# ---------------------------------------------------------------------------
+# Guardrail — must run BEFORE any app import because dotenv.load_dotenv()
+# in app.config modifies os.environ.  We evaluate the raw subprocess
+# environment only.
+# ---------------------------------------------------------------------------
 
 from __future__ import annotations
 
+import os
+import sys
+
+_RAW_TEST_DB = os.environ.get("TEST_DATABASE_URL", "").strip()
+_RAW_LIVE_DB = os.environ.get("DATABASE_URL", "").strip()
+
+if not _RAW_TEST_DB:
+    print(
+        "TEST_DATABASE_URL is not set.\n"
+        "The backend test suite runs destructive setup/teardown\n"
+        "(truncate_all, drop_all) and must never target the live\n"
+        "application database.  Set TEST_DATABASE_URL to a dedicated\n"
+        "test database, for example:\n"
+        '  $env:TEST_DATABASE_URL="postgresql://omega:omega_dev_password@127.0.0.1:5432/omega_test"\n'
+        "Then re-run the tests.\n",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+# Quick sanity: reject an obviously unsafe test DB name before any
+# SQLAlchemy parsing.  The structured check below is the authoritative
+# one; this is just a fast early guard.
+_TEST_DB_NAME_HINT = _RAW_TEST_DB.rstrip("/").rsplit("/", 1)[-1].split("?")[0].lower()
+if "_test" not in _TEST_DB_NAME_HINT:
+    print(
+        "TEST_DATABASE_URL must use a database whose name contains '_test'.\n"
+        "The backend test suite runs destructive setup/teardown\n"
+        "(truncate_all, drop_all) and must never target the live\n"
+        "application database.\n"
+        f"  Current test database name: '{_TEST_DB_NAME_HINT}'\n"
+        f"  Current TEST_DATABASE_URL: {_RAW_TEST_DB}\n"
+        "  Example safe value:\n"
+        '  $env:TEST_DATABASE_URL="postgresql://omega:omega_dev_password@127.0.0.1:5432/omega_test"\n',
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+# ---------------------------------------------------------------------------
+# Imports (safe to load dotenv now that the guardrail has passed)
+# ---------------------------------------------------------------------------
+
 import uuid
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
-
-_RAW_TEST_DATABASE_URL = (
-    __import__("os").environ.get("TEST_DATABASE_URL")
-    or __import__("os").environ.get("DATABASE_URL")
-    or "postgresql+psycopg://postgres:postgres@localhost:5432/omega_test"
-)
 
 
 def _normalize_database_url(database_url: str) -> str:
@@ -27,7 +71,57 @@ def _normalize_database_url(database_url: str) -> str:
     return database_url
 
 
-TEST_DATABASE_URL = _normalize_database_url(_RAW_TEST_DATABASE_URL)
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _canonical_host(raw_host: str | None) -> str:
+    if raw_host and raw_host.strip().lower() in _LOOPBACK_HOSTS:
+        return "127.0.0.1"
+    return (raw_host or "").strip().lower()
+
+
+def _effective_target(db_url: str) -> tuple[str, str, str, int | None]:
+    u = make_url(db_url)
+    port: int | None = int(u.port) if u.port is not None else None
+    return (
+        u.database.strip().lower() if u.database else "",
+        (u.username or "").strip().lower(),
+        _canonical_host(u.host),
+        port,
+    )
+
+
+def _structured_same_db_check() -> None:
+    """Structured URL comparison (post-dotenv) — rejects test==live."""
+    test_normalised = _normalize_database_url(_RAW_TEST_DB)
+    live_raw = os.environ.get("DATABASE_URL", "").strip()
+    if not live_raw:
+        return
+    live_normalised = _normalize_database_url(live_raw)
+    test_target = _effective_target(test_normalised)
+    live_target = _effective_target(live_normalised)
+
+    if test_target == live_target:
+        print(
+            "TEST_DATABASE_URL resolves to the same database as DATABASE_URL.\n"
+            "The backend test suite runs destructive setup/teardown\n"
+            "(truncate_all, drop_all) and must never target the live\n"
+            "application database.\n"
+            f"  Effective target: {test_target[0]}@"
+            f"{test_target[2]}:{test_target[3] or 'default'}\n"
+            f"  TEST_DATABASE_URL: {_RAW_TEST_DB}\n"
+            f"  DATABASE_URL:      {live_raw}\n"
+            "  Point TEST_DATABASE_URL at a separate test database, for example:\n"
+            '  $env:TEST_DATABASE_URL="postgresql://omega:omega_dev_password@127.0.0.1:5432/omega_test"\n'
+            "  Then re-run the tests.\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+_structured_same_db_check()
+
+TEST_DATABASE_URL = _normalize_database_url(_RAW_TEST_DB)
 
 
 def _build_test_engine() -> Engine:

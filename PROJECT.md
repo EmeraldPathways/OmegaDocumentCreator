@@ -240,7 +240,7 @@ The main remaining gaps are operational hardening and product polish rather than
 - ~~`cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup~~ → session cleanup runs on startup
 - document pack skips preview-only documents that have no stored artifact files
 - Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
-- `income-protection-page.tsx` partially decomposed (helpers extracted to `income-protection-helpers.tsx`, 2316 lines); tabs still inline — deeper decomposition deferred
+- `income-protection-page.tsx` partially decomposed (helpers + Files tab + Generated Documents tab extracted into colocated modules, 2,178 lines); workflow tabs still inline — deeper decomposition deferred
 
 ## Post-Fix Security & Operations Improvements (2026-06)
 
@@ -351,3 +351,4 @@ Infrastructure:
 - Stage 22: complete
 - Stage 23: complete (admin-audit-only pass; frontend decomposition deferred)
 - Stage 24: complete (helper extraction delivered; `income-protection-helpers.tsx` is 282 lines)
+- Stage 25: complete (Files + Generated Documents tabs extracted into colocated components)

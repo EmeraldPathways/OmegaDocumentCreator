@@ -8,6 +8,7 @@ export default defineConfig({
     port: 3007,
     proxy: {
       "/auth": "http://127.0.0.1:8007",
+      "/clients": "http://127.0.0.1:8007",
       "/documents": "http://127.0.0.1:8007",
       "/health": "http://127.0.0.1:8007",
     },
