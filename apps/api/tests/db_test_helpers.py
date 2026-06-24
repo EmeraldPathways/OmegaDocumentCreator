@@ -63,6 +63,7 @@ def truncate_all(session: Session) -> None:
     """Delete all rows from Phase 2 tables (in FK dependency order)."""
     tables = [
         "dependants",
+        "sessions",
         "audit_logs",
         "files",
         "documents",

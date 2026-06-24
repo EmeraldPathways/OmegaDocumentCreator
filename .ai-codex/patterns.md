@@ -5,7 +5,8 @@
 - Backend sets the cookie on `POST /auth/login`.
 - Frontend validates an existing session with `GET /auth/me`.
 - No Bearer token flow exists.
-- Audit entries are created for login success and logout (not failed attempts).
+- Audit entries are created for login success (`login_success`), failed attempts (`login_failed`), and logout.
+- Login is rate-limited to 5 attempts per minute per IP.
 
 ```ts
 await fetch("/auth/me");
@@ -63,7 +64,9 @@ Repositories accept a `Session`, return models or dicts, and do not own session 
 _log_audit(request, db=db, action="client_created", entity_type="client",
            entity_id=client_ref, details={"full_name": name})
 ```
-- Called after successful actions only (not before, not on failure)
+- Called after successful write actions and for login attempts (both success and failure)
+- `login_failed` audit entries are created for invalid credential attempts
+- `login_success` audit entries are created for successful logins
 - Admin audit-logs route reads from PostgreSQL via `AuditLogRepository.list_recent()`
 
 ## Backup manifest pattern (Phase 7)
@@ -82,7 +85,7 @@ _log_audit(request, db=db, action="client_created", entity_type="client",
 
 ## Session handling
 
-- Backend session keys in live code: `user_email`, `last_seen_at`
+- Backend session keys in live code: `session_id`, `user_email`, `last_seen_at`
 - No `role` session key is stored directly.
 - Admin checks happen after `_current_user()` resolves the user record from PostgreSQL (via `UserRepository`).
 
@@ -96,10 +99,10 @@ is_session_expired(last_seen_at: str | None, timeout_minutes: int) -> bool
 
 ## Frontend workflow persistence
 
-- `client-data-context.tsx` writes browser state to `localStorage` under `omega-client-records`.
+- `client-data-context.tsx` holds client/workflow state in React context (not localStorage).
 - Workflow saves are backed by `PUT /clients/{ref}/workflow` (PostgreSQL via `WorkflowRepository`).
 - Frontend loads workflow from backend on client change via `fetchWorkflow()`.
-- Selected auth user is mirrored separately in `sessionStorage`.
+- Selected auth user is mirrored in `sessionStorage` only for UI convenience.
 
 ## Local run paths
 

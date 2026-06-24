@@ -14,46 +14,20 @@ describe("generateDocument", () => {
     window.sessionStorage.clear();
   });
 
-  it("restores a demo staff API session when the browser is still unauthenticated", async () => {
+  it("throws a session-expired error when document generation returns 401", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(new Response(null, { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ user: { email: "staff@omega.local", role: "staff" } }), { status: 200 }))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            item: {
-              title: "Fact Find",
-              summary: "Generated summary",
-              sections: [{ id: "summary", title: "Summary", body_html: "<p>Generated body</p>" }],
-              warnings: [],
-              generated_html: "<section><p>Generated body</p></section>",
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }));
 
-    const document = await generateDocument({
-      clientReference: "CLI-2026-0002",
-      documentType: "Fact Find",
-      templateId: "fact-find",
-      workflowSnapshot: {},
-    });
-
-    expect(document.title).toBe("Fact Find");
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/auth/login",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          email: "staff@omega.local",
-          password: "ChangeMe123!",
-        }),
+    await expect(
+      generateDocument({
+        clientReference: "CLI-2026-0002",
+        documentType: "Fact Find",
+        templateId: "fact-find",
+        workflowSnapshot: {},
       }),
-    );
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    ).rejects.toThrow("Session expired. Please log in again.");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes integration request artifacts returned by the backend", async () => {

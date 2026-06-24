@@ -87,7 +87,7 @@ function buildImageParagraph(block: Extract<WordExportBlock, { kind: "image" }>)
     children: [
       new ImageRun({
         data: parsedImage.data,
-        type: parsedImage.mimeType,
+        type: parsedImage.mimeType as "jpg" | "png" | "gif" | "bmp",
         transformation: {
           width,
           height: Math.round(width * 0.6),

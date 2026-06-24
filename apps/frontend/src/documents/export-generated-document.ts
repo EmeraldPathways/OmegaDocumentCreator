@@ -46,7 +46,7 @@ function buildHeadingPreviewBlocks(previewDocument: Document) {
     currentBlock.appendChild(element.cloneNode(true));
   });
 
-  if (currentBlock && currentBlock.children.length > 0) {
+  if (currentBlock !== null) {
     blocks.push(currentBlock);
   }
 

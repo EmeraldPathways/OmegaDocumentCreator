@@ -32,6 +32,12 @@ class UserRepository:
     def add(self, user: User) -> None:
         self._db.add(user)
 
+    def record_login(self, user: User) -> None:
+        """Update the user's last-login timestamp (no-op for now)."""
+        # In a fuller implementation this would update a last_login_at column.
+        # For now, just flush to keep the pattern open without requiring schema change.
+        self._db.flush()
+
     def to_response(self, user: User) -> dict[str, str]:
         return {
             "first_name": user.first_name,
@@ -50,7 +56,7 @@ class UserRepository:
         password_hash: str,
         role: UserRole,
         status: UserStatus = UserStatus.ACTIVE,
-    ) -> dict[str, str]:
+    ) -> User:
         normalized = email.lower()
         existing = self.get_by_email(normalized)
         if existing is not None:
@@ -65,7 +71,7 @@ class UserRepository:
         )
         self._db.add(user)
         self._db.flush()
-        return self.to_response(user)
+        return user
 
     def disable(self, email: str) -> dict[str, str] | None:
         user = self.get_by_email(email)

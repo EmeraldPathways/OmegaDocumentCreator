@@ -1,9 +1,9 @@
 """Minimal, safe migration runner for Omega Document Creator.
 
 Usage (from apps/api/):
-  .\.venv\Scripts\python -m app.migrate          # apply pending migrations
-  .\.venv\Scripts\python -m app.migrate --status  # list migrations and applied state
-  .\.venv\Scripts\python -m app.migrate --force    # re-apply all migrations
+  .venv/Scripts/python -m app.migrate          # apply pending migrations
+  .venv/Scripts/python -m app.migrate --status  # list migrations and applied state
+  .venv/Scripts/python -m app.migrate --force    # re-apply all migrations
 
 Migrations live in apps/api/migrations/ as numbered SQL files.
 Applied migrations are tracked in a table named `_migrations`.
@@ -18,16 +18,22 @@ from pathlib import Path
 
 
 def _ensure_migration_table(db: object) -> None:
+    from sqlalchemy import text
+
     db.execute(
-        """CREATE TABLE IF NOT EXISTS _migrations (
-            filename TEXT PRIMARY KEY,
-            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )"""
+        text(
+            """CREATE TABLE IF NOT EXISTS _migrations (
+                filename TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )"""
+        )
     )
 
 
 def _applied_migrations(db: object) -> set[str]:
-    result = db.execute("SELECT filename FROM _migrations ORDER BY filename")
+    from sqlalchemy import text
+
+    result = db.execute(text("SELECT filename FROM _migrations ORDER BY filename"))
     return {row[0] for row in result.fetchall()}
 
 

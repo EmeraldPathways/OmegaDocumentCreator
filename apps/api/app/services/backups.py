@@ -115,8 +115,7 @@ def create_backup_manifest(
     dumps_dir = backup_path / "dumps"
     dumps_dir.mkdir(parents=True, exist_ok=True)
 
-    client_files_stats = _scan_directory_stats(file_storage_path)
-    documents_stats = _scan_directory_stats(file_storage_path)
+    storage_stats = _scan_directory_stats(file_storage_path)
 
     # ---- Real pg_dump (best-effort) ----
     dump_path: str | None = None
@@ -150,8 +149,8 @@ def create_backup_manifest(
         "database": database_section,
         "storage": {
             "file_storage_root": str(file_storage_path),
-            "client_files": client_files_stats,
-            "documents": documents_stats,
+            "file_count": storage_stats["file_count"],
+            "total_bytes": storage_stats["total_bytes"],
         },
         "artifact": {
             "manifest_filename": manifest_filename,

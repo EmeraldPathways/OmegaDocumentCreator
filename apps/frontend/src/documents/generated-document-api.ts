@@ -43,7 +43,7 @@ export async function listDocuments(clientReference: string): Promise<BackendGen
   }
 
   const payload = (await response.json()) as { items: BackendGeneratedDocument[] };
-  return payload.items;
+  return payload.items ?? [];
 }
 
 export async function createDocument(
@@ -51,17 +51,23 @@ export async function createDocument(
   payload: CreateDocumentPayload,
   artifact?: CreateDocumentArtifact,
 ): Promise<BackendGeneratedDocument> {
-  const body = artifact ? new FormData() : JSON.stringify(payload);
-  const headers = artifact ? undefined : { "Content-Type": "application/json" };
+  let body: FormData | string;
+  let headers: Record<string, string> | undefined;
 
   if (artifact) {
-    body.append("document_type", payload.document_type);
-    if (payload.document_name) body.append("document_name", payload.document_name);
-    if (payload.version) body.append("version", payload.version);
-    if (payload.status) body.append("status", payload.status);
-    if (payload.preview_title) body.append("preview_title", payload.preview_title);
-    if (payload.preview_html) body.append("preview_html", payload.preview_html);
-    body.append("artifact", new File([artifact.blob], artifact.filename, { type: artifact.contentType }));
+    const form = new FormData();
+    form.append("document_type", payload.document_type);
+    if (payload.document_name) form.append("document_name", payload.document_name);
+    if (payload.version) form.append("version", payload.version);
+    if (payload.status) form.append("status", payload.status);
+    if (payload.preview_title) form.append("preview_title", payload.preview_title);
+    if (payload.preview_html) form.append("preview_html", payload.preview_html);
+    form.append("artifact", new File([artifact.blob], artifact.filename, { type: artifact.contentType }));
+    body = form;
+    headers = undefined;
+  } else {
+    body = JSON.stringify(payload);
+    headers = { "Content-Type": "application/json" };
   }
 
   const response = await fetch(
@@ -105,6 +111,20 @@ export async function downloadDocument(
       anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export async function deleteDocument(
+  clientReference: string,
+  documentId: string,
+): Promise<void> {
+  const response = await fetch(
+    `/clients/${encodeURIComponent(clientReference)}/documents/${encodeURIComponent(documentId)}`,
+    { method: "DELETE", credentials: "same-origin" },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Delete document failed: ${response.status}`);
+  }
 }
 
 export async function downloadDocumentPack(

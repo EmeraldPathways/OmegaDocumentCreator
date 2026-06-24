@@ -50,7 +50,7 @@ export async function listFiles(clientReference: string): Promise<BackendFile[]>
   }
 
   const payload = (await response.json()) as { items: BackendFile[] };
-  return payload.items;
+  return payload.items ?? [];
 }
 
 export async function downloadFile(
@@ -76,4 +76,18 @@ export async function downloadFile(
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export async function deleteFile(
+  clientReference: string,
+  fileId: string,
+): Promise<void> {
+  const response = await fetch(
+    `/clients/${encodeURIComponent(clientReference)}/files/${encodeURIComponent(fileId)}`,
+    { method: "DELETE", credentials: "same-origin" },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Delete failed: ${response.status}`);
+  }
 }

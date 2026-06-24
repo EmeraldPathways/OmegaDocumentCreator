@@ -72,6 +72,17 @@ if settings.trusted_proxy_count > 0:
 # or TRUSTED_PROXY_COUNT / FORWARDED_ALLOW_IPS via uvicorn config.
 
 # ---------------------------------------------------------------------------
+# CSRF middleware — enforce origin checks on state-changing requests
+# ---------------------------------------------------------------------------
+
+
+@app.middleware("http")
+async def _csrf_middleware(request: Request, call_next: object) -> object:
+    _csrf_check(request)
+    return await call_next(request)
+
+
+# ---------------------------------------------------------------------------
 # Startup / shutdown events
 # ---------------------------------------------------------------------------
 
@@ -428,6 +439,7 @@ def _check_login_rate(client_ip: str) -> None:
 @app.post("/auth/login")
 def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
     client_ip = request.client.host if request.client else "unknown"
+    _check_login_rate(client_ip)
     db = get_session()
     try:
         user_repo = UserRepository(db)
@@ -1037,7 +1049,7 @@ def admin_update_user(
     db = get_session()
     try:
         repo = UserRepository(db)
-        user_model = repo.get_by_id(user_id)
+        user_model = repo.get_by_email(user_id)
         if not user_model:
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -1069,7 +1081,7 @@ def admin_list_backups(request: Request) -> dict[str, list[dict[str, object]]]:
     db = get_session()
     try:
         repo = BackupRepository(db)
-        runs = repo.list_all()
+        runs = repo.list_recent(limit=100)
         items = [repo.to_response(r) for r in runs]
         db.commit()
         return {"items": items}
@@ -1079,25 +1091,29 @@ def admin_list_backups(request: Request) -> dict[str, list[dict[str, object]]]:
 
 @app.post("/admin/backups", status_code=201)
 def admin_create_backup(request: Request) -> dict[str, dict[str, object]]:
-    _require_admin(request)
+    user = _require_admin(request)
     db = get_session()
     try:
         repo = BackupRepository(db)
 
         manifest = create_backup_manifest(
-            backup_root=settings.backup_path,
+            backup_path=settings.backup_path,
             file_storage_path=settings.file_storage_path,
+            triggered_by_email=user["email"],
             database_url=settings.database_url,
             pg_dump_bin=settings.pg_dump_bin,
         )
 
+        user_repo = UserRepository(db)
+        user_model = user_repo.get_by_email(user["email"])
+
         run = BackupRunModel(
             status=manifest["status"],
+            triggered_by=user_model.id if user_model else None,
             database_backup=manifest.get("database_backup"),
             files_backup=manifest.get("files_backup"),
-            manifest_path=manifest.get("manifest_path"),
-            total_size_bytes=manifest.get("total_size_bytes"),
-            error_message=manifest.get("error"),
+            documents_backup=manifest.get("documents_backup"),
+            error_message=manifest.get("error_message"),
         )
         repo.add(run)
 
@@ -1120,8 +1136,11 @@ def admin_dry_run_restore(backup_id: str, request: Request) -> dict[str, object]
 
     Admin-only. Does NOT execute any destructive restore. Returns
     success if the dump artifact exists and is readable by pg_restore.
+
+    Persists a RestoreAttempt record for every attempt, including
+    failures where no database dump artifact exists.
     """
-    _require_admin(request)
+    user = _require_admin(request)
     db = get_session()
     try:
         backup_repo = BackupRepository(db)
@@ -1130,6 +1149,21 @@ def admin_dry_run_restore(backup_id: str, request: Request) -> dict[str, object]
             raise HTTPException(status_code=404, detail="Backup run not found")
 
         if not run.database_backup:
+            # Persist the failed attempt before raising so operators can
+            # see that a dry-run was attempted on a dump-less backup.
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="dry_run", dump_file=None,
+                error_message="No database dump artifact in backup",
+            )
+            _log_audit(
+                request, db=db,
+                action="restore_dry_run",
+                entity_type="backup_run",
+                entity_id=backup_id,
+                details={"passed": False, "reason": "no_dump_artifact"},
+            )
+            db.commit()
             raise HTTPException(status_code=400, detail="Backup has no database dump artifact")
 
         error = dry_run_restore(
@@ -1138,12 +1172,20 @@ def admin_dry_run_restore(backup_id: str, request: Request) -> dict[str, object]
             pg_restore_bin=settings.pg_restore_bin,
         )
 
+        # Persist a restore attempt record for dry-run auditability
+        passed = error is None
+        _persist_restore_attempt(
+            backup_repo, run.id, user, "dry_run_passed" if passed else "failed",
+            mode="dry_run", dump_file=run.database_backup,
+            error_message=error if not passed else None,
+        )
+
         _log_audit(
             request, db=db,
             action="restore_dry_run",
             entity_type="backup_run",
             entity_id=backup_id,
-            details={"dump_file": run.database_backup, "passed": error is None},
+            details={"dump_file": run.database_backup, "passed": passed},
         )
         db.commit()
 
@@ -1166,15 +1208,34 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
     user = _require_admin(request)
     db = get_session()
     try:
+        from pathlib import Path as _Path
+
         backup_repo = BackupRepository(db)
         run = backup_repo.get_by_id(backup_id)
         if not run:
             raise HTTPException(status_code=404, detail="Backup run not found")
 
+        # Validate confirmation token first — cheapest check
+        if payload.confirm != "yes-do-restore-now":
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="Restore not confirmed",
+            )
+            db.commit()
+            raise HTTPException(status_code=400, detail="Restore not confirmed — explicit confirmation required")
+
         # Pre-validate manifest
         if not run.files_backup:
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="Backup has no manifest file reference",
+            )
+            db.commit()
             raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
-        manifest_path = Path(settings.backup_path) / run.files_backup
+
+        manifest_path = _Path(settings.backup_path) / run.files_backup
         try:
             validation = validate_restore(
                 backup_root=settings.backup_path,
@@ -1186,6 +1247,7 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
                 mode="execute", dump_file=run.database_backup,
                 error_message=str(exc),
             )
+            db.commit()
             raise HTTPException(status_code=400, detail=str(exc))
 
         if not validation["valid"]:
@@ -1194,6 +1256,7 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
                 mode="execute", dump_file=run.database_backup,
                 error_message="validation-failed",
             )
+            db.commit()
             raise HTTPException(status_code=400, detail=f"Restore validation failed: {validation['warnings']}")
 
         if not run.database_backup:
@@ -1202,16 +1265,8 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
                 mode="execute", dump_file=None,
                 error_message="No database dump artifact in backup",
             )
-            raise HTTPException(status_code=400, detail="Backup has no database dump artifact")
-
-        if payload.confirm != "yes-do-restore-now":
-            _persist_restore_attempt(
-                backup_repo, run.id, user, "failed",
-                mode="execute", dump_file=run.database_backup,
-                error_message="Restore not confirmed",
-            )
             db.commit()
-            raise HTTPException(status_code=400, detail="Restore not confirmed — explicit confirmation required")
+            raise HTTPException(status_code=400, detail="Backup has no database dump artifact")
 
         # Attempt real restore — only with correct confirmation marker
         try:
@@ -1302,6 +1357,59 @@ def admin_schedule_status(request: Request) -> dict[str, object]:
     return get_scheduler_status()
 
 
+@app.patch("/admin/users/{user_id}/disable")
+def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, str]]:
+    """Disable a user account. Admin-only."""
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        result = repo.disable(user_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+        _log_audit(
+            request, db=db,
+            action="user_disabled",
+            entity_type="user",
+            entity_id=user_id,
+        )
+        db.commit()
+        return {"item": result}
+    finally:
+        db.close()
+
+
+@app.post("/admin/backups/{backup_id}/validate-restore")
+def admin_validate_restore(backup_id: str, request: Request) -> dict[str, object]:
+    """Validate a backup's manifest and artifacts for restore. Admin-only."""
+    _require_admin(request)
+    db = get_session()
+    try:
+        from pathlib import Path as _Path
+        backup_repo = BackupRepository(db)
+        run = backup_repo.get_by_id(backup_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Backup run not found")
+        if not run.files_backup:
+            raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
+        manifest_path = _Path(settings.backup_path) / run.files_backup
+        validation = validate_restore(
+            backup_root=settings.backup_path,
+            manifest_path=manifest_path,
+        )
+        _log_audit(
+            request, db=db,
+            action="restore_validated",
+            entity_type="backup_run",
+            entity_id=backup_id,
+            details={"valid": validation.get("valid", False)},
+        )
+        db.commit()
+        return validation
+    finally:
+        db.close()
+
+
 @app.get("/admin/security-summary")
 def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
     _require_admin(request)
@@ -1316,6 +1424,21 @@ def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
             "file_storage_visibility": "private_server_storage",
         }
     }
+
+
+@app.get("/admin/audit-logs")
+def admin_audit_logs(request: Request) -> dict[str, list[dict[str, object]]]:
+    """List recent audit log entries. Admin-only."""
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = AuditLogRepository(db)
+        entries = repo.list_recent()
+        items = [AuditLogRepository.to_response(e) for e in entries]
+        db.commit()
+        return {"items": items}
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------

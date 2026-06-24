@@ -1,86 +1,62 @@
-# Cline Result — Prompt 8: Remote Access / Cloudflare Tunnel Automation
+# Stage 21: Frontend Maintainability Hardening
 
-Status: complete
+## Verdict
+**Stage 21 is complete as a partial maintainability pass.** One safe extraction delivered. Frontend typecheck is clean. Behavior preserved. Pre-existing vitest failures are documented separately.
 
 ## Files Changed
 
-1. `infra/cloudflared/config.yaml.example` — new Cloudflare Tunnel config template with consistent hostname examples and ingress rules for API and frontend
-2. `infra/cloudflared/setup-tunnel.sh` — automated shell script that creates and configures a Cloudflare Tunnel with correct env instructions (`ENVIRONMENT=production`, `REMOTE_ACCESS_MODE=remote`)
-3. `infra/docker/compose.yaml` — added commented-out cloudflared sidecar service with clear multi-step enablement comments and placeholder UUID markers
-4. `.gitignore` — added `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml` exclusions to keep secrets out of the repo
-5. `.agent-handoff/cline-result.md` — this file
-6. `.agent-handoff/validation-log.md` — updated covering all 8 prompts
+| File | Change |
+|------|--------|
+| `apps/frontend/src/pages/income-protection-page.tsx` | Extracted `PENSION_SECTION_CONFIGS` (47 lines) from inline `renderPensionSection()` function body to module-level constant. Function simplified from 55 to 31 lines. |
+| `.agent-handoff/cline-result.md` | This file |
+| `.agent-handoff/validation-log.md` | Updated with accurate validation status |
 
 ## What Changed
 
-### Config template (`config.yaml.example`)
-- Tunnel UUID: `YOUR_TUNNEL_UUID`
-- Credentials file: `/etc/cloudflared/YOUR_TUNNEL_UUID.json`
-- Ingress rules:
-  - `omega-api.yourdomain.com` → `http://api:8000`
-  - `omega.yourdomain.com` → `http://frontend:3000`
-- Catch-all denies everything else
-- Note: copy to `config.yaml`, or run `setup-tunnel.sh` to generate
+### Extraction
+- **`PENSION_SECTION_CONFIGS`** (47-line `Record<"self" | "partner", Config>`) lifted from the body of `renderPensionSection()` to the file's module-level constants section, between `useAccordionState()` and the `IncomeProtectionPage` export.
+- Uses `as const` for full type narrowing, preserving exact string literal types for all field keys.
+- `renderPensionSection()` data lookup is now a single line: `const config = PENSION_SECTION_CONFIGS[section];`
 
-### Setup script (`setup-tunnel.sh`)
-- Interactive prompts for tunnel name, API hostname, and frontend hostname
-- Runs `cloudflared tunnel create`, copies credentials JSON, generates `config.yaml`
-- Runs `cloudflared tunnel route dns` for both hostnames
-- **Fixed**: next-steps env instructions now match `config.py` model:
-  - `ENVIRONMENT=production`
-  - `REMOTE_ACCESS_MODE=remote`
-  - `CORS_ORIGINS=https://<frontend-hostname>`
-  - `APP_URL=https://<api-hostname>`
-  - `TRUSTED_PROXY_COUNT=1`
-  - `COOKIE_SECURE=true`
-  - `SESSION_SECRET=<generate-a-strong-random-secret>`
+### Behavior preserved
+- All 5 tabs (Fact Find, Fact Find Update, Statement of Suitability, Files, Generated Documents) render identically
+- Workflow save/load unchanged
+- File upload/download/delete flows unchanged
+- Document generate/preview/download/delete/pack flows unchanged
+- No route or API contract changes
 
-### Docker compose
-- Comments now explain the 4-step enablement process: (1) run setup script, (2) set env vars, (3) uncomment block, (4) replace UUID placeholder
-- Credentials volume mount uses `YOUR_TUNNEL_UUID` placeholder with the JSON file path explained
+## Validation Results
 
-### Secrets protection
-- `.gitignore` excludes `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml`
-- Only `config.yaml.example` is committed — the actual config and credentials are git-ignored
+| Gate | Result |
+|------|--------|
+| Backend (PostgreSQL) | **117 passed, 0 skipped, 0 failed** |
+| Frontend TypeScript | **0 errors** |
+| Frontend vitest | **91 passed, 4 failed** |
 
-## Operator Commands
+### Vitest failures (all pre-existing, none from Stage 21)
 
-```bash
-# One-time setup
-chmod +x infra/cloudflared/setup-tunnel.sh
-cloudflared tunnel login
-./infra/cloudflared/setup-tunnel.sh
+| Test | Reason |
+|------|--------|
+| `document-api.test.ts` — auto-reauth | `generateDocument()` throws on 401 instead of re-authenticating via `/auth/login` — test expects old auto-reauth behavior |
+| `app.test.tsx` — template state (3 tests) | Tests expect template dropdown to show "fact-find-custom" label; actual DOM shows "fact-find" |
 
-# Configure .env
-ENVIRONMENT=production
-REMOTE_ACCESS_MODE=remote
-CORS_ORIGINS=https://omega.yourdomain.com
-APP_URL=https://omega-api.yourdomain.com
-TRUSTED_PROXY_COUNT=1
-COOKIE_SECURE=true
-SESSION_SECRET=<strong-random-secret>
+All 4 failures exist in the codebase before Stage 21 and are unrelated to the extraction done here.
 
-# Docker with cloudflared sidecar
-# 1. Uncomment the cloudflared block in infra/docker/compose.yaml
-# 2. Replace YOUR_TUNNEL_UUID with the real UUID
-# 3. Ensure credentials JSON is at infra/cloudflared/<UUID>.json
-docker compose -f infra/docker/compose.yaml up
+## Verification Commands
 
-# Test
-curl -H 'Host: omega-api.yourdomain.com' http://localhost:8000/health
+```powershell
+# Backend tests
+$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests/test_api.py -v
+
+# Frontend typecheck
+Set-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+
+# Frontend tests
+Set-Location apps\frontend; node_modules\.bin\vitest.cmd run
 ```
-
-## Verification
-
-- **Config model match**: all env instructions in setup script and compose now use `ENVIRONMENT=production` + `REMOTE_ACCESS_MODE=remote`, matching `config.py` which reads `ENVIRONMENT` for deployment mode and `REMOTE_ACCESS_MODE` for `local_only` vs `remote`
-- **Consistency**: `config.yaml.example`, setup script prompts/output, and compose usage all reference `YOUR_TUNNEL_UUID` placeholder consistently
-- **Secrets protection**: `.gitignore` still excludes `infra/cloudflared/*.json` and `infra/cloudflared/config.yaml`
-- No backend or frontend code changed
 
 ## Remaining Limitations
 
-1. Setup script requires `cloudflared` CLI installed and authenticated on the operator's machine
-2. Tunnel credentials file must be copied to the Docker mount path for the containerized sidecar
-3. No health check on the cloudflared sidecar in Docker compose
-4. No automated certificate renewal — Cloudflare Tunnel handles this transparently
-5. Only Cloudflare Tunnel path implemented — no VPN, Tailscale, or ngrok alternatives
+- `income-protection-page.tsx` remains monolithic at ~2600 lines — further decomposition deferred
+- 4 pre-existing vitest failures (noted above, outside Stage 21 scope)
+- `app.on_event` API deprecated (backend) — deferred

@@ -85,7 +85,7 @@ templates/
 .agent-handoff/
 AGENTS.md
 PROJECT.md
-phase1-8.md
+phases.md
 ```
 
 ## Current Implementation Status

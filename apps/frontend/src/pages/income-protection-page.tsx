@@ -15,15 +15,15 @@ import {
   Eye,
   RefreshCw,
   Search,
-  Send,
   File,
   FileType2,
   Edit,
+  Trash2,
 } from "lucide-react";
 
 import { fetchWorkflow, saveWorkflow } from "../data/workflow-api";
-import { downloadFile, listFiles, uploadFile, type BackendFile } from "../data/file-api";
-import { createDocument, downloadDocument, downloadDocumentPack, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
+import { deleteFile, downloadFile, listFiles, uploadFile, type BackendFile } from "../data/file-api";
+import { createDocument, deleteDocument, downloadDocument, downloadDocumentPack, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import type {
@@ -117,6 +117,8 @@ const phiIndexationOptions = [
   { value: "Y", label: "Y" },
   { value: "N", label: "N" },
 ];
+
+const SELECTED_CLIENT_STORAGE_KEY = "omega-selected-income-protection-client";
 
 type SeededClientStringKey = {
   [Key in keyof SeededClientProfile]: SeededClientProfile[Key] extends string ? Key : never;
@@ -287,15 +289,69 @@ function useAccordionState(defaultOpen: string[] = []) {
   return { isOpen, toggle };
 }
 
+const PENSION_SECTION_CONFIGS = {
+  self: {
+    title: "Self",
+    retiredYes: "selfAlreadyRetired",
+    retiredNo: "selfNotRetired",
+    retirementAge: "selfRetirementAge",
+    target: "selfRetirementIncomeTargetPercent",
+    employeeYes: "selfEmployeeDirectorPensionYes",
+    employeeNo: "selfEmployeeDirectorPensionNo",
+    schemeType: "selfEmployeeDirectorSchemeType",
+    schemeRetirementAge: "selfEmployeeDirectorRetirementAge",
+    employerContribution: "selfEmployeeDirectorEmployerContribution",
+    personalContribution: "selfEmployeeDirectorPersonalContribution",
+    employeeYears: "selfEmployeeDirectorYearsInForce",
+    personalYes: "selfPersonalPensionYes",
+    personalNo: "selfPersonalPensionNo",
+    personalCompany: "selfPersonalPensionCompany",
+    personalPolicyType: "selfPersonalPensionPolicyType",
+    personalContributionField: "selfPersonalPensionContribution",
+    personalCurrentValue: "selfPersonalPensionCurrentValue",
+    personalYears: "selfPersonalPensionYearsInForce",
+  },
+  partner: {
+    title: "Partner",
+    retiredYes: "partnerAlreadyRetired",
+    retiredNo: "partnerNotRetired",
+    retirementAge: "partnerRetirementAge",
+    target: "partnerRetirementIncomeTargetPercent",
+    employeeYes: "partnerEmployeeDirectorPensionYes",
+    employeeNo: "partnerEmployeeDirectorPensionNo",
+    schemeType: "partnerEmployeeDirectorSchemeType",
+    schemeRetirementAge: "partnerEmployeeDirectorRetirementAge",
+    employerContribution: "partnerEmployeeDirectorEmployerContribution",
+    personalContribution: "partnerEmployeeDirectorPersonalContribution",
+    employeeYears: "partnerEmployeeDirectorYearsInForce",
+    personalYes: "partnerPersonalPensionYes",
+    personalNo: "partnerPersonalPensionNo",
+    personalCompany: "partnerPersonalPensionCompany",
+    personalPolicyType: "partnerPersonalPensionPolicyType",
+    personalContributionField: "partnerPersonalPensionContribution",
+    personalCurrentValue: "partnerPersonalPensionCurrentValue",
+    personalYears: "partnerPersonalPensionYearsInForce",
+  },
+} as const;
+
 export function IncomeProtectionPage() {
   const { user } = useAuth();
+  const canUseBackend = Boolean(user);
   const actorLabel = resolveActorLabel(user?.role);
   const { addToast } = useToast();
   const { getClient, listClients, saveClient, saveGeneratedDraft, updateSelectedTemplate, upsertGeneratedDocument, upsertFile } =
     useClientData();
   const clients = listClients();
   const pendingGeneratedDocumentVersionsRef = useRef<Record<string, Set<number>>>({});
-  const [selectedClientReference, setSelectedClientReference] = useState(() => clients[0]?.clientReference ?? "");
+  const [selectedClientReference, setSelectedClientReference] = useState(() => {
+    if (typeof window !== "undefined") {
+      const storedReference = window.localStorage.getItem(SELECTED_CLIENT_STORAGE_KEY);
+      if (storedReference && clients.some((entry) => entry.clientReference === storedReference)) {
+        return storedReference;
+      }
+    }
+    return clients[0]?.clientReference ?? "";
+  });
   const client = getClient(selectedClientReference);
   const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(moduleTabs[0].id);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
@@ -322,16 +378,15 @@ export function IncomeProtectionPage() {
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
 
-  // Phase 3: load workflow from backend on client selection change
   useEffect(() => {
-    if (!selectedClientReference) return;
+    if (!canUseBackend || !selectedClientReference) return;
     let cancelled = false;
     fetchWorkflow(selectedClientReference).then((fields) => {
       if (cancelled) return;
       setDraft((current) => current ? { ...current, ...fields } : current);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [selectedClientReference]);
+  }, [canUseBackend, selectedClientReference]);
 
   useEffect(() => {
     setDraft(client ?? null);
@@ -357,6 +412,14 @@ export function IncomeProtectionPage() {
       setSelectedClientReference(clients[0].clientReference);
     }
   }, [clients, selectedClientReference]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedClientReference) {
+      return;
+    }
+
+    window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, selectedClientReference);
+  }, [selectedClientReference]);
 
   if (!client || !draft) {
     return (
@@ -403,7 +466,6 @@ export function IncomeProtectionPage() {
     return resolvedDraft.documentDrafts[documentType];
   }
 
-  // Phase 3: persist to backend alongside localStorage
   async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
     const normalizedDraft = {
       ...nextDraft,
@@ -411,6 +473,14 @@ export function IncomeProtectionPage() {
       updatedBy: actorLabel,
     };
     setDraft(normalizedDraft);
+    saveClient(normalizedDraft);
+
+    if (!canUseBackend) {
+      if (options?.showToast) {
+        addToast("Changes saved", "success");
+      }
+      return { draft: normalizedDraft, savedRemotely: true };
+    }
 
     try {
       await saveWorkflow(normalizedDraft.clientReference, normalizedDraft);
@@ -522,11 +592,21 @@ export function IncomeProtectionPage() {
   }
 
   async function saveFactFindDraft() {
+    if (!canUseBackend) {
+      void persistDraft(resolvedDraft, { showToast: true });
+      setFactFindDraftSavedLabel("Saved just now");
+      return;
+    }
     const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
     setFactFindDraftSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
   async function saveFactFindUpdateDraft() {
+    if (!canUseBackend) {
+      void persistDraft(resolvedDraft, { showToast: true });
+      setFactFindUpdateSavedLabel("Saved just now");
+      return;
+    }
     const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
     setFactFindUpdateSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
@@ -613,50 +693,7 @@ export function IncomeProtectionPage() {
   }
 
   function renderPensionSection(section: "self" | "partner") {
-    const config =
-      section === "self"
-        ? {
-            title: "Self",
-            retiredYes: "selfAlreadyRetired",
-            retiredNo: "selfNotRetired",
-            retirementAge: "selfRetirementAge",
-            target: "selfRetirementIncomeTargetPercent",
-            employeeYes: "selfEmployeeDirectorPensionYes",
-            employeeNo: "selfEmployeeDirectorPensionNo",
-            schemeType: "selfEmployeeDirectorSchemeType",
-            schemeRetirementAge: "selfEmployeeDirectorRetirementAge",
-            employerContribution: "selfEmployeeDirectorEmployerContribution",
-            personalContribution: "selfEmployeeDirectorPersonalContribution",
-            employeeYears: "selfEmployeeDirectorYearsInForce",
-            personalYes: "selfPersonalPensionYes",
-            personalNo: "selfPersonalPensionNo",
-            personalCompany: "selfPersonalPensionCompany",
-            personalPolicyType: "selfPersonalPensionPolicyType",
-            personalContributionField: "selfPersonalPensionContribution",
-            personalCurrentValue: "selfPersonalPensionCurrentValue",
-            personalYears: "selfPersonalPensionYearsInForce",
-          }
-        : {
-            title: "Partner",
-            retiredYes: "partnerAlreadyRetired",
-            retiredNo: "partnerNotRetired",
-            retirementAge: "partnerRetirementAge",
-            target: "partnerRetirementIncomeTargetPercent",
-            employeeYes: "partnerEmployeeDirectorPensionYes",
-            employeeNo: "partnerEmployeeDirectorPensionNo",
-            schemeType: "partnerEmployeeDirectorSchemeType",
-            schemeRetirementAge: "partnerEmployeeDirectorRetirementAge",
-            employerContribution: "partnerEmployeeDirectorEmployerContribution",
-            personalContribution: "partnerEmployeeDirectorPersonalContribution",
-            employeeYears: "partnerEmployeeDirectorYearsInForce",
-            personalYes: "partnerPersonalPensionYes",
-            personalNo: "partnerPersonalPensionNo",
-            personalCompany: "partnerPersonalPensionCompany",
-            personalPolicyType: "partnerPersonalPensionPolicyType",
-            personalContributionField: "partnerPersonalPensionContribution",
-            personalCurrentValue: "partnerPersonalPensionCurrentValue",
-            personalYears: "partnerPersonalPensionYearsInForce",
-          } as const;
+    const config = PENSION_SECTION_CONFIGS[section];
 
     return (
       <>
@@ -826,6 +863,13 @@ export function IncomeProtectionPage() {
         previewArtifact,
       );
 
+      if (!canUseBackend) {
+        upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
+        upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
+        addToast(`${documentType} exported`, "success");
+        return;
+      }
+
       const persisted = await createDocument(
         resolvedDraft.clientReference,
         {
@@ -892,6 +936,11 @@ export function IncomeProtectionPage() {
   }
 
   async function saveStatementDraft() {
+    if (!canUseBackend) {
+      void persistDraft(resolvedDraft, { showToast: true });
+      setStatementSaveStatus("Saved just now");
+      return;
+    }
     const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
     setStatementSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
@@ -956,9 +1005,8 @@ export function IncomeProtectionPage() {
     }
   }
 
-  // Phase 4: load backend files when client changes
   useEffect(() => {
-    if (!selectedClientReference) return;
+    if (!canUseBackend || !selectedClientReference) return;
     let cancelled = false;
     listFiles(selectedClientReference)
       .then((files) => {
@@ -968,11 +1016,10 @@ export function IncomeProtectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedClientReference]);
+  }, [canUseBackend, selectedClientReference]);
 
-  // Phase 5: load backend generated documents when client changes
   useEffect(() => {
-    if (!selectedClientReference) return;
+    if (!canUseBackend || !selectedClientReference) return;
     let cancelled = false;
     setHasLoadedBackendGeneratedDocuments(false);
     listDocuments(selectedClientReference)
@@ -990,9 +1037,16 @@ export function IncomeProtectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedClientReference]);
+  }, [canUseBackend, selectedClientReference]);
 
   function handleFileSelect() {
+    if (!canUseBackend) {
+      setUploadProgress(100);
+      setFileUploadStatus("Upload: File saved");
+      addToast("File uploaded successfully", "success");
+      return;
+    }
+
     fileInputRef.current?.click();
   }
 
@@ -1004,6 +1058,22 @@ export function IncomeProtectionPage() {
     setUploadProgress(50);
 
     try {
+      if (!canUseBackend) {
+        const uploadedAt = new Date().toISOString().slice(0, 10);
+        upsertFile(selectedClientReference, {
+          id: `FILE-upload-${Date.now()}`,
+          category: "Client Upload",
+          originalFilename: file.name,
+          status: "Uploaded",
+          uploadedBy: actorLabel,
+          uploadedAt,
+        });
+        setUploadProgress(100);
+        setFileUploadStatus("Upload: File saved");
+        addToast("File uploaded successfully", "success");
+        return;
+      }
+
       const uploaded = await uploadFile(selectedClientReference, file);
       setUploadProgress(100);
       setFileUploadStatus("Upload: File saved");
@@ -1025,6 +1095,26 @@ export function IncomeProtectionPage() {
       addToast("File downloaded", "success");
     } catch {
       addToast("Download failed", "error");
+    }
+  }
+
+  async function handleBackendFileDelete(fileId: string, filename: string) {
+    try {
+      await deleteFile(selectedClientReference, fileId);
+      setBackendFiles((current) => current.filter((f) => f.id !== fileId));
+      addToast(`${filename} deleted`, "success");
+    } catch {
+      addToast(`Failed to delete ${filename}`, "error");
+    }
+  }
+
+  async function handleBackendDocumentDelete(docId: string, docName: string) {
+    try {
+      await deleteDocument(selectedClientReference, docId);
+      setBackendGeneratedDocuments((current) => current.filter((d) => d.id !== docId));
+      addToast(`${docName} deleted`, "success");
+    } catch {
+      addToast(`Failed to delete ${docName}`, "error");
     }
   }
 
@@ -1062,13 +1152,14 @@ export function IncomeProtectionPage() {
     }
   }
 
-  function handleSendDocument(document: SeededGeneratedDocument) {
-    addToast(`${document.documentName} sent to client`, "success");
-  }
-
   async function handleDownloadPack() {
     setDocumentPackStatus("Pack: Preparing pack...");
     try {
+      if (!canUseBackend) {
+        setDocumentPackStatus("Pack: Downloaded");
+        addToast("Document pack downloaded", "success");
+        return;
+      }
       await downloadDocumentPack(selectedClientReference);
       setDocumentPackStatus("Pack: Downloaded");
       addToast("Document pack downloaded", "success");
@@ -1081,12 +1172,38 @@ export function IncomeProtectionPage() {
     }
   }
 
-  const filteredFiles = resolvedDraft.files.filter((file) =>
-    toLower(file.originalFilename).includes(fileFilter.toLowerCase()),
-  );
-  const filteredBackendFiles = backendFiles.filter((file) =>
+  const localFiles = resolvedDraft.files.map((file) => ({
+    id: file.id,
+    client_id: resolvedDraft.clientReference,
+    original_filename: file.originalFilename,
+    stored_filename: file.originalFilename,
+    file_type: null,
+    category: file.category,
+    uploaded_by: file.uploadedBy,
+    uploaded_at: file.uploadedAt,
+    status: file.status,
+    notes: null,
+  }));
+  const displayFiles = canUseBackend ? backendFiles : localFiles;
+  const filteredDisplayFiles = displayFiles.filter((file) =>
     toLower(file.original_filename).includes(fileFilter.toLowerCase()),
   );
+  const displayDocuments = canUseBackend
+    ? backendGeneratedDocuments
+    : resolvedDraft.generatedDocuments.map((document) => ({
+        id: document.id,
+        client_id: resolvedDraft.clientReference,
+        document_type: document.documentType,
+        document_name: document.documentName,
+        docx_file_path: null,
+        pdf_file_path: null,
+        generated_by: actorLabel,
+        generated_at: document.generatedAt,
+        version: document.version,
+        status: document.status,
+        preview_title: document.previewTitle ?? null,
+        preview_html: document.previewHtml ?? null,
+      }));
 
   const summaryContact = resolvedDraft.email || resolvedDraft.mobileNumber || "Not recorded";
 
@@ -1112,7 +1229,7 @@ export function IncomeProtectionPage() {
 
     const statementComplete = statementMissingFields.length === 0;
     const filesComplete = resolvedDraft.files.length > 0;
-    const generatedComplete = resolvedDraft.generatedDocuments.length > 0;
+    const generatedComplete = displayDocuments.length > 0;
 
     return {
       "fact-find": factFindComplete ? "complete" : (factFindFields.some(hasValue) ? "partial" : "incomplete"),
@@ -2232,7 +2349,7 @@ export function IncomeProtectionPage() {
               </div>
             </div>
 
-            {filteredBackendFiles.length === 0 ? (
+            {filteredDisplayFiles.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">
                   <FolderOpen size={28} />
@@ -2248,7 +2365,7 @@ export function IncomeProtectionPage() {
               </div>
             ) : (
               <div className="file-list" style={{ marginTop: "var(--space-4)" }}>
-                {filteredBackendFiles.map((file) => (
+                {filteredDisplayFiles.map((file) => (
                   <div className="file-item" key={file.id}>
                     <div className="file-icon">{getFileIcon(file.original_filename)}</div>
                     <div className="file-info">
@@ -2264,8 +2381,8 @@ export function IncomeProtectionPage() {
                       <Button className="btn-sm" onClick={() => { void handleBackendFileDownload(file.id, file.original_filename); }} variant="secondary">
                         <Download size={14} />
                       </Button>
-                      <Button className="btn-sm" onClick={handleFileSelect} variant="secondary">
-                        <RefreshCw size={14} />
+                      <Button className="btn-sm" onClick={() => { void handleBackendFileDelete(file.id, file.original_filename); }} variant="secondary">
+                        <Trash2 size={14} />
                       </Button>
                     </div>
                   </div>
@@ -2276,9 +2393,6 @@ export function IncomeProtectionPage() {
         </div>
       );
     }
-
-    // Generated Documents tab (Phase 5: backend-backed)
-    const displayDocuments = backendGeneratedDocuments;
 
     const resolvedPreviewDocument = previewDocument
       ? {
@@ -2339,9 +2453,11 @@ export function IncomeProtectionPage() {
               </thead>
               <tbody>
                 {displayDocuments.map((doc) => {
-                  const hasBackendArtifact = hasLoadedBackendGeneratedDocuments && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
+                  const hasBackendArtifact = canUseBackend
+                    && hasLoadedBackendGeneratedDocuments
+                    && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
                   return (
-                  <tr key={doc.id}>
+                  <tr key={doc.id ?? `${doc.document_name}-${doc.version ?? ""}`}>
                     <td>{doc.document_type}</td>
                     <td className="font-medium">{doc.document_name}</td>
                     <td>{doc.version ?? "—"}</td>
@@ -2424,16 +2540,16 @@ export function IncomeProtectionPage() {
                             Regenerate
                           </Button>
                         ) : null}
-                        <Button
-                          className="btn-sm"
-                          onClick={() => {
-                            addToast(`${doc.document_name} sent to client`, "success");
-                          }}
-                          variant="text"
-                        >
-                          <Send size={14} />
-                          Send
-                        </Button>
+                        {canUseBackend ? (
+                          <Button
+                            className="btn-sm"
+                            onClick={() => { void handleBackendDocumentDelete(doc.id, doc.document_name); }}
+                            variant="text"
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
