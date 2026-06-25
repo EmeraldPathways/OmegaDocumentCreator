@@ -68,7 +68,14 @@ function AppRoutes() {
             </RequireAdmin>
           }
         />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/settings"
+          element={
+            <RequireAdmin>
+              <SettingsPage />
+            </RequireAdmin>
+          }
+        />
       </Routes>
       </ErrorBoundary>
     </AppShell>

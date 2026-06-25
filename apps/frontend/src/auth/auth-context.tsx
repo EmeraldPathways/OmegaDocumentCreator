@@ -33,7 +33,7 @@ function normalizeEmail(email: string) {
 function resolveRole(email: string): SessionRole {
   const normalizedEmail = normalizeEmail(email);
 
-  if (normalizedEmail === "admin@omega.local") {
+  if (normalizedEmail === "admin@omega.local" || normalizedEmail === "andrew@omegafinancial.ie") {
     return "admin";
   }
 

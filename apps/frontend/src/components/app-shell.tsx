@@ -18,7 +18,9 @@ export function AppShell({ children }: PropsWithChildren) {
   const [searchQuery, setSearchQuery] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const visibleNavItems = isAdmin ? [...navItems, { label: "Admin", to: "/admin", icon: Lock }] : navItems;
+  const visibleNavItems = isAdmin
+    ? [...navItems, { label: "Admin", to: "/admin", icon: Lock }]
+    : navItems.filter((item) => item.label !== "Settings");
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -101,17 +103,19 @@ export function AppShell({ children }: PropsWithChildren) {
                     <span>{userName}</span>
                   </div>
                   <div className="user-menu-divider" />
-                  <button
-                    className="user-menu-item"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate("/settings");
-                    }}
-                    type="button"
-                  >
-                    <Settings size={16} />
-                    Settings
-                  </button>
+                  {isAdmin ? (
+                    <button
+                      className="user-menu-item"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        navigate("/settings");
+                      }}
+                      type="button"
+                    >
+                      <Settings size={16} />
+                      Settings
+                    </button>
+                  ) : null}
                   {isSignedIn ? (
                     <button
                       className="user-menu-item"

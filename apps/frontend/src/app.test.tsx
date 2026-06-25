@@ -343,6 +343,8 @@ describe("App routes", () => {
   });
 
   it("renders the Settings page with Stage 16 AI readiness guidance", () => {
+    signInAsAdmin();
+
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <App />
@@ -1630,6 +1632,8 @@ describe("App routes", () => {
   });
 
   it("persists settings after saving and reopening the page", async () => {
+    signInAsAdmin();
+
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <App />
@@ -1644,6 +1648,8 @@ describe("App routes", () => {
     });
 
     cleanup();
+
+    signInAsAdmin();
 
     render(
       <MemoryRouter initialEntries={["/settings"]}>

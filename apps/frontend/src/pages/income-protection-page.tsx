@@ -1089,11 +1089,6 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          {renderGenerationRequirements("Fact Find generation requirements", factFindGenerationRequirements, factFindMissingFields, {
-            explainSharedFields: true,
-            emphasiseMissing: showFactFindValidation,
-          })}
-
           <Accordion flush>
             <AccordionItem
               indicator={tabProgress["fact-find"]}
@@ -1763,6 +1758,10 @@ export function IncomeProtectionPage() {
               <p className="text-muted text-small">OFM Financial Ltd T/A Omega Financial Management, regulated by the Central Bank of Ireland.</p>
             </AccordionItem>
               </Accordion>
+              {renderGenerationRequirements("Fact Find generation requirements", factFindGenerationRequirements, factFindMissingFields, {
+                explainSharedFields: true,
+                emphasiseMissing: showFactFindValidation,
+              })}
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{factFindDraftSavedLabel}</span>
                 <Button onClick={() => void saveFactFindDraft()} variant="primary">
@@ -1811,13 +1810,6 @@ export function IncomeProtectionPage() {
               <h2>Fact Find Update Draft</h2>
             </div>
           </div>
-
-          {renderGenerationRequirements(
-            "Fact Find Update generation requirements",
-            factFindUpdateGenerationRequirements,
-            factFindUpdateGenerationRequirements.filter((item) => !item.complete).map((item) => item.label),
-            { explainSharedFields: true },
-          )}
 
           <Accordion flush>
             <AccordionItem
@@ -1905,6 +1897,12 @@ export function IncomeProtectionPage() {
                   </p>
                 </AccordionItem>
               </Accordion>
+              {renderGenerationRequirements(
+                "Fact Find Update generation requirements",
+                factFindUpdateGenerationRequirements,
+                factFindUpdateGenerationRequirements.filter((item) => !item.complete).map((item) => item.label),
+                { explainSharedFields: true },
+              )}
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{factFindUpdateSavedLabel}</span>
                 <Button onClick={() => void saveFactFindUpdateDraft()} variant="primary">
@@ -1954,11 +1952,6 @@ export function IncomeProtectionPage() {
               <h2>Statement of Suitability Draft</h2>
             </div>
           </div>
-
-          {renderGenerationRequirements("Statement of Suitability generation requirements", statementGenerationRequirements, statementMissingFields, {
-            explainSharedFields: true,
-            emphasiseMissing: showStatementValidation,
-          })}
 
           <Accordion flush>
             <AccordionItem
@@ -2068,6 +2061,10 @@ export function IncomeProtectionPage() {
               />
             </div>
           </section>
+              {renderGenerationRequirements("Statement of Suitability generation requirements", statementGenerationRequirements, statementMissingFields, {
+                explainSharedFields: true,
+                emphasiseMissing: showStatementValidation,
+              })}
               <div className="sticky-action-bar">
                 <span className="sticky-action-bar-status">{statementSaveStatus}</span>
                 <Button onClick={() => void saveStatementDraft()} variant="primary">

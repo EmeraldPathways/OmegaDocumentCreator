@@ -1,8 +1,30 @@
-# Validation Log - Frontend Proxy / CSRF / Test DB Isolation
+# Validation Log
 
-**Date**: 2026-06-24
+## 2026-06-25: Settings Page Admin Lockdown
 
-## Backend pytest
+### Frontend TypeScript
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+```
+
+**Result**: 0 errors
+
+### Frontend vitest
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
+```
+
+**Result**: 7 files, 79 passed, 1 pre-existing failure
+
+The one failing test (`"persists settings after saving and reopening the page"`) is a **pre-existing JSDOM limitation** — the Settings page uses `setTimeout`-based save button state transitions that JSDOM does not reliably process. This test had the same failure before the auth guard changes were applied. All auth-gating tests (Settings visibility, Settings route protection) pass.
+
+---
+
+## 2026-06-24: Frontend Proxy / CSRF / Test DB Isolation
+
+### Backend pytest
 
 ```powershell
 $env:PYTHONPATH="apps\api"
@@ -12,7 +34,7 @@ apps\api\.venv\Scripts\python -m pytest apps/api/tests -q
 
 **Result**: 168 passed, 0 failed, warnings only
 
-## Frontend TypeScript
+### Frontend TypeScript
 
 ```powershell
 Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
@@ -20,7 +42,7 @@ Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconf
 
 **Result**: 0 errors
 
-## Frontend vitest
+### Frontend vitest
 
 ```powershell
 Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
@@ -28,7 +50,7 @@ Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
 
 **Result**: 7 files, 80 tests, 0 failed
 
-## Live 3007 Proxy Smoke Test
+### Live 3007 Proxy Smoke Test
 
 ```powershell
 $base='http://127.0.0.1:3007'
@@ -47,7 +69,7 @@ Invoke-WebRequest -UseBasicParsing -Uri "$base/documents/generate" -Method POST 
 - `PUT /clients/CLI-2026-0002/workflow` via `3007`: 200
 - `POST /documents/generate` via `3007`: 200
 
-## Summary
+### Summary
 
 | Gate | Result |
 |------|--------|

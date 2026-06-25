@@ -1,4 +1,13 @@
-# Fix: Frontend Proxy / CSRF / Test DB Isolation
+# Fix: Lock Down Frontend Settings Page to Admin Only
+
+## Verdict
+**The frontend `/settings` route and Settings navigation are now restricted to the admin user (`andrew@omegafinancial.ie`) only.** Non-admin users can no longer see Settings in the top nav or user menu dropdown, and cannot access `/settings` by direct URL (they are redirected to `/login`).
+
+Previous session result (Frontend Proxy / CSRF / Test DB Isolation) retained below.
+
+---
+
+# Previous: Frontend Proxy / CSRF / Test DB Isolation
 
 ## Verdict
 **The live frontend development path is now working on the real `3007` proxy for login, workflow save, and document generation.** The final blocking issue was not CSRF: the Vite dev server was not proxying `/clients`, so workflow fetch/save never reached the backend. The backend test suite is also isolated from the live development database and no longer wipes live users/clients during pytest runs.
