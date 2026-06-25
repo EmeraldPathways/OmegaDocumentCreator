@@ -24,7 +24,7 @@ const STORAGE_KEY = "omega-app-settings";
 const AI_STORAGE_KEY = "omega-ai-settings";
 
 const defaultSettings: AppSettings = {
-  adminEmail: "admin@omega.local",
+  adminEmail: "",
   appUrl: "http://office-server.local",
   backupPath: "D:\\Omega\\backups",
   fileStoragePath: "D:\\Omega\\clients",
@@ -62,7 +62,11 @@ function readStoredSettings() {
   }
 
   try {
-    return { ...defaultSettings, ...(JSON.parse(storedValue) as Partial<AppSettings>) };
+    const parsed = { ...defaultSettings, ...(JSON.parse(storedValue) as Partial<AppSettings>) };
+    if (parsed.adminEmail.trim().toLowerCase() === "admin@omega.local") {
+      parsed.adminEmail = "";
+    }
+    return parsed;
   } catch {
     return defaultSettings;
   }

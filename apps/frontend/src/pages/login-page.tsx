@@ -2,12 +2,13 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/auth-context";
+import { Button, Input } from "../components/ui";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("admin@omega.local");
-  const [password, setPassword] = useState("ChangeMe123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -25,22 +26,38 @@ export function LoginPage() {
 
   return (
     <div className="page-stack">
-      <section className="panel login-panel">
-        <p className="eyebrow">Secure access</p>
-        <h1>Staff Login</h1>
+      <div className="page-heading page-heading-compact">
+        <div>
+          <h1>Staff Login</h1>
+          <p className="page-subtitle">Enter your credentials to access Omega Document Creator.</p>
+        </div>
+      </div>
+
+      <section className="section-divided">
+        <h2 className="section-title">Login credentials</h2>
         <form className="login-form" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
-          </label>
-          <label>
-            Password
-            <input onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
-          </label>
-          <button className="primary-action" type="submit">
-            Sign In
-          </button>
-          {error ? <p>{error}</p> : null}
+          <div className="form-grid">
+            <Input
+              id="login-email"
+              label="Email"
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              value={email}
+            />
+            <Input
+              id="login-password"
+              label="Password"
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              value={password}
+            />
+          </div>
+          {error ? <p className="field-error" style={{ marginTop: "var(--space-4)" }}>{error}</p> : null}
+          <div className="sticky-action-bar" style={{ marginTop: "var(--space-5)" }}>
+            <Button type="submit" variant="primary">
+              Sign In
+            </Button>
+          </div>
         </form>
       </section>
     </div>
