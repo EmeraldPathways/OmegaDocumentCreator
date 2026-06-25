@@ -1,5 +1,34 @@
 # Validation Log
 
+## 2026-06-25: Income Protection / Clients UI Cleanup Phase
+
+### Frontend TypeScript
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
+```
+
+**Result**: 0 errors
+
+### Frontend vitest
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache
+```
+
+**Result**: 7 files, 79 passed, 1 pre-existing failure
+
+The one failing test (`"persists settings after saving and reopening the page"`) is a **pre-existing JSDOM limitation** — the Settings page uses `setTimeout`-based save button state transitions that JSDOM does not reliably process. This test had the same failure before these UI cleanup changes. All 3 updated assertions (currency, status text, button label) pass correctly.
+
+### Summary
+
+| Gate | Result |
+|------|--------|
+| Frontend TypeScript | 0 errors |
+| Frontend vitest | 79 passed, 1 pre-existing failure (unchanged) |
+
+---
+
 ## 2026-06-25: Settings Page Admin Lockdown
 
 ### Frontend TypeScript

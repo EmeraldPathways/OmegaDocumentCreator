@@ -444,17 +444,13 @@ export function ClientProfilePage() {
           ) : null}
         </div>
 
-        {resolvedDraft.dependants.length === 0 && !isAddingDependant ? (
+          {resolvedDraft.dependants.length === 0 && !isAddingDependant ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <Users size={28} />
             </div>
             <div className="empty-state-title">No dependants recorded</div>
-            <p className="empty-state-description">Add dependants to include them in client documentation.</p>
-            <Button onClick={() => setIsAddingDependant(true)} variant="secondary">
-              <Plus size={18} />
-              Add Dependant
-            </Button>
+            <p className="empty-state-description">Use the add button above to record dependants for client documentation.</p>
           </div>
         ) : null}
 

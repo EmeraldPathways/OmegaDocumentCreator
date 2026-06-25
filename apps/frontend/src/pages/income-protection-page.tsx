@@ -115,7 +115,7 @@ export function IncomeProtectionPage() {
   const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
-  const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Waiting for upload");
+  const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
   const [documentDownloadStatus, setDocumentDownloadStatus] = useState("Download: No document downloaded yet");
@@ -1201,7 +1201,7 @@ export function IncomeProtectionPage() {
                   label={requiredLabel("Income / salary")}
                   onBlur={(event) => updateField("income", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("income", event.target.value)}
-                  prefix="£"
+                  prefix="€"
                   step="0.01"
                   type="number"
                   value={resolvedDraft.income}
@@ -1253,7 +1253,7 @@ export function IncomeProtectionPage() {
                   label={requiredLabel("Monthly premium")}
                   onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("premium", event.target.value)}
-                  prefix="£"
+                  prefix="€"
                   step="0.01"
                   type="number"
                   value={resolvedDraft.premium}
@@ -2033,7 +2033,7 @@ export function IncomeProtectionPage() {
                 label={requiredLabel("Gross monthly premium")}
                 onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("premium", event.target.value)}
-                prefix="£"
+                prefix="€"
                 step="0.01"
                 type="number"
                 value={resolvedDraft.premium}
@@ -2044,7 +2044,7 @@ export function IncomeProtectionPage() {
                 label={requiredLabel("Net monthly cost")}
                 onBlur={(event) => updateField("netMonthlyCost", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("netMonthlyCost", event.target.value)}
-                prefix="£"
+                prefix="€"
                 step="0.01"
                 type="number"
                 value={resolvedDraft.netMonthlyCost}
@@ -2185,7 +2185,7 @@ export function IncomeProtectionPage() {
           <div className="workflow-header-actions income-protection-header-actions">
             <Link className="btn btn-primary" to="/clients/new">
               <Plus size={18} />
-              Add Client
+              Create Client
             </Link>
             <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
               <Edit size={18} />

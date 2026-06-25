@@ -94,7 +94,7 @@ describe("App routes", () => {
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Add Client" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create Client" })).toBeInTheDocument();
   });
 
   it("renders the clients page for the clients route", () => {
@@ -378,7 +378,7 @@ describe("App routes", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Add Client" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create Client" })).toBeInTheDocument();
     expect(screen.getByLabelText("Select workflow client")).toHaveValue("CLI-2026-0002");
     expect(screen.queryByLabelText("Search workflow clients")).not.toBeInTheDocument();
   });
@@ -1316,7 +1316,7 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
 
-    expect(screen.getByText("Waiting for upload")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Upload File" }));
 
