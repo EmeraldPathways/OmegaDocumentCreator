@@ -102,7 +102,7 @@ export function AdminPage() {
             </Button>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap-flush">
             <table className="data-table">
               <thead>
                 <tr>
@@ -140,7 +140,7 @@ export function AdminPage() {
           </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap-flush">
           <table className="data-table">
             <thead>
               <tr>
@@ -178,7 +178,7 @@ export function AdminPage() {
           <Badge variant="ready">Backup status: {backupStatus}</Badge>
         </div>
 
-        <div className="table-wrap">
+        <div className="table-wrap-flush">
           <table className="data-table">
             <thead>
               <tr>
@@ -215,7 +215,7 @@ export function AdminPage() {
             <p className="empty-state-description">System activity will appear here once records are created.</p>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap-flush">
             <table className="data-table">
               <thead>
                 <tr>

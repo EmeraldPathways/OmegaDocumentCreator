@@ -18,14 +18,18 @@ function appendStyle(existingStyle: string | null, nextStyle: string) {
   return [existingStyle ?? "", nextStyle].filter(Boolean).join(";");
 }
 
+function hasPdfClass(sourceElement: Element, className: string) {
+  return sourceElement.classList.contains(className);
+}
+
 function isPdfBlock(sourceElement: Element) {
   return (
-    sourceElement.classList.contains("document-banner") ||
-    sourceElement.classList.contains("client-summary-grid") ||
-    sourceElement.classList.contains("document-grid") ||
-    sourceElement.classList.contains("document-section") ||
-    sourceElement.classList.contains("document-callout") ||
-    sourceElement.classList.contains("signatures-footer")
+    hasPdfClass(sourceElement, "document-banner") ||
+    hasPdfClass(sourceElement, "client-summary-grid") ||
+    hasPdfClass(sourceElement, "document-grid") ||
+    hasPdfClass(sourceElement, "document-section") ||
+    hasPdfClass(sourceElement, "document-callout") ||
+    hasPdfClass(sourceElement, "signatures-footer")
   );
 }
 
@@ -37,7 +41,7 @@ function elementStyles(sourceElement: Element) {
     return "display:block;color:#1f2937;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.6";
   }
 
-  if (tagName === "header" && classList.contains("document-banner")) {
+  if ((tagName === "header" || tagName === "div") && classList.contains("document-banner")) {
     return "display:block;background:#f6ede3;border:1px solid #e5d5c5;border-radius:16px;padding:22px 24px;margin:0 0 18px;page-break-inside:avoid";
   }
 
@@ -49,19 +53,19 @@ function elementStyles(sourceElement: Element) {
     return "margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#6b7280";
   }
 
-  if (tagName === "section" && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
+  if ((tagName === "section" || tagName === "div") && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
     return "display:block;border:1px solid #e5e7eb;border-radius:14px;padding:18px 20px;margin:0 0 16px;background:#faf7f2;page-break-inside:avoid";
   }
 
-  if (tagName === "section" && classList.contains("document-section")) {
+  if ((tagName === "section" || tagName === "div") && classList.contains("document-section")) {
     return "display:block;margin:0 0 16px;padding:0 0 2px;page-break-inside:avoid";
   }
 
-  if (tagName === "aside" && classList.contains("document-callout")) {
+  if ((tagName === "aside" || tagName === "div") && classList.contains("document-callout")) {
     return "display:block;background:#fff6e6;border-left:6px solid #c68b2c;border-radius:12px;padding:16px 18px;margin:0 0 16px;page-break-inside:avoid";
   }
 
-  if (tagName === "footer" && classList.contains("signatures-footer")) {
+  if ((tagName === "footer" || tagName === "div") && classList.contains("signatures-footer")) {
     return "display:block;margin-top:20px;padding-top:14px;border-top:2px solid #5b2230;page-break-inside:avoid";
   }
 
@@ -430,6 +434,157 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
   } finally {
     document.body.removeChild(container);
   }
+}
+
+export function buildStandaloneDocumentPreviewHtml(html: string) {
+  const styledContent = buildPdfStyledHtml(html, true);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e8edf5;
+    display: flex;
+    justify-content: center;
+    padding: 32px 24px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #0f172a;
+    min-height: 100vh;
+  }
+  .preview-page {
+    width: 794px;
+    min-height: 1123px;
+    background: #ffffff;
+    border: 1px solid #dbe3ee;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+    padding: 72px 80px 80px;
+  }
+  .preview-page .workflow-document {
+    color: #1f2937;
+  }
+  .preview-page .document-banner {
+    background: #f6ede3;
+    border: 1px solid #e5d5c5;
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+  }
+  .preview-page .document-eyebrow {
+    margin: 0 0 8px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7c4b2a;
+  }
+  .preview-page .document-subtitle {
+    margin: 8px 0 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 13px;
+    color: #6b7280;
+  }
+  .preview-page .client-summary-grid,
+  .preview-page .document-grid {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #faf7f2;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .preview-page .grid-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .preview-page .grid-item {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .preview-page .grid-label {
+    display: block;
+    margin-bottom: 4px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #7c4b2a;
+  }
+  .preview-page .grid-item strong {
+    display: block;
+    font-size: 13px;
+    color: #111827;
+  }
+  .preview-page .document-section {
+    margin-bottom: 18px;
+  }
+  .preview-page .document-callout {
+    border-left: 6px solid #c68b2c;
+    border-radius: 12px;
+    background: #fff6e6;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .preview-page .signatures-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #5b2230;
+  }
+  .preview-page h1 {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #3c1321;
+  }
+  .preview-page h2 {
+    margin: 0 0 10px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #5b2230;
+  }
+  .preview-page h3 {
+    margin: 0 0 8px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #374151;
+  }
+  .preview-page p {
+    margin: 0 0 10px;
+    line-height: 1.6;
+  }
+  .preview-page ul,
+  .preview-page ol {
+    margin: 0 0 10px;
+    padding-left: 22px;
+  }
+  .preview-page li {
+    margin-bottom: 6px;
+  }
+  .preview-page img {
+    display: block;
+    max-width: 100%;
+    margin: 16px auto;
+    border-radius: 10px;
+  }
+</style>
+</head>
+<body>
+  <div class="preview-page">${styledContent}</div>
+</body>
+</html>`;
 }
 
 export async function exportHtmlToPdf(html: string, filename: string) {

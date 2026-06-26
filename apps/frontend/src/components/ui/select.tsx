@@ -16,13 +16,15 @@ export function Select({ label, error, hint, options, id, className = "", ...pro
           {label}
         </label>
       ) : null}
-      <select className={`field-input field-select ${error ? "is-error" : ""}`} id={selectId} {...props}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div className={`field-select-wrap${error ? " is-error" : ""}`}>
+        <select className={`field-select${error ? " is-error" : ""}`} id={selectId} {...props}>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
       {error ? <span className="field-error">{error}</span> : null}
       {hint ? <span className="field-hint">{hint}</span> : null}
     </div>

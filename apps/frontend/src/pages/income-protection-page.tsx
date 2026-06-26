@@ -1089,14 +1089,14 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          <Accordion flush>
+          <Accordion flush className="workflow-form-accordion">
             <AccordionItem
               indicator={tabProgress["fact-find"]}
               isOpen={factFindWorkspaceAccordion.isOpen("fact-find-form")}
               onToggle={() => factFindWorkspaceAccordion.toggle("fact-find-form")}
               title="Fact Find Form"
             >
-              <Accordion flush>
+              <Accordion flush className="workflow-section-accordion">
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.servicesRequestedLifeProtection,
@@ -1762,8 +1762,8 @@ export function IncomeProtectionPage() {
                 explainSharedFields: true,
                 emphasiseMissing: showFactFindValidation,
               })}
-              <div className="sticky-action-bar">
-                <span className="sticky-action-bar-status">{factFindDraftSavedLabel}</span>
+              <div className="form-action-row">
+                <span className="form-action-row-status">{factFindDraftSavedLabel}</span>
                 <Button onClick={() => void saveFactFindDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find
@@ -1811,14 +1811,14 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          <Accordion flush>
+          <Accordion flush className="workflow-form-accordion">
             <AccordionItem
               indicator={tabProgress["fact-find-update"]}
               isOpen={factFindUpdateWorkspaceAccordion.isOpen("fact-find-update-form")}
               onToggle={() => factFindUpdateWorkspaceAccordion.toggle("fact-find-update-form")}
               title="Fact Find Update Form"
             >
-              <Accordion flush>
+              <Accordion flush className="workflow-section-accordion">
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.factFindUpdatePersonalCircumstances,
@@ -1903,8 +1903,8 @@ export function IncomeProtectionPage() {
                 factFindUpdateGenerationRequirements.filter((item) => !item.complete).map((item) => item.label),
                 { explainSharedFields: true },
               )}
-              <div className="sticky-action-bar">
-                <span className="sticky-action-bar-status">{factFindUpdateSavedLabel}</span>
+              <div className="form-action-row">
+                <span className="form-action-row-status">{factFindUpdateSavedLabel}</span>
                 <Button onClick={() => void saveFactFindUpdateDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find Update
@@ -1953,7 +1953,7 @@ export function IncomeProtectionPage() {
             </div>
           </div>
 
-          <Accordion flush>
+          <Accordion flush className="workflow-form-accordion">
             <AccordionItem
               indicator={tabProgress["statement-of-suitability"]}
               isOpen={statementWorkspaceAccordion.isOpen("statement-form")}
@@ -2065,8 +2065,8 @@ export function IncomeProtectionPage() {
                 explainSharedFields: true,
                 emphasiseMissing: showStatementValidation,
               })}
-              <div className="sticky-action-bar">
-                <span className="sticky-action-bar-status">{statementSaveStatus}</span>
+              <div className="form-action-row">
+                <span className="form-action-row-status">{statementSaveStatus}</span>
                 <Button onClick={() => void saveStatementDraft()} variant="primary">
                   <Save size={18} />
                   Save Statement

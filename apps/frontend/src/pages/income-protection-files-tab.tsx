@@ -115,7 +115,7 @@ export function IncomeProtectionFilesTab({
         <div className="upload-zone-hint">or click to browse</div>
       </div>
 
-      <section className="section-divided">
+      <section className="section">
         <div className="section-header">
           <h3 className="section-title">Tracked client files</h3>
           <div style={{ maxWidth: "260px", width: "100%" }}>

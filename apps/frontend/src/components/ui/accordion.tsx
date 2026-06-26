@@ -20,7 +20,7 @@ export function AccordionItem({ title, indicator, children, isOpen, onToggle }: 
       >
         <span className="accordion-header-content">
           {title}
-          {indicator ? <span style={{ marginLeft: "var(--space-2)" }}>{indicator}</span> : null}
+          {indicator ? <span className="accordion-indicator">{indicator}</span> : null}
         </span>
         <ChevronDown className="accordion-chevron" size={20} />
       </button>
@@ -33,6 +33,18 @@ export function AccordionItem({ title, indicator, children, isOpen, onToggle }: 
   );
 }
 
-export function Accordion({ children, flush }: { children: ReactNode; flush?: boolean }) {
-  return <div className={`accordion${flush ? " accordion-flush" : ""}`}>{children}</div>;
+export function Accordion({
+  children,
+  flush,
+  className = "",
+}: {
+  children: ReactNode;
+  flush?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`accordion${flush ? " accordion-flush" : ""}${className ? ` ${className}` : ""}`}>
+      {children}
+    </div>
+  );
 }

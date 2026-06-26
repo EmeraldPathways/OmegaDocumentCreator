@@ -1,6 +1,7 @@
 import { Download, Eye, FileDown, RefreshCw, Trash2 } from "lucide-react";
 
 import { Badge, Button, Modal } from "../components/ui";
+import { buildStandaloneDocumentPreviewHtml } from "../documents/pdf-export";
 import { formatDisplayDate, getDocumentStatusVariant } from "./income-protection-helpers";
 import type { SeededGeneratedDocument } from "../data/seeded-clients";
 import type { BackendGeneratedDocument } from "../documents/generated-document-api";
@@ -216,7 +217,7 @@ export function IncomeProtectionGeneratedDocumentsTab({
         {previewDocument?.previewHtml ? (
           <iframe
             className="document-preview-iframe"
-            srcDoc={previewDocument.previewHtml}
+            srcDoc={buildStandaloneDocumentPreviewHtml(previewDocument.previewHtml)}
             title={previewDocument.documentName}
           />
         ) : (

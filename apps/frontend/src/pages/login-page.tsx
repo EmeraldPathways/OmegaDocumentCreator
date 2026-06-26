@@ -53,10 +53,12 @@ export function LoginPage() {
             />
           </div>
           {error ? <p className="field-error" style={{ marginTop: "var(--space-4)" }}>{error}</p> : null}
-          <div className="sticky-action-bar" style={{ marginTop: "var(--space-5)" }}>
-            <Button type="submit" variant="primary">
-              Sign In
-            </Button>
+          <div className="form-actions">
+            <div className="form-actions-right">
+              <Button type="submit" variant="primary">
+                Sign In
+              </Button>
+            </div>
           </div>
         </form>
       </section>
