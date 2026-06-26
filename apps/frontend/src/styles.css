@@ -826,7 +826,7 @@ button {
   padding: 10px 14px;
   border: 0;
   border-radius: var(--radius-md);
-  background: transparent;
+  background: #ffffff;
   font: inherit;
   font-size: var(--font-size-base);
   color: var(--color-text);
@@ -1402,6 +1402,10 @@ button {
   max-width: 420px;
 }
 
+.income-protection-page .income-protection-client-field .field-select-wrap {
+  background: #ffffff;
+}
+
 .income-protection-page .income-protection-header-actions {
   flex: 0 0 auto;
   align-self: flex-end;
@@ -1410,10 +1414,6 @@ button {
   background: transparent;
   border-top: 0;
   border-radius: 0;
-}
-
-.income-protection-page .income-protection-summary-bar {
-  margin-top: 0;
 }
 
 /* Generated output workspace */
@@ -1870,7 +1870,7 @@ button {
 .generated-output-pdf-page-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-3);
   padding-bottom: 18px;
   margin-bottom: 28px;
@@ -1878,9 +1878,16 @@ button {
 }
 
 .generated-output-pdf-brand {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.generated-output-pdf-brand-image {
+  display: block;
+  width: 230px;
+  max-width: 100%;
+  height: auto;
 }
 
 .generated-output-pdf-subtitle {
@@ -1890,6 +1897,11 @@ button {
 
 .generated-output-pdf-page-body {
   min-height: 520px;
+}
+
+.generated-output-pdf-page-body .workflow-document-fact-find .document-top-logo,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .document-top-logo {
+  display: none;
 }
 
 .generated-output-pdf-page-footer {
@@ -2654,6 +2666,19 @@ button {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.generated-document-item {
+  align-items: center;
+}
+
+.generated-document-info {
+  min-width: 0;
+}
+
+.generated-document-item .badge {
+  flex-shrink: 0;
 }
 
 /* Preview */
@@ -2879,6 +2904,330 @@ button {
 
 .text-small {
   font-size: var(--font-size-small);
+}
+
+/* Shared top logo block for Fact Find / Fact Find Update */
+.workflow-document-fact-find .document-top-logo,
+.workflow-document-fact-find-update .document-top-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.workflow-document-fact-find .document-top-logo img,
+.workflow-document-fact-find-update .document-top-logo img {
+  display: block;
+  max-width: 200px;
+  height: auto;
+}
+
+/* Statement of Suitability hides top logo (uses inline statement-logo instead) */
+.workflow-document-statement-of-suitability .document-top-logo {
+  display: none;
+}
+
+/* ============================================================
+   Statement of Suitability — Letter/Document View
+   Scoped under .workflow-document-statement-of-suitability
+   ============================================================ */
+.workflow-document-statement-of-suitability {
+  color: #1f2937;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.workflow-document-statement-of-suitability .document-banner {
+  display: none;
+}
+
+.workflow-document-statement-of-suitability .signatures-footer {
+  display: none;
+}
+
+/* Statement letter header: logo top-left, address/date block below */
+.workflow-document-statement-of-suitability .statement-letter-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #c68b2c;
+}
+
+.workflow-document-statement-of-suitability .statement-logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  margin: 0 0 16px 0;
+}
+
+.workflow-document-statement-of-suitability .statement-address-block {
+  margin-bottom: 10px;
+}
+
+.workflow-document-statement-of-suitability .statement-address-block p {
+  margin: 0 0 2px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.workflow-document-statement-of-suitability .statement-letter-date {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b2230;
+}
+
+/* Statement opening / salutation */
+.workflow-document-statement-of-suitability .statement-opening {
+  margin-bottom: 24px;
+}
+
+.workflow-document-statement-of-suitability .statement-opening p:first-child {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* Statement section blocks */
+.workflow-document-statement-of-suitability .statement-section {
+  margin-bottom: 22px;
+}
+
+.workflow-document-statement-of-suitability .statement-section h2 {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #5b2230;
+}
+
+.workflow-document-statement-of-suitability .statement-section p {
+  margin: 0 0 8px;
+}
+
+.workflow-document-statement-of-suitability .statement-section ul,
+.workflow-document-statement-of-suitability .statement-section ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+/* Footer contact line */
+.workflow-document-statement-of-suitability .statement-footer-contact {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 2px solid #5b2230;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.workflow-document-statement-of-suitability .statement-footer-contact p {
+  margin: 0 0 3px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Statement styles for TipTap editor (div-based blocks)
+   Scoped inside .ProseMirror .workflow-document-statement-of-suitability
+   ============================================================ */
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability {
+  color: #1f2937;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .document-banner {
+  display: none;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .signatures-footer {
+  display: none;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #c68b2c;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  margin: 0 0 16px 0;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block {
+  margin-bottom: 10px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block p {
+  margin: 0 0 2px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-date {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b2230;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-opening {
+  margin-bottom: 24px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-opening p:first-child {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-section {
+  margin-bottom: 22px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-section h2 {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #5b2230;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-section p {
+  margin: 0 0 8px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-section ul,
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-section ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-footer-contact {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 2px solid #5b2230;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-footer-contact p {
+  margin: 0 0 3px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Statement styles for PDF preview
+   Scoped inside .generated-output-pdf-page-body
+   ============================================================ */
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability {
+  color: #1f2937;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .document-banner {
+  display: none;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .signatures-footer {
+  display: none;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #c68b2c;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  margin: 0 0 16px 0;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block {
+  margin-bottom: 10px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block p {
+  margin: 0 0 2px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-date {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5b2230;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-opening {
+  margin-bottom: 24px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-opening p:first-child {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-section {
+  margin-bottom: 22px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-section h2 {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #5b2230;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-section p {
+  margin: 0 0 8px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-section ul,
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-section ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-footer-contact {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 2px solid #5b2230;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-footer-contact p {
+  margin: 0 0 3px;
+  line-height: 1.5;
 }
 
 /* Responsive */

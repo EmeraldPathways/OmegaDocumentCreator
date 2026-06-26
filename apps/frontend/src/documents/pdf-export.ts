@@ -29,7 +29,14 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "document-grid") ||
     hasPdfClass(sourceElement, "document-section") ||
     hasPdfClass(sourceElement, "document-callout") ||
-    hasPdfClass(sourceElement, "signatures-footer")
+    hasPdfClass(sourceElement, "document-top-logo") ||
+    hasPdfClass(sourceElement, "signatures-footer") ||
+    hasPdfClass(sourceElement, "statement-document-body") ||
+    hasPdfClass(sourceElement, "statement-letter-header") ||
+    hasPdfClass(sourceElement, "statement-address-block") ||
+    hasPdfClass(sourceElement, "statement-opening") ||
+    hasPdfClass(sourceElement, "statement-section") ||
+    hasPdfClass(sourceElement, "statement-footer-contact")
   );
 }
 
@@ -39,6 +46,10 @@ function elementStyles(sourceElement: Element) {
 
   if (tagName === "article" && classList.contains("workflow-document")) {
     return "display:block;color:#1f2937;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.6";
+  }
+
+  if (tagName === "div" && classList.contains("document-top-logo")) {
+    return "display:flex;justify-content:flex-start;margin:0 0 24px;page-break-inside:avoid";
   }
 
   if ((tagName === "header" || tagName === "div") && classList.contains("document-banner")) {
@@ -99,6 +110,14 @@ function elementStyles(sourceElement: Element) {
 
   if (tagName === "p") {
     return "margin:0 0 10px;line-height:1.6;white-space:pre-wrap";
+  }
+
+  if (tagName === "img" && classList.contains("document-top-logo-image")) {
+    return "display:block;max-width:220px;height:auto;margin:0;border-radius:0";
+  }
+
+  if (tagName === "img" && classList.contains("statement-logo")) {
+    return "display:block;width:180px;height:auto;margin:0 0 16px 0;border-radius:0";
   }
 
   if (tagName === "img") {
@@ -283,10 +302,6 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number) 
       font-family:Georgia,'Times New Roman',serif;
       font-size:14px;
     ">
-      <div style="position:absolute;top:28px;left:42px;right:42px;height:88px;">
-        <div style="font-family:Helvetica,Arial,sans-serif;font-size:24px;font-weight:700;color:#5b2230;">Omega Financial Management</div>
-        <div style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#666;margin-top:6px;">Income Protection Workflow</div>
-      </div>
       <div style="position:absolute;top:${HEADER_HEIGHT}px;left:50px;right:50px;bottom:${FOOTER_HEIGHT}px;overflow:hidden;">
         ${content}
       </div>
@@ -578,6 +593,47 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     max-width: 100%;
     margin: 16px auto;
     border-radius: 10px;
+  }
+  .preview-page .document-top-logo {
+    display: flex;
+    justify-content: flex-start;
+    margin: 0 0 24px;
+  }
+  .preview-page .document-top-logo-image {
+    display: block;
+    max-width: 220px;
+    height: auto;
+    margin: 0;
+    border-radius: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #c68b2c;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-logo {
+    display: block;
+    width: 180px;
+    height: auto;
+    margin: 0 0 16px 0;
+    border-radius: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block {
+    margin-bottom: 10px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block p {
+    margin: 0 0 2px;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.4;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
+    margin: 0;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #5b2230;
   }
 </style>
 </head>

@@ -54,6 +54,8 @@ export type ComposedBlock =
   | { kind: "grid"; title: string; className?: string; items: Array<{ label: string; value: string }> }
   | { kind: "section"; title: string; bodyHtml: string; className?: string }
   | { kind: "callout"; tone: "warning" | "info"; title: string; bodyHtml: string }
+  | { kind: "logo"; className?: string }
+  | { kind: "statement-body"; bodyHtml: string }
   | {
       kind: "footer";
       title: string;

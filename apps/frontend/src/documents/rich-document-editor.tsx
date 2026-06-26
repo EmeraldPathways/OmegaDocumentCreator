@@ -21,11 +21,18 @@ const WORKFLOW_BLOCK_CLASSES = new Set([
   "grid-items",
   "document-section",
   "document-callout",
+  "document-top-logo",
   "signatures-footer",
+  "statement-document-body",
+  "statement-letter-header",
+  "statement-address-block",
+  "statement-opening",
+  "statement-section",
+  "statement-footer-contact",
 ]);
 const WORKFLOW_INLINE_BLOCK_CLASSES = new Set(["grid-item"]);
 const WORKFLOW_INLINE_CLASSES = new Set(["grid-label"]);
-const WORKFLOW_TEXT_CLASSES = new Set(["document-eyebrow", "document-subtitle"]);
+const WORKFLOW_TEXT_CLASSES = new Set(["document-eyebrow", "document-subtitle", "statement-letter-date"]);
 
 function normalizeClassNames(
   value: string | null | undefined,
@@ -95,7 +102,14 @@ const WorkflowBlockNode = Node.create({
       { tag: "div.grid-items" },
       { tag: "div.document-section" },
       { tag: "div.document-callout" },
+      { tag: "div.document-top-logo" },
       { tag: "div.signatures-footer" },
+      { tag: "div.statement-document-body" },
+      { tag: "div.statement-letter-header" },
+      { tag: "div.statement-address-block" },
+      { tag: "div.statement-opening" },
+      { tag: "div.statement-section" },
+      { tag: "div.statement-footer-contact" },
     ];
   },
   addAttributes() {

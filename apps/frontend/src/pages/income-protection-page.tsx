@@ -998,8 +998,6 @@ export function IncomeProtectionPage() {
         preview_html: document.previewHtml ?? null,
       }));
 
-  const summaryContact = resolvedDraft.email || resolvedDraft.mobileNumber || "Not recorded";
-
   // Progress indicators per tab
   const tabProgress = useMemo(() => {
     const factFindFields = [
@@ -2164,22 +2162,24 @@ export function IncomeProtectionPage() {
             <label className="field-label" htmlFor="client-select">
               Select workflow client
             </label>
-            <select
-              className="field-input field-select"
-              id="client-select"
-              onChange={(event) => {
-                if (event.target.value) {
-                  setSelectedClientReference(event.target.value);
-                }
-              }}
-              value={resolvedDraft.clientReference}
-            >
-              {clients.map((entry) => (
-                <option key={entry.clientReference} value={entry.clientReference}>
-                  {entry.fullName} ({entry.clientReference})
-                </option>
-              ))}
-            </select>
+            <div className="field-select-wrap">
+              <select
+                className="field-select"
+                id="client-select"
+                onChange={(event) => {
+                  if (event.target.value) {
+                    setSelectedClientReference(event.target.value);
+                  }
+                }}
+                value={resolvedDraft.clientReference}
+              >
+                {clients.map((entry) => (
+                  <option key={entry.clientReference} value={entry.clientReference}>
+                    {entry.fullName} ({entry.clientReference})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="workflow-header-actions income-protection-header-actions">
@@ -2191,29 +2191,6 @@ export function IncomeProtectionPage() {
               <Edit size={18} />
               Edit Client
             </Link>
-          </div>
-        </div>
-
-        <div className="workflow-summary-bar income-protection-summary-bar">
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Client</span>
-            <strong>{resolvedDraft.fullName}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Reference</span>
-            <strong>{resolvedDraft.clientReference}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">DOB</span>
-            <strong>{formatDisplayDate(resolvedDraft.dateOfBirth)}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Contact</span>
-            <strong>{summaryContact}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Occupation</span>
-            <strong>{resolvedDraft.occupation || "Not recorded"}</strong>
           </div>
         </div>
       </section>
@@ -2250,4 +2227,3 @@ export function IncomeProtectionPage() {
     </div>
   );
 }
-

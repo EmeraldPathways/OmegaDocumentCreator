@@ -1,10 +1,10 @@
-import { Download, Eye, FileDown, RefreshCw, Trash2 } from "lucide-react";
+import { Download, Eye, FileDown, FileText, RefreshCw, Trash2 } from "lucide-react";
 
 import { Badge, Button, Modal } from "../components/ui";
-import { buildStandaloneDocumentPreviewHtml } from "../documents/pdf-export";
-import { formatDisplayDate, getDocumentStatusVariant } from "./income-protection-helpers";
 import type { SeededGeneratedDocument } from "../data/seeded-clients";
 import type { BackendGeneratedDocument } from "../documents/generated-document-api";
+import { buildStandaloneDocumentPreviewHtml } from "../documents/pdf-export";
+import { formatDisplayDate, getDocumentStatusVariant } from "./income-protection-helpers";
 
 export interface GeneratedDocumentsTabProps {
   documentPackStatus: string;
@@ -23,6 +23,25 @@ export interface GeneratedDocumentsTabProps {
   onBackendDelete: (docId: string, docName: string) => void;
   addToast: (message: string, variant: "success" | "error") => void;
   downloadDocument: (clientReference: string, documentId: string, filename: string) => Promise<void>;
+}
+
+function buildPreviewPayload(doc: BackendGeneratedDocument) {
+  return {
+    id: doc.id,
+    documentType: doc.document_type,
+    documentName: doc.document_name,
+    version: doc.version ?? "Version 1",
+    status: doc.status,
+    generatedAt: doc.generated_at ?? "",
+    previewHtml: doc.preview_html ?? undefined,
+    previewTitle: doc.preview_title ?? undefined,
+  };
+}
+
+function getDocumentMeta(doc: BackendGeneratedDocument) {
+  return [doc.document_type, doc.version ?? "Version 1", doc.generated_at ? formatDisplayDate(doc.generated_at) : null]
+    .filter(Boolean)
+    .join(" • ");
 }
 
 export function IncomeProtectionGeneratedDocumentsTab({
@@ -88,124 +107,88 @@ export function IncomeProtectionGeneratedDocumentsTab({
           </Button>
         </div>
       ) : (
-        <div className="table-wrap-flush">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">Document Type</th>
-                <th scope="col">Document Name</th>
-                <th scope="col">Version</th>
-                <th scope="col">Status</th>
-                <th scope="col">Generated At</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayDocuments.map((doc) => {
-                const hasBackendArtifact = canUseBackend
-                  && hasLoadedBackendGeneratedDocuments
-                  && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
-                return (
-                <tr key={doc.id ?? `${doc.document_name}-${doc.version ?? ""}`}>
-                  <td>{doc.document_type}</td>
-                  <td className="font-medium">{doc.document_name}</td>
-                  <td>{doc.version ?? "—"}</td>
-                  <td>
-                    <Badge variant={getDocumentStatusVariant(doc.status)}>{doc.status ?? "Draft"}</Badge>
-                  </td>
-                  <td>{doc.generated_at ? formatDisplayDate(doc.generated_at) : "—"}</td>
-                  <td>
-                    <div className="generated-doc-actions">
+        <section className="section">
+          <div className="section-header">
+            <h3 className="section-title">Tracked generated documents</h3>
+          </div>
+
+          <div className="file-list" style={{ marginTop: "var(--space-4)" }}>
+            {displayDocuments.map((doc) => {
+              const hasBackendArtifact = canUseBackend
+                && hasLoadedBackendGeneratedDocuments
+                && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
+              const previewPayload = buildPreviewPayload(doc);
+
+              return (
+                <div className="file-item generated-document-item" key={doc.id ?? `${doc.document_name}-${doc.version ?? ""}`}>
+                  <div className="file-icon">
+                    <FileText size={20} />
+                  </div>
+                  <div className="file-info generated-document-info">
+                    <div className="file-name">{doc.document_name}</div>
+                    <div className="file-meta">{getDocumentMeta(doc)}</div>
+                  </div>
+                  <Badge variant={getDocumentStatusVariant(doc.status)}>{doc.status ?? "Draft"}</Badge>
+                  <div className="file-actions generated-doc-actions">
+                    <Button
+                      aria-label={`Preview ${doc.document_name}`}
+                      className="btn-sm"
+                      onClick={() => onPreviewDocument(previewPayload)}
+                      variant="secondary"
+                    >
+                      <Eye size={14} />
+                    </Button>
+                    {hasBackendArtifact ? (
                       <Button
+                        aria-label={`Download ${doc.document_name}`}
                         className="btn-sm"
                         onClick={() => {
-                          onPreviewDocument({
-                            id: doc.id,
-                            documentType: doc.document_type,
-                            documentName: doc.document_name,
-                            version: doc.version ?? "Version 1",
-                            status: doc.status,
-                            generatedAt: doc.generated_at ?? "",
-                            previewHtml: doc.preview_html ?? undefined,
-                            previewTitle: doc.preview_title ?? undefined,
-                          });
+                          const filename = doc.document_name;
+                          void downloadDocument(selectedClientReference, doc.id, filename).then(
+                            () => addToast(`${doc.document_name} downloaded`, "success"),
+                            () => addToast("Download failed", "error"),
+                          );
                         }}
                         variant="secondary"
                       >
-                        <Eye size={14} />
-                        Preview
+                        <Download size={14} />
                       </Button>
-                      {hasBackendArtifact ? (
-                        <Button
-                          className="btn-sm"
-                          onClick={() => {
-                            const filename = doc.document_name;
-                            void downloadDocument(selectedClientReference, doc.id, filename).then(
-                              () => addToast(`${doc.document_name} downloaded`, "success"),
-                              () => addToast("Download failed", "error"),
-                            );
-                          }}
-                          variant="secondary"
-                        >
-                          <Download size={14} />
-                          Download
-                        </Button>
-                      ) : (
-                        <Button
-                          className="btn-sm"
-                          onClick={() => onFallbackDownload({
-                            id: doc.id,
-                            documentType: doc.document_type,
-                            documentName: doc.document_name,
-                            version: doc.version ?? "Version 1",
-                            status: doc.status,
-                            generatedAt: doc.generated_at ?? "",
-                            previewHtml: doc.preview_html ?? undefined,
-                            previewTitle: doc.preview_title ?? undefined,
-                          })}
-                          variant="secondary"
-                        >
-                          <Download size={14} />
-                          Download
-                        </Button>
-                      )}
-                      {doc.document_type !== "Terms of Business" ? (
-                        <Button
-                          className="btn-sm"
-                          onClick={() => onRegenerate({
-                            id: doc.id,
-                            documentType: doc.document_type,
-                            documentName: doc.document_name,
-                            version: doc.version ?? "Version 1",
-                            status: doc.status,
-                            generatedAt: doc.generated_at ?? "",
-                            previewHtml: doc.preview_html ?? undefined,
-                            previewTitle: doc.preview_title ?? undefined,
-                          })}
-                          variant="text"
-                        >
-                          <RefreshCw size={14} />
-                          Regenerate
-                        </Button>
-                      ) : null}
-                      {canUseBackend ? (
-                        <Button
-                          className="btn-sm"
-                          onClick={() => { void onBackendDelete(doc.id, doc.document_name); }}
-                          variant="text"
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    ) : (
+                      <Button
+                        aria-label={`Download ${doc.document_name}`}
+                        className="btn-sm"
+                        onClick={() => onFallbackDownload(previewPayload)}
+                        variant="secondary"
+                      >
+                        <Download size={14} />
+                      </Button>
+                    )}
+                    {doc.document_type !== "Terms of Business" ? (
+                      <Button
+                        aria-label={`Regenerate ${doc.document_name}`}
+                        className="btn-sm"
+                        onClick={() => onRegenerate(previewPayload)}
+                        variant="secondary"
+                      >
+                        <RefreshCw size={14} />
+                      </Button>
+                    ) : null}
+                    {canUseBackend ? (
+                      <Button
+                        aria-label={`Delete ${doc.document_name}`}
+                        className="btn-sm"
+                        onClick={() => { void onBackendDelete(doc.id, doc.document_name); }}
+                        variant="secondary"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <Modal

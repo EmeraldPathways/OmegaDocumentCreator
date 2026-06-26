@@ -3,6 +3,7 @@ import { CheckCircle2, Copy, Edit2, Eye, FileDown, FileText, RefreshCw } from "l
 
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
+import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 import { buildPdfStyledHtml, paginatePdfContent } from "./pdf-export";
 import { resolveDraftPreviewHtml } from "./document-preview";
 import { RichDocumentEditor } from "./rich-document-editor";
@@ -24,19 +25,39 @@ type GeneratedOutputWorkspaceProps = {
 
 type ViewMode = "edit" | "preview";
 
-function PreviewPage({ children, pageNumber, totalPages }: { children: string; pageNumber: number; totalPages: number }) {
+function PreviewPage({
+  children,
+  pageNumber,
+  totalPages,
+  showShellChrome,
+}: {
+  children: string;
+  pageNumber: number;
+  totalPages: number;
+  showShellChrome: boolean;
+}) {
   return (
     <div className="generated-output-pdf-page">
-      <div className="generated-output-pdf-page-header">
-        <div className="generated-output-pdf-brand">Omega Financial Management</div>
-        <div className="generated-output-pdf-subtitle">Income Protection Workflow</div>
-      </div>
+      {showShellChrome ? (
+        <div className="generated-output-pdf-page-header">
+          <div className="generated-output-pdf-brand">
+            <img
+              alt="Omega Financial Management"
+              className="generated-output-pdf-brand-image"
+              src={OMEGA_LOGO_DATA_URI}
+            />
+          </div>
+          <div className="generated-output-pdf-subtitle">Income Protection Workflow</div>
+        </div>
+      ) : null}
       <div className="generated-output-pdf-page-body" dangerouslySetInnerHTML={{ __html: children }} />
-      <div className="generated-output-pdf-page-footer">
-        <div>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
-        <div>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
-        {totalPages > 1 ? <div>{`Page ${pageNumber} of ${totalPages}`}</div> : null}
-      </div>
+      {showShellChrome ? (
+        <div className="generated-output-pdf-page-footer">
+          <div>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
+          <div>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
+          {totalPages > 1 ? <div>{`Page ${pageNumber} of ${totalPages}`}</div> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -44,15 +65,25 @@ function PreviewPage({ children, pageNumber, totalPages }: { children: string; p
 function PdfPreview({ html }: { html: string }) {
   const styledHtml = useMemo(() => buildPdfStyledHtml(html, true), [html]);
   const pagination = paginatePdfContent(styledHtml);
+  const showShellChrome = !styledHtml.includes("workflow-document-statement-of-suitability");
 
   if (pagination.mode === "continuous") {
-    return <PreviewPage pageNumber={1} totalPages={1}>{pagination.html}</PreviewPage>;
+    return (
+      <PreviewPage pageNumber={1} showShellChrome={showShellChrome} totalPages={1}>
+        {pagination.html}
+      </PreviewPage>
+    );
   }
 
   return (
     <>
       {pagination.pages.map((pageHtml, index) => (
-        <PreviewPage key={`generated-output-page-${index + 1}`} pageNumber={index + 1} totalPages={pagination.pages.length}>
+        <PreviewPage
+          key={`generated-output-page-${index + 1}`}
+          pageNumber={index + 1}
+          showShellChrome={showShellChrome}
+          totalPages={pagination.pages.length}
+        >
           {pageHtml}
         </PreviewPage>
       ))}

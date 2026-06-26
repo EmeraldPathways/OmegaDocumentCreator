@@ -6,6 +6,7 @@ import type {
   IntegrationRequestArtifact,
   SupportedDocumentType,
 } from "./document-types";
+import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
 function escapeHtml(value: string) {
   return value
@@ -244,6 +245,13 @@ function buildFooterBlock(profile: SeededClientProfile, documentType: SupportedD
 const DATA_PROTECTION_MARKETING_COPY =
   "We collect your personal details in order to provide the highest standard of service to you. We take great care with the information provided; taking steps to keep it secure and to ensure it is used only for legitimate purposes. The information you have provided will be treated as confidential and will be retained by Omega Financial Management in electronic format for the purposes of providing financial services. We will use your contact details when we need to contact you in respect of the policy(ies) that you have with us. Under the General Data Protection Regulation 2018 you have various rights relating to your Personal Data.";
 
+function buildLogoBlock(className?: string): ComposedBlock {
+  return {
+    kind: "logo",
+    className: className ?? "document-top-logo",
+  };
+}
+
 function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[] {
   return [
     detailGrid(
@@ -422,44 +430,84 @@ function buildTermsBlocks(profile: SeededClientProfile, recommendationHtml: stri
   ];
 }
 
-function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {
+function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
+  const addressLines = [
+    profile.homeAddressLine1,
+    profile.homeAddressLine2,
+    profile.clientHomeAddressLine3,
+    profile.clientHomeAddressLine4,
+    profile.townCity,
+    profile.county,
+  ]
+    .map((line) => line?.trim() ?? "")
+    .filter(Boolean);
+
   return [
-    detailGrid(
-      "Client Summary",
-      summaryGridItems(profile, "Statement of Suitability"),
-      "client-summary-grid",
-    ),
-    detailGrid("Recommendation Details", [
-      { label: "Statement type", value: profile.statementType },
-      { label: "Product type", value: profile.productType },
-      { label: "Recommended cover", value: profile.recommendedCover },
-      { label: "Deferred period", value: profile.deferredPeriod },
-      { label: "Cover to age", value: profile.coverAge },
-      { label: "Gross monthly premium", value: profile.premium },
-      { label: "Net monthly cost", value: profile.netMonthlyCost },
-      { label: "Letter date", value: profile.letterDate },
-    ]),
+    '<div class="statement-letter-header">',
+    '<img class="statement-logo" src="' + escapeHtml(OMEGA_LOGO_DATA_URI) + '" alt="Omega Financial Management" />',
+    '<div class="statement-address-block">',
+    ...addressLines.map((line) => `<p>${escapeHtml(line)}</p>`),
+    "</div>",
+    `<p class="statement-letter-date">${escapeHtml(profile.letterDate || "Date not recorded")}</p>`,
+    "</div>",
+  ].join("");
+}
+
+function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
+  const addressLines = [
+    profile.homeAddressLine1,
+    profile.homeAddressLine2,
+    profile.clientHomeAddressLine3,
+    profile.clientHomeAddressLine4,
+    profile.townCity,
+    profile.county,
+  ]
+    .map((line) => line?.trim() ?? "")
+    .filter(Boolean);
+
+  const personalCircumstances = profile.personalCircumstances?.trim() || "No personal circumstances recorded.";
+  const financialSituation = profile.financialSituation?.trim() || "No financial situation recorded.";
+
+  const bodyHtml = [
+    buildStatementLetterHeaderHtml(profile),
+    '<div class="statement-opening">',
+    `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
+    "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
+    "</div>",
+    '<div class="statement-section">',
+    '<h2>Personal Circumstances</h2>',
+    `<p>${escapeHtml(personalCircumstances)}</p>`,
+    "</div>",
+    '<div class="statement-section">',
+    '<h2>Financial Situation</h2>',
+    `<p>${escapeHtml(financialSituation)}</p>`,
+    "</div>",
+    '<div class="statement-section">',
+    '<h2>Recommendation</h2>',
+    recommendationHtml,
+    needsHtml,
+    "</div>",
+    '<div class="statement-section">',
+    '<h2>Warnings</h2>',
+    warningHtml,
+    "</div>",
+    '<div class="statement-footer-contact">',
+    "<p>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18  |  Tel: 01 293 8554</p>",
+    "<p>Email: info@omegafinancial.ie  |  Website: www.omegafinancial.ie</p>",
+    "<p>Omega Financial Management is regulated by the Central Bank of Ireland.</p>",
+    "</div>",
+  ].join("");
+
+  return bodyHtml;
+}
+
+function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {
+  const sectionBodyHtml = buildStatementSectionHtml(profile, recommendationHtml, needsHtml, warningHtml);
+
+  return [
     {
-      kind: "section",
-      title: "Recommendation Section",
-      bodyHtml: recommendationHtml,
-    },
-    {
-      kind: "section",
-      title: "Needs and Objectives",
-      bodyHtml: needsHtml,
-    },
-    ...buildPhiBlocks(profile),
-    detailGrid("Declarations", [
-      { label: "PEP confirmation", value: profile.pepConfirmation },
-      { label: "Related PEP confirmation", value: profile.pepRelatedConfirmation },
-      { label: "Execution only", value: profile.executionOnlyConfirmation },
-    ]),
-    {
-      kind: "callout",
-      tone: "warning",
-      title: "Warnings and Disclaimers",
-      bodyHtml: warningHtml,
+      kind: "statement-body",
+      bodyHtml: sectionBodyHtml,
     },
   ];
 }
@@ -484,19 +532,25 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
           ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
           : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
 
+  const isStatement = documentType === "Statement of Suitability";
+  const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
+
+  const sharedBlocks: ComposedBlock[] = [
+    ...(isFactFind ? [buildLogoBlock()] : []),
+    {
+      kind: "banner",
+      eyebrow: documentType,
+      title,
+      subtitle: `${profile.fullName} (${profile.clientReference})`,
+    },
+    ...bodyBlocks,
+    ...(isStatement ? [] : [buildFooterBlock(profile, documentType)]),
+  ];
+
   return {
     documentType,
     title: documentType,
-    blocks: [
-      {
-        kind: "banner",
-        eyebrow: documentType,
-        title,
-        subtitle: `${profile.fullName} (${profile.clientReference})`,
-      },
-      ...bodyBlocks,
-      buildFooterBlock(profile, documentType),
-    ],
+    blocks: isStatement ? bodyBlocks : sharedBlocks,
   };
 }
 
@@ -527,9 +581,20 @@ function renderBlock(block: ComposedBlock) {
         "</section>",
       ].join("");
     case "section":
+      if (!block.title) {
+        return `<div class="${escapeHtml(block.className ?? "document-section")}">${block.bodyHtml}</div>`;
+      }
       return `<section class="${escapeHtml(block.className ?? "document-section")}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</section>`;
+    case "statement-body":
+      return `<div class="statement-document-body">${block.bodyHtml}</div>`;
     case "callout":
       return `<aside class="document-callout document-callout-${escapeHtml(block.tone)}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</aside>`;
+    case "logo":
+      return [
+        `<div class="${escapeHtml(block.className ?? "document-top-logo")}">`,
+        `<img class="document-top-logo-image" src="${escapeHtml(OMEGA_LOGO_DATA_URI)}" alt="Omega Financial Management" />`,
+        "</div>",
+      ].join("");
     case "footer":
       return [
         '<footer class="signatures-footer">',
@@ -569,9 +634,20 @@ function renderEditorBlock(block: ComposedBlock) {
         "</div>",
       ].join("");
     case "section":
+      if (!block.title) {
+        return `<div class="${escapeHtml(block.className ?? "document-section")}">${block.bodyHtml}</div>`;
+      }
       return `<div class="${escapeHtml(block.className ?? "document-section")}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</div>`;
+    case "statement-body":
+      return `<div class="statement-document-body">${block.bodyHtml}</div>`;
     case "callout":
       return `<div class="document-callout document-callout-${escapeHtml(block.tone)}"><h2>${escapeHtml(block.title)}</h2>${block.bodyHtml}</div>`;
+    case "logo":
+      return [
+        `<div class="${escapeHtml(block.className ?? "document-top-logo")}">`,
+        `<img class="document-top-logo-image" src="${escapeHtml(OMEGA_LOGO_DATA_URI)}" alt="Omega Financial Management" />`,
+        "</div>",
+      ].join("");
     case "footer":
       return [
         '<div class="signatures-footer">',
