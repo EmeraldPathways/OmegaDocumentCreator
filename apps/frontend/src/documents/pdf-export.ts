@@ -18,6 +18,28 @@ function appendStyle(existingStyle: string | null, nextStyle: string) {
   return [existingStyle ?? "", nextStyle].filter(Boolean).join(";");
 }
 
+function stripPreviewLogosForWorkflowPreview(html: string) {
+  if (typeof DOMParser === "undefined") {
+    return html;
+  }
+
+  const parser = new DOMParser();
+  const sourceDocument = parser.parseFromString(stripMarkdownFences(html), "text/html");
+  const factFindArticle = sourceDocument.querySelector(
+    ".workflow-document-fact-find, .workflow-document-fact-find-update",
+  );
+
+  if (!factFindArticle) {
+    return html;
+  }
+
+  factFindArticle.querySelectorAll(".document-top-logo").forEach((element) => {
+    element.remove();
+  });
+
+  return sourceDocument.body.innerHTML.trim();
+}
+
 function hasPdfClass(sourceElement: Element, className: string) {
   return sourceElement.classList.contains(className);
 }
@@ -194,7 +216,7 @@ function cloneStyledNode(sourceNode: Node, targetDocument: Document, addBlockCla
 }
 
 export function buildPdfStyledHtml(html: string, addBlockClass = false) {
-  const cleanedHtml = stripMarkdownFences(html);
+  const cleanedHtml = stripPreviewLogosForWorkflowPreview(stripMarkdownFences(html));
 
   if (typeof DOMParser === "undefined") {
     return cleanedHtml;
@@ -231,7 +253,22 @@ function splitContentIntoPages(htmlContent: string) {
   tempContainer.appendChild(contentDiv);
   document.body.appendChild(tempContainer);
 
-  const elements = Array.from(contentDiv.querySelectorAll(".pdf-block"));
+  const workflowArticle = contentDiv.querySelector(".workflow-document");
+  const workflowArticleClass = workflowArticle?.getAttribute("class");
+  const pageRoot = workflowArticle ?? contentDiv;
+  const wrapPageHtml = (pageHtml: string) =>
+    workflowArticleClass ? `<article class="${workflowArticleClass}">${pageHtml}</article>` : pageHtml;
+
+  const elements = Array.from(pageRoot.querySelectorAll(".pdf-block")).filter((element) => {
+    let parent = element.parentElement;
+    while (parent && parent !== pageRoot) {
+      if (parent.classList.contains("pdf-block")) {
+        return false;
+      }
+      parent = parent.parentElement;
+    }
+    return true;
+  });
   if (elements.length === 0) {
     document.body.removeChild(tempContainer);
     return { mode: "continuous", html: htmlContent } as const;
@@ -256,7 +293,7 @@ function splitContentIntoPages(htmlContent: string) {
     }
 
     if (currentPageElements.length > 0 && currentPageHeight + nextHeight > PAGE_CONTENT_HEIGHT) {
-      pages.push(currentPageElements.join(""));
+      pages.push(wrapPageHtml(currentPageElements.join("")));
       currentPageElements = [nextHtml];
       currentPageHeight = nextHeight;
       continue;
@@ -267,7 +304,7 @@ function splitContentIntoPages(htmlContent: string) {
   }
 
   if (currentPageElements.length > 0) {
-    pages.push(currentPageElements.join(""));
+    pages.push(wrapPageHtml(currentPageElements.join("")));
   }
 
   document.body.removeChild(tempContainer);
@@ -308,6 +345,7 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number) 
       <div style="position:absolute;bottom:28px;left:42px;right:42px;border-top:1px solid #5b2230;padding-top:8px;text-align:center;">
         <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;">Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
         <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;margin-top:2px;">Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
+        <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;margin-top:2px;">Omega Financial Management is regulated by the Central Bank of Ireland.</div>
         ${totalPages > 1 ? `<div style="font-size:8px;color:#666;margin-top:6px;">Page ${pageNumber} of ${totalPages}</div>` : ""}
       </div>
     </div>
@@ -453,6 +491,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 
 export function buildStandaloneDocumentPreviewHtml(html: string) {
   const styledContent = buildPdfStyledHtml(html, true);
+  const isStatement = styledContent.includes("workflow-document-statement-of-suitability");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -477,7 +516,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     background: #ffffff;
     border: 1px solid #dbe3ee;
     box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
-    padding: 72px 80px 80px;
+    padding: ${isStatement ? "72px 80px 48px" : "72px 80px 80px"};
   }
   .preview-page .workflow-document {
     color: #1f2937;
@@ -635,10 +674,30 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-weight: 600;
     color: #5b2230;
   }
+  .preview-page-footer {
+    margin-top: 32px;
+    padding-top: 18px;
+    border-top: 1px solid #5b2230;
+    text-align: center;
+    color: #475569;
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .preview-page-footer p {
+    margin: 0 0 3px;
+  }
 </style>
 </head>
 <body>
-  <div class="preview-page">${styledContent}</div>
+  <div class="preview-page">
+    ${styledContent}
+    <div class="preview-page-footer">
+      <p>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</p>
+      <p>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</p>
+      <p>Omega Financial Management is regulated by the Central Bank of Ireland.</p>
+    </div>
+  </div>
 </body>
 </html>`;
 }

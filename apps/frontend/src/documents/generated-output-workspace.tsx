@@ -29,16 +29,18 @@ function PreviewPage({
   children,
   pageNumber,
   totalPages,
-  showShellChrome,
+  showShellHeader,
+  showShellFooter,
 }: {
   children: string;
   pageNumber: number;
   totalPages: number;
-  showShellChrome: boolean;
+  showShellHeader: boolean;
+  showShellFooter: boolean;
 }) {
   return (
     <div className="generated-output-pdf-page">
-      {showShellChrome ? (
+      {showShellHeader ? (
         <div className="generated-output-pdf-page-header">
           <div className="generated-output-pdf-brand">
             <img
@@ -51,10 +53,11 @@ function PreviewPage({
         </div>
       ) : null}
       <div className="generated-output-pdf-page-body" dangerouslySetInnerHTML={{ __html: children }} />
-      {showShellChrome ? (
+      {showShellFooter ? (
         <div className="generated-output-pdf-page-footer">
           <div>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
           <div>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
+          <div>Omega Financial Management is regulated by the Central Bank of Ireland.</div>
           {totalPages > 1 ? <div>{`Page ${pageNumber} of ${totalPages}`}</div> : null}
         </div>
       ) : null}
@@ -65,11 +68,13 @@ function PreviewPage({
 function PdfPreview({ html }: { html: string }) {
   const styledHtml = useMemo(() => buildPdfStyledHtml(html, true), [html]);
   const pagination = paginatePdfContent(styledHtml);
-  const showShellChrome = !styledHtml.includes("workflow-document-statement-of-suitability");
+  const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
+  const showShellHeader = !isStatement;
+  const showShellFooter = true;
 
   if (pagination.mode === "continuous") {
     return (
-      <PreviewPage pageNumber={1} showShellChrome={showShellChrome} totalPages={1}>
+      <PreviewPage pageNumber={1} showShellFooter={showShellFooter} showShellHeader={showShellHeader} totalPages={1}>
         {pagination.html}
       </PreviewPage>
     );
@@ -81,7 +86,8 @@ function PdfPreview({ html }: { html: string }) {
         <PreviewPage
           key={`generated-output-page-${index + 1}`}
           pageNumber={index + 1}
-          showShellChrome={showShellChrome}
+          showShellFooter={showShellFooter}
+          showShellHeader={showShellHeader}
           totalPages={pagination.pages.length}
         >
           {pageHtml}

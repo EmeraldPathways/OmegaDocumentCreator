@@ -1846,6 +1846,27 @@ button {
   cursor: pointer;
 }
 
+.generated-output-logo-image {
+  margin: 0 0 16px;
+}
+
+.generated-output-logo-image img {
+  display: block;
+  max-width: 220px;
+  height: auto;
+  margin: 0;
+  border-radius: 0;
+}
+
+.generated-output-editor.ProseMirror .statement-letter-header .generated-output-logo-image {
+  margin: 0 0 16px;
+}
+
+.generated-output-editor.ProseMirror .statement-letter-header .generated-output-logo-image img {
+  width: 180px;
+  max-width: 100%;
+}
+
 .generated-output-pdf-page {
   width: 794px;
   max-width: 100%;

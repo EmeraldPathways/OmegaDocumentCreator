@@ -209,6 +209,51 @@ function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: Sup
   ].join("");
 }
 
+function buildStatementPersonalCircumstancesHtml(profile: SeededClientProfile) {
+  if (profile.personalCircumstances?.trim()) {
+    return `<p>${escapeHtml(profile.personalCircumstances.trim())}</p>`;
+  }
+
+  const lines = [
+    profile.occupation ? `Occupation: ${profile.occupation}.` : "",
+    profile.employmentStatus ? `Employment status: ${profile.employmentStatus}.` : "",
+    profile.maritalStatus ? `Marital status: ${profile.maritalStatus}.` : "",
+    profile.partnerName ? `Partner: ${profile.partnerName}.` : "",
+    profile.dependants.length > 0 ? `Dependants: ${profile.dependants.map((dependant) => dependant.name).filter(Boolean).join(", ")}.` : "",
+    profile.smokerStatus ? `Smoker status: ${profile.smokerStatus}.` : "",
+    profile.gender ? `Gender: ${profile.gender}.` : "",
+  ].filter(Boolean);
+
+  if (lines.length === 0) {
+    return "<p>No personal circumstances recorded.</p>";
+  }
+
+  return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+}
+
+function buildStatementFinancialSituationHtml(profile: SeededClientProfile) {
+  if (profile.financialSituation?.trim()) {
+    return `<p>${escapeHtml(profile.financialSituation.trim())}</p>`;
+  }
+
+  const lines = [
+    profile.income ? `Annual income: ${profile.income}.` : "",
+    profile.recommendedCover ? `Recommended cover: ${profile.recommendedCover}.` : "",
+    profile.deferredPeriod ? `Deferred period: ${profile.deferredPeriod}.` : "",
+    profile.coverAge ? `Cover to age: ${profile.coverAge}.` : "",
+    profile.premium ? `Monthly premium: ${profile.premium}.` : "",
+    profile.liabilityMortgageBalanceOutstanding ? `Mortgage balance outstanding: ${profile.liabilityMortgageBalanceOutstanding}.` : "",
+    profile.totalLiabilitiesPerMonthSelf ? `Total monthly liabilities (self): ${profile.totalLiabilitiesPerMonthSelf}.` : "",
+    profile.totalLiabilitiesPerMonthJoint ? `Total monthly liabilities (joint): ${profile.totalLiabilitiesPerMonthJoint}.` : "",
+  ].filter(Boolean);
+
+  if (lines.length === 0) {
+    return "<p>No financial situation recorded.</p>";
+  }
+
+  return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+}
+
 function buildWarningHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   if (documentType === "Fact Find") {
     return "<p>Please confirm that the information captured in this fact find is complete and accurate.</p>";
@@ -454,20 +499,6 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
 }
 
 function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
-  const addressLines = [
-    profile.homeAddressLine1,
-    profile.homeAddressLine2,
-    profile.clientHomeAddressLine3,
-    profile.clientHomeAddressLine4,
-    profile.townCity,
-    profile.county,
-  ]
-    .map((line) => line?.trim() ?? "")
-    .filter(Boolean);
-
-  const personalCircumstances = profile.personalCircumstances?.trim() || "No personal circumstances recorded.";
-  const financialSituation = profile.financialSituation?.trim() || "No financial situation recorded.";
-
   const bodyHtml = [
     buildStatementLetterHeaderHtml(profile),
     '<div class="statement-opening">',
@@ -476,11 +507,11 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     "</div>",
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
-    `<p>${escapeHtml(personalCircumstances)}</p>`,
+    buildStatementPersonalCircumstancesHtml(profile),
     "</div>",
     '<div class="statement-section">',
     '<h2>Financial Situation</h2>',
-    `<p>${escapeHtml(financialSituation)}</p>`,
+    buildStatementFinancialSituationHtml(profile),
     "</div>",
     '<div class="statement-section">',
     '<h2>Recommendation</h2>',
@@ -490,11 +521,6 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     '<div class="statement-section">',
     '<h2>Warnings</h2>',
     warningHtml,
-    "</div>",
-    '<div class="statement-footer-contact">',
-    "<p>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18  |  Tel: 01 293 8554</p>",
-    "<p>Email: info@omegafinancial.ie  |  Website: www.omegafinancial.ie</p>",
-    "<p>Omega Financial Management is regulated by the Central Bank of Ireland.</p>",
     "</div>",
   ].join("");
 

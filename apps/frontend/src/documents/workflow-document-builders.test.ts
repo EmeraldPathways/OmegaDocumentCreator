@@ -51,7 +51,6 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-address-block");
     expect(document.html).toContain("statement-opening");
     expect(document.html).toContain("statement-section");
-    expect(document.html).toContain("statement-footer-contact");
     // Statement must NOT contain old shared blocks
     expect(document.html).not.toContain("document-banner");
     expect(document.html).not.toContain("signatures-footer");
@@ -68,11 +67,32 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Dear Jamie Murphy");
     expect(document.html).toContain("2026-06-06");
     expect(document.html).toContain("15 Sea Road");
-    // Footer contact line
-    expect(document.html).toContain("Suite 31, The Mall");
-    expect(document.html).toContain("info@omegafinancial.ie");
     // Omega branding
     expect(document.html).toContain("Omega Financial");
+  });
+
+  it("falls back to fact find values for statement personal and financial sections when dedicated statement fields are blank", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.personalCircumstances = "";
+    profile.financialSituation = "";
+    profile.occupation = "Doctor";
+    profile.employmentStatus = "Employed";
+    profile.maritalStatus = "Single";
+    profile.income = "60000";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Occupation: Doctor.");
+    expect(document.html).toContain("Employment status: Employed.");
+    expect(document.html).toContain("Marital status: Single.");
+    expect(document.html).toContain("Annual income: 60000.");
+    expect(document.html).toContain("Recommended cover: 30000.");
+    expect(document.html).toContain("Deferred period: 13 weeks.");
+    expect(document.html).toContain("Monthly premium: 165.50.");
   });
 
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {

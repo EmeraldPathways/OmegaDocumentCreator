@@ -4,6 +4,7 @@ import { EditorContent, NodeViewWrapper, ReactNodeViewRenderer, useEditor, type 
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { Bold, Image as ImageIcon, Italic, List, ListOrdered, Redo, Type, Undo } from "lucide-react";
+import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
 type RichDocumentEditorProps = {
   content: string;
@@ -198,6 +199,21 @@ function ToolbarButton({
 }
 
 function ResizableImage({ node, selected, updateAttributes }: NodeViewProps) {
+  const className = typeof node.attrs.class === "string" ? node.attrs.class : "";
+  const isWorkflowLogo =
+    className.includes("document-top-logo-image")
+    || className.includes("statement-logo")
+    || node.attrs.src === OMEGA_LOGO_DATA_URI
+    || node.attrs.alt === "Omega Financial Management";
+
+  if (isWorkflowLogo) {
+    return (
+      <NodeViewWrapper as="div" className="generated-output-logo-image">
+        <img alt={node.attrs.alt || ""} className={className || undefined} src={node.attrs.src} />
+      </NodeViewWrapper>
+    );
+  }
+
   return (
     <NodeViewWrapper as="figure" className={`generated-output-image${selected ? " is-selected" : ""}`}>
       <img alt={node.attrs.alt || ""} src={node.attrs.src} style={{ width: node.attrs.width || "60%" }} />
@@ -220,12 +236,17 @@ const ResizableImageExtension = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      class: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("class"),
+        renderHTML: (attributes) => (attributes.class ? { class: attributes.class } : {}),
+      },
       width: {
-        default: "60%",
-        parseHTML: (element) => element.getAttribute("width") || element.style.width || "60%",
+        default: null,
+        parseHTML: (element) => element.getAttribute("width") || element.style.width || null,
         renderHTML: (attributes) => ({
-          width: attributes.width,
-          style: `width:${attributes.width};`,
+          ...(attributes.width ? { width: attributes.width } : {}),
+          ...(attributes.width ? { style: `width:${attributes.width};` } : {}),
         }),
       },
     };
