@@ -16,6 +16,7 @@ Describe the exact task for the implementation agent to execute.
 - Codex is the planner and reviewer.
 - Cline or DeepSeek is the implementation agent.
 - At the start of each new implementation conversation, read `AGENTS.md` first.
+- Format new handoff prompts using `.agent-handoff/prompt-format.md`.
 - At the start of each new implementation conversation, use Agentmemory and Token Savior when available.
 - Do not edit files outside the agreed scope.
 - Do not work on the same files in parallel with Codex.

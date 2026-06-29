@@ -143,6 +143,14 @@ Persist anything likely to save future time.
 
 ---
 
+## Prompt handoff default
+
+- Use `.agent-handoff/` as the default prompt handoff surface for this repo.
+- For new implementation prompts, follow `.agent-handoff/prompt-format.md`.
+- Write the active implementation prompt in `.agent-handoff/codex-task.md` unless the user asks for a different file.
+
+---
+
 ## Git publishing preference
 
 - When the user says push to main, perform a one-pass workflow: stage only the task files, commit once with a clear message, and push HEAD to origin/main.
