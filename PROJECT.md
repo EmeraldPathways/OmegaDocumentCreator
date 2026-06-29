@@ -255,6 +255,8 @@ The main remaining gaps are operational hardening and product polish rather than
 - Docker Compose includes health checks and restart policies for all services
 - PostgreSQL port bound to localhost only in Docker Compose
 - Security summary endpoint now reflects live configuration instead of static template
+- BestAdvice PHI quote parsing now reads live quote rows from `Result > Outputs > Quotes > Company`
+- Statement of Suitability now inserts a BIS quote comparison table after the introduction using fact find workflow values plus returned quote results
 
 ## Delivery Plan
 

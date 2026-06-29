@@ -120,7 +120,7 @@ def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any])
     errors_text = (root.findtext("Errors") or "").strip()
     quote_results: list[dict[str, str]] = []
 
-    for company in root.findall("./Quotes/Company"):
+    for company in root.findall("./Outputs/Quotes/Company"):
         quote_results.append(
             {
                 "provider_name": (company.findtext("Name") or "").strip(),

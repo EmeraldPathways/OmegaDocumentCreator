@@ -58,6 +58,11 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "statement-address-block") ||
     hasPdfClass(sourceElement, "statement-opening") ||
     hasPdfClass(sourceElement, "statement-section") ||
+    hasPdfClass(sourceElement, "statement-quote-summary") ||
+    hasPdfClass(sourceElement, "statement-quote-table") ||
+    hasPdfClass(sourceElement, "statement-quote-row") ||
+    hasPdfClass(sourceElement, "statement-quote-row-header") ||
+    hasPdfClass(sourceElement, "statement-quote-cell") ||
     hasPdfClass(sourceElement, "statement-footer-contact")
   );
 }
@@ -92,6 +97,27 @@ function elementStyles(sourceElement: Element) {
 
   if ((tagName === "section" || tagName === "div") && classList.contains("document-section")) {
     return "display:block;margin:0 0 16px;padding:0 0 2px;page-break-inside:avoid";
+  }
+
+  if (tagName === "div" && classList.contains("statement-quote-summary")) {
+    return "display:block;margin:0 0 12px";
+  }
+
+  if (tagName === "div" && classList.contains("statement-quote-table")) {
+    return "display:block;border:1px solid #d6d3d1;border-radius:12px;overflow:hidden;margin:0 0 8px";
+  }
+
+  if (tagName === "div" && classList.contains("statement-quote-row-header")) {
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;background:#f6ede3;border-top:none";
+  }
+
+  if (tagName === "div" && classList.contains("statement-quote-row")) {
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;border-top:1px solid #e5e7eb";
+  }
+
+  if (tagName === "div" && classList.contains("statement-quote-cell")) {
+    const baseStyle = "display:block;padding:10px 12px";
+    return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
   }
 
   if ((tagName === "aside" || tagName === "div") && classList.contains("document-callout")) {

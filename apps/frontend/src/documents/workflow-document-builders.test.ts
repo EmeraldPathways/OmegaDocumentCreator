@@ -95,6 +95,60 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Monthly premium: 165.50.");
   });
 
+  it("renders BIS quote results as a statement comparison table immediately after the introduction using fact find values", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.phiIndexation = "Y";
+    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Reviewable",
+            levelPremium: "102.50",
+            escalation3Premium: "116.40",
+          },
+          {
+            providerName: "Irish Life",
+            policyType: "Guaranteed",
+            levelPremium: "136.53",
+            escalation5Premium: "149.78",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("statement-quote-table");
+    expect(document.html).toContain("Income Protection Quote Comparison");
+    expect(document.html).toContain("Cover amount: 30000");
+    expect(document.html).toContain("Deferred period: 13 weeks");
+    expect(document.html).toContain("Cover to age: 65");
+    expect(document.html).toContain("Smoker status: Non-Smoker");
+    expect(document.html).toContain("Occupation class: 2");
+    expect(document.html).toContain("Indexation: Y");
+    expect(document.html).toContain("Aviva");
+    expect(document.html).toContain("Reviewable");
+    expect(document.html).toContain("102.50");
+    expect(document.html).toContain("116.40");
+    expect(document.html).toContain("Irish Life");
+    expect(document.html).toContain("Guaranteed");
+    expect(document.html).toContain("149.78");
+    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-opening"));
+    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeLessThan(document.html.indexOf("Personal Circumstances"));
+  });
+
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {
     const profile = cloneProfile("CLI-2026-0001");
     profile.documentDrafts["Fact Find"].lastGeneratedSections = [];

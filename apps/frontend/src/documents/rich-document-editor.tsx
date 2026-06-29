@@ -29,6 +29,11 @@ const WORKFLOW_BLOCK_CLASSES = new Set([
   "statement-address-block",
   "statement-opening",
   "statement-section",
+  "statement-quote-summary",
+  "statement-quote-table",
+  "statement-quote-row",
+  "statement-quote-row-header",
+  "statement-quote-cell",
   "statement-footer-contact",
 ]);
 const WORKFLOW_INLINE_BLOCK_CLASSES = new Set(["grid-item"]);
@@ -110,6 +115,11 @@ const WorkflowBlockNode = Node.create({
       { tag: "div.statement-address-block" },
       { tag: "div.statement-opening" },
       { tag: "div.statement-section" },
+      { tag: "div.statement-quote-summary" },
+      { tag: "div.statement-quote-table" },
+      { tag: "div.statement-quote-row" },
+      { tag: "div.statement-quote-row-header" },
+      { tag: "div.statement-quote-cell" },
       { tag: "div.statement-footer-contact" },
     ];
   },

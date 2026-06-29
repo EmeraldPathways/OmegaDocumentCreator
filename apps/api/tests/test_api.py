@@ -33,6 +33,66 @@ def _db_is_available() -> bool:
 _DB_AVAILABLE = _db_is_available()
 _test_engine = db_test_helpers.setup_test_db() if _DB_AVAILABLE else None
 
+
+class PhiParsingTests(unittest.TestCase):
+    def test_submit_phi_request_parses_live_output_quote_path(self) -> None:
+        from app.config import get_settings
+        from app.document_generation import submit_phi_request
+
+        xml_result = """<?xml version="1.0"?>
+<Result>
+  <Errors></Errors>
+  <Outputs>
+    <Quotes>
+      <Company>
+        <Name>Irish Life</Name>
+        <Type>Guaranteed</Type>
+        <Level>136.53</Level>
+        <Esc3></Esc3>
+        <Esc5>149.78</Esc5>
+      </Company>
+      <Company>
+        <Name>Aviva</Name>
+        <Type>Reviewable</Type>
+        <Level>102.50</Level>
+        <Esc3>116.40</Esc3>
+        <Esc5></Esc5>
+      </Company>
+    </Quotes>
+  </Outputs>
+</Result>
+"""
+        mock_response = Mock()
+        mock_response.read.return_value = xml_result.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+
+        with patch("app.document_generation.urlopen", return_value=mock_response):
+            result = submit_phi_request(
+                get_settings(
+                    PHI_ENDPOINT_URL="http://example.test/interface_phi.php",
+                    PHI_USERNAME="user",
+                    PHI_PASSWORD="pass",
+                    PHI_REQUEST_FROM="omega",
+                    PHI_REQUEST_FROM_CODE="code",
+                ),
+                {
+                    "dateOfBirth": "1990-11-08",
+                    "gender": "Female",
+                    "smokerStatus": "Non-Smoker",
+                    "coverAge": "65",
+                    "recommendedCover": "30000",
+                    "deferredPeriod": "13 weeks",
+                    "phiOccupationalClass": "2",
+                    "phiIndexation": "Y",
+                },
+            )
+
+        self.assertEqual(result["status"], "sent")
+        self.assertEqual(len(result["quote_results"]), 2)
+        self.assertEqual(result["quote_results"][0]["provider_name"], "Irish Life")
+        self.assertEqual(result["quote_results"][1]["escalation_3_premium"], "116.40")
+
 if _test_engine is not None:
     app.db._engine = _test_engine
     app.db._SessionLocal = sessionmaker(bind=_test_engine, autoflush=False, autocommit=False)

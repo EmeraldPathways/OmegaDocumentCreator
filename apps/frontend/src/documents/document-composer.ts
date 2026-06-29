@@ -254,6 +254,53 @@ function buildStatementFinancialSituationHtml(profile: SeededClientProfile) {
   return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 }
 
+function buildStatementQuoteComparisonHtml(profile: SeededClientProfile) {
+  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+  const quoteResults = requests.flatMap((request) => request.quoteResults);
+
+  if (quoteResults.length === 0) {
+    return "";
+  }
+
+  const summaryItems = [
+    `Cover amount: ${valueOrFallback(profile.recommendedCover)}`,
+    `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
+    `Cover to age: ${valueOrFallback(profile.coverAge)}`,
+    `Smoker status: ${valueOrFallback(profile.smokerStatus)}`,
+    `Occupation class: ${valueOrFallback(profile.phiOccupationalClass)}`,
+    `Indexation: ${valueOrFallback(profile.phiIndexation)}`,
+  ];
+
+  const headers = ["Provider", "Policy Type", "Level", "Esc 3%", "Esc 5%"];
+  const rows = quoteResults
+    .map((quote) =>
+      [
+        valueOrFallback(quote.providerName),
+        valueOrFallback(quote.policyType),
+        valueOrFallback(quote.levelPremium),
+        valueOrFallback(quote.escalation3Premium),
+        valueOrFallback(quote.escalation5Premium),
+      ]
+        .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)
+        .join(""),
+    )
+    .map((cells) => `<div class="statement-quote-row">${cells}</div>`)
+    .join("");
+
+  return [
+    '<div class="statement-section">',
+    "<h2>Income Protection Quote Comparison</h2>",
+    `<div class="statement-quote-summary">${summaryItems.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`,
+    '<div class="statement-quote-table">',
+    `<div class="statement-quote-row statement-quote-row-header">${headers
+      .map((header) => `<div class="statement-quote-cell"><p>${escapeHtml(header)}</p></div>`)
+      .join("")}</div>`,
+    rows,
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
 function buildWarningHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   if (documentType === "Fact Find") {
     return "<p>Please confirm that the information captured in this fact find is complete and accurate.</p>";
@@ -499,12 +546,14 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
 }
 
 function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
+  const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
     buildStatementLetterHeaderHtml(profile),
     '<div class="statement-opening">',
     `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
     "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
     "</div>",
+    quoteComparisonHtml,
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
     buildStatementPersonalCircumstancesHtml(profile),
