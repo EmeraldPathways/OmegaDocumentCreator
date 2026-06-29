@@ -66,7 +66,10 @@ function PreviewPage({
 }
 
 function PdfPreview({ html }: { html: string }) {
-  const styledHtml = useMemo(() => buildPdfStyledHtml(html, true), [html]);
+  const styledHtml = useMemo(
+    () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true }),
+    [html],
+  );
   const pagination = paginatePdfContent(styledHtml);
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
   const showShellHeader = !isStatement;

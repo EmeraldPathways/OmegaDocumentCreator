@@ -1963,6 +1963,23 @@ describe("Generated document export", () => {
     expect(styledHtml).toContain("border-top:2px solid #5b2230");
   });
 
+  it("keeps fact find logos for export html and strips them only for preview shells", async () => {
+    const { buildPdfStyledHtml } = await vi.importActual<typeof import("./documents/pdf-export")>("./documents/pdf-export");
+    const { getSeededClientProfile } = await vi.importActual<typeof import("./data/seeded-clients")>("./data/seeded-clients");
+    const { buildWorkflowDocument } = await vi.importActual<typeof import("./documents/workflow-document-builders")>(
+      "./documents/workflow-document-builders",
+    );
+
+    const profile = structuredClone(getSeededClientProfile("CLI-2026-0002"));
+    const html = buildWorkflowDocument(profile, "Fact Find").html;
+
+    const exportHtml = buildPdfStyledHtml(html, true);
+    const previewHtml = buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true });
+
+    expect(exportHtml).toContain("document-top-logo-image");
+    expect(previewHtml).not.toContain("document-top-logo");
+  });
+
   it("falls back to continuous PDF pagination for an oversized block", async () => {
     const { paginatePdfContent } = await vi.importActual<typeof import("./documents/pdf-export")>("./documents/pdf-export");
     const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;

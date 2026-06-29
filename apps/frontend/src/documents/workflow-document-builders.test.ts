@@ -52,6 +52,10 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-opening");
     expect(document.html).toContain("statement-important-notice");
     expect(document.html).toContain("statement-section");
+    expect(document.html).toContain("statement-quote-block");
+    expect(document.html).toContain("statement-closing");
+    expect(document.html).toContain("statement-declaration");
+    expect(document.html).toContain("statement-important-info");
     // Statement must NOT contain old shared blocks
     expect(document.html).not.toContain("document-banner");
     expect(document.html).not.toContain("signatures-footer");
@@ -76,6 +80,14 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-signature-area");
     // Omega branding
     expect(document.html).toContain("Omega Financial");
+    // Declaration and important information blocks (Statement-only)
+    expect(document.html).toContain("Declaration to be completed by Client:");
+    expect(document.html).toContain("I am happy to proceed on the basis of the recommendation given to me and wish to affect the policy recommended.");
+    expect(document.html).toContain("Amanda McLaughlin");
+    expect(document.html).toContain("statement-declaration");
+    expect(document.html).toContain("statement-important-info");
+    expect(document.html).toContain("It is vital to make full disclosure of relevant facts");
+    expect(document.html).toContain("I wish to confirm that I have read the Customer Information Booklet");
   });
 
   it("falls back to fact find values for statement personal and financial sections when dedicated statement fields are blank", () => {

@@ -162,6 +162,52 @@ function extractBlocksFromElement(element: Element, blocks: WordExportBlock[]) {
     return;
   }
 
+  if (classList.contains("statement-document-body")) {
+    Array.from(element.children).forEach((child) => extractBlocksFromElement(child, blocks));
+    return;
+  }
+
+  if (classList.contains("statement-letter-header")) {
+    const logoSrc = element.querySelector(".statement-logo")?.getAttribute("src") ?? "";
+    if (logoSrc) {
+      blocks.push({
+        kind: "image",
+        src: logoSrc,
+        alt: "Omega Financial Management",
+        width: "200",
+      });
+    }
+    const addressText = textFromElement(element.querySelector(".statement-address-block"));
+    if (addressText) {
+      blocks.push({ kind: "paragraph", text: addressText });
+    }
+    const dateText = textFromElement(element.querySelector(".statement-letter-date"));
+    if (dateText) {
+      blocks.push({ kind: "paragraph", text: dateText });
+    }
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
+  if (
+    tagName === "div" &&
+    (classList.contains("statement-opening") ||
+      classList.contains("statement-section") ||
+      classList.contains("statement-quote-block") ||
+      classList.contains("statement-closing") ||
+      classList.contains("statement-declaration") ||
+      classList.contains("statement-important-info") ||
+      classList.contains("statement-important-notice"))
+  ) {
+    const heading = textFromElement(element.querySelector("h2"));
+    if (heading) {
+      blocks.push({ kind: "sectionHeading", text: heading });
+    }
+    Array.from(element.children).forEach((child) => appendNestedContent(child, blocks));
+    blocks.push({ kind: "spacer" });
+    return;
+  }
+
   if (isBanner) {
     const eyebrow = textFromElement(element.querySelector(".document-eyebrow"));
     const title = textFromElement(element.querySelector("h1"));

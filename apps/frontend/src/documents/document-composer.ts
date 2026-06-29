@@ -450,7 +450,7 @@ function buildStatementQuoteComparisonHtml(profile: SeededClientProfile) {
     .join("");
 
   return [
-    '<div class="statement-section">',
+    '<div class="statement-section statement-quote-block">',
     "<h2>Income Protection Quote Comparison</h2>",
     `<div class="statement-quote-summary">${summaryItems.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`,
     '<div class="statement-quote-table">',
@@ -732,6 +732,37 @@ function buildStatementClosingHtml(profile: SeededClientProfile) {
   ].join("");
 }
 
+function buildStatementDeclarationHtml() {
+  return [
+    '<div class="statement-section statement-declaration">',
+    "<h2>Declaration to be completed by Client:</h2>",
+    "<p>I am happy to proceed on the basis of the recommendation given to me and wish to affect the policy recommended.</p>",
+    '<div class="statement-signature-area">',
+    "<p>_______________________    ______________</p>",
+    "<p>Amanda McLaughlin    Date</p>",
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
+function buildStatementImportantInfoHtml1() {
+  return [
+    '<div class="statement-section statement-important-info">',
+    "<h2>IMPORTANT INFORMATION:</h2>",
+    "<p>It is vital to make full disclosure of relevant facts, including: (a) your medical details or history; and (b) any previous insurance claims made by you for the type of insurance sought. Failure to disclose all information may result in (I) your policy being cancelled; (ii) that claims may not be paid; (iii) you may encounter difficulty in trying to purchase insurance elsewhere.</p>",
+    "</div>",
+  ].join("");
+}
+
+function buildStatementImportantInfoHtml2() {
+  return [
+    '<div class="statement-section statement-important-info">',
+    "<h2>IMPORTANT INFORMATION:</h2>",
+    "<p>I wish to confirm that I have read the Customer Information Booklet, I am aware of the benefits available under the recommended policy. I am aware of the general exclusions that attach to the recommended policy. I understand the meaning of disability as defined in the recommended policy. I am are also aware of the reductions applied to the benefit where there are disability payments from other sources. I agree with the recommendation made and wish to effect the transaction recommended.</p>",
+    "</div>",
+  ].join("");
+}
+
 function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
   const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
@@ -760,6 +791,9 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     warningHtml,
     "</div>",
     buildStatementClosingHtml(profile),
+    buildStatementDeclarationHtml(),
+    buildStatementImportantInfoHtml1(),
+    buildStatementImportantInfoHtml2(),
   ].join("");
 
   return bodyHtml;

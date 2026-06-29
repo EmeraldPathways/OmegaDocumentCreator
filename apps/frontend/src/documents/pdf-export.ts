@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
 const A4_WIDTH_PX = 794;
 const A4_HEIGHT_PX = 1123;
@@ -40,6 +41,10 @@ function stripPreviewLogosForWorkflowPreview(html: string) {
   return sourceDocument.body.innerHTML.trim();
 }
 
+type BuildPdfStyledHtmlOptions = {
+  stripFactFindLogosForPreview?: boolean;
+};
+
 function hasPdfClass(sourceElement: Element, className: string) {
   return sourceElement.classList.contains(className);
 }
@@ -58,19 +63,150 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "statement-address-block") ||
     hasPdfClass(sourceElement, "statement-opening") ||
     hasPdfClass(sourceElement, "statement-section") ||
+    hasPdfClass(sourceElement, "statement-important-notice") ||
+    hasPdfClass(sourceElement, "statement-quote-block") ||
     hasPdfClass(sourceElement, "statement-quote-summary") ||
     hasPdfClass(sourceElement, "statement-quote-table") ||
     hasPdfClass(sourceElement, "statement-quote-row") ||
     hasPdfClass(sourceElement, "statement-quote-row-header") ||
     hasPdfClass(sourceElement, "statement-quote-cell") ||
+    hasPdfClass(sourceElement, "statement-closing") ||
+    hasPdfClass(sourceElement, "statement-declaration") ||
+    hasPdfClass(sourceElement, "statement-important-info") ||
     hasPdfClass(sourceElement, "statement-footer-contact")
+  );
+}
+
+function elementIsStatement(sourceElement: Element) {
+  const classList = sourceElement.classList;
+  return (
+    classList.contains("statement-letter-header") ||
+    classList.contains("statement-logo") ||
+    classList.contains("statement-address-block") ||
+    classList.contains("statement-letter-date") ||
+    classList.contains("statement-opening") ||
+    classList.contains("statement-section") ||
+    classList.contains("statement-important-notice") ||
+    classList.contains("statement-quote-block") ||
+    classList.contains("statement-quote-summary") ||
+    classList.contains("statement-quote-table") ||
+    classList.contains("statement-quote-row") ||
+    classList.contains("statement-quote-row-header") ||
+    classList.contains("statement-quote-cell") ||
+    classList.contains("statement-closing") ||
+    classList.contains("statement-declaration") ||
+    classList.contains("statement-important-info") ||
+    classList.contains("statement-signature-area") ||
+    classList.contains("statement-signature-line") ||
+    classList.contains("statement-footer-contact") ||
+    classList.contains("statement-document-body") ||
+    (sourceElement.parentElement?.classList.contains("statement-document-body") ?? false) ||
+    (sourceElement.parentElement?.classList.contains("statement-section") ?? false)
   );
 }
 
 function elementStyles(sourceElement: Element) {
   const tagName = sourceElement.tagName.toLowerCase();
   const classList = sourceElement.classList;
+  const isStmt = elementIsStatement(sourceElement);
 
+  // --- Statement formal document styles (stop web-card look) ---
+  if (classList.contains("statement-document-body")) {
+    return "display:block;color:#000;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.65";
+  }
+
+  if (classList.contains("statement-letter-header")) {
+    return "display:block;text-align:center;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-logo")) {
+    return "display:block;width:200px;height:auto;margin:0 auto 18px auto;border-radius:0";
+  }
+
+  if (classList.contains("statement-address-block")) {
+    return "display:block;text-align:left;margin:0 0 8px";
+  }
+
+  if (isStmt && classList.contains("statement-letter-date")) {
+    return "margin:12px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
+  }
+
+  if (classList.contains("statement-opening")) {
+    return "display:block;margin:0 0 20px;page-break-inside:avoid";
+  }
+
+  // Statement section headings: black, bold, underlined, serif
+  if (isStmt && tagName === "h2") {
+    return "margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:700;text-decoration:underline;color:#000";
+  }
+
+  if (classList.contains("statement-important-notice")) {
+    return "display:block;border:1.5px solid #000;padding:14px 16px;margin:0 0 20px;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-quote-block")) {
+    return "display:block;margin:0 0 20px;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-quote-summary")) {
+    return "display:block;margin:0 0 8px";
+  }
+
+  if (classList.contains("statement-quote-table")) {
+    return "display:block;border:1px solid #000;margin:0 0 8px";
+  }
+
+  if (classList.contains("statement-quote-row-header")) {
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;background:#e8e8e8;border-bottom:1px solid #000";
+  }
+
+  if (classList.contains("statement-quote-row")) {
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;border-bottom:1px solid #ccc";
+  }
+
+  if (classList.contains("statement-quote-cell")) {
+    const baseStyle = "display:block;padding:8px 10px";
+    return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #ccc`;
+  }
+
+  if (classList.contains("statement-closing")) {
+    return "display:block;margin:24px 0 0;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-signature-area")) {
+    return "display:block;margin:16px 0 0";
+  }
+
+  if (classList.contains("statement-signature-line")) {
+    return "margin:0";
+  }
+
+  if (classList.contains("statement-declaration")) {
+    return "display:block;border:1px solid #000;padding:14px 16px;margin:20px 0 0;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-important-info")) {
+    return "display:block;border:1px solid #000;padding:14px 16px;margin:20px 0 0;page-break-inside:avoid";
+  }
+
+  // Statement paragraphs: black, serif, tighter spacing
+  if (isStmt && tagName === "p") {
+    return "margin:0 0 8px;line-height:1.6;white-space:pre-wrap;color:#000";
+  }
+
+  if (isStmt && tagName === "strong") {
+    return "font-weight:700;color:#000";
+  }
+
+  if (isStmt && (tagName === "ul" || tagName === "ol")) {
+    return "margin:0 0 8px;padding-left:22px;color:#000";
+  }
+
+  if (isStmt && tagName === "li") {
+    return "margin:0 0 4px;line-height:1.6;color:#000";
+  }
+
+  // --- Existing non-Statement styles (unchanged) ---
   if (tagName === "article" && classList.contains("workflow-document")) {
     return "display:block;color:#1f2937;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.6";
   }
@@ -99,27 +235,6 @@ function elementStyles(sourceElement: Element) {
     return "display:block;margin:0 0 16px;padding:0 0 2px;page-break-inside:avoid";
   }
 
-  if (tagName === "div" && classList.contains("statement-quote-summary")) {
-    return "display:block;margin:0 0 12px";
-  }
-
-  if (tagName === "div" && classList.contains("statement-quote-table")) {
-    return "display:block;border:1px solid #d6d3d1;border-radius:12px;overflow:hidden;margin:0 0 8px";
-  }
-
-  if (tagName === "div" && classList.contains("statement-quote-row-header")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;background:#f6ede3;border-top:none";
-  }
-
-  if (tagName === "div" && classList.contains("statement-quote-row")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;border-top:1px solid #e5e7eb";
-  }
-
-  if (tagName === "div" && classList.contains("statement-quote-cell")) {
-    const baseStyle = "display:block;padding:10px 12px";
-    return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
-  }
-
   if ((tagName === "aside" || tagName === "div") && classList.contains("document-callout")) {
     return "display:block;background:#fff6e6;border-left:6px solid #c68b2c;border-radius:12px;padding:16px 18px;margin:0 0 16px;page-break-inside:avoid";
   }
@@ -144,19 +259,19 @@ function elementStyles(sourceElement: Element) {
     return "display:block;font-size:13px;color:#111827";
   }
 
-  if (tagName === "h1") {
+  if (!isStmt && tagName === "h1") {
     return "margin:0;font-family:Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;line-height:1.2;color:#3c1321";
   }
 
-  if (tagName === "h2") {
+  if (!isStmt && tagName === "h2") {
     return "margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;line-height:1.25;color:#5b2230";
   }
 
-  if (tagName === "h3") {
+  if (!isStmt && tagName === "h3") {
     return "margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#374151";
   }
 
-  if (tagName === "p") {
+  if (!isStmt && tagName === "p") {
     return "margin:0 0 10px;line-height:1.6;white-space:pre-wrap";
   }
 
@@ -164,19 +279,15 @@ function elementStyles(sourceElement: Element) {
     return "display:block;max-width:220px;height:auto;margin:0;border-radius:0";
   }
 
-  if (tagName === "img" && classList.contains("statement-logo")) {
-    return "display:block;width:180px;height:auto;margin:0 0 16px 0;border-radius:0";
-  }
-
   if (tagName === "img") {
     return "display:block;max-width:100%;height:auto;margin:16px auto;border-radius:10px";
   }
 
-  if (tagName === "ul" || tagName === "ol") {
+  if (!isStmt && (tagName === "ul" || tagName === "ol")) {
     return "margin:0 0 10px;padding-left:22px";
   }
 
-  if (tagName === "li") {
+  if (!isStmt && tagName === "li") {
     return "margin:0 0 6px;line-height:1.6";
   }
 
@@ -241,8 +352,11 @@ function cloneStyledNode(sourceNode: Node, targetDocument: Document, addBlockCla
   return targetElement;
 }
 
-export function buildPdfStyledHtml(html: string, addBlockClass = false) {
-  const cleanedHtml = stripPreviewLogosForWorkflowPreview(stripMarkdownFences(html));
+export function buildPdfStyledHtml(html: string, addBlockClass = false, options?: BuildPdfStyledHtmlOptions) {
+  const markdownStrippedHtml = stripMarkdownFences(html);
+  const cleanedHtml = options?.stripFactFindLogosForPreview
+    ? stripPreviewLogosForWorkflowPreview(markdownStrippedHtml)
+    : markdownStrippedHtml;
 
   if (typeof DOMParser === "undefined") {
     return cleanedHtml;
@@ -352,7 +466,30 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function buildPageHtml(content: string, pageNumber: number, totalPages: number) {
+const OMEGA_FOOTER_LINES = [
+  "Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18. Tel: 01 293 8554 Email: info@omegafinancial.ie Website: www.omegafinancial.ie",
+  "Directors: John O'Connor B.A. CIM, Hilary O'Connor B.A. DBS",
+  "OFM Financial Ltd trading as Omega Financial Management is regulated by the Central Bank of Ireland. Registered in Ireland Number 226937",
+];
+
+function buildPageHtml(content: string, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
+  const footerLines = OMEGA_FOOTER_LINES.map(
+    (line) => `<div style="font-size:7.5px;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:3px;">${line}</div>`,
+  ).join("");
+  const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
+  const headerHtml = options?.showShellHeader
+    ? `
+      <div style="position:absolute;top:20px;left:42px;right:42px;text-align:center;">
+        <img
+          src="${OMEGA_LOGO_DATA_URI}"
+          alt="Omega Financial Management"
+          style="display:block;width:160px;height:auto;margin:0 auto 8px;"
+        />
+        <div style="font-size:10px;font-family:Helvetica,Arial,sans-serif;color:#444;">Income Protection Workflow</div>
+      </div>
+    `
+    : "";
+
   return `
     <div class="pdf-page" style="
       width:${A4_WIDTH_PX}px;
@@ -365,17 +502,44 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number) 
       font-family:Georgia,'Times New Roman',serif;
       font-size:14px;
     ">
+      ${headerHtml}
       <div style="position:absolute;top:${HEADER_HEIGHT}px;left:50px;right:50px;bottom:${FOOTER_HEIGHT}px;overflow:hidden;">
         ${content}
       </div>
-      <div style="position:absolute;bottom:28px;left:42px;right:42px;border-top:1px solid #5b2230;padding-top:8px;text-align:center;">
-        <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;">Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
-        <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;margin-top:2px;">Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
-        <div style="font-size:8px;font-family:Helvetica,Arial,sans-serif;color:#333;margin-top:2px;">Omega Financial Management is regulated by the Central Bank of Ireland.</div>
-        ${totalPages > 1 ? `<div style="font-size:8px;color:#666;margin-top:6px;">Page ${pageNumber} of ${totalPages}</div>` : ""}
+      <div style="position:absolute;bottom:20px;left:42px;right:42px;border-top:1px solid #000;padding-top:6px;text-align:center;">
+        ${footerLines}
+        ${pageNumberHtml}
       </div>
     </div>
   `;
+}
+
+function drawPdfPageChrome(pdf: jsPDF, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
+  if (options?.showShellHeader) {
+    pdf.addImage(OMEGA_LOGO_DATA_URI, "PNG", 71, 9, 68, 18, undefined, "FAST");
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10);
+    pdf.setTextColor(68, 68, 68);
+    pdf.text("Income Protection Workflow", 105, 34, { align: "center" });
+  }
+
+  pdf.setDrawColor(0, 0, 0);
+  pdf.setLineWidth(0.2);
+  pdf.line(42, 275, 168, 275);
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(68, 68, 68);
+  let footerY = 279;
+  OMEGA_FOOTER_LINES.forEach((line) => {
+    pdf.text(line, 105, footerY, { align: "center", maxWidth: 126 });
+    footerY += 3.6;
+  });
+
+  if (totalPages > 1) {
+    pdf.setTextColor(136, 136, 136);
+    pdf.text(`Page ${pageNumber} of ${totalPages}`, 105, footerY + 2, { align: "center" });
+  }
 }
 
 function stripHtml(html: string) {
@@ -405,7 +569,10 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
     return pdf.output("blob");
   }
 
-  const parsedContent = buildPdfStyledHtml(html, true);
+  const isStatement = html.includes("workflow-document-statement-of-suitability");
+  const parsedContent = buildPdfStyledHtml(html, true, {
+    stripFactFindLogosForPreview: !isStatement,
+  });
   const pagination = splitContentIntoPages(parsedContent);
   const container = document.createElement("div");
   container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
@@ -423,7 +590,9 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
     if (pagination.mode === "paged") {
       for (let pageIndex = 0; pageIndex < pagination.pages.length; pageIndex += 1) {
         const pageDiv = document.createElement("div");
-        pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length);
+        pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length, {
+          showShellHeader: !isStatement,
+        });
         container.appendChild(pageDiv);
 
         const pageElement = pageDiv.querySelector(".pdf-page") as HTMLElement | null;
@@ -506,6 +675,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
         }
 
         pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 12, 20, A4_WIDTH_MM - 24, contentHeightMm, undefined, "SLOW");
+        drawPdfPageChrome(pdf, pageIndex + 1, totalPages, { showShellHeader: !isStatement });
       }
     }
 
@@ -518,6 +688,128 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 export function buildStandaloneDocumentPreviewHtml(html: string) {
   const styledContent = buildPdfStyledHtml(html, true);
   const isStatement = styledContent.includes("workflow-document-statement-of-suitability");
+
+  const statementPreviewCss = `
+  .preview-page .workflow-document-statement-of-suitability {
+    color: #000;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-logo {
+    display: block;
+    width: 220px;
+    height: auto;
+    margin: 0 auto 18px auto;
+    border-radius: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block {
+    text-align: left;
+    margin-bottom: 8px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block p {
+    margin: 0 0 2px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    color: #000;
+    line-height: 1.4;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
+    margin: 12px 0 0;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    font-weight: 400;
+    color: #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-opening {
+    margin-bottom: 20px;
+  }
+  .preview-page .workflow-document-statement-of-suitability h2 {
+    margin: 0 0 10px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: underline;
+    color: #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-important-notice {
+    border: 1.5px solid #000;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-block {
+    margin-bottom: 20px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-summary {
+    margin-bottom: 8px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-table {
+    border: 1px solid #000;
+    margin-bottom: 8px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    background: #e8e8e8;
+    border-bottom: 1px solid #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    border-bottom: 1px solid #ccc;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell {
+    padding: 8px 10px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell + .statement-quote-cell {
+    border-left: 1px solid #ccc;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-section {
+    margin-bottom: 16px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-closing {
+    margin-top: 24px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-area {
+    margin-top: 16px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-declaration {
+    border: 1px solid #000;
+    padding: 14px 16px;
+    margin-top: 20px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-important-info {
+    border: 1px solid #000;
+    padding: 14px 16px;
+    margin-top: 20px;
+  }
+  .preview-page .workflow-document-statement-of-suitability p {
+    margin: 0 0 8px;
+    line-height: 1.6;
+    color: #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability ul,
+  .preview-page .workflow-document-statement-of-suitability ol {
+    margin: 0 0 8px;
+    padding-left: 22px;
+    color: #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability li {
+    margin-bottom: 4px;
+    line-height: 1.6;
+    color: #000;
+  }
+  .preview-page .workflow-document-statement-of-suitability strong {
+    color: #000;
+  }
+  `;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -671,47 +963,19 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     margin: 0;
     border-radius: 0;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
-    margin-bottom: 28px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #c68b2c;
-  }
-  .preview-page .workflow-document-statement-of-suitability .statement-logo {
-    display: block;
-    width: 180px;
-    height: auto;
-    margin: 0 0 16px 0;
-    border-radius: 0;
-  }
-  .preview-page .workflow-document-statement-of-suitability .statement-address-block {
-    margin-bottom: 10px;
-  }
-  .preview-page .workflow-document-statement-of-suitability .statement-address-block p {
-    margin: 0 0 2px;
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 13px;
-    color: #374151;
-    line-height: 1.4;
-  }
-  .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
-    margin: 0;
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    color: #5b2230;
-  }
+  ${isStatement ? statementPreviewCss : ""}
   .preview-page-footer {
     margin-top: 32px;
     padding-top: 18px;
-    border-top: 1px solid #5b2230;
+    border-top: 1px solid #000;
     text-align: center;
-    color: #475569;
+    color: #444;
     font-family: Helvetica, Arial, sans-serif;
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.5;
   }
   .preview-page-footer p {
-    margin: 0 0 3px;
+    margin: 0 0 2px;
   }
 </style>
 </head>
@@ -719,9 +983,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   <div class="preview-page">
     ${styledContent}
     <div class="preview-page-footer">
-      <p>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</p>
-      <p>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</p>
-      <p>Omega Financial Management is regulated by the Central Bank of Ireland.</p>
+      <p>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18. Tel: 01 293 8554 Email: info@omegafinancial.ie Website: www.omegafinancial.ie</p>
+      <p>Directors: John O'Connor B.A. CIM, Hilary O'Connor B.A. DBS</p>
+      <p>OFM Financial Ltd trading as Omega Financial Management is regulated by the Central Bank of Ireland. Registered in Ireland Number 226937</p>
     </div>
   </div>
 </body>

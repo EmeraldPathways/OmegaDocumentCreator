@@ -29,11 +29,17 @@ const WORKFLOW_BLOCK_CLASSES = new Set([
   "statement-address-block",
   "statement-opening",
   "statement-section",
+  "statement-important-notice",
+  "statement-quote-block",
   "statement-quote-summary",
   "statement-quote-table",
   "statement-quote-row",
   "statement-quote-row-header",
   "statement-quote-cell",
+  "statement-closing",
+  "statement-declaration",
+  "statement-important-info",
+  "statement-signature-area",
   "statement-footer-contact",
 ]);
 const WORKFLOW_INLINE_BLOCK_CLASSES = new Set(["grid-item"]);
