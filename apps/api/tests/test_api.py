@@ -35,6 +35,35 @@ _test_engine = db_test_helpers.setup_test_db() if _DB_AVAILABLE else None
 
 
 class PhiParsingTests(unittest.TestCase):
+    def test_build_phi_request_payload_includes_age_and_excludes_indexation(self) -> None:
+        from app.config import get_settings
+        from app.document_generation import build_phi_request_payload
+
+        payload = build_phi_request_payload(
+            get_settings(
+                PHI_ENDPOINT_URL="http://example.test/interface_phi.php",
+                PHI_USERNAME="user",
+                PHI_PASSWORD="pass",
+                PHI_REQUEST_FROM="omega",
+                PHI_REQUEST_FROM_CODE="code",
+            ),
+            {
+                "dateOfBirth": "1996-06-29",
+                "letterDate": "2026-06-29",
+                "gender": "Female",
+                "smokerStatus": "Non-Smoker",
+                "coverAge": "65",
+                "recommendedCover": "30000",
+                "deferredPeriod": "13 weeks",
+                "phiOccupationalClass": "2",
+            },
+        )
+
+        self.assertIn({"label": "Age", "value": "30"}, payload["request_fields"])
+        self.assertNotIn({"label": "Indexation", "value": "Y"}, payload["request_fields"])
+        self.assertIn("<Age>30</Age>", payload["xml"])
+        self.assertNotIn("<Indexation>", payload["xml"])
+
     def test_submit_phi_request_parses_live_output_quote_path(self) -> None:
         from app.config import get_settings
         from app.document_generation import submit_phi_request
@@ -78,13 +107,13 @@ class PhiParsingTests(unittest.TestCase):
                 ),
                 {
                     "dateOfBirth": "1990-11-08",
+                    "letterDate": "2026-06-29",
                     "gender": "Female",
                     "smokerStatus": "Non-Smoker",
                     "coverAge": "65",
                     "recommendedCover": "30000",
                     "deferredPeriod": "13 weeks",
                     "phiOccupationalClass": "2",
-                    "phiIndexation": "Y",
                 },
             )
 

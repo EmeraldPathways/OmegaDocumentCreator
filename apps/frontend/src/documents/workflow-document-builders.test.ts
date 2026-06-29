@@ -50,6 +50,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-logo");
     expect(document.html).toContain("statement-address-block");
     expect(document.html).toContain("statement-opening");
+    expect(document.html).toContain("statement-important-notice");
     expect(document.html).toContain("statement-section");
     // Statement must NOT contain old shared blocks
     expect(document.html).not.toContain("document-banner");
@@ -67,6 +68,12 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Dear Jamie Murphy");
     expect(document.html).toContain("2026-06-06");
     expect(document.html).toContain("15 Sea Road");
+    expect(document.html).toContain("Important Notice – Statement of Suitability");
+    expect(document.html).toContain("product(s) or service(s) offered or recommended");
+    expect(document.html).toContain("Please review all of the contents of this recommendation carefully");
+    expect(document.html).toContain("Kind regards.");
+    expect(document.html).toContain("Yours sincerely");
+    expect(document.html).toContain("statement-signature-area");
     // Omega branding
     expect(document.html).toContain("Omega Financial");
   });
@@ -92,24 +99,25 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Annual income: 60000.");
     expect(document.html).toContain("Recommended cover: 30000.");
     expect(document.html).toContain("Deferred period: 13 weeks.");
-    expect(document.html).toContain("Monthly premium: 165.50.");
+    expect(document.html).not.toContain("Monthly premium: 165.50.");
   });
 
   it("renders BIS quote results as a statement comparison table immediately after the introduction using fact find values", () => {
     const profile = cloneProfile("CLI-2026-0002");
+    profile.dateOfBirth = "1996-06-29";
+    profile.letterDate = "2026-06-29";
     profile.recommendedCover = "30000";
     profile.deferredPeriod = "13 weeks";
     profile.coverAge = "65";
     profile.smokerStatus = "Non-Smoker";
     profile.phiOccupationalClass = "2";
-    profile.phiIndexation = "Y";
     profile.documentDrafts["Statement of Suitability"].integrationRequests = [
       {
         provider: "BestAdvice",
         requestType: "Phi",
         status: "sent",
         requestedAt: "2026-06-29T10:00:00+00:00",
-        requestFields: [],
+        requestFields: [{ label: "Age", value: "30" }],
         quoteResults: [
           {
             providerName: "Aviva",
@@ -133,11 +141,11 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-quote-table");
     expect(document.html).toContain("Income Protection Quote Comparison");
     expect(document.html).toContain("Cover amount: 30000");
+    expect(document.html).toContain("Age: 30");
     expect(document.html).toContain("Deferred period: 13 weeks");
     expect(document.html).toContain("Cover to age: 65");
     expect(document.html).toContain("Smoker status: Non-Smoker");
     expect(document.html).toContain("Occupation class: 2");
-    expect(document.html).toContain("Indexation: Y");
     expect(document.html).toContain("Aviva");
     expect(document.html).toContain("Reviewable");
     expect(document.html).toContain("102.50");
@@ -145,8 +153,50 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Irish Life");
     expect(document.html).toContain("Guaranteed");
     expect(document.html).toContain("149.78");
+    expect(document.html).not.toContain("Indexation:");
     expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-opening"));
     expect(document.html.indexOf("Income Protection Quote Comparison")).toBeLessThan(document.html.indexOf("Personal Circumstances"));
+  });
+
+  it("renders a populated statement recommendation using quote and fact find values", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.provider = "";
+    profile.productType = "Income Protection";
+    profile.income = "46666.67";
+    profile.recommendedCover = "35000";
+    profile.deferredPeriod = "13 Week";
+    profile.coverAge = "65";
+    profile.premium = "";
+    profile.netMonthlyCost = "72.98";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "Age", value: "30" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Guaranteed",
+            levelPremium: "121.62",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Recommendation: Aviva 13 Week deferred plan for €35,000 per annum");
+    expect(document.html).toContain("We recommend an Aviva Income Protection 13 Week deferred plan for €35,000 to cover you to age 65.");
+    expect(document.html).toContain("As this represents 75% of your salary");
+    expect(document.html).toContain("The gross cost of this 13 Week deferred period plan is €121.62 less tax relief @40% giving a net cost of €72.98pm.");
+    expect(document.html).toContain("We have discussed affordability of this plan and you are happy to proceed.");
+    expect(document.html).toContain("The premium offered by Aviva for this type of cover is competitive");
+    expect(document.html).toContain("The monthly premium receives 40% tax relief on this plan.");
   });
 
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {

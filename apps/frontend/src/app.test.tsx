@@ -506,7 +506,6 @@ describe("App routes", () => {
     storedClients["CLI-2026-0002"].gender = "";
     storedClients["CLI-2026-0002"].smokerStatus = "";
     storedClients["CLI-2026-0002"].phiOccupationalClass = "";
-    storedClients["CLI-2026-0002"].phiIndexation = "";
     setStoredClients(storedClients);
 
     render(
@@ -518,6 +517,31 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
+  });
+
+  it("keeps provider premium and PHI indexation on fact find income protection", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: /Income Protection/ }));
+
+    expect(document.getElementById("ff-provider")).toBeInTheDocument();
+    expect(document.getElementById("ff-premium")).toBeInTheDocument();
+    expect(document.getElementById("ff-phiIndexation")).toBeInTheDocument();
+    expect(document.getElementById("ff-recommendedCover")).toBeInTheDocument();
+    expect(document.getElementById("ff-deferredPeriod")).toBeInTheDocument();
+    expect(document.getElementById("ff-coverAge")).toBeInTheDocument();
+    expect(document.getElementById("ff-smokerStatus")).toBeInTheDocument();
+    expect(document.getElementById("ff-phiOccupationalClass")).toBeInTheDocument();
+
+    expect(document.querySelector('label[for="ff-provider"]')?.textContent).toBe("Provider");
+    expect(document.querySelector('label[for="ff-premium"]')?.textContent).toBe("Monthly premium");
+    expect(document.querySelector('label[for="ff-phiIndexation"]')?.textContent).toBe("PHI indexation");
+    expect(document.querySelector('label[for="ff-recommendedCover"]')?.textContent).toContain("*");
   });
 
   it("updates the draft save status inside the Fact Find tab", () => {
@@ -1221,8 +1245,9 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeDisabled();
-    expect(screen.getByLabelText(/Provider name/i)).toHaveValue("");
     expect(screen.getByLabelText(/Product type/i)).toHaveValue("");
+    expect(screen.queryByLabelText(/Provider name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Gross monthly premium/i)).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/Advisor name/i).length).toBeGreaterThan(0);
   });
 

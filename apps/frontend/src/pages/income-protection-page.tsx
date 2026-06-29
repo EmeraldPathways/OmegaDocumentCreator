@@ -199,8 +199,8 @@ export function IncomeProtectionPage() {
   const statementMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
     !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
+    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
     !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
-    !hasValue(resolvedDraft.provider) ? "Provider recommended" : null,
     !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
     !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
     !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
@@ -208,8 +208,6 @@ export function IncomeProtectionPage() {
     !hasValue(resolvedDraft.gender) ? "Gender" : null,
     !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
     !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
-    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
-    !hasValue(resolvedDraft.premium) ? "Gross monthly premium" : null,
     !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
     !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
@@ -227,8 +225,8 @@ export function IncomeProtectionPage() {
   const statementGenerationRequirements = [
     { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
     { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
+    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
     { label: "Statement type", complete: hasValue(resolvedDraft.statementType), location: "Statement" },
-    { label: "Provider recommended", complete: hasValue(resolvedDraft.provider), location: "Statement or Fact Find" },
     { label: "Product recommended", complete: hasValue(resolvedDraft.productType), location: "Statement" },
     { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
     { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
@@ -236,8 +234,6 @@ export function IncomeProtectionPage() {
     { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
     { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
     { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
-    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
-    { label: "Gross monthly premium", complete: hasValue(resolvedDraft.premium), location: "Statement or Fact Find" },
     { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Statement or Fact Find" },
     { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
   ];
@@ -252,7 +248,6 @@ export function IncomeProtectionPage() {
     { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
     { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
     { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
-    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
   ];
 
   function getDocumentDraft(documentType: SupportedDocumentType) {
@@ -1218,14 +1213,11 @@ export function IncomeProtectionPage() {
 
             <AccordionItem
               indicator={getSectionProgress([
-                resolvedDraft.provider,
                 resolvedDraft.recommendedCover,
-                resolvedDraft.premium,
                 resolvedDraft.deferredPeriod,
                 resolvedDraft.coverAge,
                 resolvedDraft.smokerStatus,
                 resolvedDraft.phiOccupationalClass,
-                resolvedDraft.phiIndexation,
               ])}
               isOpen={factFindAccordion.isOpen("income-protection")}
               onToggle={() => factFindAccordion.toggle("income-protection")}
@@ -1234,21 +1226,21 @@ export function IncomeProtectionPage() {
               <div className="form-grid">
                 <Input
                   id="ff-provider"
-                  label={requiredLabel("Provider")}
+                  label="Provider"
                   onChange={(event) => updateField("provider", event.target.value)}
                   type="text"
                   value={resolvedDraft.provider}
                 />
                 <Input
                   id="ff-recommendedCover"
-                  label={requiredLabel("Recommended cover")}
+                  label={requiredLabel("Annual Cover Amount (€)")}
                   onChange={(event) => updateField("recommendedCover", event.target.value)}
                   type="text"
                   value={resolvedDraft.recommendedCover}
                 />
                 <Input
                   id="ff-premium"
-                  label={requiredLabel("Monthly premium")}
+                  label="Monthly premium"
                   onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("premium", event.target.value)}
                   prefix="€"
@@ -1286,7 +1278,7 @@ export function IncomeProtectionPage() {
                 />
                 <Select
                   id="ff-phiIndexation"
-                  label={requiredLabel("PHI indexation")}
+                  label="PHI indexation"
                   onChange={(event) => updateField("phiIndexation", event.target.value)}
                   options={phiIndexationOptions}
                   value={resolvedDraft.phiIndexation}
@@ -1976,13 +1968,6 @@ export function IncomeProtectionPage() {
                 value={resolvedDraft.statementType}
               />
               <Input
-                id="sos-provider"
-                label={requiredLabel("Provider name")}
-                onChange={(event) => updateField("provider", event.target.value)}
-                type="text"
-                value={resolvedDraft.provider}
-              />
-              <Input
                 id="sos-productType"
                 label={requiredLabel("Product type")}
                 onChange={(event) => updateField("productType", event.target.value)}
@@ -2004,7 +1989,7 @@ export function IncomeProtectionPage() {
             <div className="form-grid">
               <Input
                 id="sos-recommendedCover"
-                label={requiredLabel("Recommended cover")}
+                label={requiredLabel("Annual Cover Amount (€)")}
                 onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("recommendedCover", event.target.value)}
                 prefix="EUR"
@@ -2026,7 +2011,7 @@ export function IncomeProtectionPage() {
                 options={coverAgeOptions}
                 value={resolvedDraft.coverAge}
               />
-              <Input
+              {false ? <Input
                 id="sos-premium"
                 label={requiredLabel("Gross monthly premium")}
                 onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
@@ -2035,7 +2020,7 @@ export function IncomeProtectionPage() {
                 step="0.01"
                 type="number"
                 value={resolvedDraft.premium}
-              />
+              /> : null}
               <Input
                 hint="Gross premium minus tax relief at your marginal rate"
                 id="sos-netMonthlyCost"

@@ -8,6 +8,14 @@ import type {
 } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
+type StatementRecommendationProfile = SeededClientProfile &
+  Partial<{
+    discountApplied: string;
+    taxReliefPercentage: string;
+    affordabilityDiscussed: string;
+    clientHappyToProceed: string;
+  }>;
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -68,11 +76,11 @@ function summaryGridItems(profile: SeededClientProfile, documentType: SupportedD
 
   return [
     ...commonItems,
-    { label: "Provider", value: profile.provider },
     { label: "Recommended cover", value: profile.recommendedCover },
     { label: "Deferred period", value: profile.deferredPeriod },
     { label: "Cover to age", value: profile.coverAge },
-    { label: "Premium", value: profile.premium },
+    { label: "Smoker status", value: profile.smokerStatus },
+    { label: "Occupation class", value: profile.phiOccupationalClass },
   ];
 }
 
@@ -174,11 +182,14 @@ function buildRecommendationHtml(profile: SeededClientProfile, documentType: Sup
     return paragraphHtml(profile.termsNotes || "Terms of Business issued for client review and record keeping.");
   }
 
+  if (documentType === "Statement of Suitability") {
+    return buildStatementRecommendationHtml(profile);
+  }
+
   const lines = [
-    `${valueOrFallback(profile.provider)} ${valueOrFallback(profile.productType, "Income Protection recommendation")}`.trim(),
+    valueOrFallback(profile.productType, "Income Protection recommendation"),
     `Recommended cover: ${valueOrFallback(profile.recommendedCover)}`,
     `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
-    `Premium: ${valueOrFallback(profile.premium)}`,
   ];
 
   return `<p>${escapeHtml(lines.join(". "))}.</p>`;
@@ -241,7 +252,6 @@ function buildStatementFinancialSituationHtml(profile: SeededClientProfile) {
     profile.recommendedCover ? `Recommended cover: ${profile.recommendedCover}.` : "",
     profile.deferredPeriod ? `Deferred period: ${profile.deferredPeriod}.` : "",
     profile.coverAge ? `Cover to age: ${profile.coverAge}.` : "",
-    profile.premium ? `Monthly premium: ${profile.premium}.` : "",
     profile.liabilityMortgageBalanceOutstanding ? `Mortgage balance outstanding: ${profile.liabilityMortgageBalanceOutstanding}.` : "",
     profile.totalLiabilitiesPerMonthSelf ? `Total monthly liabilities (self): ${profile.totalLiabilitiesPerMonthSelf}.` : "",
     profile.totalLiabilitiesPerMonthJoint ? `Total monthly liabilities (joint): ${profile.totalLiabilitiesPerMonthJoint}.` : "",
@@ -254,6 +264,158 @@ function buildStatementFinancialSituationHtml(profile: SeededClientProfile) {
   return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 }
 
+function requestFieldValue(requests: IntegrationRequestArtifact[], label: string) {
+  for (const request of requests) {
+    const field = request.requestFields.find((entry) => entry.label === label && entry.value.trim().length > 0);
+    if (field) {
+      return field.value;
+    }
+  }
+  return "";
+}
+
+function parseNumber(value: string | undefined) {
+  const normalized = value?.replace(/[^\d.-]/g, "").trim() ?? "";
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatEuroAmount(value: number | null, fractionDigits = 2) {
+  if (value === null) {
+    return "";
+  }
+  return new Intl.NumberFormat("en-IE", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
+
+function indefiniteArticle(value: string) {
+  return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
+}
+
+function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  const quotes = requests.flatMap((request) => request.quoteResults);
+  if (quotes.length === 0) {
+    return null;
+  }
+
+  const provider = profile.provider.trim().toLowerCase();
+  if (provider) {
+    const matchedQuote = quotes.find((quote) => quote.providerName.trim().toLowerCase() === provider);
+    if (matchedQuote) {
+      return matchedQuote;
+    }
+  }
+
+  return quotes[0];
+}
+
+function resolveTaxReliefPercentage(
+  profile: StatementRecommendationProfile,
+  grossPremium: number | null,
+  netMonthlyCost: number | null,
+) {
+  const configuredValue = parseNumber(profile.taxReliefPercentage);
+  if (configuredValue !== null) {
+    return configuredValue;
+  }
+
+  if (grossPremium !== null && netMonthlyCost !== null && grossPremium > 0 && netMonthlyCost <= grossPremium) {
+    return Math.round((1 - netMonthlyCost / grossPremium) * 100);
+  }
+
+  return null;
+}
+
+function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: string | undefined) {
+  const trimmed = sectionHtml?.trim() ?? "";
+  if (!trimmed) {
+    return computedHtml;
+  }
+
+  const normalized = trimmed.toLowerCase();
+  const looksGeneric =
+    normalized.includes("prepared for") ||
+    normalized.includes("is proposed with cover of") ||
+    normalized.includes("seeded fallback content");
+
+  return looksGeneric ? computedHtml : `${computedHtml}${trimmed}`;
+}
+
+function buildStatementRecommendationHtml(profile: SeededClientProfile) {
+  const statementProfile = profile as StatementRecommendationProfile;
+  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+  const selectedQuote = findSelectedQuote(profile, requests);
+  const provider = valueOrFallback(profile.provider || selectedQuote?.providerName, "Recommended provider");
+  const deferredPeriod = valueOrFallback(profile.deferredPeriod, "Deferred period to be confirmed");
+  const coverAmountNumber = parseNumber(profile.recommendedCover);
+  const coverAmount = coverAmountNumber === null ? valueOrFallback(profile.recommendedCover) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
+  const coverAge = valueOrFallback(profile.coverAge, "selected retirement age");
+  const incomeNumber = parseNumber(profile.income);
+  const coverShare =
+    incomeNumber !== null && incomeNumber > 0 && coverAmountNumber !== null ? Math.round((coverAmountNumber / incomeNumber) * 100) : null;
+  const grossPremiumNumber = parseNumber(profile.premium) ?? parseNumber(selectedQuote?.levelPremium);
+  const netMonthlyCostNumber = parseNumber(profile.netMonthlyCost);
+  const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremiumNumber, netMonthlyCostNumber);
+  const discountApplied = parseNumber(statementProfile.discountApplied);
+  const productLabel = valueOrFallback(profile.productType, "Income Protection policy");
+  const affordabilityConfirmed =
+    (statementProfile.affordabilityDiscussed?.trim() ?? "").toLowerCase() === "yes" ||
+    (statementProfile.clientHappyToProceed?.trim() ?? "").toLowerCase() === "yes" ||
+    profile.recommendationAcknowledged.trim().toLowerCase() === "yes";
+
+  const summaryLine = `<p><strong>Recommendation: ${escapeHtml(provider)} ${escapeHtml(deferredPeriod)} deferred plan for ${escapeHtml(coverAmount)} per annum</strong></p>`;
+  const recommendationLine = `<p>We recommend ${escapeHtml(
+    `${indefiniteArticle(provider)} ${provider} ${productLabel} ${deferredPeriod} deferred plan for ${coverAmount} to cover you to age ${coverAge}`,
+  )}.</p>`;
+
+  const rationaleLine =
+    coverShare === null
+      ? "<p>This level of cover is intended to protect your income and support your standard of living if you are unable to work due to illness or injury.</p>"
+      : `<p>As this represents ${escapeHtml(String(coverShare))}% of your salary, this keeps you within Revenue limits while giving you the cover needed to maintain your standard of living.</p>`;
+
+  const costParts = [
+    grossPremiumNumber === null ? "" : `The gross cost of this ${deferredPeriod} deferred period plan is €${formatEuroAmount(grossPremiumNumber)}`,
+    discountApplied === null ? "" : `(${formatEuroAmount(discountApplied)}% discount on premium applied)`,
+    taxReliefPercentage === null ? "" : `less tax relief @${Math.round(taxReliefPercentage)}%`,
+    netMonthlyCostNumber === null ? "" : `giving a net cost of €${formatEuroAmount(netMonthlyCostNumber)}pm`,
+  ].filter(Boolean);
+  const costLine = costParts.length === 0 ? "" : `<p>${escapeHtml(costParts.join(" "))}.</p>`;
+
+  const affordabilityLine = affordabilityConfirmed
+    ? "<p>We have discussed affordability of this plan and you are happy to proceed.</p>"
+    : "<p>Affordability of this plan should be reviewed and confirmed before proceeding.</p>";
+
+  const reasonItems = [
+    `The cover amount and ${deferredPeriod} deferred period align with the protection need identified in your Fact Find.`,
+    selectedQuote?.policyType
+      ? `The ${selectedQuote.policyType.toLowerCase()} premium basis selected for this cover matches the policy terms returned by the quote system.`
+      : `The premium basis selected for the cover should be read together with the policy conditions provided by ${provider}.`,
+    `The premium offered by ${provider} for this type of cover is competitive in comparison to the market quotes returned at this time.`,
+    taxReliefPercentage === null
+      ? "Income Protection premiums may qualify for tax relief subject to Revenue rules."
+      : `The monthly premium receives ${Math.round(taxReliefPercentage)}% tax relief on this plan.`,
+    `${provider} is regulated by the Central Bank of Ireland, which means it must maintain sufficient financial reserves to meet valid claims.`,
+    "Waiver of premium means your premiums are paid while an income protection benefit is being paid, subject to the policy conditions.",
+  ];
+
+  return [
+    summaryLine,
+    recommendationLine,
+    rationaleLine,
+    costLine,
+    affordabilityLine,
+    `<p>We recommend this ${escapeHtml(provider)} Income Protection policy for the following reasons:</p>`,
+    listHtml(reasonItems),
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
 function buildStatementQuoteComparisonHtml(profile: SeededClientProfile) {
   const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
   const quoteResults = requests.flatMap((request) => request.quoteResults);
@@ -264,11 +426,11 @@ function buildStatementQuoteComparisonHtml(profile: SeededClientProfile) {
 
   const summaryItems = [
     `Cover amount: ${valueOrFallback(profile.recommendedCover)}`,
+    `Age: ${valueOrFallback(requestFieldValue(requests, "Age"))}`,
     `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
     `Cover to age: ${valueOrFallback(profile.coverAge)}`,
     `Smoker status: ${valueOrFallback(profile.smokerStatus)}`,
     `Occupation class: ${valueOrFallback(profile.phiOccupationalClass)}`,
-    `Indexation: ${valueOrFallback(profile.phiIndexation)}`,
   ];
 
   const headers = ["Provider", "Policy Type", "Level", "Esc 3%", "Esc 5%"];
@@ -545,6 +707,30 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
   ].join("");
 }
 
+function buildStatementNoticeHtml() {
+  return [
+    '<div class="statement-section statement-important-notice">',
+    "<p><strong>Important Notice – Statement of Suitability</strong></p>",
+    "<p><strong>This is an important document which sets out the reasons why the product(s) or service(s) offered or recommended is/are considered suitable, or the most suitable, for your particular needs, objectives and circumstances.</strong></p>",
+    "</div>",
+  ].join("");
+}
+
+function buildStatementClosingHtml(profile: SeededClientProfile) {
+  return [
+    '<div class="statement-section statement-closing">',
+    "<p>Please review all of the contents of this recommendation carefully, should you have any queries please feel free to give me a call.</p>",
+    "<p>Kind regards.</p>",
+    "<p>Yours sincerely</p>",
+    '<div class="statement-signature-area">',
+    `<p><strong>${escapeHtml(valueOrFallback(profile.advisorName, "Omega Advisor"))}</strong></p>`,
+    '<p class="statement-signature-line">______________________________</p>',
+    "<p>Financial Advisor</p>",
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
 function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
   const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
@@ -553,6 +739,7 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
     "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
     "</div>",
+    buildStatementNoticeHtml(),
     quoteComparisonHtml,
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
@@ -571,6 +758,7 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     '<h2>Warnings</h2>',
     warningHtml,
     "</div>",
+    buildStatementClosingHtml(profile),
   ].join("");
 
   return bodyHtml;
@@ -594,7 +782,11 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const recommendationSection = findDraftSection(draftSections, "recommendation", "summary", "issue");
   const needsSection = findDraftSection(draftSections, "needs", "objective", "circumstance");
   const warningSection = findDraftSection(draftSections, "warning", "disclaimer", "risk");
-  const recommendationHtml = recommendationSection?.bodyHtml ?? buildRecommendationHtml(profile, documentType);
+  const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
+  const recommendationHtml =
+    documentType === "Statement of Suitability"
+      ? mergeStatementRecommendationHtml(computedRecommendationHtml, recommendationSection?.bodyHtml)
+      : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);
   const warningHtml = warningSection?.bodyHtml ?? buildWarningHtml(profile, documentType);
 
