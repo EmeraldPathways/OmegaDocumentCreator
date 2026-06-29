@@ -2,11 +2,11 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
-const A4_WIDTH_PX = 794;
-const A4_HEIGHT_PX = 1123;
-const HEADER_HEIGHT = 120;
-const FOOTER_HEIGHT = 110;
-const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 20;
+export const A4_WIDTH_PX = 794;
+export const A4_HEIGHT_PX = 1123;
+export const HEADER_HEIGHT = 120;
+export const FOOTER_HEIGHT = 110;
+export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 20;
 const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
@@ -58,7 +58,6 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "document-callout") ||
     hasPdfClass(sourceElement, "document-top-logo") ||
     hasPdfClass(sourceElement, "signatures-footer") ||
-    hasPdfClass(sourceElement, "statement-document-body") ||
     hasPdfClass(sourceElement, "statement-letter-header") ||
     hasPdfClass(sourceElement, "statement-address-block") ||
     hasPdfClass(sourceElement, "statement-opening") ||
@@ -423,11 +422,101 @@ function splitContentIntoPages(htmlContent: string) {
     return rectHeight + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
   };
 
-  for (const element of elements) {
-    const nextHeight = getElementHeight(element);
-    const nextHtml = (element as HTMLElement).outerHTML;
+  const createWrappedFragmentHtml = (sourceElement: Element, childHtml: string) => {
+    const fragmentElement = document.createElement(sourceElement.tagName.toLowerCase());
+    const className = sourceElement.getAttribute("class");
+    const style = sourceElement.getAttribute("style");
+
+    if (className) {
+      fragmentElement.setAttribute("class", className);
+    }
+
+    if (style) {
+      fragmentElement.setAttribute("style", style);
+    }
+
+    fragmentElement.innerHTML = childHtml;
+    return fragmentElement.outerHTML;
+  };
+
+  const splitOversizedStatementBlock = (element: Element, measuredHeight: number) => {
+    const canSplit =
+      element.classList.contains("statement-section") ||
+      element.classList.contains("statement-opening") ||
+      element.classList.contains("statement-closing");
+
+    if (!canSplit) {
+      return null;
+    }
+
+    const children = Array.from(element.children);
+    if (children.length < 2) {
+      return null;
+    }
+
+    const childHeights = children.map((child) => getElementHeight(child));
+    if (childHeights.some((height) => height > PAGE_CONTENT_HEIGHT)) {
+      return null;
+    }
+
+    const wrapperHeight = Math.max(
+      0,
+      measuredHeight - childHeights.reduce((total, height) => total + height, 0),
+    );
+
+    const fragments: Array<{ height: number; html: string }> = [];
+    let fragmentChildren: string[] = [];
+    let fragmentHeight = wrapperHeight;
+
+    for (let index = 0; index < children.length; index += 1) {
+      const child = children[index];
+      const childHeight = childHeights[index];
+
+      if (fragmentChildren.length > 0 && fragmentHeight + childHeight > PAGE_CONTENT_HEIGHT) {
+        fragments.push({
+          height: fragmentHeight,
+          html: createWrappedFragmentHtml(element, fragmentChildren.join("")),
+        });
+        fragmentChildren = [];
+        fragmentHeight = wrapperHeight;
+      }
+
+      fragmentChildren.push((child as HTMLElement).outerHTML);
+      fragmentHeight += childHeight;
+    }
+
+    if (fragmentChildren.length > 0) {
+      fragments.push({
+        height: fragmentHeight,
+        html: createWrappedFragmentHtml(element, fragmentChildren.join("")),
+      });
+    }
+
+    return fragments.length > 1 ? fragments : null;
+  };
+
+  const pendingItems: Array<{ element?: Element; height?: number; html?: string }> = elements.map((element) => ({ element }));
+
+  while (pendingItems.length > 0) {
+    const nextItem = pendingItems.shift();
+    if (!nextItem) {
+      continue;
+    }
+
+    const nextHeight = nextItem.element ? getElementHeight(nextItem.element) : (nextItem.height ?? 0);
+    const nextHtml = nextItem.element ? (nextItem.element as HTMLElement).outerHTML : (nextItem.html ?? "");
 
     if (nextHeight > PAGE_CONTENT_HEIGHT) {
+      if (nextItem.element) {
+        const splitFragments = splitOversizedStatementBlock(nextItem.element, nextHeight);
+        if (splitFragments) {
+          pendingItems.unshift(
+            ...splitFragments.map((fragment) => ({ height: fragment.height, html: fragment.html })),
+          );
+          continue;
+        }
+      }
+
       document.body.removeChild(tempContainer);
       return { mode: "continuous", html: htmlContent } as const;
     }
@@ -466,11 +555,15 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const OMEGA_FOOTER_LINES = [
+export const OMEGA_FOOTER_LINES = [
   "Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18. Tel: 01 293 8554 Email: info@omegafinancial.ie Website: www.omegafinancial.ie",
   "Directors: John O'Connor B.A. CIM, Hilary O'Connor B.A. DBS",
   "OFM Financial Ltd trading as Omega Financial Management is regulated by the Central Bank of Ireland. Registered in Ireland Number 226937",
 ];
+
+export function shouldShowPdfShellHeader(isStatement: boolean, pageIndex: number) {
+  return !isStatement || pageIndex > 0;
+}
 
 function buildPageHtml(content: string, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
   const footerLines = OMEGA_FOOTER_LINES.map(
@@ -591,7 +684,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
       for (let pageIndex = 0; pageIndex < pagination.pages.length; pageIndex += 1) {
         const pageDiv = document.createElement("div");
         pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length, {
-          showShellHeader: !isStatement,
+          showShellHeader: shouldShowPdfShellHeader(isStatement, pageIndex),
         });
         container.appendChild(pageDiv);
 
@@ -675,7 +768,9 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
         }
 
         pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 12, 20, A4_WIDTH_MM - 24, contentHeightMm, undefined, "SLOW");
-        drawPdfPageChrome(pdf, pageIndex + 1, totalPages, { showShellHeader: !isStatement });
+        drawPdfPageChrome(pdf, pageIndex + 1, totalPages, {
+          showShellHeader: shouldShowPdfShellHeader(isStatement, pageIndex),
+        });
       }
     }
 

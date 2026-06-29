@@ -257,6 +257,8 @@ The main remaining gaps are operational hardening and product polish rather than
 - Security summary endpoint now reflects live configuration instead of static template
 - BestAdvice PHI quote parsing now reads live quote rows from `Result > Outputs > Quotes > Company`
 - Statement of Suitability now inserts a BIS quote comparison table after the introduction using fact find workflow values plus returned quote results
+- Statement PDF preview/export now shares the same page shell constants, footer content, and multi-page header logic; oversized Statement sections are split by child content before falling back to continuous slicing
+- Frontend document generation now retries `/documents/generate` once after bootstrapping the seeded staff session when the protected route returns `401`
 
 ## Delivery Plan
 

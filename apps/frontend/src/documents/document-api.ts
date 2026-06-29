@@ -20,6 +20,9 @@ type GenerateDocumentResponseItem = {
   integrationRequests: IntegrationRequestArtifact[];
 };
 
+const DEMO_STAFF_EMAIL = "staff@omega.local";
+const DEMO_STAFF_PASSWORD = "ChangeMe123!";
+
 type RawGeneratedSection = {
   id?: string;
   title?: string;
@@ -210,7 +213,25 @@ export async function generateDocument({
     }),
   };
 
-  const response = await fetch("/documents/generate", requestInit);
+  const sendGenerateRequest = () => fetch("/documents/generate", requestInit);
+  let response = await sendGenerateRequest();
+
+  if (response.status === 401) {
+    const bootstrapResponse = await fetch("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: DEMO_STAFF_EMAIL,
+        password: DEMO_STAFF_PASSWORD,
+      }),
+    });
+
+    if (bootstrapResponse.ok) {
+      response = await sendGenerateRequest();
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401) {

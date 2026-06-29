@@ -4,7 +4,7 @@ import { CheckCircle2, Copy, Edit2, Eye, FileDown, FileText, RefreshCw } from "l
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
-import { buildPdfStyledHtml, paginatePdfContent } from "./pdf-export";
+import { buildPdfStyledHtml, paginatePdfContent, A4_WIDTH_PX, A4_HEIGHT_PX, HEADER_HEIGHT, FOOTER_HEIGHT, OMEGA_FOOTER_LINES, shouldShowPdfShellHeader } from "./pdf-export";
 import { resolveDraftPreviewHtml } from "./document-preview";
 import { RichDocumentEditor } from "./rich-document-editor";
 
@@ -38,28 +38,61 @@ function PreviewPage({
   showShellHeader: boolean;
   showShellFooter: boolean;
 }) {
+  const footerLines = OMEGA_FOOTER_LINES.map(
+    (line) => `<div style="font-size:7.5px;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:3px;">${line}</div>`,
+  ).join("");
+  const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
+
   return (
-    <div className="generated-output-pdf-page">
+    <div
+      className="generated-output-pdf-page"
+      style={{
+        width: A4_WIDTH_PX,
+        minHeight: A4_HEIGHT_PX,
+        height: "auto",
+        background: "#fff",
+        border: "1px solid #dbe3ee",
+        boxShadow: "0 4px 16px rgba(15,23,42,0.08)",
+        margin: "0 auto 24px",
+        position: "relative",
+        boxSizing: "border-box",
+      }}
+    >
       {showShellHeader ? (
-        <div className="generated-output-pdf-page-header">
-          <div className="generated-output-pdf-brand">
-            <img
-              alt="Omega Financial Management"
-              className="generated-output-pdf-brand-image"
-              src={OMEGA_LOGO_DATA_URI}
-            />
-          </div>
-          <div className="generated-output-pdf-subtitle">Income Protection Workflow</div>
+        <div
+          style={{
+            textAlign: "center",
+            padding: "20px 42px 12px",
+            borderBottom: "1px solid #e5e7eb",
+          }}
+        >
+          <img
+            alt="Omega Financial Management"
+            src={OMEGA_LOGO_DATA_URI}
+            style={{ display: "block", width: 160, height: "auto", margin: "0 auto 8px" }}
+          />
+          <div style={{ fontSize: 10, fontFamily: "Helvetica,Arial,sans-serif", color: "#444" }}>Income Protection Workflow</div>
         </div>
       ) : null}
-      <div className="generated-output-pdf-page-body" dangerouslySetInnerHTML={{ __html: children }} />
+      <div
+        className="generated-output-pdf-page-body"
+        style={{
+          padding: "0 50px",
+          paddingTop: showShellHeader ? 0 : 20,
+          minHeight: showShellFooter ? A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 40 : A4_HEIGHT_PX - 80,
+        }}
+        dangerouslySetInnerHTML={{ __html: children }}
+      />
       {showShellFooter ? (
-        <div className="generated-output-pdf-page-footer">
-          <div>Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18 | Tel: 01 293 8554</div>
-          <div>Email: info@omegafinancial.ie | Website: www.omegafinancial.ie</div>
-          <div>Omega Financial Management is regulated by the Central Bank of Ireland.</div>
-          {totalPages > 1 ? <div>{`Page ${pageNumber} of ${totalPages}`}</div> : null}
-        </div>
+        <div
+          style={{
+            margin: "0 42px",
+            padding: "12px 0 8px",
+            borderTop: "1px solid #000",
+            textAlign: "center",
+          }}
+          dangerouslySetInnerHTML={{ __html: footerLines + pageNumberHtml }}
+        />
       ) : null}
     </div>
   );
@@ -72,12 +105,16 @@ function PdfPreview({ html }: { html: string }) {
   );
   const pagination = paginatePdfContent(styledHtml);
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
-  const showShellHeader = !isStatement;
   const showShellFooter = true;
 
   if (pagination.mode === "continuous") {
     return (
-      <PreviewPage pageNumber={1} showShellFooter={showShellFooter} showShellHeader={showShellHeader} totalPages={1}>
+      <PreviewPage
+        pageNumber={1}
+        showShellFooter={showShellFooter}
+        showShellHeader={shouldShowPdfShellHeader(isStatement, 0)}
+        totalPages={1}
+      >
         {pagination.html}
       </PreviewPage>
     );
@@ -90,7 +127,7 @@ function PdfPreview({ html }: { html: string }) {
           key={`generated-output-page-${index + 1}`}
           pageNumber={index + 1}
           showShellFooter={showShellFooter}
-          showShellHeader={showShellHeader}
+          showShellHeader={shouldShowPdfShellHeader(isStatement, index)}
           totalPages={pagination.pages.length}
         >
           {pageHtml}

@@ -16,7 +16,9 @@ describe("generateDocument", () => {
 
   it("throws a session-expired error when document generation returns 401", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
 
     await expect(
       generateDocument({
@@ -27,7 +29,50 @@ describe("generateDocument", () => {
       }),
     ).rejects.toThrow("Session expired. Please log in again.");
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries document generation after bootstrapping the demo staff session on 401", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            item: {
+              title: "Statement of Suitability",
+              summary: "Generated summary",
+              sections: [{ id: "summary", title: "Summary", body_html: "<p>Generated body</p>" }],
+              warnings: [],
+              generated_html: "<section><p>Generated body</p></section>",
+              integration_requests: [],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const document = await generateDocument({
+      clientReference: "CLI-2026-0002",
+      documentType: "Statement of Suitability",
+      templateId: "statement-of-suitability",
+      workflowSnapshot: {},
+    });
+
+    expect(document.title).toBe("Statement of Suitability");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/auth/login",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          email: "staff@omega.local",
+          password: "ChangeMe123!",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/documents/generate", expect.anything());
   });
 
   it("normalizes integration request artifacts returned by the backend", async () => {
