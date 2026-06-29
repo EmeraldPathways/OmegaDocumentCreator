@@ -36,6 +36,7 @@ export type SeededGeneratedDocument = {
 
 export type SeededClientProfile = {
   clientReference: string;
+  factFindType: string;
   fullName: string;
   firstName: string;
   surname: string;
@@ -257,6 +258,7 @@ function createDefaultSavingsInvestmentRows(): SeededSavingsInvestmentRow[] {
 export const seededClientProfiles: Record<string, SeededClientProfile> = {
   "CLI-2026-0001": {
     clientReference: "CLI-2026-0001",
+    factFindType: "all",
     fullName: "Test Client",
     firstName: "Test",
     surname: "Client",
@@ -502,6 +504,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
   },
   "CLI-2026-0002": {
     clientReference: "CLI-2026-0002",
+    factFindType: "all",
     fullName: "Jamie Murphy",
     firstName: "Jamie",
     surname: "Murphy",

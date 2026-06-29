@@ -535,6 +535,7 @@ function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[
 }
 
 function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {
+  const isSmall = profile.factFindType === "small";
   const servicesRequested = checkedItemLabels([
     { label: "Life Protection", value: profile.servicesRequestedLifeProtection },
     { label: "Income Protection", value: profile.servicesRequestedIncomeProtection },
@@ -584,35 +585,35 @@ function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: s
       { label: "Cover to age", value: profile.coverAge },
       { label: "Monthly premium", value: profile.premium },
     ]),
-    detailGrid("Assets & Liabilities", [
+    ...(!isSmall ? [detailGrid("Assets & Liabilities", [
       { label: "Home (Self)", value: profile.assetHomeSelf },
       { label: "Home (Partner)", value: profile.assetHomePartner },
       { label: "Mortgage balance outstanding", value: profile.liabilityMortgageBalanceOutstanding },
       { label: "Mortgage monthly repayment", value: profile.liabilityMortgageMonthlyRepayment },
       { label: "Total liabilities per month - Self", value: profile.totalLiabilitiesPerMonthSelf },
       { label: "Total liabilities per month - Joint", value: profile.totalLiabilitiesPerMonthJoint },
-    ]),
-    detailGrid("Pension Arrangements", [
+    ])] : []),
+    ...(!isSmall ? [detailGrid("Pension Arrangements", [
       { label: "Self retirement age", value: profile.selfRetirementAge },
       { label: "Self pension scheme", value: profile.selfEmployeeDirectorSchemeType },
       { label: "Self personal pension company", value: profile.selfPersonalPensionCompany },
       { label: "Partner retirement age", value: profile.partnerRetirementAge },
       { label: "Partner pension scheme", value: profile.partnerEmployeeDirectorSchemeType },
       { label: "Partner personal pension company", value: profile.partnerPersonalPensionCompany },
-    ]),
-    detailGrid("Life Insurance & Serious Illness", [
+    ])] : []),
+    ...(!isSmall ? [detailGrid("Life Insurance & Serious Illness", [
       { label: "Mortgage protection", value: profile.mortgageProtection || yesNoValue(profile.mortgageProtectionYes) },
       { label: "Life Insurance (Self)", value: profile.selfLifeInsuranceAmount },
       { label: "Life Insurance (Partner)", value: profile.partnerLifeInsuranceAmount },
       { label: "Serious Illness (Self)", value: profile.selfSeriousIllnessAmount },
       { label: "Serious Illness (Partner)", value: profile.partnerSeriousIllnessAmount },
       { label: "Personal insurance record", value: profile.personalInsurance },
-    ]),
-    {
-      kind: "section",
+    ])] : []),
+    ...(!isSmall ? [{
+      kind: "section" as const,
       title: "Savings & Investments",
       bodyHtml: [listHtml(savingsRows, "No savings or investments recorded."), paragraphHtml(profile.savingsInvestmentComments, "No comments recorded.")].join(""),
-    },
+    }] : []),
     {
       kind: "section",
       title: "Recommendation Section",

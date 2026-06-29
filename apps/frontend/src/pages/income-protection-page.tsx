@@ -183,6 +183,7 @@ export function IncomeProtectionPage() {
   }
 
   const resolvedDraft = draft;
+  const factFindType = resolvedDraft.factFindType ?? "all";
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
 
@@ -1080,6 +1081,21 @@ export function IncomeProtectionPage() {
             <div>
               <h2>Fact Find Draft</h2>
             </div>
+            <div className="fact-find-type-selector">
+                <Select
+                id="ff-type"
+                label="Fact Find type"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  updateField("factFindType" as keyof SeededClientProfile, value);
+                }}
+                options={[
+                  { value: "all", label: "Fact Find All" },
+                  { value: "small", label: "Fact Find Small" },
+                ]}
+                value={factFindType}
+              />
+            </div>
           </div>
 
           <Accordion flush className="workflow-form-accordion">
@@ -1319,6 +1335,7 @@ export function IncomeProtectionPage() {
               </div>
             </AccordionItem>
 
+                {factFindType !== "small" && (
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.assetHomeSelf,
@@ -1380,7 +1397,9 @@ export function IncomeProtectionPage() {
                   {renderYesNoGroup("Are your liabilities covered by any other insurance?", "liabilitiesCoveredByOtherInsuranceYes", "liabilitiesCoveredByOtherInsuranceNo", "ff-liabilities-covered")}
                   {renderTextarea("ff-liabilitiesCoveredDetails", "If yes, please provide details.", "liabilitiesCoveredByOtherInsuranceDetails")}
                 </AccordionItem>
+                )}
 
+                {factFindType !== "small" && (
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.selfRetirementAge,
@@ -1393,7 +1412,9 @@ export function IncomeProtectionPage() {
                 >
                   {renderPensionSection("self")}
                 </AccordionItem>
+                )}
 
+                {factFindType !== "small" && (
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.partnerRetirementAge,
@@ -1406,7 +1427,9 @@ export function IncomeProtectionPage() {
                 >
                   {renderPensionSection("partner")}
                 </AccordionItem>
+                )}
 
+                {factFindType !== "small" && (
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.savingsInvestmentRows[0]?.financialInstitution ?? "",
@@ -1432,7 +1455,9 @@ export function IncomeProtectionPage() {
                   </div>
                   {renderTextarea("ff-savings-comments", "Comments", "savingsInvestmentComments")}
                 </AccordionItem>
+                )}
 
+                {factFindType !== "small" && (
             <AccordionItem
               indicator={getSectionProgress([
                 resolvedDraft.mortgageProtection,
@@ -1513,6 +1538,7 @@ export function IncomeProtectionPage() {
                 />
               </div>
             </AccordionItem>
+                )}
 
             <AccordionItem
               indicator={getSectionProgress([resolvedDraft.personalCircumstances, resolvedDraft.financialSituation, resolvedDraft.needsObjectives])}
