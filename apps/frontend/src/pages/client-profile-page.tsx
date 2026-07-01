@@ -310,48 +310,36 @@ export function ClientProfilePage() {
             Generated Documents
           </h2>
         </div>
-        <div className="table-wrap-flush">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">Document</th>
-                <th scope="col">Type</th>
-                <th scope="col">Version</th>
-                <th scope="col">Status</th>
-                <th scope="col">Generated</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((document) => (
-                <tr key={document.id}>
-                  <td className="font-medium">{document.documentName}</td>
-                  <td>{document.documentType}</td>
-                  <td>{document.version}</td>
-                  <td>
-                    <Badge variant={getStatusVariant(document.status)}>{document.status}</Badge>
-                  </td>
-                  <td>{document.generatedAt ? formatDate(document.generatedAt) : "—"}</td>
-                  <td>
-                    <div className="generated-doc-actions">
-                      <Button aria-label="Open" onClick={() => setPreviewDocument(document)} variant="secondary">
-                        <Eye size={14} />
-                        Open
-                      </Button>
-                      <Button onClick={() => handleDownloadDocument(document)} variant="secondary">
-                        <Download size={14} />
-                        Download
-                      </Button>
-                      <Button onClick={() => handleRegenerateDocument(document)} variant="text">
-                        <RefreshCw size={14} />
-                        Regenerate
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="file-list">
+          {documents.map((document) => (
+            <div key={document.id} className="file-item generated-document-item">
+              <div className="file-icon">
+                <FileText size={20} />
+              </div>
+              <div className="file-info generated-document-info">
+                <div className="file-name">{document.documentName}</div>
+                <div className="file-meta">
+                  {document.documentType} &middot; Version {document.version}
+                  {document.generatedAt ? ` · ${formatDate(document.generatedAt)}` : ""}
+                </div>
+              </div>
+              <Badge variant={getStatusVariant(document.status)}>{document.status}</Badge>
+              <div className="file-actions generated-doc-actions">
+                <Button aria-label="Open" className="btn-sm" onClick={() => setPreviewDocument(document)} variant="secondary">
+                  <Eye size={14} />
+                  Open
+                </Button>
+                <Button className="btn-sm" onClick={() => handleDownloadDocument(document)} variant="secondary">
+                  <Download size={14} />
+                  Download
+                </Button>
+                <Button className="btn-sm" onClick={() => handleRegenerateDocument(document)} variant="text">
+                  <RefreshCw size={14} />
+                  Regenerate
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -379,53 +367,34 @@ export function ClientProfilePage() {
             </Button>
           </div>
         ) : (
-          <div className="table-wrap-flush">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Filename</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Uploaded by</th>
-                  <th scope="col">Date</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resolvedDraft.files.map((file) => (
-                  <tr key={file.id}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                        <span style={{ color: "var(--color-secondary)" }}>
-                          <FileIcon filename={file.originalFilename} />
-                        </span>
-                        <span className="font-medium">{file.originalFilename}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`category-badge ${getFileCategoryClass(file.category)}`}>{file.category}</span>
-                    </td>
-                    <td>
-                      <Badge variant={getStatusVariant(file.status)}>{file.status}</Badge>
-                    </td>
-                    <td>{file.uploadedBy}</td>
-                    <td>{formatDate(file.uploadedAt)}</td>
-                    <td>
-                      <div className="generated-doc-actions">
-                        <Button onClick={() => handleDownloadFile(file)} variant="secondary" className="btn-sm">
-                          <Download size={14} />
-                          Download
-                        </Button>
-                        <Button onClick={() => handleDeleteFile(file)} variant="danger" className="btn-sm">
-                          <Trash2 size={14} />
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="file-list">
+            {resolvedDraft.files.map((file) => (
+              <div key={file.id} className="file-item">
+                <div className="file-icon">
+                  <FileIcon filename={file.originalFilename} />
+                </div>
+                <div className="file-info">
+                  <div className="file-name">{file.originalFilename}</div>
+                  <div className="file-meta">
+                    <span className={`category-badge ${getFileCategoryClass(file.category)}`}>{file.category}</span>
+                    <span> &middot; </span>
+                    <Badge variant={getStatusVariant(file.status)}>{file.status}</Badge>
+                    <span> &middot; </span>
+                    <span>by {file.uploadedBy} on {formatDate(file.uploadedAt)}</span>
+                  </div>
+                </div>
+                <div className="file-actions">
+                  <Button className="btn-sm" onClick={() => handleDownloadFile(file)} variant="secondary">
+                    <Download size={14} />
+                    Download
+                  </Button>
+                  <Button className="btn-sm" onClick={() => handleDeleteFile(file)} variant="danger">
+                    <Trash2 size={14} />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>

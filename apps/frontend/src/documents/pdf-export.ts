@@ -59,6 +59,8 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "document-top-logo") ||
     hasPdfClass(sourceElement, "signatures-footer") ||
     hasPdfClass(sourceElement, "statement-letter-header") ||
+    hasPdfClass(sourceElement, "statement-header-top") ||
+    hasPdfClass(sourceElement, "statement-client-details") ||
     hasPdfClass(sourceElement, "statement-address-block") ||
     hasPdfClass(sourceElement, "statement-opening") ||
     hasPdfClass(sourceElement, "statement-section") ||
@@ -80,6 +82,8 @@ function elementIsStatement(sourceElement: Element) {
   const classList = sourceElement.classList;
   return (
     classList.contains("statement-letter-header") ||
+    classList.contains("statement-header-top") ||
+    classList.contains("statement-client-details") ||
     classList.contains("statement-logo") ||
     classList.contains("statement-address-block") ||
     classList.contains("statement-letter-date") ||
@@ -115,11 +119,23 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-letter-header")) {
-    return "display:block;text-align:center;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
+    return "display:block;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
+  }
+
+  if (classList.contains("statement-header-top")) {
+    return "display:flex;flex-direction:row;align-items:flex-start;gap:32px;margin-bottom:16px";
   }
 
   if (classList.contains("statement-logo")) {
-    return "display:block;width:200px;height:auto;margin:0 auto 18px auto;border-radius:0";
+    return "display:block;width:180px;height:auto;margin:0;border-radius:0;flex-shrink:0";
+  }
+
+  if (classList.contains("statement-client-details")) {
+    return "display:block;text-align:left;flex:1;min-width:0";
+  }
+
+  if (classList.contains("statement-client-name")) {
+    return "margin:0 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:700;color:#000";
   }
 
   if (classList.contains("statement-address-block")) {
@@ -127,7 +143,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (isStmt && classList.contains("statement-letter-date")) {
-    return "margin:12px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
+    return "margin:12px 0 0;text-align:left;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
   }
 
   if (classList.contains("statement-opening")) {
@@ -211,7 +227,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (tagName === "div" && classList.contains("document-top-logo")) {
-    return "display:flex;justify-content:flex-start;margin:0 0 24px;page-break-inside:avoid";
+    return "display:flex;justify-content:center;margin:0 0 20px;page-break-inside:avoid";
   }
 
   if ((tagName === "header" || tagName === "div") && classList.contains("document-banner")) {
@@ -275,7 +291,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (tagName === "img" && classList.contains("document-top-logo-image")) {
-    return "display:block;max-width:220px;height:auto;margin:0;border-radius:0";
+    return "display:block;max-width:200px;height:auto;margin:0;border-radius:0";
   }
 
   if (tagName === "img") {
@@ -792,17 +808,36 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     line-height: 1.65;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
-    text-align: center;
     margin-bottom: 32px;
     padding-bottom: 20px;
     border-bottom: 2px solid #000;
   }
+  .preview-page .workflow-document-statement-of-suitability .statement-header-top {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+    margin-bottom: 16px;
+  }
   .preview-page .workflow-document-statement-of-suitability .statement-logo {
     display: block;
-    width: 220px;
+    width: 180px;
     height: auto;
-    margin: 0 auto 18px auto;
+    margin: 0;
     border-radius: 0;
+    flex-shrink: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-client-details {
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-client-name {
+    margin: 0 0 8px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-address-block {
     text-align: left;
@@ -817,6 +852,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
     margin: 12px 0 0;
+    text-align: left;
     font-family: Georgia, "Times New Roman", serif;
     font-size: 12px;
     font-weight: 400;
@@ -1048,12 +1084,12 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .document-top-logo {
     display: flex;
-    justify-content: flex-start;
-    margin: 0 0 24px;
+    justify-content: center;
+    margin: 0 0 20px;
   }
   .preview-page .document-top-logo-image {
     display: block;
-    max-width: 220px;
+    max-width: 200px;
     height: auto;
     margin: 0;
     border-radius: 0;

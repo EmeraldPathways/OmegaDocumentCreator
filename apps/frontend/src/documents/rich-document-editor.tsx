@@ -26,6 +26,8 @@ const WORKFLOW_BLOCK_CLASSES = new Set([
   "signatures-footer",
   "statement-document-body",
   "statement-letter-header",
+  "statement-header-top",
+  "statement-client-details",
   "statement-address-block",
   "statement-opening",
   "statement-section",
@@ -44,7 +46,12 @@ const WORKFLOW_BLOCK_CLASSES = new Set([
 ]);
 const WORKFLOW_INLINE_BLOCK_CLASSES = new Set(["grid-item"]);
 const WORKFLOW_INLINE_CLASSES = new Set(["grid-label"]);
-const WORKFLOW_TEXT_CLASSES = new Set(["document-eyebrow", "document-subtitle", "statement-letter-date"]);
+const WORKFLOW_TEXT_CLASSES = new Set([
+  "document-eyebrow",
+  "document-subtitle",
+  "statement-client-name",
+  "statement-letter-date",
+]);
 
 function normalizeClassNames(
   value: string | null | undefined,
@@ -118,6 +125,8 @@ const WorkflowBlockNode = Node.create({
       { tag: "div.signatures-footer" },
       { tag: "div.statement-document-body" },
       { tag: "div.statement-letter-header" },
+      { tag: "div.statement-header-top" },
+      { tag: "div.statement-client-details" },
       { tag: "div.statement-address-block" },
       { tag: "div.statement-opening" },
       { tag: "div.statement-section" },

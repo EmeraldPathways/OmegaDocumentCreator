@@ -26,12 +26,14 @@ type GeneratedOutputWorkspaceProps = {
 type ViewMode = "edit" | "preview";
 
 function PreviewPage({
+  bodyPadding,
   children,
   pageNumber,
   totalPages,
   showShellHeader,
   showShellFooter,
 }: {
+  bodyPadding: string;
   children: string;
   pageNumber: number;
   totalPages: number;
@@ -77,8 +79,7 @@ function PreviewPage({
       <div
         className="generated-output-pdf-page-body"
         style={{
-          padding: "0 50px",
-          paddingTop: showShellHeader ? 0 : 20,
+          padding: bodyPadding,
           minHeight: showShellFooter ? A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 40 : A4_HEIGHT_PX - 80,
         }}
         dangerouslySetInnerHTML={{ __html: children }}
@@ -99,20 +100,28 @@ function PreviewPage({
 }
 
 function PdfPreview({ html }: { html: string }) {
+  const isStatementSource = html.includes("workflow-document-statement-of-suitability");
   const styledHtml = useMemo(
-    () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true }),
-    [html],
+    () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: isStatementSource }),
+    [html, isStatementSource],
   );
   const pagination = paginatePdfContent(styledHtml);
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
-  const showShellFooter = true;
+  const showShellFooter = isStatement;
+  const previewBodyPadding = isStatement
+    ? "20px 24px 80px"
+    : "72px 80px 80px";
+  const shouldRenderShellHeader = (pageIndex: number) => isStatement
+    ? shouldShowPdfShellHeader(isStatement, pageIndex)
+    : false;
 
   if (pagination.mode === "continuous") {
     return (
       <PreviewPage
+        bodyPadding={previewBodyPadding}
         pageNumber={1}
         showShellFooter={showShellFooter}
-        showShellHeader={shouldShowPdfShellHeader(isStatement, 0)}
+        showShellHeader={shouldRenderShellHeader(0)}
         totalPages={1}
       >
         {pagination.html}
@@ -124,10 +133,11 @@ function PdfPreview({ html }: { html: string }) {
     <>
       {pagination.pages.map((pageHtml, index) => (
         <PreviewPage
+          bodyPadding={previewBodyPadding}
           key={`generated-output-page-${index + 1}`}
           pageNumber={index + 1}
           showShellFooter={showShellFooter}
-          showShellHeader={shouldShowPdfShellHeader(isStatement, index)}
+          showShellHeader={shouldRenderShellHeader(index)}
           totalPages={pagination.pages.length}
         >
           {pageHtml}
