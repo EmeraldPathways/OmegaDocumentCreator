@@ -2970,6 +2970,9 @@ button {
 
 /* Statement letter header: logo left, client name + address right */
 .workflow-document-statement-of-suitability .statement-letter-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
   margin-bottom: 28px;
   padding-bottom: 20px;
   border-bottom: 2px solid #c68b2c;
@@ -2992,9 +2995,13 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-client-details {
-  text-align: left;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
   min-width: 0;
+  margin-left: auto;
+  text-align: right;
 }
 
 .workflow-document-statement-of-suitability .statement-client-name {
@@ -3007,6 +3014,7 @@ button {
 
 .workflow-document-statement-of-suitability .statement-address-block {
   margin-bottom: 10px;
+  text-align: right;
 }
 
 .workflow-document-statement-of-suitability .statement-address-block p {
@@ -3022,7 +3030,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: #5b2230;
-  text-align: left;
+  text-align: right;
 }
 
 /* Statement opening / salutation */
@@ -3148,6 +3156,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
   margin-bottom: 28px;
   padding-bottom: 20px;
   border-bottom: 2px solid #c68b2c;
@@ -3170,9 +3181,13 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-details {
-  text-align: left;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
   min-width: 0;
+  margin-left: auto;
+  text-align: right;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-name {
@@ -3185,6 +3200,7 @@ button {
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block {
   margin-bottom: 10px;
+  text-align: right;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block p {
@@ -3200,7 +3216,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: #5b2230;
-  text-align: left;
+  text-align: right;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-opening {
@@ -3320,6 +3336,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
   margin-bottom: 28px;
   padding-bottom: 20px;
   border-bottom: 2px solid #c68b2c;
@@ -3342,9 +3361,13 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-details {
-  text-align: left;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
   min-width: 0;
+  margin-left: auto;
+  text-align: right;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-name {
@@ -3357,6 +3380,7 @@ button {
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block {
   margin-bottom: 10px;
+  text-align: right;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block p {
@@ -3372,7 +3396,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: #5b2230;
-  text-align: left;
+  text-align: right;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-opening {

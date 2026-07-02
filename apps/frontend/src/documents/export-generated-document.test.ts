@@ -51,6 +51,9 @@ describe("buildExportDocumentArtifact", () => {
     expect(artifact.html).toContain("statement-quote-table");
     expect(artifact.html).toContain("Personal Circumstances");
     expect(artifact.html).toContain("Financial Situation");
+    expect(artifact.html).toContain("Needs and Objectives");
     expect(artifact.html).toContain("Important Notice");
+    expect(artifact.html.indexOf("Needs and Objectives")).toBeGreaterThan(artifact.html.indexOf("Financial Situation"));
+    expect(artifact.html.indexOf("Needs and Objectives")).toBeLessThan(artifact.html.indexOf("Recommendation"));
   });
 });

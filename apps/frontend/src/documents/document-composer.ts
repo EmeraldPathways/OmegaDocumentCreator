@@ -233,11 +233,7 @@ function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: Sup
     return paragraphHtml(profile.factFindUpdateNeedsAndObjectives, "No needs and objectives recorded.");
   }
 
-  return [
-    paragraphHtml(profile.personalCircumstances || "No personal circumstances recorded."),
-    paragraphHtml(profile.financialSituation || "No financial situation recorded."),
-    paragraphHtml(profile.needsObjectives || "No needs and objectives recorded."),
-  ].join("");
+  return paragraphHtml(profile.needsObjectives, "No needs and objectives recorded.");
 }
 
 function buildStatementPersonalCircumstancesHtml(profile: SeededClientProfile) {
@@ -748,10 +744,12 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
   return [
     '<div class="statement-letter-header">',
     '<img class="statement-logo" src="' + escapeHtml(OMEGA_LOGO_DATA_URI) + '" alt="Omega Financial Management" />',
+    '<div class="statement-client-details">',
     '<div class="statement-address-block">',
     ...addressLines.map((line) => `<p>${escapeHtml(line)}</p>`),
     "</div>",
     `<p class="statement-letter-date">${escapeHtml(profile.letterDate || "Date not recorded")}</p>`,
+    "</div>",
     "</div>",
   ].join("");
 }
@@ -815,11 +813,11 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
   const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
     buildStatementLetterHeaderHtml(profile),
+    buildStatementNoticeHtml(),
     '<div class="statement-opening">',
     `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
     "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
     "</div>",
-    buildStatementNoticeHtml(),
     quoteComparisonHtml,
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
@@ -830,9 +828,12 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     buildStatementFinancialSituationHtml(profile),
     "</div>",
     '<div class="statement-section">',
+    '<h2>Needs and Objectives</h2>',
+    needsHtml,
+    "</div>",
+    '<div class="statement-section">',
     '<h2>Recommendation</h2>',
     recommendationHtml,
-    needsHtml,
     "</div>",
     '<div class="statement-section">',
     '<h2>Warnings</h2>',

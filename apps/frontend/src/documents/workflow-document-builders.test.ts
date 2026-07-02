@@ -66,6 +66,7 @@ describe("buildWorkflowDocument", () => {
     // Personal Circumstances / Financial Situation headings
     expect(document.html).toContain("Personal Circumstances");
     expect(document.html).toContain("Financial Situation");
+    expect(document.html).toContain("Needs and Objectives");
     expect(document.html).toContain("Recommendation");
     expect(document.html).toContain("Warnings");
     // Letter metadata
@@ -88,8 +89,11 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-important-info");
     expect(document.html).toContain("It is vital to make full disclosure of relevant facts");
     expect(document.html).toContain("I wish to confirm that I have read the Customer Information Booklet");
-    expect(document.html.indexOf("statement-important-notice")).toBeGreaterThan(document.html.indexOf("statement-opening"));
+    expect(document.html.indexOf("statement-important-notice")).toBeGreaterThan(document.html.indexOf("statement-letter-header"));
+    expect(document.html.indexOf("statement-important-notice")).toBeLessThan(document.html.indexOf("statement-opening"));
     expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-important-notice"));
+    expect(document.html.indexOf("Needs and Objectives")).toBeGreaterThan(document.html.indexOf("Financial Situation"));
+    expect(document.html.indexOf("Needs and Objectives")).toBeLessThan(document.html.indexOf("Recommendation"));
   });
 
   it("falls back to fact find values for statement personal and financial sections when dedicated statement fields are blank", () => {
@@ -114,6 +118,25 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Recommended cover: 30000.");
     expect(document.html).toContain("Deferred period: 13 weeks.");
     expect(document.html).not.toContain("Monthly premium: 165.50.");
+  });
+
+  it("uses only fact-find needs text in the standalone statement needs section", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.personalCircumstances = "Personal facts.";
+    profile.financialSituation = "Financial facts.";
+    profile.needsObjectives = "Needs facts.";
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    const needsIndex = document.html.indexOf("<h2>Needs and Objectives</h2>");
+    const recommendationIndex = document.html.indexOf("<h2>Recommendation</h2>");
+
+    expect(needsIndex).toBeGreaterThan(-1);
+    expect(recommendationIndex).toBeGreaterThan(needsIndex);
+    expect(document.html).toContain("<h2>Needs and Objectives</h2><p>Needs facts.</p>");
+    expect(document.html).not.toContain("<h2>Needs and Objectives</h2><p>Personal facts.</p>");
+    expect(document.html).not.toContain("<h2>Needs and Objectives</h2><p>Financial facts.</p>");
   });
 
   it("renders BIS quote results as a statement comparison table immediately after the introduction using fact find values", () => {

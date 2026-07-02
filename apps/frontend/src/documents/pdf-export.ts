@@ -119,7 +119,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-letter-header")) {
-    return "display:block;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
+    return "display:flex;align-items:flex-start;gap:32px;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
   }
 
   if (classList.contains("statement-header-top")) {
@@ -131,7 +131,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-client-details")) {
-    return "display:block;text-align:left;flex:1;min-width:0";
+    return "display:flex;flex:1;flex-direction:column;align-items:flex-end;min-width:0;margin-left:auto;text-align:right";
   }
 
   if (classList.contains("statement-client-name")) {
@@ -139,11 +139,11 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-address-block")) {
-    return "display:block;text-align:left;margin:0 0 8px";
+    return "display:block;text-align:right;margin:0 0 8px";
   }
 
   if (isStmt && classList.contains("statement-letter-date")) {
-    return "margin:12px 0 0;text-align:left;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
+    return "margin:12px 0 0;text-align:right;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
   }
 
   if (classList.contains("statement-opening")) {
@@ -807,6 +807,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     line-height: 1.65;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
     margin-bottom: 32px;
     padding-bottom: 20px;
     border-bottom: 2px solid #000;
@@ -827,9 +830,13 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     flex-shrink: 0;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-client-details {
-    text-align: left;
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    align-items: flex-end;
     min-width: 0;
+    margin-left: auto;
+    text-align: right;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-client-name {
     margin: 0 0 8px;
@@ -839,7 +846,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     color: #000;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-address-block {
-    text-align: left;
+    text-align: right;
     margin-bottom: 8px;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-address-block p {
@@ -851,7 +858,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
     margin: 12px 0 0;
-    text-align: left;
+    text-align: right;
     font-family: Georgia, "Times New Roman", serif;
     font-size: 12px;
     font-weight: 400;
