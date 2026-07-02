@@ -35,7 +35,7 @@ _test_engine = db_test_helpers.setup_test_db() if _DB_AVAILABLE else None
 
 
 class PhiParsingTests(unittest.TestCase):
-    def test_build_phi_request_payload_includes_age_and_excludes_indexation(self) -> None:
+    def test_build_phi_request_payload_includes_indexation(self) -> None:
         from app.config import get_settings
         from app.document_generation import build_phi_request_payload
 
@@ -56,13 +56,13 @@ class PhiParsingTests(unittest.TestCase):
                 "recommendedCover": "30000",
                 "deferredPeriod": "13 weeks",
                 "phiOccupationalClass": "2",
+                "phiIndexation": "Y",
             },
         )
 
-        self.assertIn({"label": "Age", "value": "30"}, payload["request_fields"])
-        self.assertNotIn({"label": "Indexation", "value": "Y"}, payload["request_fields"])
-        self.assertIn("<Age>30</Age>", payload["xml"])
-        self.assertNotIn("<Indexation>", payload["xml"])
+        self.assertIn({"label": "Indexation", "value": "Y"}, payload["request_fields"])
+        self.assertIn("<Indexation>Y</Indexation>", payload["xml"])
+        self.assertNotIn("<Age>", payload["xml"])
 
     def test_submit_phi_request_parses_live_output_quote_path(self) -> None:
         from app.config import get_settings
@@ -114,6 +114,7 @@ class PhiParsingTests(unittest.TestCase):
                     "recommendedCover": "30000",
                     "deferredPeriod": "13 weeks",
                     "phiOccupationalClass": "2",
+                    "phiIndexation": "Y",
                 },
             )
 

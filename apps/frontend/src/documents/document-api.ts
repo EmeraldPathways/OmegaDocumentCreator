@@ -20,6 +20,11 @@ type GenerateDocumentResponseItem = {
   integrationRequests: IntegrationRequestArtifact[];
 };
 
+type StatementQuoteRequest = {
+  clientReference: string;
+  workflowSnapshot: Record<string, unknown>;
+};
+
 const DEMO_STAFF_EMAIL = "staff@omega.local";
 const DEMO_STAFF_PASSWORD = "ChangeMe123!";
 
@@ -38,6 +43,26 @@ type RawGenerateDocumentResponse = {
     sections?: RawGeneratedSection[];
     warnings?: string[];
     generated_html?: string;
+    integration_requests?: Array<{
+      provider?: string;
+      request_type?: string;
+      status?: "sent" | "failed";
+      requested_at?: string;
+      request_fields?: Array<{ label?: string; value?: string }>;
+      quote_results?: Array<{
+        provider_name?: string;
+        policy_type?: string;
+        level_premium?: string;
+        escalation_3_premium?: string;
+        escalation_5_premium?: string;
+      }>;
+      errors?: string[];
+    }>;
+  };
+};
+
+type RawStatementQuoteResponse = {
+  item?: {
     integration_requests?: Array<{
       provider?: string;
       request_type?: string;
@@ -194,27 +219,17 @@ function normalizeIntegrationRequests(
   }));
 }
 
-export async function generateDocument({
-  clientReference,
-  documentType,
-  templateId,
-  workflowSnapshot,
-}: GenerateDocumentRequest): Promise<GenerateDocumentResponseItem> {
+async function sendAuthenticatedJsonRequest(path: string, body: Record<string, unknown>) {
   const requestInit: RequestInit = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      client_reference: clientReference,
-      document_type: documentType,
-      template_id: templateId,
-      workflow_snapshot: workflowSnapshot,
-    }),
+    body: JSON.stringify(body),
   };
 
-  const sendGenerateRequest = () => fetch("/documents/generate", requestInit);
-  let response = await sendGenerateRequest();
+  const sendRequest = () => fetch(path, requestInit);
+  let response = await sendRequest();
 
   if (response.status === 401) {
     const bootstrapResponse = await fetch("/auth/login", {
@@ -229,9 +244,25 @@ export async function generateDocument({
     });
 
     if (bootstrapResponse.ok) {
-      response = await sendGenerateRequest();
+      response = await sendRequest();
     }
   }
+
+  return response;
+}
+
+export async function generateDocument({
+  clientReference,
+  documentType,
+  templateId,
+  workflowSnapshot,
+}: GenerateDocumentRequest): Promise<GenerateDocumentResponseItem> {
+  const response = await sendAuthenticatedJsonRequest("/documents/generate", {
+      client_reference: clientReference,
+      document_type: documentType,
+      template_id: templateId,
+      workflow_snapshot: workflowSnapshot,
+  });
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -253,4 +284,24 @@ export async function generateDocument({
     generatedHtml: sanitizeGeneratedHtml(payload.item.generated_html ?? ""),
     integrationRequests: normalizeIntegrationRequests(payload.item.integration_requests),
   };
+}
+
+export async function fetchStatementQuoteRequests({
+  clientReference,
+  workflowSnapshot,
+}: StatementQuoteRequest): Promise<IntegrationRequestArtifact[]> {
+  const response = await sendAuthenticatedJsonRequest("/documents/statement-quote", {
+    client_reference: clientReference,
+    workflow_snapshot: workflowSnapshot,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Session expired. Please log in again.");
+    }
+    throw new Error(`Statement quote request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as RawStatementQuoteResponse;
+  return normalizeIntegrationRequests(payload.item?.integration_requests);
 }

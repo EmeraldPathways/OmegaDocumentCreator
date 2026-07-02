@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import app.db as app_db
 from app.config import get_settings
 from app.db import get_engine, get_session
-from app.document_generation import generate_document
+from app.document_generation import build_statement_quote_requests, generate_document
 from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_slug
 from app.domain.users import UserRole, UserStatus
 from app.models import AuditLog
@@ -251,6 +251,11 @@ class DocumentGenerationRequest(BaseModel):
     client_reference: str
     document_type: str
     template_id: str
+    workflow_snapshot: dict[str, object]
+
+
+class StatementQuoteRequest(BaseModel):
+    client_reference: str
     workflow_snapshot: dict[str, object]
 
 
@@ -739,6 +744,33 @@ def generate_document_record(
         )
         db.commit()
         return {"item": item}
+    finally:
+        db.close()
+
+
+@app.post("/documents/statement-quote")
+def generate_statement_quote(
+    payload: StatementQuoteRequest, request: Request
+) -> dict[str, dict[str, object] | list[dict[str, object]]]:
+    current_user = _current_user(request)
+    db = get_session()
+    try:
+        client_repo = ClientRepository(db)
+        client = client_repo.get_by_reference(payload.client_reference)
+        integration_requests = build_statement_quote_requests(
+            settings=settings,
+            workflow_snapshot=payload.workflow_snapshot,
+        )
+        _log_audit(
+            request, db=db,
+            action="statement_quote_generated",
+            entity_type="document",
+            entity_id=payload.client_reference,
+            client_id=client.id if client else None,
+            details={"document_type": "Statement of Suitability"},
+        )
+        db.commit()
+        return {"item": {"integration_requests": integration_requests}}
     finally:
         db.close()
 

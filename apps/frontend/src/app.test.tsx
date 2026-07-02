@@ -506,6 +506,7 @@ describe("App routes", () => {
     storedClients["CLI-2026-0002"].gender = "";
     storedClients["CLI-2026-0002"].smokerStatus = "";
     storedClients["CLI-2026-0002"].phiOccupationalClass = "";
+    storedClients["CLI-2026-0002"].phiIndexation = "";
     setStoredClients(storedClients);
 
     render(
@@ -663,27 +664,203 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("PHI Request Details")).toBeInTheDocument();
+      expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("BestAdvice")).toBeInTheDocument();
-    expect(screen.getByText("08/11/1990")).toBeInTheDocument();
-    expect(screen.getByText("Acme Life")).toBeInTheDocument();
-    expect(screen.getByText(/Level: 42.10/)).toBeInTheDocument();
+    expect(document.querySelector(".statement-quote-table")).not.toBeNull();
 
     const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
       string,
       {
-        documentDrafts?: Record<string, { integrationRequests?: Array<{ provider: string; status: string }> }>;
+        documentDrafts?: Record<
+          string,
+          {
+            integrationRequests?: Array<{ provider: string; status: string }>;
+            editedHtml?: string;
+          }
+        >;
       }
     >;
 
     expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.integrationRequests).toEqual([
       expect.objectContaining({ provider: "BestAdvice", status: "sent" }),
     ]);
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.editedHtml).toContain(
+      "statement-quote-table",
+    );
+  });
+
+  it("preserves statement quote table artifacts when backend workflow hydration returns form fields only", async () => {
+    const storedClients = createSeededClientProfiles();
+    setStoredClients(storedClients);
+    window.sessionStorage.setItem(
+      "omega-session-user",
+      JSON.stringify({ email: "staff@omega.local", role: "staff" }),
+    );
+
+    const emptyStatementDraft = {
+      "Statement of Suitability": {
+        generationStatus: "idle",
+        lastGeneratedHtml: "",
+        lastGeneratedSections: [],
+        integrationRequests: [],
+        editedHtml: "",
+      },
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/auth/me")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              user: { email: "staff@omega.local", role: "staff" },
+            }),
+          });
+        }
+
+        if (url.includes("/clients/CLI-2026-0002/workflow")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              item: {
+                provider: "Zurich Life",
+                recommendedCover: "30000",
+                deferredPeriod: "13 weeks",
+                coverAge: "65",
+                documentDrafts: emptyStatementDraft,
+              },
+            }),
+          });
+        }
+
+        if (url.includes("/clients/CLI-2026-0002/files") || url.includes("/clients/CLI-2026-0002/documents")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ items: [] }),
+          });
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Aviva")).toBeInTheDocument();
+    expect(screen.getByText("Irish Life")).toBeInTheDocument();
   });
 
   it("renders a PHI integration warning when the Statement of Suitability generation returns a failed request artifact", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(createGenerateDocumentResponse({
+            title: "Statement of Suitability",
+            integrationRequests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "failed",
+                requested_at: "2026-06-19T10:00:00+00:00",
+                request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                quote_results: [],
+                errors: ["service unavailable"],
+              },
+            ],
+          }));
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("PHI Integration Warning")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("service unavailable")).toBeInTheDocument();
+  });
+
+  it("uses the dedicated statement quote response to render the quote table", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Statement of Suitability",
+              integrationRequests: [
+                {
+                  provider: "BestAdvice",
+                  request_type: "Phi",
+                  status: "sent",
+                  requested_at: "2026-06-19T10:00:00+00:00",
+                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                  quote_results: [{ provider_name: "Aviva", level_premium: "102.50" }],
+                  errors: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        if (url.includes("/documents/generate")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Statement of Suitability",
+              integrationRequests: [],
+            }),
+          );
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Aviva")).toBeInTheDocument();
+  });
+
+  it("preserves the last successful statement quote table when a regenerate returns failed PHI results", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -711,13 +888,20 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("PHI Integration Warning")).toBeInTheDocument();
+      expect(screen.getByText("Draft generated")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("service unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
+    expect(screen.getByText("Aviva")).toBeInTheDocument();
+    expect(screen.getByText("Irish Life")).toBeInTheDocument();
   });
 
   it("allows inline editing of generated preview sections and persists the edited content after reopening", async () => {

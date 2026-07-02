@@ -32,7 +32,7 @@ import type {
   SeededGeneratedDocument,
   SeededSavingsInvestmentRow,
 } from "../data/seeded-clients";
-import { generateDocument } from "../documents/document-api";
+import { fetchStatementQuoteRequests, generateDocument } from "../documents/document-api";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { resolveWorkspaceDocumentDraft } from "../documents/statement-draft";
@@ -87,6 +87,151 @@ import {
 import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
 import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
 
+function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
+  if (!draft) {
+    return false;
+  }
+
+  return Boolean(
+    draft.lastGeneratedHtml ||
+    draft.editedHtml ||
+    (draft.lastGeneratedSections?.length ?? 0) > 0 ||
+    (draft.integrationRequests?.length ?? 0) > 0,
+  );
+}
+
+function hasStatementQuoteResults(requests?: GeneratedDocumentDraft["integrationRequests"]) {
+  return (requests ?? []).some((request) => request.quoteResults.length > 0);
+}
+
+function resolveStatementIntegrationRequests(
+  currentRequests: GeneratedDocumentDraft["integrationRequests"],
+  nextRequests?: GeneratedDocumentDraft["integrationRequests"],
+) {
+  if (!nextRequests) {
+    return currentRequests;
+  }
+
+  if (hasStatementQuoteResults(nextRequests) || !hasStatementQuoteResults(currentRequests)) {
+    return nextRequests;
+  }
+
+  return currentRequests;
+}
+
+function mergeDocumentDrafts(
+  currentDrafts: SeededClientProfile["documentDrafts"],
+  incomingDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>,
+) {
+  if (!incomingDrafts) {
+    return currentDrafts;
+  }
+
+  return {
+    "Fact Find": {
+      ...currentDrafts["Fact Find"],
+      ...incomingDrafts["Fact Find"],
+      lastGeneratedHtml:
+        incomingDrafts["Fact Find"]?.lastGeneratedHtml || currentDrafts["Fact Find"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Fact Find"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? incomingDrafts["Fact Find"]?.lastGeneratedSections
+          : currentDrafts["Fact Find"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Fact Find"]?.integrationRequests?.length ?? 0) > 0
+          ? incomingDrafts["Fact Find"]?.integrationRequests
+          : currentDrafts["Fact Find"].integrationRequests,
+      editedHtml: incomingDrafts["Fact Find"]?.editedHtml || currentDrafts["Fact Find"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find"])
+        ? incomingDrafts["Fact Find"]?.generationStatus ?? currentDrafts["Fact Find"].generationStatus
+        : currentDrafts["Fact Find"].generationStatus,
+    },
+    "Fact Find Update": {
+      ...currentDrafts["Fact Find Update"],
+      ...incomingDrafts["Fact Find Update"],
+      lastGeneratedHtml:
+        incomingDrafts["Fact Find Update"]?.lastGeneratedHtml || currentDrafts["Fact Find Update"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Fact Find Update"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? incomingDrafts["Fact Find Update"]?.lastGeneratedSections
+          : currentDrafts["Fact Find Update"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Fact Find Update"]?.integrationRequests?.length ?? 0) > 0
+          ? incomingDrafts["Fact Find Update"]?.integrationRequests
+          : currentDrafts["Fact Find Update"].integrationRequests,
+      editedHtml: incomingDrafts["Fact Find Update"]?.editedHtml || currentDrafts["Fact Find Update"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find Update"])
+        ? incomingDrafts["Fact Find Update"]?.generationStatus ?? currentDrafts["Fact Find Update"].generationStatus
+        : currentDrafts["Fact Find Update"].generationStatus,
+    },
+    "Terms of Business": {
+      ...currentDrafts["Terms of Business"],
+      ...incomingDrafts["Terms of Business"],
+      lastGeneratedHtml:
+        incomingDrafts["Terms of Business"]?.lastGeneratedHtml || currentDrafts["Terms of Business"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Terms of Business"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? incomingDrafts["Terms of Business"]?.lastGeneratedSections
+          : currentDrafts["Terms of Business"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Terms of Business"]?.integrationRequests?.length ?? 0) > 0
+          ? incomingDrafts["Terms of Business"]?.integrationRequests
+          : currentDrafts["Terms of Business"].integrationRequests,
+      editedHtml: incomingDrafts["Terms of Business"]?.editedHtml || currentDrafts["Terms of Business"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Terms of Business"])
+        ? incomingDrafts["Terms of Business"]?.generationStatus ?? currentDrafts["Terms of Business"].generationStatus
+        : currentDrafts["Terms of Business"].generationStatus,
+    },
+    "Statement of Suitability": {
+      ...currentDrafts["Statement of Suitability"],
+      ...incomingDrafts["Statement of Suitability"],
+      lastGeneratedHtml:
+        incomingDrafts["Statement of Suitability"]?.lastGeneratedHtml ||
+        currentDrafts["Statement of Suitability"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Statement of Suitability"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? incomingDrafts["Statement of Suitability"]?.lastGeneratedSections
+          : currentDrafts["Statement of Suitability"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Statement of Suitability"]?.integrationRequests?.length ?? 0) > 0
+          ? incomingDrafts["Statement of Suitability"]?.integrationRequests
+          : currentDrafts["Statement of Suitability"].integrationRequests,
+      editedHtml:
+        incomingDrafts["Statement of Suitability"]?.editedHtml ||
+        currentDrafts["Statement of Suitability"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Statement of Suitability"])
+        ? incomingDrafts["Statement of Suitability"]?.generationStatus ??
+          currentDrafts["Statement of Suitability"].generationStatus
+        : currentDrafts["Statement of Suitability"].generationStatus,
+    },
+  };
+}
+
+function mergeWorkflowFieldsIntoDraft(
+  currentDraft: SeededClientProfile,
+  fields: Partial<SeededClientProfile>,
+): SeededClientProfile {
+  const {
+    documentDrafts: incomingDocumentDrafts,
+    files: _incomingFiles,
+    generatedDocuments: _incomingGeneratedDocuments,
+    ...workflowFields
+  } = fields;
+
+  return {
+    ...currentDraft,
+    ...workflowFields,
+    documentDrafts: mergeDocumentDrafts(currentDraft.documentDrafts, incomingDocumentDrafts),
+    files: currentDraft.files,
+    generatedDocuments: currentDraft.generatedDocuments,
+  };
+}
+
+function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<SeededClientProfile> {
+  const { documentDrafts: _documentDrafts, files: _files, generatedDocuments: _generatedDocuments, ...workflowFields } = draft;
+  return workflowFields;
+}
+
 export function IncomeProtectionPage() {
   const { user } = useAuth();
   const canUseBackend = Boolean(user);
@@ -136,7 +281,7 @@ export function IncomeProtectionPage() {
     let cancelled = false;
     fetchWorkflow(selectedClientReference).then((fields) => {
       if (cancelled) return;
-      setDraft((current) => current ? { ...current, ...fields } : current);
+      setDraft((current) => current ? mergeWorkflowFieldsIntoDraft(current, fields) : current);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [canUseBackend, selectedClientReference]);
@@ -252,6 +397,7 @@ export function IncomeProtectionPage() {
     !hasValue(resolvedDraft.gender) ? "Gender" : null,
     !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
     !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
+    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
     !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
     !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
   ].filter(isPresent);
@@ -278,6 +424,7 @@ export function IncomeProtectionPage() {
     { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
     { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
     { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
+    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
     { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Statement or Fact Find" },
     { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
   ];
@@ -319,7 +466,7 @@ export function IncomeProtectionPage() {
     }
 
     try {
-      await saveWorkflow(normalizedDraft.clientReference, normalizedDraft);
+      await saveWorkflow(normalizedDraft.clientReference, buildWorkflowPersistencePayload(normalizedDraft));
       if (options?.showToast) {
         addToast("Changes saved", "success");
       }
@@ -819,19 +966,32 @@ export function IncomeProtectionPage() {
     setStatementDocumentStatus("Document: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "generating" });
     try {
-      const generatedDocument = await generateDocument({
-        clientReference: resolvedDraft.clientReference,
-        documentType: "Statement of Suitability",
-        templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
-        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
-      });
+      const workflowSnapshot = resolvedDraft as unknown as Record<string, unknown>;
+      const [quoteRequests, generatedDocument] = await Promise.all([
+        fetchStatementQuoteRequests({
+          clientReference: resolvedDraft.clientReference,
+          workflowSnapshot,
+        }).catch(() => undefined),
+        generateDocument({
+          clientReference: resolvedDraft.clientReference,
+          documentType: "Statement of Suitability",
+          templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
+          workflowSnapshot,
+        }),
+      ]);
+      const integrationRequests = resolveStatementIntegrationRequests(
+        getDocumentDraft("Statement of Suitability").integrationRequests,
+        quoteRequests ?? generatedDocument.integrationRequests,
+      );
       saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests:
-          generatedDocument.integrationRequests ?? getDocumentDraft("Statement of Suitability").integrationRequests,
-        editedHtml: buildGeneratedEditorHtml("Statement of Suitability", generatedDocument),
+        integrationRequests,
+        editedHtml: buildGeneratedEditorHtml("Statement of Suitability", {
+          ...generatedDocument,
+          integrationRequests,
+        }),
       });
       setStatementDocumentStatus("Document: Draft generated");
       addToast("Statement of Suitability draft generated", "success");

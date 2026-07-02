@@ -36,28 +36,6 @@ def _format_phi_date(value: str) -> str:
     return value
 
 
-def _parse_iso_date(value: str) -> datetime | None:
-    normalized = value.strip()
-    if not normalized:
-        return None
-    try:
-        return datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-
-
-def _derive_phi_age(workflow_snapshot: dict[str, Any]) -> str:
-    dob_value = _get_snapshot_value(workflow_snapshot, "dateOfBirth", "date_of_birth")
-    dob = _parse_iso_date(dob_value)
-    if dob is None:
-        return ""
-
-    reference_value = _get_snapshot_value(workflow_snapshot, "letterDate", "letter_date")
-    reference = _parse_iso_date(reference_value) or datetime.now(UTC)
-    age = reference.year - dob.year - ((reference.month, reference.day) < (dob.month, dob.day))
-    return str(age)
-
-
 def _normalize_phi_deferred_period(value: str) -> str:
     if value.startswith("13"):
         return "13"
@@ -71,7 +49,6 @@ def _normalize_phi_deferred_period(value: str) -> str:
 def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
     request_fields = [
         {"label": "DOB", "value": _format_phi_date(_get_snapshot_value(workflow_snapshot, "dateOfBirth", "date_of_birth"))},
-        {"label": "Age", "value": _derive_phi_age(workflow_snapshot)},
         {"label": "Sex", "value": _get_snapshot_value(workflow_snapshot, "gender")},
         {"label": "Smoker", "value": _get_snapshot_value(workflow_snapshot, "smokerStatus")},
         {"label": "NRA", "value": _get_snapshot_value(workflow_snapshot, "coverAge", "cover_age")},
@@ -81,6 +58,7 @@ def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str
             "value": _normalize_phi_deferred_period(_get_snapshot_value(workflow_snapshot, "deferredPeriod", "deferred_period")),
         },
         {"label": "OccupationalClass", "value": _get_snapshot_value(workflow_snapshot, "phiOccupationalClass")},
+        {"label": "Indexation", "value": _get_snapshot_value(workflow_snapshot, "phiIndexation")},
     ]
 
     missing_fields = [field["label"] for field in request_fields if not field["value"]]
@@ -109,15 +87,15 @@ def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str
         "<RequestType>Phi</RequestType>"
         "<Life1>"
         f"<DOB>{escape(request_fields[0]['value'])}</DOB>"
-        f"<Age>{escape(request_fields[1]['value'])}</Age>"
-        f"<Sex>{escape(request_fields[2]['value'])}</Sex>"
-        f"<Smoker>{escape(request_fields[3]['value'])}</Smoker>"
+        f"<Sex>{escape(request_fields[1]['value'])}</Sex>"
+        f"<Smoker>{escape(request_fields[2]['value'])}</Smoker>"
         "</Life1>"
         "<Plan>"
-        f"<NRA>{escape(request_fields[4]['value'])}</NRA>"
-        f"<AnnualAmount>{escape(request_fields[5]['value'])}</AnnualAmount>"
-        f"<DeferredPeriod>{escape(request_fields[6]['value'])}</DeferredPeriod>"
-        f"<OccupationalClass>{escape(request_fields[7]['value'])}</OccupationalClass>"
+        f"<NRA>{escape(request_fields[3]['value'])}</NRA>"
+        f"<AnnualAmount>{escape(request_fields[4]['value'])}</AnnualAmount>"
+        f"<DeferredPeriod>{escape(request_fields[5]['value'])}</DeferredPeriod>"
+        f"<OccupationalClass>{escape(request_fields[6]['value'])}</OccupationalClass>"
+        f"<Indexation>{escape(request_fields[7]['value'])}</Indexation>"
         "</Plan>"
         "</Inputs>"
     )
@@ -239,6 +217,20 @@ def generate_document(
 
 def replace_spaces(value: str, replacement: str) -> str:
     return value.replace(" ", replacement)
+
+
+def build_statement_quote_requests(
+    *,
+    settings: AppSettings,
+    workflow_snapshot: dict[str, Any],
+) -> list[dict[str, Any]]:
+    warnings: list[str] = []
+    return _build_integration_requests(
+        settings=settings,
+        document_type="Statement of Suitability",
+        workflow_snapshot=workflow_snapshot,
+        warnings=warnings,
+    )
 
 
 def _build_integration_requests(
