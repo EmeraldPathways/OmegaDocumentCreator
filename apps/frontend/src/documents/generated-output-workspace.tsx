@@ -73,7 +73,6 @@ function PreviewPage({
             src={OMEGA_LOGO_DATA_URI}
             style={{ display: "block", width: 160, height: "auto", margin: "0 auto 8px" }}
           />
-          <div style={{ fontSize: 10, fontFamily: "Helvetica,Arial,sans-serif", color: "#444" }}>Income Protection Workflow</div>
         </div>
       ) : null}
       <div

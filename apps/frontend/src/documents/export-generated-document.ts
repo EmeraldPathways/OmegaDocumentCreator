@@ -1,6 +1,7 @@
 import type { SeededClientProfile } from "../data/seeded-clients";
 import { sanitizeGeneratedHtml } from "./document-api";
 import { buildPdfBlobFromHtml, exportHtmlToPdf } from "./pdf-export";
+import { resolveWorkspaceDocumentDraft } from "./statement-draft";
 import { buildWordBlobFromHtml, exportHtmlToWord } from "./word-export";
 import { buildWorkflowDocument, type WorkflowDocumentType } from "./workflow-document-builders";
 import { resolveDraftPreviewHtml } from "./document-preview";
@@ -136,14 +137,15 @@ function resolveExportDocument(
   documentType: WorkflowDocumentType,
   override?: ExportDocumentArtifact,
 ) {
+  const resolvedDraft = resolveWorkspaceDocumentDraft(profile, documentType);
   const sanitizedDraft = {
-    ...profile.documentDrafts[documentType],
-    lastGeneratedHtml: sanitizeGeneratedHtml(profile.documentDrafts[documentType]?.lastGeneratedHtml ?? ""),
-    lastGeneratedSections: (profile.documentDrafts[documentType]?.lastGeneratedSections ?? []).map((section) => ({
+    ...resolvedDraft,
+    lastGeneratedHtml: sanitizeGeneratedHtml(resolvedDraft.lastGeneratedHtml ?? ""),
+    lastGeneratedSections: (resolvedDraft.lastGeneratedSections ?? []).map((section) => ({
       ...section,
       bodyHtml: sanitizeGeneratedHtml(section.bodyHtml),
     })),
-    editedHtml: sanitizeGeneratedHtml(profile.documentDrafts[documentType]?.editedHtml ?? ""),
+    editedHtml: sanitizeGeneratedHtml(resolvedDraft.editedHtml ?? ""),
   };
   const sanitizedProfile = {
     ...profile,

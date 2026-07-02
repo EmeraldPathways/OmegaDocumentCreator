@@ -30,4 +30,27 @@ describe("buildExportDocumentArtifact", () => {
     expect(artifact.html).toContain("Client Summary");
     expect(artifact.html).toContain("Contact Details");
   });
+
+  it("rebuilds a legacy statement draft so export keeps the quote table and statement sections", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].editedHtml = "<p>Old statement html without quote table.</p>";
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedHtml =
+      "<p>Statement of Suitability prepared for Jamie Murphy.</p>";
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [
+      {
+        id: "recommendation",
+        title: "Recommendation",
+        bodyHtml: "<p>Statement of Suitability prepared for Jamie Murphy.</p>",
+      },
+    ];
+
+    const artifact = buildExportDocumentArtifact(profile, "Statement of Suitability");
+
+    expect(artifact.html).toContain("statement-document-body");
+    expect(artifact.html).toContain("Income Protection Quote Comparison");
+    expect(artifact.html).toContain("statement-quote-table");
+    expect(artifact.html).toContain("Personal Circumstances");
+    expect(artifact.html).toContain("Financial Situation");
+    expect(artifact.html).toContain("Important Notice");
+  });
 });

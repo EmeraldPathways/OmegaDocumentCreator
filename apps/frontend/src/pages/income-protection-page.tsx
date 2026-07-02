@@ -35,6 +35,7 @@ import type {
 import { generateDocument } from "../documents/document-api";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
+import { resolveWorkspaceDocumentDraft } from "../documents/statement-draft";
 import { builtInDocumentTemplates } from "../documents/document-templates";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
@@ -173,6 +174,48 @@ export function IncomeProtectionPage() {
     window.localStorage.setItem(SELECTED_CLIENT_STORAGE_KEY, selectedClientReference);
   }, [selectedClientReference]);
 
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    const documentType = "Statement of Suitability" satisfies SupportedDocumentType;
+    const currentStatementDraft = draft.documentDrafts[documentType];
+    const resolvedStatementDraft = resolveWorkspaceDocumentDraft(draft, documentType);
+
+    const needsRepair =
+      currentStatementDraft.editedHtml !== resolvedStatementDraft.editedHtml ||
+      currentStatementDraft.lastGeneratedHtml !== resolvedStatementDraft.lastGeneratedHtml ||
+      JSON.stringify(currentStatementDraft.lastGeneratedSections) !== JSON.stringify(resolvedStatementDraft.lastGeneratedSections) ||
+      JSON.stringify(currentStatementDraft.integrationRequests) !== JSON.stringify(resolvedStatementDraft.integrationRequests);
+
+    if (!needsRepair) {
+      return;
+    }
+
+    saveGeneratedDraft(draft.clientReference, documentType, {
+      generationStatus: resolvedStatementDraft.generationStatus,
+      lastGeneratedHtml: resolvedStatementDraft.lastGeneratedHtml,
+      lastGeneratedSections: resolvedStatementDraft.lastGeneratedSections,
+      integrationRequests: resolvedStatementDraft.integrationRequests,
+      editedHtml: resolvedStatementDraft.editedHtml,
+    });
+
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        documentDrafts: {
+          ...currentDraft.documentDrafts,
+          [documentType]: resolvedStatementDraft,
+        },
+      };
+    });
+  }, [draft, saveGeneratedDraft]);
+
   if (!client || !draft) {
     return (
       <section className="card">
@@ -253,6 +296,10 @@ export function IncomeProtectionPage() {
 
   function getDocumentDraft(documentType: SupportedDocumentType) {
     return resolvedDraft.documentDrafts[documentType];
+  }
+
+  function getWorkspaceDocumentDraft(documentType: SupportedDocumentType) {
+    return resolveWorkspaceDocumentDraft(resolvedDraft, documentType);
   }
 
   async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
@@ -626,7 +673,7 @@ export function IncomeProtectionPage() {
           ...resolvedDraft.documentDrafts[documentType],
           lastGeneratedHtml: generatedDocument.generatedHtml,
           lastGeneratedSections: generatedDocument.sections,
-          integrationRequests: generatedDocument.integrationRequests ?? [],
+          integrationRequests: generatedDocument.integrationRequests ?? resolvedDraft.documentDrafts[documentType].integrationRequests,
           editedHtml: "",
         },
       },
@@ -712,7 +759,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests: generatedDocument.integrationRequests,
+        integrationRequests: generatedDocument.integrationRequests ?? getDocumentDraft("Fact Find").integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Fact Find", generatedDocument),
       });
       setFactFindGenerationStatus("Generation: Draft generated");
@@ -749,7 +796,7 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests: generatedDocument.integrationRequests,
+        integrationRequests: generatedDocument.integrationRequests ?? getDocumentDraft("Fact Find Update").integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Fact Find Update", generatedDocument),
       });
       setFactFindUpdateGenerationStatus("Generation: Draft generated");
@@ -782,7 +829,8 @@ export function IncomeProtectionPage() {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests: generatedDocument.integrationRequests,
+        integrationRequests:
+          generatedDocument.integrationRequests ?? getDocumentDraft("Statement of Suitability").integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Statement of Suitability", generatedDocument),
       });
       setStatementDocumentStatus("Document: Draft generated");
@@ -1959,7 +2007,7 @@ export function IncomeProtectionPage() {
     }
 
     if (activeTab.id === "statement-of-suitability") {
-      const statementDraft = getDocumentDraft("Statement of Suitability");
+      const statementDraft = getWorkspaceDocumentDraft("Statement of Suitability");
 
       return (
         <div className="page-stack">

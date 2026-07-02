@@ -31,7 +31,7 @@ function valueOrFallback(value: string | undefined, fallback = "Not recorded") {
 }
 
 function paragraphHtml(value: string | undefined, fallback = "Not recorded.") {
-  return `<p>${escapeHtml(valueOrFallback(value, fallback))}</p>`;
+  return `<p>${escapeHtml(valueOrFallback(value, fallback)).replace(/\r?\n/g, "<br />")}</p>`;
 }
 
 function listHtml(items: string[], emptyText = "No items recorded.") {
@@ -195,6 +195,22 @@ function buildRecommendationHtml(profile: SeededClientProfile, documentType: Sup
   return `<p>${escapeHtml(lines.join(". "))}.</p>`;
 }
 
+function buildFactFindPersonalCircumstancesHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
+  if (documentType === "Fact Find Update") {
+    return paragraphHtml(profile.factFindUpdatePersonalCircumstances, "No personal circumstances recorded.");
+  }
+
+  return paragraphHtml(profile.personalCircumstances, "No personal circumstances recorded.");
+}
+
+function buildFactFindFinancialSituationHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
+  if (documentType === "Fact Find Update") {
+    return paragraphHtml(profile.factFindUpdateFinancialSituation, "No financial situation recorded.");
+  }
+
+  return paragraphHtml(profile.financialSituation, "No financial situation recorded.");
+}
+
 function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   if (documentType === "Fact Find") {
     const dependantItems = profile.dependants.map((dependant) =>
@@ -211,6 +227,10 @@ function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: Sup
     return paragraphHtml(
       profile.termsClientReviewed || "Awaiting confirmation that the client has reviewed and understood the Terms of Business.",
     );
+  }
+
+  if (documentType === "Fact Find Update") {
+    return paragraphHtml(profile.factFindUpdateNeedsAndObjectives, "No needs and objectives recorded.");
   }
 
   return [
@@ -506,7 +526,12 @@ function buildLogoBlock(className?: string): ComposedBlock {
   };
 }
 
-function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[] {
+function buildFactFindUpdateBlocks(
+  profile: SeededClientProfile,
+  personalCircumstancesHtml: string,
+  financialSituationHtml: string,
+  needsHtml: string,
+): ComposedBlock[] {
   return [
     detailGrid(
       "Client Summary",
@@ -515,12 +540,18 @@ function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[
     ),
     {
       kind: "section",
-      title: "Additional Relevant Information",
-      bodyHtml: [
-        paragraphHtml(profile.factFindUpdatePersonalCircumstances, "No personal circumstances recorded."),
-        paragraphHtml(profile.factFindUpdateFinancialSituation, "No financial situation recorded."),
-        paragraphHtml(profile.factFindUpdateNeedsAndObjectives, "No needs and objectives recorded."),
-      ].join(""),
+      title: "Personal Circumstances",
+      bodyHtml: personalCircumstancesHtml,
+    },
+    {
+      kind: "section",
+      title: "Financial Situation",
+      bodyHtml: financialSituationHtml,
+    },
+    {
+      kind: "section",
+      title: "Needs and Objectives",
+      bodyHtml: needsHtml,
     },
     detailGrid("Client Declarations", [
       { label: "Execution only basis", value: profile.factFindUpdateExecutionOnlyBasis },
@@ -534,7 +565,14 @@ function buildFactFindUpdateBlocks(profile: SeededClientProfile): ComposedBlock[
   ];
 }
 
-function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {
+function buildFactFindBlocks(
+  profile: SeededClientProfile,
+  recommendationHtml: string,
+  personalCircumstancesHtml: string,
+  financialSituationHtml: string,
+  needsHtml: string,
+  warningHtml: string,
+): ComposedBlock[] {
   const isSmall = profile.factFindType === "small";
   const servicesRequested = checkedItemLabels([
     { label: "Life Protection", value: profile.servicesRequestedLifeProtection },
@@ -577,6 +615,21 @@ function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: s
       { label: "Income", value: profile.income },
       { label: "Advisor", value: profile.advisorName },
     ]),
+    {
+      kind: "section",
+      title: "Personal Circumstances",
+      bodyHtml: personalCircumstancesHtml,
+    },
+    {
+      kind: "section",
+      title: "Financial Situation",
+      bodyHtml: financialSituationHtml,
+    },
+    {
+      kind: "section",
+      title: "Needs and Objectives",
+      bodyHtml: needsHtml,
+    },
     detailGrid("Income Protection Arrangements", [
       { label: "No deferred provider", value: profile.incomeProtectionNoDeferredProvider },
       { label: "Deferred provider", value: profile.incomeProtectionDeferredProvider || profile.provider },
@@ -618,11 +671,6 @@ function buildFactFindBlocks(profile: SeededClientProfile, recommendationHtml: s
       kind: "section",
       title: "Recommendation Section",
       bodyHtml: recommendationHtml,
-    },
-    {
-      kind: "section",
-      title: "Needs and Objectives",
-      bodyHtml: needsHtml,
     },
     detailGrid("Declarations and Confirmations", [
       { label: "Execution only", value: profile.executionOnlyConfirmation },
@@ -699,15 +747,11 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
 
   return [
     '<div class="statement-letter-header">',
-    '<div class="statement-header-top">',
     '<img class="statement-logo" src="' + escapeHtml(OMEGA_LOGO_DATA_URI) + '" alt="Omega Financial Management" />',
-    '<div class="statement-client-details">',
-    `<p class="statement-client-name"><strong>${escapeHtml(profile.fullName)}</strong></p>`,
     '<div class="statement-address-block">',
     ...addressLines.map((line) => `<p>${escapeHtml(line)}</p>`),
     "</div>",
     `<p class="statement-letter-date">${escapeHtml(profile.letterDate || "Date not recorded")}</p>`,
-    "</div>",
     "</div>",
   ].join("");
 }
@@ -771,11 +815,11 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
   const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
     buildStatementLetterHeaderHtml(profile),
-    buildStatementNoticeHtml(),
     '<div class="statement-opening">',
     `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
     "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
     "</div>",
+    buildStatementNoticeHtml(),
     quoteComparisonHtml,
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
@@ -819,7 +863,12 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
     documentType === "Fact Find" ? "Income Protection Fact Find" : documentType === "Terms of Business" ? "Terms of Business" : documentType;
   const draftSections = getDraftSections(profile, documentType);
   const recommendationSection = findDraftSection(draftSections, "recommendation", "summary", "issue");
-  const needsSection = findDraftSection(draftSections, "needs", "objective", "circumstance");
+  const personalCircumstancesSection = findDraftSection(draftSections, "personal circumstance");
+  const financialSituationSection = findDraftSection(draftSections, "financial situation");
+  const needsSection =
+    documentType === "Statement of Suitability"
+      ? findDraftSection(draftSections, "needs", "objective", "circumstance")
+      : findDraftSection(draftSections, "needs", "objective");
   const warningSection = findDraftSection(draftSections, "warning", "disclaimer", "risk");
   const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
   const recommendationHtml =
@@ -831,9 +880,21 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
 
   const bodyBlocks =
     documentType === "Fact Find"
-      ? buildFactFindBlocks(profile, recommendationHtml, needsHtml, warningHtml)
+      ? buildFactFindBlocks(
+          profile,
+          recommendationHtml,
+          personalCircumstancesSection?.bodyHtml ?? buildFactFindPersonalCircumstancesHtml(profile, documentType),
+          financialSituationSection?.bodyHtml ?? buildFactFindFinancialSituationHtml(profile, documentType),
+          needsHtml,
+          warningHtml,
+        )
       : documentType === "Fact Find Update"
-        ? buildFactFindUpdateBlocks(profile)
+        ? buildFactFindUpdateBlocks(
+            profile,
+            personalCircumstancesSection?.bodyHtml ?? buildFactFindPersonalCircumstancesHtml(profile, documentType),
+            financialSituationSection?.bodyHtml ?? buildFactFindFinancialSituationHtml(profile, documentType),
+            needsHtml,
+          )
         : documentType === "Terms of Business"
           ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
           : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);

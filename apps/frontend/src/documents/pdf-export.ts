@@ -594,7 +594,6 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
           alt="Omega Financial Management"
           style="display:block;width:160px;height:auto;margin:0 auto 8px;"
         />
-        <div style="font-size:10px;font-family:Helvetica,Arial,sans-serif;color:#444;">Income Protection Workflow</div>
       </div>
     `
     : "";

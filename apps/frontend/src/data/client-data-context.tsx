@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
+import { isLegacyStatementDraft, resolveStatementDraft } from "../documents/statement-draft";
 
 import {
   createSeededClientProfiles,
@@ -58,6 +59,10 @@ function normalizeDraft(
   storedDraft?: Partial<GeneratedDocumentDraft>,
 ): GeneratedDocumentDraft {
   const contentDraft = isPristineDraft(storedDraft) ? undefined : storedDraft;
+  const integrationRequests =
+    (contentDraft?.integrationRequests?.length ?? 0) > 0
+      ? contentDraft?.integrationRequests
+      : fallbackDraft.integrationRequests;
 
   return {
     ...fallbackDraft,
@@ -65,7 +70,7 @@ function normalizeDraft(
     generationStatus: contentDraft?.generationStatus ?? fallbackDraft.generationStatus,
     lastGeneratedHtml: contentDraft?.lastGeneratedHtml ?? fallbackDraft.lastGeneratedHtml,
     lastGeneratedSections: contentDraft?.lastGeneratedSections ?? fallbackDraft.lastGeneratedSections,
-    integrationRequests: contentDraft?.integrationRequests ?? fallbackDraft.integrationRequests,
+    integrationRequests,
     editedHtml: contentDraft?.editedHtml ?? fallbackDraft.editedHtml,
   };
 }
@@ -89,14 +94,38 @@ function normalizeDocumentDrafts(
 
 function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   const seededClient = createSeededClientProfiles()[client.clientReference];
-
-  return {
+  const normalizedDocumentDrafts = normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts);
+  const normalizedClient: SeededClientProfile = {
     ...seededClient,
     ...client,
     status: client.status ?? "Draft",
     files: client.files ?? seededClient?.files ?? [],
     generatedDocuments: client.generatedDocuments ?? seededClient?.generatedDocuments ?? [],
-    documentDrafts: normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts),
+    documentDrafts: normalizedDocumentDrafts,
+  };
+
+  const statementDraft = normalizedClient.documentDrafts["Statement of Suitability"];
+  if (!isLegacyStatementDraft(statementDraft)) {
+    return normalizedClient;
+  }
+
+  const statementProfile = {
+    ...normalizedClient,
+    documentDrafts: {
+      ...normalizedDocumentDrafts,
+      "Statement of Suitability": {
+        ...statementDraft,
+        editedHtml: "",
+      },
+    },
+  };
+
+  return {
+    ...normalizedClient,
+    documentDrafts: {
+      ...normalizedDocumentDrafts,
+      "Statement of Suitability": resolveStatementDraft(statementProfile),
+    },
   };
 }
 

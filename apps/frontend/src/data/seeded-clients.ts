@@ -734,6 +734,30 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
             bodyHtml: "<p>Statement of Suitability prepared for Jamie Murphy.</p>",
           },
         ],
+        integrationRequests: [
+          {
+            provider: "BestAdvice",
+            requestType: "Phi",
+            status: "sent",
+            requestedAt: "2026-06-29T10:00:00+00:00",
+            requestFields: [{ label: "Age", value: "30" }],
+            quoteResults: [
+              {
+                providerName: "Aviva",
+                policyType: "Reviewable",
+                levelPremium: "102.50",
+                escalation3Premium: "116.40",
+              },
+              {
+                providerName: "Irish Life",
+                policyType: "Guaranteed",
+                levelPremium: "136.53",
+                escalation5Premium: "149.78",
+              },
+            ],
+            errors: [],
+          },
+        ],
       },
     },
     files: [

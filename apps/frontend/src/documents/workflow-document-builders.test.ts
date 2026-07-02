@@ -88,6 +88,8 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-important-info");
     expect(document.html).toContain("It is vital to make full disclosure of relevant facts");
     expect(document.html).toContain("I wish to confirm that I have read the Customer Information Booklet");
+    expect(document.html.indexOf("statement-important-notice")).toBeGreaterThan(document.html.indexOf("statement-opening"));
+    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-important-notice"));
   });
 
   it("falls back to fact find values for statement personal and financial sections when dedicated statement fields are blank", () => {
@@ -253,6 +255,52 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("31 The Mall");
     expect(document.html).toContain("Not recorded");
     expect(document.html).toContain("signatures-footer");
+  });
+
+  it("renders fact find personal circumstances, financial situation, and needs sections verbatim from generated draft sections", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [
+      {
+        id: "personal-circumstances",
+        title: "Personal Circumstances",
+        bodyHtml: "<p>Personal line 1.</p><p>Personal line 2.</p>",
+      },
+      {
+        id: "financial-situation",
+        title: "Financial Situation",
+        bodyHtml: "<p>Financial line 1.</p><p>Financial line 2.</p>",
+      },
+      {
+        id: "needs-and-objectives",
+        title: "Needs and Objectives",
+        bodyHtml: "<p>Needs line 1.</p><p>Needs line 2.</p>",
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).toContain("<h2>Personal Circumstances</h2>");
+    expect(document.html).toContain("<p>Personal line 1.</p><p>Personal line 2.</p>");
+    expect(document.html).toContain("<h2>Financial Situation</h2>");
+    expect(document.html).toContain("<p>Financial line 1.</p><p>Financial line 2.</p>");
+    expect(document.html).toContain("<h2>Needs and Objectives</h2>");
+    expect(document.html).toContain("<p>Needs line 1.</p><p>Needs line 2.</p>");
+  });
+
+  it("renders fact find update personal circumstances, financial situation, and needs sections verbatim from workflow values", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindUpdatePersonalCircumstances = "Update personal line 1\nUpdate personal line 2";
+    profile.factFindUpdateFinancialSituation = "Update financial line 1\nUpdate financial line 2";
+    profile.factFindUpdateNeedsAndObjectives = "Update needs line 1\nUpdate needs line 2";
+
+    const document = buildWorkflowDocument(profile, "Fact Find Update");
+
+    expect(document.html).toContain("<h2>Personal Circumstances</h2>");
+    expect(document.html).toContain("Update personal line 1<br />Update personal line 2");
+    expect(document.html).toContain("<h2>Financial Situation</h2>");
+    expect(document.html).toContain("Update financial line 1<br />Update financial line 2");
+    expect(document.html).toContain("<h2>Needs and Objectives</h2>");
+    expect(document.html).toContain("Update needs line 1<br />Update needs line 2");
   });
 
   it("preserves terms of business issue confirmations and contact preferences", () => {
