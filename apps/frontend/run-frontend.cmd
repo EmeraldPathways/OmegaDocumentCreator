@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-"C:\Program Files\nodejs\node.exe" node_modules\vite\bin\vite.js --config vite.run.config.ts
+npm.cmd run dev -- --config vite.run.config.ts

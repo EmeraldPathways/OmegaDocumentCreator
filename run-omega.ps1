@@ -5,7 +5,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 function Test-PortListening {
     param([int]$Port)
 
-    return $null -ne (netstat -ano | Select-String "127\.0\.0\.1:$Port\s")
+    return $null -ne (netstat -ano | Select-String "127\.0\.0\.1:$Port\s+.*LISTENING")
 }
 
 function Wait-ForPort {
@@ -98,9 +98,11 @@ Start-OmegaService `
     -Name "Omega Frontend" `
     -Port 3007 `
     -WorkingDirectory $frontendDir `
-    -FilePath "C:\Program Files\nodejs\node.exe" `
+    -FilePath "C:\Program Files\nodejs\npm.cmd" `
     -ArgumentList @(
-        (Join-Path $frontendDir "node_modules\vite\bin\vite.js"),
+        "run",
+        "dev",
+        "--",
         "--config",
         "vite.run.config.ts"
     ) `
