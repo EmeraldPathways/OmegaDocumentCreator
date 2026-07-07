@@ -4,7 +4,8 @@ import io
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,8 @@ from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_
 from app.domain.users import UserRole, UserStatus
 from app.models import AuditLog
 from app.models import BackupRun as BackupRunModel
+from app.models import Client as ClientModel
+from app.models import Dependant as DependantModel
 from app.models import RestoreAttempt as RestoreAttemptModel
 from app.models import Document as DocumentModel
 from app.models import File as FileModel
@@ -92,6 +95,92 @@ async def _csrf_middleware(request: Request, call_next: object) -> object:
 # ---------------------------------------------------------------------------
 
 
+_SEEDED_CLIENTS = [
+    {
+        "client_reference": "CLI-2026-0001",
+        "first_name": "Test",
+        "surname": "Client",
+        "title": "Mr",
+        "email": "",
+        "mobile_number": "",
+        "marital_status": "Married",
+        "date_of_birth": date(1985, 4, 12),
+        "town_city": "Dublin",
+        "county": "Dublin",
+        "home_address_line_1": "1 Main Street",
+        "eircode": "D01 AB12",
+        "partner_name": "Taylor Client",
+        "created_by_email": None,
+        "dependants": [],
+    },
+    {
+        "client_reference": "CLI-2026-0002",
+        "first_name": "Jamie",
+        "surname": "Murphy",
+        "title": "Ms",
+        "email": "jamie.murphy@example.com",
+        "mobile_number": "0870000002",
+        "marital_status": "Single",
+        "date_of_birth": date(1990, 11, 8),
+        "town_city": "Galway",
+        "county": "Galway",
+        "home_address_line_1": "15 Sea Road",
+        "eircode": "H91 CD34",
+        "partner_name": "",
+        "created_by_email": None,
+        "dependants": [
+            {
+                "name": "Ella Murphy",
+                "date_of_birth": date(2017, 6, 20),
+                "notes": "Child",
+            }
+        ],
+    },
+]
+
+
+def _bootstrap_seed_clients(db: object, fallback_user_email: str) -> None:
+    user_repo = UserRepository(db)
+    created_by_id = user_repo.get_by_email(fallback_user_email).id if user_repo.get_by_email(fallback_user_email) else None
+
+    for seeded_client in _SEEDED_CLIENTS:
+        existing = db.query(ClientModel).filter(ClientModel.client_reference == seeded_client["client_reference"]).first()
+        if existing is not None:
+            continue
+
+        client = ClientModel(
+            client_reference=seeded_client["client_reference"],
+            first_name=seeded_client["first_name"],
+            surname=seeded_client["surname"],
+            full_name=f"{seeded_client['first_name']} {seeded_client['surname']}".strip(),
+            title=seeded_client["title"] or None,
+            marital_status=seeded_client["marital_status"] or None,
+            date_of_birth=seeded_client["date_of_birth"],
+            home_address_line_1=seeded_client["home_address_line_1"] or None,
+            town_city=seeded_client["town_city"] or None,
+            county=seeded_client["county"] or None,
+            eircode=seeded_client["eircode"] or None,
+            mobile_number=seeded_client["mobile_number"] or None,
+            email=seeded_client["email"] or None,
+            partner_name=seeded_client["partner_name"] or None,
+            status="draft",
+            created_by=created_by_id,
+            updated_by=created_by_id,
+        )
+        db.add(client)
+        db.flush()
+
+        for dependant in seeded_client["dependants"]:
+            db.add(
+                DependantModel(
+                    client_id=client.id,
+                    name=dependant["name"],
+                    date_of_birth=dependant["date_of_birth"],
+                    notes=dependant["notes"] or None,
+                )
+            )
+
+
 def _startup_db_check() -> None:
     """Verify database connectivity, seed default users, and start scheduler if enabled."""
     import logging
@@ -129,6 +218,12 @@ def _startup_db_check() -> None:
             conn.execute(text("SELECT 1"))
         logger.info("Database connection verified.")
 
+        from app.migrate import run_migrations
+
+        applied_migrations = run_migrations()
+        if applied_migrations:
+            logger.info("Applied %d pending migration(s) on startup.", len(applied_migrations))
+
         db = get_session()
         try:
             # Clean up expired sessions on startup
@@ -159,6 +254,8 @@ def _startup_db_check() -> None:
                     role=UserRole.STAFF,
                 )
                 logger.info("Bootstrap staff user created: %s", settings.staff_email)
+
+            _bootstrap_seed_clients(db, settings.admin_email)
 
             db.commit()
         finally:
@@ -316,6 +413,33 @@ def _require_admin(request: Request) -> dict[str, str]:
 _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
+def _trusted_csrf_origins() -> list[str]:
+    trusted = [settings.app_url.rstrip("/")]
+    if settings.csrf_trusted_origins:
+        trusted.extend(settings.csrf_trusted_origins)
+
+    if settings.environment == "development":
+        trusted.extend(
+            [
+                "http://127.0.0.1:3000",
+                "http://localhost:3000",
+                "http://127.0.0.1:3007",
+                "http://localhost:3007",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ]
+        )
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in trusted:
+        normalized = value.rstrip("/")
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+    return deduped
+
+
 def _csrf_check(request: Request) -> None:
     """Reject cross-origin state-changing requests for cookie-session endpoints.
 
@@ -332,13 +456,13 @@ def _csrf_check(request: Request) -> None:
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
 
-    trusted_origins: list[str] = [settings.app_url.rstrip("/")]
-    if settings.csrf_trusted_origins:
-        trusted_origins.extend(settings.csrf_trusted_origins)
+    trusted_origins = _trusted_csrf_origins()
 
     def _is_trusted_origin(value: str) -> bool:
         v = value.rstrip("/")
-        return any(v == t or v.startswith(t + "/") or v.startswith(t + ":") for t in trusted_origins)
+        parsed = urlsplit(v)
+        candidate_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else v
+        return any(candidate_origin == t for t in trusted_origins)
 
     if origin is not None:
         if not _is_trusted_origin(origin):

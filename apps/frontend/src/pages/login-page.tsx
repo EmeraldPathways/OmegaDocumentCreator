@@ -17,7 +17,7 @@ export function LoginPage() {
 
     const didSignIn = await signIn(email, password);
     if (!didSignIn) {
-      setError("Sign in failed");
+      setError("Invalid email or password");
       return;
     }
 

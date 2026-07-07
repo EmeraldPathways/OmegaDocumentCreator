@@ -14,6 +14,13 @@ type SessionUser = {
   role: SessionRole;
 };
 
+type LoginResponse = {
+  user?: {
+    email?: string;
+    role?: SessionRole;
+  };
+};
+
 type AuthContextValue = {
   isAdmin: boolean;
   isSignedIn: boolean;
@@ -28,20 +35,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function resolveRole(email: string): SessionRole {
-  const normalizedEmail = normalizeEmail(email);
-
-  if (normalizedEmail === "admin@omega.local" || normalizedEmail === "andrew@omegafinancial.ie") {
-    return "admin";
-  }
-
-  if (normalizedEmail.length > 0) {
-    return "staff";
-  }
-
-  return null;
 }
 
 function readStoredUser(): SessionUser | null {
@@ -66,11 +59,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
 
   async function signIn(email: string, password: string) {
-    const role = resolveRole(email);
-    if (!role) {
-      return false;
-    }
-
     const response = await fetch("/auth/login", {
       method: "POST",
       headers: {
@@ -86,7 +74,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return false;
     }
 
-    const nextUser = { email: normalizeEmail(email), role };
+    const payload = (await response.json()) as LoginResponse;
+    const responseUser = payload.user;
+    if (!responseUser?.email || !responseUser.role) {
+      return false;
+    }
+
+    const nextUser = {
+      email: normalizeEmail(responseUser.email),
+      role: responseUser.role,
+    };
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
     return true;

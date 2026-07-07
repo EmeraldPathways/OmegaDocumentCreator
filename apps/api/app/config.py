@@ -3,12 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+def _resolve_project_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / ".env").exists():
+            return parent
+    return current.parents[1]
+
+
+_PROJECT_ROOT = _resolve_project_root()
+_DOTENV_PATH = _PROJECT_ROOT / ".env"
+if _DOTENV_PATH.exists():
+    load_dotenv(_DOTENV_PATH)
 
 
 @dataclass(slots=True)
@@ -71,6 +82,18 @@ def _env_or(env_key: str, default: str) -> str:
     return os.getenv(env_key, default)
 
 
+def _normalize_database_url(database_url: str, environment: str) -> str:
+    if environment != "development" or Path("/.dockerenv").exists():
+        return database_url
+
+    parsed = urlsplit(database_url)
+    if parsed.hostname != "postgres":
+        return database_url
+
+    netloc = parsed.netloc.replace("@postgres", "@127.0.0.1")
+    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+
 def _parse_origin_list(raw: str) -> list[str] | None:
     """Parse comma-separated origin list; return None if empty."""
     cleaned = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
@@ -83,8 +106,13 @@ def get_settings(**overrides: str) -> AppSettings:
     cors_origins_raw = _env_or("CORS_ORIGINS", "")
     cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()] if cors_origins_raw else None
 
+    environment = overrides.get("ENVIRONMENT") or _env_or("ENVIRONMENT", "development")
+
     values = {
-        "database_url": overrides.get("DATABASE_URL") or _env_or("DATABASE_URL", "postgresql://placeholder"),
+        "database_url": _normalize_database_url(
+            overrides.get("DATABASE_URL") or _env_or("DATABASE_URL", "postgresql://placeholder"),
+            environment,
+        ),
         "file_storage_path": overrides.get("FILE_STORAGE_PATH") or _env_or("FILE_STORAGE_PATH", "storage/clients"),
         "backup_path": overrides.get("BACKUP_PATH") or _env_or("BACKUP_PATH", "storage/backups"),
         "session_secret": overrides.get("SESSION_SECRET") or _env_or("SESSION_SECRET", "development-only"),
@@ -102,7 +130,7 @@ def get_settings(**overrides: str) -> AppSettings:
         ),
         "cookie_secure": (overrides.get("COOKIE_SECURE") or _env_or("COOKIE_SECURE", "false")).lower() == "true",
         "cookie_samesite": overrides.get("COOKIE_SAMESITE") or _env_or("COOKIE_SAMESITE", "lax"),
-        "environment": overrides.get("ENVIRONMENT") or _env_or("ENVIRONMENT", "development"),
+        "environment": environment,
         "remote_access_mode": overrides.get("REMOTE_ACCESS_MODE") or _env_or("REMOTE_ACCESS_MODE", "local_only"),
         "pdf_converter_bin": overrides.get("PDF_CONVERTER_BIN") or _env_or("PDF_CONVERTER_BIN", "soffice"),
         "pg_dump_bin": overrides.get("PG_DUMP_BIN") or _env_or("PG_DUMP_BIN", "pg_dump"),

@@ -18,8 +18,11 @@ apps/api/storage/backups/*
 !apps/api/storage/backups/.gitkeep
 apps/api/.pytest_cache/
 apps/frontend/.vite/
+apps/frontend/.vite-run-cache/
 apps/frontend/dist/
+apps/frontend/*.log
 .playwright-mcp/
+.specstory/
 apps/api/*.log
 .tmp/
 .vscode/
