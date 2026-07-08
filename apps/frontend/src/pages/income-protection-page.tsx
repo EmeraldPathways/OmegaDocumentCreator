@@ -135,11 +135,11 @@ function mergeDocumentDrafts(
         incomingDrafts["Fact Find"]?.lastGeneratedHtml || currentDrafts["Fact Find"].lastGeneratedHtml,
       lastGeneratedSections:
         (incomingDrafts["Fact Find"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? incomingDrafts["Fact Find"]?.lastGeneratedSections
+          ? (incomingDrafts["Fact Find"]?.lastGeneratedSections ?? currentDrafts["Fact Find"].lastGeneratedSections)
           : currentDrafts["Fact Find"].lastGeneratedSections,
       integrationRequests:
         (incomingDrafts["Fact Find"]?.integrationRequests?.length ?? 0) > 0
-          ? incomingDrafts["Fact Find"]?.integrationRequests
+          ? (incomingDrafts["Fact Find"]?.integrationRequests ?? currentDrafts["Fact Find"].integrationRequests)
           : currentDrafts["Fact Find"].integrationRequests,
       editedHtml: incomingDrafts["Fact Find"]?.editedHtml || currentDrafts["Fact Find"].editedHtml,
       generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find"])
@@ -153,11 +153,11 @@ function mergeDocumentDrafts(
         incomingDrafts["Fact Find Update"]?.lastGeneratedHtml || currentDrafts["Fact Find Update"].lastGeneratedHtml,
       lastGeneratedSections:
         (incomingDrafts["Fact Find Update"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? incomingDrafts["Fact Find Update"]?.lastGeneratedSections
+          ? (incomingDrafts["Fact Find Update"]?.lastGeneratedSections ?? currentDrafts["Fact Find Update"].lastGeneratedSections)
           : currentDrafts["Fact Find Update"].lastGeneratedSections,
       integrationRequests:
         (incomingDrafts["Fact Find Update"]?.integrationRequests?.length ?? 0) > 0
-          ? incomingDrafts["Fact Find Update"]?.integrationRequests
+          ? (incomingDrafts["Fact Find Update"]?.integrationRequests ?? currentDrafts["Fact Find Update"].integrationRequests)
           : currentDrafts["Fact Find Update"].integrationRequests,
       editedHtml: incomingDrafts["Fact Find Update"]?.editedHtml || currentDrafts["Fact Find Update"].editedHtml,
       generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find Update"])
@@ -171,11 +171,11 @@ function mergeDocumentDrafts(
         incomingDrafts["Terms of Business"]?.lastGeneratedHtml || currentDrafts["Terms of Business"].lastGeneratedHtml,
       lastGeneratedSections:
         (incomingDrafts["Terms of Business"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? incomingDrafts["Terms of Business"]?.lastGeneratedSections
+          ? (incomingDrafts["Terms of Business"]?.lastGeneratedSections ?? currentDrafts["Terms of Business"].lastGeneratedSections)
           : currentDrafts["Terms of Business"].lastGeneratedSections,
       integrationRequests:
         (incomingDrafts["Terms of Business"]?.integrationRequests?.length ?? 0) > 0
-          ? incomingDrafts["Terms of Business"]?.integrationRequests
+          ? (incomingDrafts["Terms of Business"]?.integrationRequests ?? currentDrafts["Terms of Business"].integrationRequests)
           : currentDrafts["Terms of Business"].integrationRequests,
       editedHtml: incomingDrafts["Terms of Business"]?.editedHtml || currentDrafts["Terms of Business"].editedHtml,
       generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Terms of Business"])
@@ -190,11 +190,11 @@ function mergeDocumentDrafts(
         currentDrafts["Statement of Suitability"].lastGeneratedHtml,
       lastGeneratedSections:
         (incomingDrafts["Statement of Suitability"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? incomingDrafts["Statement of Suitability"]?.lastGeneratedSections
+          ? (incomingDrafts["Statement of Suitability"]?.lastGeneratedSections ?? currentDrafts["Statement of Suitability"].lastGeneratedSections)
           : currentDrafts["Statement of Suitability"].lastGeneratedSections,
       integrationRequests:
         (incomingDrafts["Statement of Suitability"]?.integrationRequests?.length ?? 0) > 0
-          ? incomingDrafts["Statement of Suitability"]?.integrationRequests
+          ? (incomingDrafts["Statement of Suitability"]?.integrationRequests ?? currentDrafts["Statement of Suitability"].integrationRequests)
           : currentDrafts["Statement of Suitability"].integrationRequests,
       editedHtml:
         incomingDrafts["Statement of Suitability"]?.editedHtml ||
@@ -203,6 +203,24 @@ function mergeDocumentDrafts(
         ? incomingDrafts["Statement of Suitability"]?.generationStatus ??
           currentDrafts["Statement of Suitability"].generationStatus
         : currentDrafts["Statement of Suitability"].generationStatus,
+    },
+    "Quote": {
+      ...currentDrafts["Quote"],
+      ...incomingDrafts["Quote"],
+      lastGeneratedHtml:
+        incomingDrafts["Quote"]?.lastGeneratedHtml || currentDrafts["Quote"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Quote"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? (incomingDrafts["Quote"]?.lastGeneratedSections ?? currentDrafts["Quote"].lastGeneratedSections)
+          : currentDrafts["Quote"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Quote"]?.integrationRequests?.length ?? 0) > 0
+          ? (incomingDrafts["Quote"]?.integrationRequests ?? currentDrafts["Quote"].integrationRequests)
+          : currentDrafts["Quote"].integrationRequests,
+      editedHtml: incomingDrafts["Quote"]?.editedHtml || currentDrafts["Quote"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Quote"])
+        ? incomingDrafts["Quote"]?.generationStatus ?? currentDrafts["Quote"].generationStatus
+        : currentDrafts["Quote"].generationStatus,
     },
   };
 }
@@ -261,6 +279,8 @@ export function IncomeProtectionPage() {
   const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
+  const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
+  const [showQuoteValidation, setShowQuoteValidation] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -275,6 +295,7 @@ export function IncomeProtectionPage() {
   const factFindAccordion = useAccordionState(["personal-details"]);
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
+  const quoteWorkspaceAccordion = useAccordionState(["quote-output"]);
 
   useEffect(() => {
     if (!canUseBackend || !selectedClientReference) return;
@@ -301,8 +322,10 @@ export function IncomeProtectionPage() {
     setStatementDocumentStatus(
       getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
     );
+    setQuoteDocumentStatus(getGenerationHeaderStatus("Document", client.documentDrafts["Quote"].generationStatus));
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
+    setShowQuoteValidation(false);
   }, [selectedClientReference]);
 
   useEffect(() => {
@@ -427,6 +450,30 @@ export function IncomeProtectionPage() {
     { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
     { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Statement or Fact Find" },
     { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
+  ];
+
+  const quoteMissingFields = [
+    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
+    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
+    !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
+    !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
+    !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
+    !hasValue(resolvedDraft.gender) ? "Gender" : null,
+    !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
+    !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
+    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
+  ].filter(isPresent);
+
+  const quoteGenerationRequirements = [
+    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
+    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
+    { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
+    { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
+    { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
+    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
+    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
+    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
+    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
   ];
 
   const factFindUpdateGenerationRequirements = [
@@ -966,31 +1013,20 @@ export function IncomeProtectionPage() {
     setStatementDocumentStatus("Document: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "generating" });
     try {
-      const workflowSnapshot = resolvedDraft as unknown as Record<string, unknown>;
-      const [quoteRequests, generatedDocument] = await Promise.all([
-        fetchStatementQuoteRequests({
-          clientReference: resolvedDraft.clientReference,
-          workflowSnapshot,
-        }).catch(() => undefined),
-        generateDocument({
-          clientReference: resolvedDraft.clientReference,
-          documentType: "Statement of Suitability",
-          templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
-          workflowSnapshot,
-        }),
-      ]);
-      const integrationRequests = resolveStatementIntegrationRequests(
-        getDocumentDraft("Statement of Suitability").integrationRequests,
-        quoteRequests ?? generatedDocument.integrationRequests,
-      );
+      const generatedDocument = await generateDocument({
+        clientReference: resolvedDraft.clientReference,
+        documentType: "Statement of Suitability",
+        templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
       saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests,
+        integrationRequests: [],
         editedHtml: buildGeneratedEditorHtml("Statement of Suitability", {
           ...generatedDocument,
-          integrationRequests,
+          integrationRequests: [],
         }),
       });
       setStatementDocumentStatus("Document: Draft generated");
@@ -999,6 +1035,47 @@ export function IncomeProtectionPage() {
       saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "failed" });
       setStatementDocumentStatus("Document: Draft generation failed");
       addToast("Failed to generate Statement of Suitability draft", "error");
+    }
+  }
+
+  async function handleQuoteGenerate() {
+    if (quoteMissingFields.length > 0) {
+      setShowQuoteValidation(true);
+      setQuoteDocumentStatus("Document: Blocked by missing required fields");
+      return;
+    }
+
+    setShowQuoteValidation(false);
+    setQuoteDocumentStatus("Document: Generating");
+    saveGeneratedDraft(resolvedDraft.clientReference, "Quote", { generationStatus: "generating" });
+
+    try {
+      const integrationRequests = resolveStatementIntegrationRequests(
+        getDocumentDraft("Quote").integrationRequests,
+        await fetchStatementQuoteRequests({
+          clientReference: resolvedDraft.clientReference,
+          workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+        }),
+      );
+      const generatedDocument = {
+        generatedHtml: "",
+        sections: [],
+        integrationRequests,
+      };
+
+      saveGeneratedDraft(resolvedDraft.clientReference, "Quote", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+        integrationRequests,
+        editedHtml: buildGeneratedEditorHtml("Quote", generatedDocument),
+      });
+      setQuoteDocumentStatus("Document: Draft generated");
+      addToast("Quote draft generated", "success");
+    } catch {
+      saveGeneratedDraft(resolvedDraft.clientReference, "Quote", { generationStatus: "failed" });
+      setQuoteDocumentStatus("Document: Draft generation failed");
+      addToast("Failed to generate Quote draft", "error");
     }
   }
 
@@ -1144,6 +1221,8 @@ export function IncomeProtectionPage() {
       void handleFactFindGenerate();
     } else if (type === "Fact Find Update") {
       void handleFactFindUpdateGenerate();
+    } else if (type === "Quote") {
+      void handleQuoteGenerate();
     } else if (type === "Statement of Suitability") {
       void handleStatementGenerate();
     }
@@ -2311,6 +2390,51 @@ export function IncomeProtectionPage() {
                       updateSelectedTemplate(resolvedDraft.clientReference, "Statement of Suitability", templateId)
                     }
                     selectedTemplateId={statementDraft.selectedTemplateId}
+                  />
+                }
+              />
+            </AccordionItem>
+          </Accordion>
+        </div>
+      );
+    }
+
+    if (activeTab.id === "quote") {
+      const quoteDraft = getWorkspaceDocumentDraft("Quote");
+
+      return (
+        <div className="page-stack">
+          <div className="page-heading page-heading-compact">
+            <div>
+              <h2>Quote Comparison Draft</h2>
+            </div>
+          </div>
+
+          <Accordion flush className="workflow-form-accordion">
+            <AccordionItem
+              indicator={getGeneratedDraftStatusLabel(quoteDraft.generationStatus)}
+              isOpen={quoteWorkspaceAccordion.isOpen("quote-output")}
+              onToggle={() => quoteWorkspaceAccordion.toggle("quote-output")}
+              title="Generated Output"
+            >
+              {renderGenerationRequirements("Quote generation requirements", quoteGenerationRequirements, quoteMissingFields, {
+                explainSharedFields: true,
+                emphasiseMissing: showQuoteValidation,
+              })}
+              <GeneratedOutputWorkspace
+                draft={quoteDraft}
+                emptyMessage="Generate the quote comparison to open the quote workspace."
+                generateDisabled={quoteMissingFields.length > 0}
+                onContentChange={(html) => updateGeneratedOutput("Quote", html)}
+                onExportDocx={() => void handleGeneratedOutputExport("Quote", "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport("Quote", "pdf")}
+                onGenerate={() => void handleQuoteGenerate()}
+                statusLabel={quoteDocumentStatus.replace("Document: ", "")}
+                templatePicker={
+                  <TemplatePicker
+                    documentType="Quote"
+                    onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Quote", templateId)}
+                    selectedTemplateId={quoteDraft.selectedTemplateId}
                   />
                 }
               />

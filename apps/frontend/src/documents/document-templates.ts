@@ -29,6 +29,13 @@ export const builtInDocumentTemplates: DocumentTemplateDefinition[] = [
     description: "Recommendation summary template for suitability output.",
     sectionTitles: ["Recommendation Basics", "Cover Summary", "Needs and Objectives", "Adviser Declaration"],
   },
+  {
+    id: "quote-comparison",
+    documentType: "Quote",
+    title: "Income Protection Quote Comparison",
+    description: "Quote comparison table for income protection products.",
+    sectionTitles: ["Quote Summary", "Quote Table"],
+  },
 ];
 
 export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<Record<SupportedDocumentType, string>>(
@@ -41,6 +48,7 @@ export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<R
     "Fact Find Update": "",
     "Terms of Business": "",
     "Statement of Suitability": "",
+    "Quote": "",
   },
 );
 
@@ -72,6 +80,14 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     },
     "Statement of Suitability": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Statement of Suitability"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    },
+    "Quote": {
+      selectedTemplateId: defaultTemplateIdByDocumentType["Quote"],
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],

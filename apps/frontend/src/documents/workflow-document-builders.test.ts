@@ -52,7 +52,6 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-opening");
     expect(document.html).toContain("statement-important-notice");
     expect(document.html).toContain("statement-section");
-    expect(document.html).toContain("statement-quote-block");
     expect(document.html).toContain("statement-closing");
     expect(document.html).toContain("statement-declaration");
     expect(document.html).toContain("statement-important-info");
@@ -91,7 +90,6 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("I wish to confirm that I have read the Customer Information Booklet");
     expect(document.html.indexOf("statement-important-notice")).toBeGreaterThan(document.html.indexOf("statement-letter-header"));
     expect(document.html.indexOf("statement-important-notice")).toBeLessThan(document.html.indexOf("statement-opening"));
-    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-important-notice"));
     expect(document.html.indexOf("Needs and Objectives")).toBeGreaterThan(document.html.indexOf("Financial Situation"));
     expect(document.html.indexOf("Needs and Objectives")).toBeLessThan(document.html.indexOf("Recommendation"));
   });
@@ -139,7 +137,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("<h2>Needs and Objectives</h2><p>Financial facts.</p>");
   });
 
-  it("renders BIS quote results as a statement comparison table immediately after the introduction using fact find values", () => {
+  it("renders BIS quote results in the standalone quote document using fact find values", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.dateOfBirth = "1996-06-29";
     profile.letterDate = "2026-06-29";
@@ -148,7 +146,7 @@ describe("buildWorkflowDocument", () => {
     profile.coverAge = "65";
     profile.smokerStatus = "Non-Smoker";
     profile.phiOccupationalClass = "2";
-    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+    profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
         requestType: "Phi",
@@ -173,7 +171,7 @@ describe("buildWorkflowDocument", () => {
       },
     ];
 
-    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+    const document = buildWorkflowDocument(profile, "Quote");
 
     expect(document.html).toContain("statement-quote-table");
     expect(document.html).toContain("Income Protection Quote Comparison");
@@ -191,8 +189,8 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Guaranteed");
     expect(document.html).toContain("149.78");
     expect(document.html).not.toContain("Indexation:");
-    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeGreaterThan(document.html.indexOf("statement-opening"));
-    expect(document.html.indexOf("Income Protection Quote Comparison")).toBeLessThan(document.html.indexOf("Personal Circumstances"));
+    expect(document.html).not.toContain("statement-opening");
+    expect(document.html).not.toContain("Personal Circumstances");
   });
 
   it("renders a populated statement recommendation using quote and fact find values", () => {

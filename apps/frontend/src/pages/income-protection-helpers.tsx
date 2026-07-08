@@ -20,6 +20,7 @@ export const moduleTabs = [
   { id: "fact-find", label: "Fact Find", icon: ClipboardList },
   { id: "fact-find-update", label: "Fact Find Update", icon: FileTextIcon },
   { id: "statement-of-suitability", label: "Statement of Suitability", icon: Shield },
+  { id: "quote", label: "Quote", icon: FileText },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "generated-documents", label: "Generated Documents", icon: Download },
 ] as const;

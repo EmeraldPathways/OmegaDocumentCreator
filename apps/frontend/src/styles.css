@@ -2969,7 +2969,8 @@ button {
 }
 
 /* Statement letter header: logo left, client name + address right */
-.workflow-document-statement-of-suitability .statement-letter-header {
+.workflow-document-statement-of-suitability .statement-letter-header,
+.workflow-document-quote .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -2978,7 +2979,8 @@ button {
   border-bottom: 2px solid #c68b2c;
 }
 
-.workflow-document-statement-of-suitability .statement-header-top {
+.workflow-document-statement-of-suitability .statement-header-top,
+.workflow-document-quote .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -2986,7 +2988,8 @@ button {
   margin-bottom: 16px;
 }
 
-.workflow-document-statement-of-suitability .statement-logo {
+.workflow-document-statement-of-suitability .statement-logo,
+.workflow-document-quote .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -2994,7 +2997,8 @@ button {
   flex-shrink: 0;
 }
 
-.workflow-document-statement-of-suitability .statement-client-details {
+.workflow-document-statement-of-suitability .statement-client-details,
+.workflow-document-quote .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3004,7 +3008,8 @@ button {
   text-align: right;
 }
 
-.workflow-document-statement-of-suitability .statement-client-name {
+.workflow-document-statement-of-suitability .statement-client-name,
+.workflow-document-quote .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3012,12 +3017,14 @@ button {
   color: #1f2937;
 }
 
-.workflow-document-statement-of-suitability .statement-address-block {
+.workflow-document-statement-of-suitability .statement-address-block,
+.workflow-document-quote .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
-.workflow-document-statement-of-suitability .statement-address-block p {
+.workflow-document-statement-of-suitability .statement-address-block p,
+.workflow-document-quote .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3025,7 +3032,8 @@ button {
   line-height: 1.4;
 }
 
-.workflow-document-statement-of-suitability .statement-letter-date {
+.workflow-document-statement-of-suitability .statement-letter-date,
+.workflow-document-quote .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -3077,37 +3085,44 @@ button {
   margin: 0 0 6px;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-table {
+.workflow-document-statement-of-suitability .statement-quote-table,
+.workflow-document-quote .statement-quote-table {
   margin: 0 0 8px;
   border: 1px solid #d6d3d1;
   border-radius: 12px;
   overflow: hidden;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-row {
+.workflow-document-statement-of-suitability .statement-quote-row,
+.workflow-document-quote .statement-quote-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-row:first-child {
+.workflow-document-statement-of-suitability .statement-quote-row:first-child,
+.workflow-document-quote .statement-quote-row:first-child {
   border-top: 0;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-row-header {
+.workflow-document-statement-of-suitability .statement-quote-row-header,
+.workflow-document-quote .statement-quote-row-header {
   background: #f6ede3;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-cell {
+.workflow-document-statement-of-suitability .statement-quote-cell,
+.workflow-document-quote .statement-quote-cell {
   padding: 10px 12px;
   border-left: 1px solid #e5e7eb;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-cell:first-child {
+.workflow-document-statement-of-suitability .statement-quote-cell:first-child,
+.workflow-document-quote .statement-quote-cell:first-child {
   border-left: 0;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p {
+.workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p,
+.workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
   font-family: "Segoe UI", Tahoma, sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -3116,7 +3131,8 @@ button {
   color: #5b2230;
 }
 
-.workflow-document-statement-of-suitability .statement-quote-cell p {
+.workflow-document-statement-of-suitability .statement-quote-cell p,
+.workflow-document-quote .statement-quote-cell p {
   margin: 0;
 }
 
@@ -3155,7 +3171,8 @@ button {
   display: none;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -3164,7 +3181,8 @@ button {
   border-bottom: 2px solid #c68b2c;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-header-top {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-header-top,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -3172,7 +3190,8 @@ button {
   margin-bottom: 16px;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-logo {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-logo,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -3180,7 +3199,8 @@ button {
   flex-shrink: 0;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-details {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-details,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3190,7 +3210,8 @@ button {
   text-align: right;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-name {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-name,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3198,12 +3219,14 @@ button {
   color: #1f2937;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block p {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block p,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3211,7 +3234,8 @@ button {
   line-height: 1.4;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-date {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-date,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -3253,46 +3277,56 @@ button {
   padding-left: 22px;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary {
   margin-bottom: 12px;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary p,
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell p {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary p,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell p {
   margin: 0;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-table {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-table,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-table {
   margin: 0 0 8px;
   border: 1px solid #d6d3d1;
   border-radius: 12px;
   overflow: hidden;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row:first-child {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row:first-child,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row:first-child {
   border-top: 0;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row-header {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row-header,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row-header {
   background: #f6ede3;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell {
   padding: 10px 12px;
   border-left: 1px solid #e5e7eb;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell:first-child {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell:first-child,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell:first-child {
   border-left: 0;
 }
 
-.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p {
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
   font-family: "Segoe UI", Tahoma, sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -3320,22 +3354,26 @@ button {
    Statement styles for PDF preview
    Scoped inside .generated-output-pdf-page-body
    ============================================================ */
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability,
+.generated-output-pdf-page-body .workflow-document-quote {
   color: #1f2937;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   line-height: 1.7;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .document-banner {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .document-banner,
+.generated-output-pdf-page-body .workflow-document-quote .document-banner {
   display: none;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .signatures-footer {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .signatures-footer,
+.generated-output-pdf-page-body .workflow-document-quote .signatures-footer {
   display: none;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header,
+.generated-output-pdf-page-body .workflow-document-quote .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -3344,7 +3382,8 @@ button {
   border-bottom: 2px solid #c68b2c;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-header-top {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-header-top,
+.generated-output-pdf-page-body .workflow-document-quote .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -3352,7 +3391,8 @@ button {
   margin-bottom: 16px;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-logo {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-logo,
+.generated-output-pdf-page-body .workflow-document-quote .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -3360,7 +3400,8 @@ button {
   flex-shrink: 0;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-details {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-details,
+.generated-output-pdf-page-body .workflow-document-quote .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3370,7 +3411,8 @@ button {
   text-align: right;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-name {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-name,
+.generated-output-pdf-page-body .workflow-document-quote .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3378,12 +3420,14 @@ button {
   color: #1f2937;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block,
+.generated-output-pdf-page-body .workflow-document-quote .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block p {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block p,
+.generated-output-pdf-page-body .workflow-document-quote .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3391,7 +3435,8 @@ button {
   line-height: 1.4;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-date {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-date,
+.generated-output-pdf-page-body .workflow-document-quote .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -3438,41 +3483,50 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-summary p,
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell p {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell p,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary p,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-cell p {
   margin: 0;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-table {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-table,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-table {
   margin: 0 0 8px;
   border: 1px solid #d6d3d1;
   border-radius: 12px;
   overflow: hidden;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row:first-child {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row:first-child,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-row:first-child {
   border-top: 0;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row-header {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row-header,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-row-header {
   background: #f6ede3;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-cell {
   padding: 10px 12px;
   border-left: 1px solid #e5e7eb;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell:first-child {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-cell:first-child,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-cell:first-child {
   border-left: 0;
 }
 
-.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p {
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
   font-family: "Segoe UI", Tahoma, sans-serif;
   font-size: 12px;
   font-weight: 700;

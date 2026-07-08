@@ -1,4 +1,4 @@
-import type { SeededClientProfile } from "../data/seeded-clients";
+﻿import type { SeededClientProfile } from "../data/seeded-clients";
 import type {
   ComposedBlock,
   ComposedDocument,
@@ -93,75 +93,11 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
   };
 }
 
-function requestFieldsHtml(requestFields: IntegrationRequestArtifact["requestFields"]) {
-  if (requestFields.length === 0) {
-    return "<p>No PHI request fields were captured.</p>";
-  }
+function getQuoteRequests(profile: SeededClientProfile) {
+  const quoteRequests = profile.documentDrafts["Quote"]?.integrationRequests ?? [];
+  const statementRequests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
 
-  return `<ul>${requestFields
-    .map((field) => `<li><strong>${escapeHtml(field.label)}:</strong> ${escapeHtml(valueOrFallback(field.value))}</li>`)
-    .join("")}</ul>`;
-}
-
-function quoteResultsHtml(quoteResults: IntegrationRequestArtifact["quoteResults"]) {
-  if (quoteResults.length === 0) {
-    return "<p>No PHI quote results were returned.</p>";
-  }
-
-  return `<ul>${quoteResults
-    .map((quote) => {
-      const premiumParts = [
-        quote.levelPremium ? `Level: ${quote.levelPremium}` : "",
-        quote.escalation3Premium ? `Esc 3%: ${quote.escalation3Premium}` : "",
-        quote.escalation5Premium ? `Esc 5%: ${quote.escalation5Premium}` : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      return `<li><strong>${escapeHtml(valueOrFallback(quote.providerName))}</strong>${quote.policyType ? ` (${escapeHtml(quote.policyType)})` : ""}${
-        premiumParts ? ` - ${escapeHtml(premiumParts)}` : ""
-      }</li>`;
-    })
-    .join("")}</ul>`;
-}
-
-function buildPhiBlocks(profile: SeededClientProfile): ComposedBlock[] {
-  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
-  if (requests.length === 0) {
-    return [];
-  }
-
-  return requests.flatMap((request) => {
-    const blocks: ComposedBlock[] = [
-      detailGrid("PHI Request Details", [
-        { label: "Provider", value: request.provider },
-        { label: "Request type", value: request.requestType },
-        { label: "Status", value: request.status },
-        { label: "Requested at", value: request.requestedAt },
-      ]),
-      {
-        kind: "section",
-        title: "PHI Request Fields",
-        bodyHtml: requestFieldsHtml(request.requestFields),
-      },
-      {
-        kind: "section",
-        title: "PHI Quote Results",
-        bodyHtml: quoteResultsHtml(request.quoteResults),
-      },
-    ];
-
-    if (request.status === "failed" || request.errors.length > 0) {
-      blocks.push({
-        kind: "callout",
-        tone: "warning",
-        title: "PHI Integration Warning",
-        bodyHtml: listHtml(request.errors, "PHI integration did not return a specific error."),
-      });
-    }
-
-    return blocks;
-  });
+  return quoteRequests.length > 0 ? quoteRequests : statementRequests;
 }
 
 function getDraftSections(profile: SeededClientProfile, documentType: SupportedDocumentType) {
@@ -432,8 +368,8 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     .join("");
 }
 
-function buildStatementQuoteComparisonHtml(profile: SeededClientProfile) {
-  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
+  const requests = getQuoteRequests(profile);
   const quoteResults = requests.flatMap((request) => request.quoteResults);
 
   if (quoteResults.length === 0) {
@@ -810,7 +746,6 @@ function buildStatementImportantInfoHtml2() {
 }
 
 function buildStatementSectionHtml(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string) {
-  const quoteComparisonHtml = buildStatementQuoteComparisonHtml(profile);
   const bodyHtml = [
     buildStatementLetterHeaderHtml(profile),
     buildStatementNoticeHtml(),
@@ -818,7 +753,6 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     `<p>Dear ${escapeHtml(profile.fullName)}</p>`,
     "<p>This Statement of Suitability outlines the recommendation provided to you based on the personal and financial information you have shared with us. It confirms that the recommended product is suitable for your needs and objectives at the time of this assessment.</p>",
     "</div>",
-    quoteComparisonHtml,
     '<div class="statement-section">',
     '<h2>Personal Circumstances</h2>',
     buildStatementPersonalCircumstancesHtml(profile),
@@ -859,9 +793,34 @@ function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: 
   ];
 }
 
+function buildQuoteBlocks(profile: SeededClientProfile): ComposedBlock[] {
+  const quoteHtml = buildQuoteComparisonHtml(profile);
+
+  if (!quoteHtml) {
+    return [
+      {
+        kind: "callout",
+        tone: "info",
+        title: "No Quote Data",
+        bodyHtml: "<p>Generate the Quote draft to populate quote comparison data, or no quote results were returned.</p>",
+      },
+    ];
+  }
+
+  return [
+    {
+      kind: "statement-body",
+      bodyHtml: [buildStatementLetterHeaderHtml(profile), quoteHtml].join(""),
+    },
+  ];
+}
+
 export function composeWorkflowDocument(profile: SeededClientProfile, documentType: SupportedDocumentType): ComposedDocument {
   const title =
-    documentType === "Fact Find" ? "Income Protection Fact Find" : documentType === "Terms of Business" ? "Terms of Business" : documentType;
+    documentType === "Fact Find" ? "Income Protection Fact Find"
+      : documentType === "Quote" ? "Income Protection Quote Comparison"
+      : documentType === "Terms of Business" ? "Terms of Business"
+      : documentType;
   const draftSections = getDraftSections(profile, documentType);
   const recommendationSection = findDraftSection(draftSections, "recommendation", "summary", "issue");
   const personalCircumstancesSection = findDraftSection(draftSections, "personal circumstance");
@@ -898,19 +857,24 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
           )
         : documentType === "Terms of Business"
           ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
-          : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
+          : documentType === "Quote"
+            ? buildQuoteBlocks(profile)
+            : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
 
   const isStatement = documentType === "Statement of Suitability";
+  const usesStatementHeader = isStatement || documentType === "Quote";
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
 
   const sharedBlocks: ComposedBlock[] = [
     ...(isFactFind ? [buildLogoBlock()] : []),
-    {
-      kind: "banner",
-      eyebrow: documentType,
-      title,
-      subtitle: `${profile.fullName} (${profile.clientReference})`,
-    },
+    ...(usesStatementHeader
+      ? []
+      : [{
+          kind: "banner" as const,
+          eyebrow: documentType,
+          title,
+          subtitle: `${profile.fullName} (${profile.clientReference})`,
+        }]),
     ...bodyBlocks,
     ...(isStatement ? [] : [buildFooterBlock(profile, documentType)]),
   ];

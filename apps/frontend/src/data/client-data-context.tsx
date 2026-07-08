@@ -61,7 +61,7 @@ function normalizeDraft(
   const contentDraft = isPristineDraft(storedDraft) ? undefined : storedDraft;
   const integrationRequests =
     (contentDraft?.integrationRequests?.length ?? 0) > 0
-      ? contentDraft?.integrationRequests
+      ? (contentDraft?.integrationRequests ?? fallbackDraft.integrationRequests)
       : fallbackDraft.integrationRequests;
 
   return {
@@ -89,6 +89,7 @@ function normalizeDocumentDrafts(
       defaultDrafts["Statement of Suitability"],
       documentDrafts?.["Statement of Suitability"],
     ),
+    "Quote": normalizeDraft(defaultDrafts["Quote"], documentDrafts?.["Quote"]),
   };
 }
 

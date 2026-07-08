@@ -660,7 +660,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
@@ -682,15 +682,15 @@ describe("App routes", () => {
       }
     >;
 
-    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.integrationRequests).toEqual([
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Quote"]?.integrationRequests).toEqual([
       expect.objectContaining({ provider: "BestAdvice", status: "sent" }),
     ]);
-    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.editedHtml).toContain(
+    expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Quote"]?.editedHtml).toContain(
       "statement-quote-table",
     );
   });
 
-  it("preserves statement quote table artifacts when backend workflow hydration returns form fields only", async () => {
+  it("preserves quote table artifacts when backend workflow hydration returns form fields only", async () => {
     const storedClients = createSeededClientProfiles();
     setStoredClients(storedClients);
     window.sessionStorage.setItem(
@@ -754,7 +754,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
 
     await waitFor(() => {
       expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
@@ -764,14 +764,14 @@ describe("App routes", () => {
     expect(screen.getByText("Irish Life")).toBeInTheDocument();
   });
 
-  it("renders a PHI integration warning when the Statement of Suitability generation returns a failed request artifact", async () => {
+  it("renders a PHI integration warning when the quote generation returns a failed request artifact", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/documents/statement-quote")) {
           return Promise.resolve(createGenerateDocumentResponse({
-            title: "Statement of Suitability",
+            title: "Income Protection Quote Comparison",
             integrationRequests: [
               {
                 provider: "BestAdvice",
@@ -796,7 +796,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
@@ -806,7 +806,7 @@ describe("App routes", () => {
     expect(screen.getByText("service unavailable")).toBeInTheDocument();
   });
 
-  it("uses the dedicated statement quote response to render the quote table", async () => {
+  it("uses the dedicated quote response to render the quote table", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
@@ -815,7 +815,7 @@ describe("App routes", () => {
         if (url.includes("/documents/statement-quote")) {
           return Promise.resolve(
             createGenerateDocumentResponse({
-              title: "Statement of Suitability",
+              title: "Income Protection Quote Comparison",
               integrationRequests: [
                 {
                   provider: "BestAdvice",
@@ -850,7 +850,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
@@ -860,25 +860,33 @@ describe("App routes", () => {
     expect(screen.getByText("Aviva")).toBeInTheDocument();
   });
 
-  it("preserves the last successful statement quote table when a regenerate returns failed PHI results", async () => {
+  it("preserves the last successful quote table when a regenerate returns failed PHI results", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        createGenerateDocumentResponse({
-          title: "Statement of Suitability",
-          integrationRequests: [
-            {
-              provider: "BestAdvice",
-              request_type: "Phi",
-              status: "failed",
-              requested_at: "2026-06-19T10:00:00+00:00",
-              request_fields: [{ label: "DOB", value: "08/11/1990" }],
-              quote_results: [],
-              errors: ["service unavailable"],
-            },
-          ],
-        }),
-      ),
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Income Protection Quote Comparison",
+              integrationRequests: [
+                {
+                  provider: "BestAdvice",
+                  request_type: "Phi",
+                  status: "failed",
+                  requested_at: "2026-06-19T10:00:00+00:00",
+                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                  quote_results: [],
+                  errors: ["service unavailable"],
+                },
+              ],
+            }),
+          );
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
     );
 
     render(
@@ -887,7 +895,7 @@ describe("App routes", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
 
     await waitFor(() => {
       expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();

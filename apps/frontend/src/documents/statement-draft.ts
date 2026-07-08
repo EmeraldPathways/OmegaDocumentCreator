@@ -8,10 +8,8 @@ export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   const hasComposedStatementHtml =
     editedHtml.includes("workflow-document-statement-of-suitability") && editedHtml.includes("statement-document-body");
-  const hasQuoteRequests = draft.integrationRequests.length > 0;
-  const hasRenderedQuoteTable = editedHtml.includes("statement-quote-table");
 
-  if (hasComposedStatementHtml && (!hasQuoteRequests || hasRenderedQuoteTable)) {
+  if (hasComposedStatementHtml) {
     return false;
   }
 
@@ -23,13 +21,11 @@ export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
     /statement of suitability prepared for/i.test(recommendationSection.bodyHtml);
 
   const hasNonComposedEditedHtml = editedHtml.length > 0 && !hasComposedStatementHtml;
-  const missingQuoteTableFromEditedHtml = hasQuoteRequests && (!editedHtml || !hasRenderedQuoteTable);
 
   return (
     hasLegacyPlaceholderSection ||
     /statement of suitability prepared for/i.test(draft.lastGeneratedHtml) ||
-    hasNonComposedEditedHtml ||
-    missingQuoteTableFromEditedHtml
+    hasNonComposedEditedHtml
   );
 }
 
