@@ -458,6 +458,24 @@ function buildLogoBlock(className?: string): ComposedBlock {
   };
 }
 
+function buildInlineLetterHeaderBlock(profile: SeededClientProfile): ComposedBlock {
+  return {
+    kind: "section",
+    className: "document-inline-header",
+    title: "",
+    bodyHtml: buildStatementLetterHeaderHtml(profile),
+  };
+}
+
+function buildTitleBannerBlock(documentType: SupportedDocumentType, profile: SeededClientProfile): ComposedBlock {
+  return {
+    kind: "banner",
+    eyebrow: documentType,
+    title: documentType === "Fact Find" ? "Income Protection Fact Find" : documentType,
+    subtitle: `${profile.fullName} (${profile.clientReference})`,
+  };
+}
+
 function buildFactFindUpdateBlocks(
   profile: SeededClientProfile,
   personalCircumstancesHtml: string,
@@ -465,6 +483,8 @@ function buildFactFindUpdateBlocks(
   needsHtml: string,
 ): ComposedBlock[] {
   return [
+    buildInlineLetterHeaderBlock(profile),
+    buildTitleBannerBlock("Fact Find Update", profile),
     detailGrid(
       "Client Summary",
       summaryGridItems(profile, "Fact Find Update"),
@@ -522,6 +542,8 @@ function buildFactFindBlocks(
     .filter((row) => row.length > 0);
 
   return [
+    buildInlineLetterHeaderBlock(profile),
+    buildTitleBannerBlock("Fact Find", profile),
     detailGrid(
       "Client Summary",
       summaryGridItems(profile, "Fact Find"),
@@ -861,12 +883,11 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
             ? buildQuoteBlocks(profile)
             : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
 
-  const isStatement = documentType === "Statement of Suitability";
-  const usesStatementHeader = isStatement || documentType === "Quote";
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
+  const isStatement = documentType === "Statement of Suitability";
+  const usesStatementHeader = isStatement || documentType === "Quote" || isFactFind;
 
   const sharedBlocks: ComposedBlock[] = [
-    ...(isFactFind ? [buildLogoBlock()] : []),
     ...(usesStatementHeader
       ? []
       : [{

@@ -1756,6 +1756,56 @@ button {
   color: #111827;
 }
 
+.generated-output-editor.ProseMirror .workflow-document-fact-find .document-banner,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .document-banner,
+.generated-output-pdf-page-body .workflow-document-fact-find .document-banner,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .document-banner {
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .client-summary-grid,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .document-grid,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .client-summary-grid,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .document-grid,
+.generated-output-pdf-page-body .workflow-document-fact-find .client-summary-grid,
+.generated-output-pdf-page-body .workflow-document-fact-find .document-grid,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .client-summary-grid,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .document-grid {
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .grid-items,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .grid-items,
+.generated-output-pdf-page-body .workflow-document-fact-find .grid-items,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .grid-items {
+  gap: 7px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .client-summary-grid .grid-items,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .client-summary-grid .grid-items,
+.generated-output-pdf-page-body .workflow-document-fact-find .client-summary-grid .grid-items,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .client-summary-grid .grid-items {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .grid-item,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .grid-item,
+.generated-output-pdf-page-body .workflow-document-fact-find .grid-item,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .grid-item {
+  padding: 6px 10px;
+  line-height: 1.2;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .grid-item strong,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .grid-item strong,
+.generated-output-pdf-page-body .workflow-document-fact-find .grid-item strong,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .grid-item strong {
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+}
+
 .generated-output-editor.ProseMirror .document-section,
 .generated-output-pdf-page-body .document-section {
   margin-bottom: 18px;
@@ -2970,7 +3020,9 @@ button {
 
 /* Statement letter header: logo left, client name + address right */
 .workflow-document-statement-of-suitability .statement-letter-header,
-.workflow-document-quote .statement-letter-header {
+.workflow-document-quote .statement-letter-header,
+.workflow-document-fact-find .statement-letter-header,
+.workflow-document-fact-find-update .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -2980,7 +3032,9 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-header-top,
-.workflow-document-quote .statement-header-top {
+.workflow-document-quote .statement-header-top,
+.workflow-document-fact-find .statement-header-top,
+.workflow-document-fact-find-update .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -2989,7 +3043,9 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-logo,
-.workflow-document-quote .statement-logo {
+.workflow-document-quote .statement-logo,
+.workflow-document-fact-find .statement-logo,
+.workflow-document-fact-find-update .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -2998,7 +3054,9 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-client-details,
-.workflow-document-quote .statement-client-details {
+.workflow-document-quote .statement-client-details,
+.workflow-document-fact-find .statement-client-details,
+.workflow-document-fact-find-update .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3009,7 +3067,9 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-client-name,
-.workflow-document-quote .statement-client-name {
+.workflow-document-quote .statement-client-name,
+.workflow-document-fact-find .statement-client-name,
+.workflow-document-fact-find-update .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3018,13 +3078,17 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-address-block,
-.workflow-document-quote .statement-address-block {
+.workflow-document-quote .statement-address-block,
+.workflow-document-fact-find .statement-address-block,
+.workflow-document-fact-find-update .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
 .workflow-document-statement-of-suitability .statement-address-block p,
-.workflow-document-quote .statement-address-block p {
+.workflow-document-quote .statement-address-block p,
+.workflow-document-fact-find .statement-address-block p,
+.workflow-document-fact-find-update .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3033,7 +3097,9 @@ button {
 }
 
 .workflow-document-statement-of-suitability .statement-letter-date,
-.workflow-document-quote .statement-letter-date {
+.workflow-document-quote .statement-letter-date,
+.workflow-document-fact-find .statement-letter-date,
+.workflow-document-fact-find-update .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -3172,7 +3238,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-header {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-header,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-letter-header,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -3182,7 +3250,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-header-top,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-header-top {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-header-top,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-header-top,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -3191,7 +3261,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-logo,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-logo {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-logo,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-logo,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -3200,7 +3272,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-details,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-details {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-details,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-client-details,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3211,7 +3285,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-client-name,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-name {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-client-name,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-client-name,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3220,13 +3296,17 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-address-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-address-block p,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block p {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-address-block p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-address-block p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3235,7 +3315,9 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-date,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-date {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-letter-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-letter-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -3355,7 +3437,9 @@ button {
    Scoped inside .generated-output-pdf-page-body
    ============================================================ */
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability,
-.generated-output-pdf-page-body .workflow-document-quote {
+.generated-output-pdf-page-body .workflow-document-quote,
+.generated-output-pdf-page-body .workflow-document-fact-find,
+.generated-output-pdf-page-body .workflow-document-fact-find-update {
   color: #1f2937;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3363,17 +3447,23 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .document-banner,
-.generated-output-pdf-page-body .workflow-document-quote .document-banner {
+.generated-output-pdf-page-body .workflow-document-quote .document-banner,
+.generated-output-pdf-page-body .workflow-document-fact-find .document-banner,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .document-banner {
   display: none;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .signatures-footer,
-.generated-output-pdf-page-body .workflow-document-quote .signatures-footer {
+.generated-output-pdf-page-body .workflow-document-quote .signatures-footer,
+.generated-output-pdf-page-body .workflow-document-fact-find .signatures-footer,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .signatures-footer {
   display: none;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header,
-.generated-output-pdf-page-body .workflow-document-quote .statement-letter-header {
+.generated-output-pdf-page-body .workflow-document-quote .statement-letter-header,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-letter-header,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-letter-header {
   display: flex;
   align-items: flex-start;
   gap: 32px;
@@ -3383,7 +3473,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-header-top,
-.generated-output-pdf-page-body .workflow-document-quote .statement-header-top {
+.generated-output-pdf-page-body .workflow-document-quote .statement-header-top,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-header-top,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-header-top {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -3392,7 +3484,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-logo,
-.generated-output-pdf-page-body .workflow-document-quote .statement-logo {
+.generated-output-pdf-page-body .workflow-document-quote .statement-logo,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-logo,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-logo {
   display: block;
   width: 180px;
   height: auto;
@@ -3401,7 +3495,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-details,
-.generated-output-pdf-page-body .workflow-document-quote .statement-client-details {
+.generated-output-pdf-page-body .workflow-document-quote .statement-client-details,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-client-details,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-client-details {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -3412,7 +3508,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-client-name,
-.generated-output-pdf-page-body .workflow-document-quote .statement-client-name {
+.generated-output-pdf-page-body .workflow-document-quote .statement-client-name,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-client-name,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-client-name {
   margin: 0 0 8px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
@@ -3421,13 +3519,17 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block,
-.generated-output-pdf-page-body .workflow-document-quote .statement-address-block {
+.generated-output-pdf-page-body .workflow-document-quote .statement-address-block,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-address-block,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-address-block {
   margin-bottom: 10px;
   text-align: right;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-address-block p,
-.generated-output-pdf-page-body .workflow-document-quote .statement-address-block p {
+.generated-output-pdf-page-body .workflow-document-quote .statement-address-block p,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-address-block p,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-address-block p {
   margin: 0 0 2px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
@@ -3436,7 +3538,9 @@ button {
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-date,
-.generated-output-pdf-page-body .workflow-document-quote .statement-letter-date {
+.generated-output-pdf-page-body .workflow-document-quote .statement-letter-date,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-letter-date,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-letter-date {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 13px;
   font-weight: 600;

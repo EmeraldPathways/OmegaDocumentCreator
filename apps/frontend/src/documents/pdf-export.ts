@@ -112,6 +112,11 @@ function elementStyles(sourceElement: Element) {
   const tagName = sourceElement.tagName.toLowerCase();
   const classList = sourceElement.classList;
   const isStmt = elementIsStatement(sourceElement);
+  const workflowRoot = sourceElement.closest(".workflow-document");
+  const isFactFindDoc = Boolean(
+    workflowRoot?.classList.contains("workflow-document-fact-find")
+    || workflowRoot?.classList.contains("workflow-document-fact-find-update"),
+  );
 
   // --- Statement formal document styles (stop web-card look) ---
   if (classList.contains("statement-document-body")) {
@@ -231,7 +236,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if ((tagName === "header" || tagName === "div") && classList.contains("document-banner")) {
-    return "display:block;background:#f6ede3;border:1px solid #e5d5c5;border-radius:16px;padding:22px 24px;margin:0 0 18px;page-break-inside:avoid";
+    return `display:block;background:#f6ede3;border:1px solid #e5d5c5;border-radius:16px;padding:${isFactFindDoc ? "16px 20px" : "22px 24px"};margin:0 0 ${isFactFindDoc ? "14px" : "18px"};page-break-inside:avoid`;
   }
 
   if (tagName === "p" && classList.contains("document-eyebrow")) {
@@ -243,7 +248,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if ((tagName === "section" || tagName === "div") && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
-    return "display:block;border:1px solid #e5e7eb;border-radius:14px;padding:18px 20px;margin:0 0 16px;background:#faf7f2;page-break-inside:avoid";
+    return `display:block;border:1px solid #e5e7eb;border-radius:14px;padding:${isFactFindDoc ? "14px 16px" : "18px 20px"};margin:0 0 ${isFactFindDoc ? "12px" : "16px"};background:#faf7f2;page-break-inside:avoid`;
   }
 
   if ((tagName === "section" || tagName === "div") && classList.contains("document-section")) {
@@ -259,11 +264,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (tagName === "div" && classList.contains("grid-items")) {
-    return "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px";
+    const isClientSummaryGrid = sourceElement.parentElement?.classList.contains("client-summary-grid") ?? false;
+    const columns = isFactFindDoc && isClientSummaryGrid
+      ? "repeat(3,minmax(180px,1fr))"
+      : "repeat(2,minmax(0,1fr))";
+    return `display:grid;grid-template-columns:${columns};gap:${isFactFindDoc ? "7px" : "10px"}`;
   }
 
   if (tagName === "div" && classList.contains("grid-item")) {
-    return "display:block;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;min-height:48px";
+    return `display:block;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:${isFactFindDoc ? "6px 10px" : "10px 12px"};min-height:48px;line-height:${isFactFindDoc ? "1.2" : "1.6"}`;
   }
 
   if (tagName === "span" && classList.contains("grid-label")) {
@@ -271,7 +280,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (tagName === "strong" && sourceElement.parentElement?.classList.contains("grid-item")) {
-    return "display:block;font-size:13px;color:#111827";
+    return `display:block;font-size:13px;color:#111827;font-family:${isFactFindDoc ? "Helvetica,Arial,sans-serif" : "inherit"};line-height:${isFactFindDoc ? "1.2" : "inherit"}`;
   }
 
   if (!isStmt && tagName === "h1") {
@@ -983,6 +992,11 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     padding: 22px 24px;
     margin-bottom: 24px;
   }
+  .preview-page .workflow-document-fact-find .document-banner,
+  .preview-page .workflow-document-fact-find-update .document-banner {
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
   .preview-page .document-eyebrow {
     margin: 0 0 8px;
     font-family: "Segoe UI", Tahoma, sans-serif;
@@ -1006,16 +1020,36 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     padding: 18px 20px;
     margin-bottom: 18px;
   }
+  .preview-page .workflow-document-fact-find .client-summary-grid,
+  .preview-page .workflow-document-fact-find .document-grid,
+  .preview-page .workflow-document-fact-find-update .client-summary-grid,
+  .preview-page .workflow-document-fact-find-update .document-grid {
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
   .preview-page .grid-items {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+  .preview-page .workflow-document-fact-find .grid-items,
+  .preview-page .workflow-document-fact-find-update .grid-items {
+    gap: 7px;
+  }
+  .preview-page .workflow-document-fact-find .client-summary-grid .grid-items,
+  .preview-page .workflow-document-fact-find-update .client-summary-grid .grid-items {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
   }
   .preview-page .grid-item {
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     padding: 10px 12px;
+  }
+  .preview-page .workflow-document-fact-find .grid-item,
+  .preview-page .workflow-document-fact-find-update .grid-item {
+    padding: 6px 10px;
+    line-height: 1.2;
   }
   .preview-page .grid-label {
     display: block;
@@ -1031,6 +1065,11 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     display: block;
     font-size: 13px;
     color: #111827;
+  }
+  .preview-page .workflow-document-fact-find .grid-item strong,
+  .preview-page .workflow-document-fact-find-update .grid-item strong {
+    font-family: Helvetica, Arial, sans-serif;
+    line-height: 1.2;
   }
   .preview-page .document-section {
     margin-bottom: 18px;
