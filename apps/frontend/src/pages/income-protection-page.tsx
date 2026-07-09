@@ -308,7 +308,17 @@ export function IncomeProtectionPage() {
   }, [canUseBackend, selectedClientReference]);
 
   useEffect(() => {
-    setDraft(client ?? null);
+    setDraft((currentDraft) => {
+      if (!client) {
+        return null;
+      }
+
+      if (!currentDraft || currentDraft.clientReference !== client.clientReference) {
+        return client;
+      }
+
+      return currentDraft;
+    });
   }, [client]);
 
   useEffect(() => {
@@ -379,6 +389,48 @@ export function IncomeProtectionPage() {
         documentDrafts: {
           ...currentDraft.documentDrafts,
           [documentType]: resolvedStatementDraft,
+        },
+      };
+    });
+  }, [draft, saveGeneratedDraft]);
+
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    const documentType = "Fact Find" satisfies SupportedDocumentType;
+    const currentFactFindDraft = draft.documentDrafts[documentType];
+    const resolvedFactFindDraft = resolveWorkspaceDocumentDraft(draft, documentType);
+
+    const needsRepair =
+      currentFactFindDraft.editedHtml !== resolvedFactFindDraft.editedHtml ||
+      currentFactFindDraft.lastGeneratedHtml !== resolvedFactFindDraft.lastGeneratedHtml ||
+      JSON.stringify(currentFactFindDraft.lastGeneratedSections) !== JSON.stringify(resolvedFactFindDraft.lastGeneratedSections) ||
+      JSON.stringify(currentFactFindDraft.integrationRequests) !== JSON.stringify(resolvedFactFindDraft.integrationRequests);
+
+    if (!needsRepair) {
+      return;
+    }
+
+    saveGeneratedDraft(draft.clientReference, documentType, {
+      generationStatus: resolvedFactFindDraft.generationStatus,
+      lastGeneratedHtml: resolvedFactFindDraft.lastGeneratedHtml,
+      lastGeneratedSections: resolvedFactFindDraft.lastGeneratedSections,
+      integrationRequests: resolvedFactFindDraft.integrationRequests,
+      editedHtml: resolvedFactFindDraft.editedHtml,
+    });
+
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        documentDrafts: {
+          ...currentDraft.documentDrafts,
+          [documentType]: resolvedFactFindDraft,
         },
       };
     });
@@ -1056,13 +1108,10 @@ export function IncomeProtectionPage() {
     saveGeneratedDraft(resolvedDraft.clientReference, "Quote", { generationStatus: "generating" });
 
     try {
-      const integrationRequests = resolveStatementIntegrationRequests(
-        getDocumentDraft("Quote").integrationRequests,
-        await fetchStatementQuoteRequests({
-          clientReference: resolvedDraft.clientReference,
-          workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
-        }),
-      );
+      const integrationRequests = await fetchStatementQuoteRequests({
+        clientReference: resolvedDraft.clientReference,
+        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+      });
       const generatedDocument = {
         generatedHtml: "",
         sections: [],

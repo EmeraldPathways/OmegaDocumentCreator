@@ -3,9 +3,18 @@ import type { GeneratedDocumentDraft, SupportedDocumentType } from "./document-t
 import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 const STATEMENT_DOCUMENT_TYPE = "Statement of Suitability" satisfies SupportedDocumentType;
+const FACT_FIND_DOCUMENT_TYPE = "Fact Find" satisfies SupportedDocumentType;
 
 function hasComposedStatementHtml(editedHtml: string) {
   return editedHtml.includes("workflow-document-statement-of-suitability") && editedHtml.includes("statement-document-body");
+}
+
+function hasLegacyFactFindHeaderHtml(editedHtml: string) {
+  return (
+    editedHtml.includes("workflow-document-fact-find")
+    && editedHtml.includes("document-top-logo")
+    && !editedHtml.includes("statement-letter-header")
+  );
 }
 
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
@@ -58,13 +67,42 @@ export function resolveStatementDraft(profile: SeededClientProfile): GeneratedDo
   };
 }
 
+export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
+  const factFindDraft = profile.documentDrafts[FACT_FIND_DOCUMENT_TYPE];
+  const editedHtml = factFindDraft.editedHtml.trim();
+
+  if (!hasLegacyFactFindHeaderHtml(editedHtml)) {
+    return factFindDraft;
+  }
+
+  const factFindProfile = {
+    ...profile,
+    documentDrafts: {
+      ...profile.documentDrafts,
+      [FACT_FIND_DOCUMENT_TYPE]: {
+        ...factFindDraft,
+        editedHtml: "",
+      },
+    },
+  } satisfies SeededClientProfile;
+
+  return {
+    ...factFindDraft,
+    editedHtml: buildWorkflowEditorDocument(factFindProfile, FACT_FIND_DOCUMENT_TYPE).html,
+  };
+}
+
 export function resolveWorkspaceDocumentDraft(
   profile: SeededClientProfile,
   documentType: SupportedDocumentType,
 ): GeneratedDocumentDraft {
-  if (documentType !== STATEMENT_DOCUMENT_TYPE) {
-    return profile.documentDrafts[documentType];
+  if (documentType === STATEMENT_DOCUMENT_TYPE) {
+    return resolveStatementDraft(profile);
   }
 
-  return resolveStatementDraft(profile);
+  if (documentType === FACT_FIND_DOCUMENT_TYPE) {
+    return resolveFactFindDraft(profile);
+  }
+
+  return profile.documentDrafts[documentType];
 }

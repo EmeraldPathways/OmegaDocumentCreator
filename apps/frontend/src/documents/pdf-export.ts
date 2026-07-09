@@ -6,7 +6,11 @@ export const A4_WIDTH_PX = 794;
 export const A4_HEIGHT_PX = 1123;
 export const HEADER_HEIGHT = 120;
 export const FOOTER_HEIGHT = 110;
-export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 20;
+const REPEATING_HEADER_TOP_OFFSET = 20;
+const REPEATING_HEADER_BOTTOM_GAP = 43;
+const PAGE_TOP_PADDING_WITH_REPEATING_HEADER =
+  REPEATING_HEADER_TOP_OFFSET + HEADER_HEIGHT + REPEATING_HEADER_BOTTOM_GAP;
+export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_TOP_PADDING_WITH_REPEATING_HEADER - FOOTER_HEIGHT - 20;
 const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
@@ -624,12 +628,12 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
   const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
   const headerHtml = options?.headerHtml
     ? `
-      <div style="position:absolute;top:20px;left:50px;right:50px;">
+      <div style="position:absolute;top:${REPEATING_HEADER_TOP_OFFSET}px;left:50px;right:50px;">
         ${options.headerHtml}
       </div>
     `
     : "";
-  const contentTop = options?.headerHtml ? HEADER_HEIGHT : PAGE_TOP_PADDING_WITHOUT_HEADER;
+  const contentTop = options?.headerHtml ? PAGE_TOP_PADDING_WITH_REPEATING_HEADER : PAGE_TOP_PADDING_WITHOUT_HEADER;
 
   return `
     <div class="pdf-page" style="
@@ -769,7 +773,10 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
         background:#ffffff;
         padding:0;
       `;
-      flowContainer.innerHTML = pagination.html;
+      const flowHtml = headerExtraction.headerHtml
+        ? `${headerExtraction.headerHtml}${pagination.html}`
+        : pagination.html;
+      flowContainer.innerHTML = flowHtml;
       container.appendChild(flowContainer);
 
       const flowCanvas = await html2canvas(flowContainer, {
@@ -783,7 +790,11 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 
       container.removeChild(flowContainer);
 
-      const pageHeightPx = (A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT) * RENDER_SCALE;
+      const pageHeightPx = (
+        A4_HEIGHT_PX
+        - (headerExtraction.headerHtml ? REPEATING_HEADER_TOP_OFFSET : PAGE_TOP_PADDING_WITHOUT_HEADER)
+        - FOOTER_HEIGHT
+      ) * RENDER_SCALE;
       const totalPages = Math.max(1, Math.ceil(flowCanvas.height / pageHeightPx));
 
       for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
@@ -830,7 +841,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 }
 
 export function buildStandaloneDocumentPreviewHtml(html: string) {
-  const styledContent = buildPdfStyledHtml(html, true);
+  const styledContent = buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true });
   const isStatement = styledContent.includes("workflow-document-statement-of-suitability");
 
   const statementPreviewCss = `

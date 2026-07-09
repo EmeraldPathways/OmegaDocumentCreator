@@ -99,15 +99,15 @@ function PreviewPage({
 }
 
 function PdfPreview({ html }: { html: string }) {
-  const isStatementSource = html.includes("workflow-document-statement-of-suitability");
+  const editorDocumentPadding = "72px 80px 80px";
   const styledHtml = useMemo(
-    () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: isStatementSource }),
-    [html, isStatementSource],
+    () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true }),
+    [html],
   );
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
   const pagination = isStatement ? paginatePdfContent(styledHtml) : null;
   const showShellFooter = isStatement;
-  const previewBodyPadding = isStatement ? "20px 24px 80px" : "40px 48px 56px";
+  const previewBodyPadding = editorDocumentPadding;
 
   if (!isStatement) {
     return (

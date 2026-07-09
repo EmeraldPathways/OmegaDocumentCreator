@@ -415,9 +415,10 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
   }
 
   const phiDob = requestFieldValue(requests, "DOB", "Date of birth");
+  const requestedCoverAmount = requestFieldValue(requests, "AnnualAmount", "Cover amount");
 
   const summaryItems = [
-    `Cover amount: ${valueOrFallback(profile.recommendedCover)}`,
+    `Cover amount: ${valueOrFallback(requestedCoverAmount || profile.recommendedCover)}`,
     `Date of birth: ${valueOrFallback(phiDob || profile.dateOfBirth)}`,
     `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
     `Cover to age: ${valueOrFallback(profile.coverAge)}`,
