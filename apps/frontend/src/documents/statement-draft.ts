@@ -4,12 +4,15 @@ import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 const STATEMENT_DOCUMENT_TYPE = "Statement of Suitability" satisfies SupportedDocumentType;
 
+function hasComposedStatementHtml(editedHtml: string) {
+  return editedHtml.includes("workflow-document-statement-of-suitability") && editedHtml.includes("statement-document-body");
+}
+
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
-  const hasComposedStatementHtml =
-    editedHtml.includes("workflow-document-statement-of-suitability") && editedHtml.includes("statement-document-body");
+  const hasComposedHtml = hasComposedStatementHtml(editedHtml);
 
-  if (hasComposedStatementHtml) {
+  if (hasComposedHtml) {
     return false;
   }
 
@@ -20,7 +23,7 @@ export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
     recommendationSection.title.toLowerCase().includes("recommendation") &&
     /statement of suitability prepared for/i.test(recommendationSection.bodyHtml);
 
-  const hasNonComposedEditedHtml = editedHtml.length > 0 && !hasComposedStatementHtml;
+  const hasNonComposedEditedHtml = editedHtml.length > 0 && !hasComposedHtml;
 
   return (
     hasLegacyPlaceholderSection ||
@@ -31,8 +34,10 @@ export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
 
 export function resolveStatementDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
   const statementDraft = profile.documentDrafts[STATEMENT_DOCUMENT_TYPE];
+  const editedHtml = statementDraft.editedHtml.trim();
+  const shouldRebuildComposedHtml = hasComposedStatementHtml(editedHtml);
 
-  if (!isLegacyStatementDraft(statementDraft)) {
+  if (!isLegacyStatementDraft(statementDraft) && !shouldRebuildComposedHtml) {
     return statementDraft;
   }
 

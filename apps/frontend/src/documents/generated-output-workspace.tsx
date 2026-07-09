@@ -4,7 +4,7 @@ import { CheckCircle2, Copy, Edit2, Eye, FileDown, FileText, RefreshCw } from "l
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
-import { buildPdfStyledHtml, paginatePdfContent, A4_WIDTH_PX, A4_HEIGHT_PX, HEADER_HEIGHT, FOOTER_HEIGHT, OMEGA_FOOTER_LINES, shouldShowPdfShellHeader } from "./pdf-export";
+import { buildPdfStyledHtml, paginatePdfContent, A4_WIDTH_PX, A4_HEIGHT_PX, HEADER_HEIGHT, FOOTER_HEIGHT, OMEGA_FOOTER_LINES } from "./pdf-export";
 import { resolveDraftPreviewHtml } from "./document-preview";
 import { RichDocumentEditor } from "./rich-document-editor";
 
@@ -104,15 +104,24 @@ function PdfPreview({ html }: { html: string }) {
     () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: isStatementSource }),
     [html, isStatementSource],
   );
-  const pagination = paginatePdfContent(styledHtml);
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
+  const pagination = isStatement ? paginatePdfContent(styledHtml) : null;
   const showShellFooter = isStatement;
-  const previewBodyPadding = isStatement
-    ? "20px 24px 80px"
-    : "72px 80px 80px";
-  const shouldRenderShellHeader = (pageIndex: number) => isStatement
-    ? shouldShowPdfShellHeader(isStatement, pageIndex)
-    : false;
+  const previewBodyPadding = isStatement ? "20px 24px 80px" : "40px 48px 56px";
+
+  if (!isStatement) {
+    return (
+      <PreviewPage
+        bodyPadding={previewBodyPadding}
+        pageNumber={1}
+        showShellFooter={false}
+        showShellHeader={false}
+        totalPages={1}
+      >
+        {styledHtml}
+      </PreviewPage>
+    );
+  }
 
   if (pagination.mode === "continuous") {
     return (
@@ -120,7 +129,7 @@ function PdfPreview({ html }: { html: string }) {
         bodyPadding={previewBodyPadding}
         pageNumber={1}
         showShellFooter={showShellFooter}
-        showShellHeader={shouldRenderShellHeader(0)}
+        showShellHeader={false}
         totalPages={1}
       >
         {pagination.html}
@@ -136,7 +145,7 @@ function PdfPreview({ html }: { html: string }) {
           key={`generated-output-page-${index + 1}`}
           pageNumber={index + 1}
           showShellFooter={showShellFooter}
-          showShellHeader={shouldRenderShellHeader(index)}
+          showShellHeader={false}
           totalPages={pagination.pages.length}
         >
           {pageHtml}

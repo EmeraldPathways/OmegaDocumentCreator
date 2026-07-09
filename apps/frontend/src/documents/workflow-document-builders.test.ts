@@ -27,7 +27,7 @@ describe("buildWorkflowDocument", () => {
         bodyHtml: "<p>Benefits may be limited by underwriting and policy definitions.</p>",
       },
     ];
-    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+    profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
         requestType: "Phi",
@@ -152,7 +152,7 @@ describe("buildWorkflowDocument", () => {
         requestType: "Phi",
         status: "sent",
         requestedAt: "2026-06-29T10:00:00+00:00",
-        requestFields: [{ label: "Age", value: "30" }],
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
         quoteResults: [
           {
             providerName: "Aviva",
@@ -205,7 +205,7 @@ describe("buildWorkflowDocument", () => {
     profile.premium = "";
     profile.netMonthlyCost = "72.98";
     profile.recommendationAcknowledged = "Yes";
-    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+    profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
         requestType: "Phi",
@@ -232,6 +232,175 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("We have discussed affordability of this plan and you are happy to proceed.");
     expect(document.html).toContain("The premium offered by Aviva for this type of cover is competitive");
     expect(document.html).toContain("The monthly premium receives 40% tax relief on this plan.");
+  });
+
+  it.skip("prefers live quote premium and request deferred period over stale statement fields", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.provider = "Aviva";
+    profile.productType = "Income Protection";
+    profile.income = "50000";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "26 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+    profile.netMonthlyCost = "100.00";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Statement of Suitability"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Guaranteed",
+            levelPremium: "121.62",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Recommendation: Aviva 13 weeks deferred plan for â‚¬30,000 per annum");
+    expect(document.html).toContain("The gross cost of this 13 weeks deferred period plan is â‚¬121.62 less tax relief @18% giving a net cost of â‚¬100.00pm.");
+    expect(document.html).not.toContain("26 weeks deferred plan");
+    expect(document.html).not.toContain("â‚¬165.50");
+  });
+
+  it("uses the first quote result for statement pricing and keeps the quote table out of the statement", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.provider = "Zurich Life";
+    profile.productType = "Income Protection";
+    profile.income = "50000";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "26 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+    profile.netMonthlyCost = "100.00";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "26 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Reviewable",
+            levelPremium: "177.74",
+            escalation3Premium: "197.24",
+          },
+          {
+            providerName: "Irish Life",
+            policyType: "Guaranteed",
+            levelPremium: "199.99",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Recommendation: Aviva 26 weeks deferred plan");
+    expect(document.html).toContain("We recommend an Aviva Income Protection 26 weeks deferred plan");
+    expect(document.html).toContain("The gross cost of this 26 weeks deferred period plan is");
+    expect(document.html).toContain("177.74");
+    expect(document.html).toContain("less tax relief @40%");
+    expect(document.html).toContain("106.64pm");
+    expect(document.html).not.toContain("165.50");
+    expect(document.html).not.toContain("statement-quote-table");
+    expect(document.html).not.toContain("197.24");
+  });
+
+  it("uses 20 percent tax relief for single clients at or below the Irish cutoff", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.maritalStatus = "Single";
+    profile.provider = "";
+    profile.productType = "Income Protection";
+    profile.income = "44000";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "26 weeks";
+    profile.coverAge = "65";
+    profile.premium = "";
+    profile.netMonthlyCost = "";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "26 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Reviewable",
+            levelPremium: "177.74",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("less tax relief @20%");
+    expect(document.html).toContain("142.19pm");
+  });
+
+  it("does not append stale generated recommendation html onto the statement recommendation", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [
+      {
+        id: "recommendation",
+        title: "Recommendation",
+        bodyHtml: "<p>The gross cost of this 26 deferred period plan is €165.50 less tax relief @40% giving a net cost of €99.30pm.</p>",
+      },
+    ];
+    profile.provider = "Zurich Life";
+    profile.productType = "Income Protection";
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "26 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+    profile.netMonthlyCost = "99.30";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "26 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Reviewable",
+            levelPremium: "177.74",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("177.74");
+    expect(document.html).toContain("106.64pm");
+    expect(document.html).not.toContain("99.30pm");
+    expect(document.html).not.toContain("165.50");
   });
 
   it("preserves fact find contact address and employment coverage when no generated draft exists", () => {

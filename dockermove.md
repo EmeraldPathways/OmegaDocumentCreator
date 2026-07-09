@@ -194,3 +194,4 @@ Acceptance criteria:
 - Docker-hosted config no longer depends on `127.0.0.1:8007` or native-only storage paths
 - The result is structurally ready for Cloudflare Tunnel to be added afterward
 ```
+Update handoff files and project.md

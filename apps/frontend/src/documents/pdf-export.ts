@@ -10,6 +10,7 @@ export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT 
 const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
+const PAGE_TOP_PADDING_WITHOUT_HEADER = 28;
 
 function stripMarkdownFences(html: string) {
   return html.replace(/^\s*```html\s*/i, "").replace(/```\s*$/i, "").trim();
@@ -120,11 +121,11 @@ function elementStyles(sourceElement: Element) {
 
   // --- Statement formal document styles (stop web-card look) ---
   if (classList.contains("statement-document-body")) {
-    return "display:block;color:#000;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.65";
+    return "display:block;color:#1f2937;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.7";
   }
 
   if (classList.contains("statement-letter-header")) {
-    return "display:flex;align-items:flex-start;gap:32px;margin:0 0 32px;padding-bottom:20px;border-bottom:2px solid #000;page-break-inside:avoid";
+    return "display:flex;align-items:flex-start;gap:32px;margin:0 0 28px;padding-bottom:20px;border-bottom:2px solid #c68b2c;page-break-inside:avoid";
   }
 
   if (classList.contains("statement-header-top")) {
@@ -144,20 +145,20 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-address-block")) {
-    return "display:block;text-align:right;margin:0 0 8px";
+    return "display:block;text-align:right;margin:0 0 10px";
   }
 
   if (isStmt && classList.contains("statement-letter-date")) {
-    return "margin:12px 0 0;text-align:right;font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:400;color:#000";
+    return "margin:0;text-align:right;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;color:#5b2230";
   }
 
   if (classList.contains("statement-opening")) {
-    return "display:block;margin:0 0 20px;page-break-inside:avoid";
+    return "display:block;margin:0 0 24px;page-break-inside:avoid";
   }
 
   // Statement section headings: black, bold, underlined, serif
   if (isStmt && tagName === "h2") {
-    return "margin:0 0 10px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:700;text-decoration:underline;color:#000";
+    return "margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #e5e7eb;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.02em;color:#5b2230";
   }
 
   if (classList.contains("statement-important-notice")) {
@@ -211,19 +212,19 @@ function elementStyles(sourceElement: Element) {
 
   // Statement paragraphs: black, serif, tighter spacing
   if (isStmt && tagName === "p") {
-    return "margin:0 0 8px;line-height:1.6;white-space:pre-wrap;color:#000";
+    return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";
   }
 
   if (isStmt && tagName === "strong") {
-    return "font-weight:700;color:#000";
+    return "font-weight:700;color:#1f2937";
   }
 
   if (isStmt && (tagName === "ul" || tagName === "ol")) {
-    return "margin:0 0 8px;padding-left:22px;color:#000";
+    return "margin:0 0 10px;padding-left:22px;color:#1f2937";
   }
 
   if (isStmt && tagName === "li") {
-    return "margin:0 0 4px;line-height:1.6;color:#000";
+    return "margin:0 0 6px;line-height:1.7;color:#1f2937";
   }
 
   // --- Existing non-Statement styles (unchanged) ---
@@ -586,26 +587,49 @@ export const OMEGA_FOOTER_LINES = [
   "OFM Financial Ltd trading as Omega Financial Management is regulated by the Central Bank of Ireland. Registered in Ireland Number 226937",
 ];
 
-export function shouldShowPdfShellHeader(isStatement: boolean, pageIndex: number) {
-  return !isStatement || pageIndex > 0;
+export function shouldShowPdfShellHeader(_isStatement: boolean, _pageIndex: number) {
+  return true;
 }
 
-function buildPageHtml(content: string, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
+function extractRepeatingHeaderHtml(html: string) {
+  if (typeof DOMParser === "undefined") {
+    return { contentHtml: html, headerHtml: "" };
+  }
+
+  const parser = new DOMParser();
+  const sourceDocument = parser.parseFromString(html, "text/html");
+  const headerElement = sourceDocument.querySelector(".statement-letter-header");
+
+  if (!headerElement) {
+    return { contentHtml: html, headerHtml: "" };
+  }
+
+  const removableWrapper = headerElement.closest(".document-inline-header");
+  if (removableWrapper) {
+    removableWrapper.remove();
+  } else {
+    headerElement.remove();
+  }
+
+  return {
+    contentHtml: sourceDocument.body.innerHTML.trim(),
+    headerHtml: headerElement.outerHTML,
+  };
+}
+
+function buildPageHtml(content: string, pageNumber: number, totalPages: number, options?: { headerHtml?: string }) {
   const footerLines = OMEGA_FOOTER_LINES.map(
     (line) => `<div style="font-size:7.5px;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:3px;">${line}</div>`,
   ).join("");
   const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
-  const headerHtml = options?.showShellHeader
+  const headerHtml = options?.headerHtml
     ? `
-      <div style="position:absolute;top:20px;left:42px;right:42px;text-align:center;">
-        <img
-          src="${OMEGA_LOGO_DATA_URI}"
-          alt="Omega Financial Management"
-          style="display:block;width:160px;height:auto;margin:0 auto 8px;"
-        />
+      <div style="position:absolute;top:20px;left:50px;right:50px;">
+        ${options.headerHtml}
       </div>
     `
     : "";
+  const contentTop = options?.headerHtml ? HEADER_HEIGHT : PAGE_TOP_PADDING_WITHOUT_HEADER;
 
   return `
     <div class="pdf-page" style="
@@ -620,7 +644,7 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
       font-size:14px;
     ">
       ${headerHtml}
-      <div style="position:absolute;top:${HEADER_HEIGHT}px;left:50px;right:50px;bottom:${FOOTER_HEIGHT}px;overflow:hidden;">
+      <div style="position:absolute;top:${contentTop}px;left:50px;right:50px;bottom:${FOOTER_HEIGHT}px;overflow:hidden;">
         ${content}
       </div>
       <div style="position:absolute;bottom:20px;left:42px;right:42px;border-top:1px solid #000;padding-top:6px;text-align:center;">
@@ -690,7 +714,8 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
   const parsedContent = buildPdfStyledHtml(html, true, {
     stripFactFindLogosForPreview: !isStatement,
   });
-  const pagination = splitContentIntoPages(parsedContent);
+  const headerExtraction = extractRepeatingHeaderHtml(parsedContent);
+  const pagination = splitContentIntoPages(headerExtraction.contentHtml);
   const container = document.createElement("div");
   container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
   document.body.appendChild(container);
@@ -708,7 +733,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
       for (let pageIndex = 0; pageIndex < pagination.pages.length; pageIndex += 1) {
         const pageDiv = document.createElement("div");
         pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length, {
-          showShellHeader: shouldShowPdfShellHeader(isStatement, pageIndex),
+          headerHtml: headerExtraction.headerHtml,
         });
         container.appendChild(pageDiv);
 
@@ -793,7 +818,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 
         pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 12, 20, A4_WIDTH_MM - 24, contentHeightMm, undefined, "SLOW");
         drawPdfPageChrome(pdf, pageIndex + 1, totalPages, {
-          showShellHeader: shouldShowPdfShellHeader(isStatement, pageIndex),
+          showShellHeader: false,
         });
       }
     }

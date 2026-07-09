@@ -587,8 +587,9 @@ export function IncomeProtectionPage() {
         onBlur={(event) => updateField(field, formatCurrency(event.target.value))}
         onChange={(event) => updateField(field, event.target.value)}
         prefix="EUR"
+        inputMode="decimal"
         step="0.01"
-        type="number"
+        type="text"
         value={resolvedDraft[field]}
       />
     );
@@ -695,8 +696,9 @@ export function IncomeProtectionPage() {
             onBlur={(event) => updateSavingsInvestmentRow(index, "value", formatCurrency(event.target.value))}
             onChange={(event) => updateSavingsInvestmentRow(index, "value", event.target.value)}
             prefix="EUR"
+            inputMode="decimal"
             step="0.01"
-            type="number"
+            type="text"
             value={row?.value ?? ""}
           />
         </td>
@@ -1365,9 +1367,6 @@ export function IncomeProtectionPage() {
       return (
         <div className="page-stack">
           <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Fact Find Draft</h2>
-            </div>
             <div className="fact-find-type-selector">
                 <Select
                 id="ff-type"
@@ -1498,8 +1497,9 @@ export function IncomeProtectionPage() {
                   onBlur={(event) => updateField("income", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("income", event.target.value)}
                   prefix="€"
+                  inputMode="decimal"
                   step="0.01"
-                  type="number"
+                  type="text"
                   value={resolvedDraft.income}
                 />
                 <Input
@@ -1547,8 +1547,9 @@ export function IncomeProtectionPage() {
                   onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                   onChange={(event) => updateField("premium", event.target.value)}
                   prefix="€"
+                  inputMode="decimal"
                   step="0.01"
-                  type="number"
+                  type="text"
                   value={resolvedDraft.premium}
                 />
                 <Select
@@ -2108,11 +2109,6 @@ export function IncomeProtectionPage() {
 
       return (
         <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Fact Find Update Draft</h2>
-            </div>
-          </div>
 
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem
@@ -2250,11 +2246,6 @@ export function IncomeProtectionPage() {
 
       return (
         <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Statement of Suitability Draft</h2>
-            </div>
-          </div>
 
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem
@@ -2306,8 +2297,9 @@ export function IncomeProtectionPage() {
                 onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("recommendedCover", event.target.value)}
                 prefix="EUR"
+                inputMode="decimal"
                 step="0.01"
-                type="number"
+                type="text"
                 value={resolvedDraft.recommendedCover}
               />
               <Select
@@ -2330,8 +2322,9 @@ export function IncomeProtectionPage() {
                 onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("premium", event.target.value)}
                 prefix="€"
+                inputMode="decimal"
                 step="0.01"
-                type="number"
+                type="text"
                 value={resolvedDraft.premium}
               /> : null}
               <Input
@@ -2341,8 +2334,9 @@ export function IncomeProtectionPage() {
                 onBlur={(event) => updateField("netMonthlyCost", formatCurrency(event.target.value))}
                 onChange={(event) => updateField("netMonthlyCost", event.target.value)}
                 prefix="€"
+                inputMode="decimal"
                 step="0.01"
-                type="number"
+                type="text"
                 value={resolvedDraft.netMonthlyCost}
               />
               <Textarea
@@ -2404,11 +2398,6 @@ export function IncomeProtectionPage() {
 
       return (
         <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div>
-              <h2>Quote Comparison Draft</h2>
-            </div>
-          </div>
 
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem

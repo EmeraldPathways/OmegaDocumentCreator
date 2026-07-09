@@ -216,9 +216,11 @@ function buildStatementFinancialSituationHtml(profile: SeededClientProfile) {
   return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 }
 
-function requestFieldValue(requests: IntegrationRequestArtifact[], label: string) {
+function requestFieldValue(requests: IntegrationRequestArtifact[], ...labels: string[]) {
+  const normalizedLabels = labels.map((label) => label.trim().toLowerCase()).filter(Boolean);
   for (const request of requests) {
-    const field = request.requestFields.find((entry) => entry.label === label && entry.value.trim().length > 0);
+    const field = request.requestFields.find((entry) =>
+      normalizedLabels.includes(entry.label.trim().toLowerCase()) && entry.value.trim().length > 0);
     if (field) {
       return field.value;
     }
@@ -254,16 +256,22 @@ function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRe
   if (quotes.length === 0) {
     return null;
   }
+  return quotes[0];
+}
 
-  const provider = profile.provider.trim().toLowerCase();
-  if (provider) {
-    const matchedQuote = quotes.find((quote) => quote.providerName.trim().toLowerCase() === provider);
-    if (matchedQuote) {
-      return matchedQuote;
-    }
+function resolveIrishIncomeTaxReliefPercentage(profile: StatementRecommendationProfile) {
+  const income = parseNumber(profile.income);
+  if (income === null) {
+    return null;
   }
 
-  return quotes[0];
+  const maritalStatus = profile.maritalStatus.trim().toLowerCase();
+  const cutoff = maritalStatus === "single" ? 44_000 : maritalStatus === "married" ? 53_000 : null;
+  if (cutoff === null) {
+    return null;
+  }
+
+  return income <= cutoff ? 20 : 40;
 }
 
 function resolveTaxReliefPercentage(
@@ -276,11 +284,40 @@ function resolveTaxReliefPercentage(
     return configuredValue;
   }
 
+  const irelandIncomeThresholdValue = resolveIrishIncomeTaxReliefPercentage(profile);
+  if (irelandIncomeThresholdValue !== null) {
+    return irelandIncomeThresholdValue;
+  }
+
   if (grossPremium !== null && netMonthlyCost !== null && grossPremium > 0 && netMonthlyCost <= grossPremium) {
     return Math.round((1 - netMonthlyCost / grossPremium) * 100);
   }
 
   return null;
+}
+
+function resolveStatementDeferredPeriod(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  return valueOrFallback(
+    requestFieldValue(requests, "DeferredPeriod", "Deferred period") || profile.deferredPeriod,
+    "Deferred period to be confirmed",
+  );
+}
+
+function resolveStatementGrossPremium(profile: SeededClientProfile, selectedQuote: ReturnType<typeof findSelectedQuote>) {
+  return parseNumber(selectedQuote?.levelPremium) ?? parseNumber(profile.premium);
+}
+
+function resolveStatementNetMonthlyCost(
+  profile: StatementRecommendationProfile,
+  grossPremium: number | null,
+  taxReliefPercentage: number | null,
+) {
+  const configuredValue = parseNumber(profile.netMonthlyCost);
+  if (grossPremium === null || taxReliefPercentage === null) {
+    return configuredValue;
+  }
+
+  return grossPremium * (1 - taxReliefPercentage / 100);
 }
 
 function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: string | undefined) {
@@ -300,19 +337,20 @@ function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: str
 
 function buildStatementRecommendationHtml(profile: SeededClientProfile) {
   const statementProfile = profile as StatementRecommendationProfile;
-  const requests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+  const requests = getQuoteRequests(profile);
   const selectedQuote = findSelectedQuote(profile, requests);
-  const provider = valueOrFallback(profile.provider || selectedQuote?.providerName, "Recommended provider");
-  const deferredPeriod = valueOrFallback(profile.deferredPeriod, "Deferred period to be confirmed");
+  const provider = valueOrFallback(selectedQuote?.providerName || profile.provider, "Recommended provider");
+  const deferredPeriod = resolveStatementDeferredPeriod(profile, requests);
   const coverAmountNumber = parseNumber(profile.recommendedCover);
   const coverAmount = coverAmountNumber === null ? valueOrFallback(profile.recommendedCover) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
   const coverAge = valueOrFallback(profile.coverAge, "selected retirement age");
   const incomeNumber = parseNumber(profile.income);
   const coverShare =
     incomeNumber !== null && incomeNumber > 0 && coverAmountNumber !== null ? Math.round((coverAmountNumber / incomeNumber) * 100) : null;
-  const grossPremiumNumber = parseNumber(profile.premium) ?? parseNumber(selectedQuote?.levelPremium);
-  const netMonthlyCostNumber = parseNumber(profile.netMonthlyCost);
-  const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremiumNumber, netMonthlyCostNumber);
+  const grossPremiumNumber = resolveStatementGrossPremium(profile, selectedQuote);
+  const configuredNetMonthlyCostNumber = parseNumber(profile.netMonthlyCost);
+  const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremiumNumber, configuredNetMonthlyCostNumber);
+  const netMonthlyCostNumber = resolveStatementNetMonthlyCost(statementProfile, grossPremiumNumber, taxReliefPercentage);
   const discountApplied = parseNumber(statementProfile.discountApplied);
   const productLabel = valueOrFallback(profile.productType, "Income Protection policy");
   const affordabilityConfirmed =
@@ -376,9 +414,11 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     return "";
   }
 
+  const phiDob = requestFieldValue(requests, "DOB", "Date of birth");
+
   const summaryItems = [
     `Cover amount: ${valueOrFallback(profile.recommendedCover)}`,
-    `Age: ${valueOrFallback(requestFieldValue(requests, "Age"))}`,
+    `Date of birth: ${valueOrFallback(phiDob || profile.dateOfBirth)}`,
     `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
     `Cover to age: ${valueOrFallback(profile.coverAge)}`,
     `Smoker status: ${valueOrFallback(profile.smokerStatus)}`,
@@ -855,7 +895,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
   const recommendationHtml =
     documentType === "Statement of Suitability"
-      ? mergeStatementRecommendationHtml(computedRecommendationHtml, recommendationSection?.bodyHtml)
+      ? computedRecommendationHtml
       : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);
   const warningHtml = warningSection?.bodyHtml ?? buildWarningHtml(profile, documentType);

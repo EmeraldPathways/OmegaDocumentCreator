@@ -72,9 +72,6 @@ export function IncomeProtectionGeneratedDocumentsTab({
   return (
     <div className="page-stack">
       <div className="page-heading page-heading-compact">
-        <div>
-          <h2>Generated Documents</h2>
-        </div>
         <div className="page-actions">
           <Button
             isLoading={documentPackStatus === "Pack: Preparing pack..."}

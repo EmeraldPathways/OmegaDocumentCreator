@@ -423,7 +423,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
 
-    expect(screen.getByRole("heading", { name: "Fact Find Draft" })).toBeInTheDocument();
     expect(screen.getAllByDisplayValue("Jamie Murphy").length).toBeGreaterThan(1);
     expect(screen.getByDisplayValue("jamie.murphy@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Employed")).toBeInTheDocument();
@@ -543,6 +542,22 @@ describe("App routes", () => {
     expect(document.querySelector('label[for="ff-premium"]')?.textContent).toBe("Monthly premium");
     expect(document.querySelector('label[for="ff-phiIndexation"]')?.textContent).toBe("PHI indexation");
     expect(document.querySelector('label[for="ff-recommendedCover"]')?.textContent).toContain("*");
+  });
+
+  it("keeps formatted salary visible on fact find after blur", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    const incomeInput = screen.getByLabelText(/Income \/ salary/i) as HTMLInputElement;
+
+    fireEvent.change(incomeInput, { target: { value: "52000" } });
+    fireEvent.blur(incomeInput);
+
+    expect(incomeInput.value).toBe("52,000.00");
   });
 
   it("updates the draft save status inside the Fact Find tab", () => {
@@ -858,6 +873,8 @@ describe("App routes", () => {
     });
 
     expect(screen.getByText("Aviva")).toBeInTheDocument();
+    expect(screen.getByText("Date of birth: 08/11/1990")).toBeInTheDocument();
+    expect(screen.queryByText("Age: Not recorded")).not.toBeInTheDocument();
   });
 
   it("preserves the last successful quote table when a regenerate returns failed PHI results", async () => {
@@ -1376,7 +1393,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
-    expect(screen.getByRole("heading", { name: "Statement of Suitability Draft" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Full Advice")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Zurich Life")).toBeInTheDocument();
     expect(screen.getByDisplayValue("30000")).toBeInTheDocument();
@@ -1518,7 +1534,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
 
-    expect(screen.getByRole("heading", { name: "Client Files" })).toBeInTheDocument();
     expect(screen.getByText("Drop files here")).toBeInTheDocument();
     expect(screen.getByText(/Proof of Age/)).toBeInTheDocument();
     expect(screen.getByText("Pending review")).toBeInTheDocument();
@@ -1551,7 +1566,6 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Generated Documents" }));
 
-    expect(screen.getByRole("heading", { name: "Generated Documents" })).toBeInTheDocument();
     expect(screen.getByText("Jamie_Murphy_Statement_of_Suitability_2026-06-06.pdf")).toBeInTheDocument();
     expect(screen.getAllByText("Version 1")).toHaveLength(2);
     expect(screen.getAllByText("PDF ready")).toHaveLength(2);

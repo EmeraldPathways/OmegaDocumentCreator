@@ -64,9 +64,6 @@ export function IncomeProtectionFilesTab({
   return (
     <div className="page-stack">
       <div className="page-heading page-heading-compact">
-        <div>
-          <h2>Client Files</h2>
-        </div>
         <div className="page-actions">
           <Button onClick={onFileSelect} variant="primary">
             <Upload size={18} />

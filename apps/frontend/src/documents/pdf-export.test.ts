@@ -83,8 +83,8 @@ describe("paginatePdfContent", () => {
 });
 
 describe("shouldShowPdfShellHeader", () => {
-  it("shows the shell header on later statement pages but not the first page", () => {
-    expect(shouldShowPdfShellHeader(true, 0)).toBe(false);
+  it("shows the shell header on every exported page", () => {
+    expect(shouldShowPdfShellHeader(true, 0)).toBe(true);
     expect(shouldShowPdfShellHeader(true, 1)).toBe(true);
     expect(shouldShowPdfShellHeader(false, 0)).toBe(true);
   });
