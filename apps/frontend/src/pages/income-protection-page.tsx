@@ -1021,14 +1021,18 @@ export function IncomeProtectionPage() {
         templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
         workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
       });
+      const integrationRequests = resolveStatementIntegrationRequests(
+        getDocumentDraft("Quote").integrationRequests,
+        generatedDocument.integrationRequests,
+      );
       saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
-        integrationRequests: [],
+        integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Statement of Suitability", {
           ...generatedDocument,
-          integrationRequests: [],
+          integrationRequests,
         }),
       });
       setStatementDocumentStatus("Document: Draft generated");
