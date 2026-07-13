@@ -281,6 +281,12 @@ export function IncomeProtectionPage() {
   const [showStatementValidation, setShowStatementValidation] = useState(false);
   const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
   const [showQuoteValidation, setShowQuoteValidation] = useState(false);
+  const [quoteAnnualCoverAmount, setQuoteAnnualCoverAmount] = useState("");
+  const [quoteCoverToAge, setQuoteCoverToAge] = useState("");
+  const [quoteOccupationClass, setQuoteOccupationClass] = useState("");
+  const [quoteDeferredPeriod, setQuoteDeferredPeriod] = useState("");
+  const [quoteSmoker, setQuoteSmoker] = useState("");
+  const [quotePhiIndexation, setQuotePhiIndexation] = useState("");
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -295,7 +301,7 @@ export function IncomeProtectionPage() {
   const factFindAccordion = useAccordionState(["personal-details"]);
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
-  const quoteWorkspaceAccordion = useAccordionState(["quote-output"]);
+  const quoteWorkspaceAccordion = useAccordionState(["quote-output", "generated-output"]);
 
   useEffect(() => {
     if (!canUseBackend || !selectedClientReference) return;
@@ -504,29 +510,60 @@ export function IncomeProtectionPage() {
     { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
   ];
 
+  const quoteYourAge = useMemo(() => {
+    if (!resolvedDraft.dateOfBirth) return "";
+    const dob = new Date(resolvedDraft.dateOfBirth);
+    if (Number.isNaN(dob.getTime())) return "";
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return String(age);
+  }, [resolvedDraft.dateOfBirth]);
+
   const quoteMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
     !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-    !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
-    !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
-    !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
-    !hasValue(resolvedDraft.gender) ? "Gender" : null,
-    !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
-    !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
-    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
+    !hasValue(quoteAnnualCoverAmount) ? "Annual cover amount" : null,
+    !hasValue(quoteCoverToAge) ? "Cover to age" : null,
+    !hasValue(quoteOccupationClass) ? "Occupation class" : null,
+    !hasValue(quoteDeferredPeriod) ? "Deferred period" : null,
+    !hasValue(quoteSmoker) ? "Smoker" : null,
   ].filter(isPresent);
 
   const quoteGenerationRequirements = [
-    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
-    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
-    { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
-    { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
-    { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
-    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
-    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
-    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
-    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
+    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
+    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
+    { label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form" },
+    { label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form" },
+    { label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form" },
+    { label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form" },
+    { label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form" },
+    { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
   ];
+
+  const quoteWorkflowSnapshot = useMemo(
+    () => ({
+      ...resolvedDraft,
+      recommendedCover: quoteAnnualCoverAmount,
+      coverAge: quoteCoverToAge,
+      phiOccupationalClass: quoteOccupationClass,
+      deferredPeriod: quoteDeferredPeriod,
+      smokerStatus: quoteSmoker,
+      phiIndexation: quotePhiIndexation,
+    }),
+    [
+      quoteAnnualCoverAmount,
+      quoteCoverToAge,
+      quoteDeferredPeriod,
+      quoteOccupationClass,
+      quotePhiIndexation,
+      quoteSmoker,
+      resolvedDraft,
+    ],
+  );
 
   const factFindUpdateGenerationRequirements = [
     { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
@@ -913,15 +950,16 @@ export function IncomeProtectionPage() {
       integrationRequests?: GeneratedDocumentDraft["integrationRequests"];
     },
   ) {
+    const sourceProfile = documentType === "Quote" ? quoteWorkflowSnapshot : resolvedDraft;
     const nextProfile = {
-      ...resolvedDraft,
+      ...sourceProfile,
       documentDrafts: {
-        ...resolvedDraft.documentDrafts,
+        ...sourceProfile.documentDrafts,
         [documentType]: {
-          ...resolvedDraft.documentDrafts[documentType],
+          ...sourceProfile.documentDrafts[documentType],
           lastGeneratedHtml: generatedDocument.generatedHtml,
           lastGeneratedSections: generatedDocument.sections,
-          integrationRequests: generatedDocument.integrationRequests ?? resolvedDraft.documentDrafts[documentType].integrationRequests,
+          integrationRequests: generatedDocument.integrationRequests ?? sourceProfile.documentDrafts[documentType].integrationRequests,
           editedHtml: "",
         },
       },
@@ -1110,7 +1148,7 @@ export function IncomeProtectionPage() {
     try {
       const integrationRequests = await fetchStatementQuoteRequests({
         clientReference: resolvedDraft.clientReference,
-        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+        workflowSnapshot: quoteWorkflowSnapshot as unknown as Record<string, unknown>,
       });
       const generatedDocument = {
         generatedHtml: "",
@@ -1589,7 +1627,7 @@ export function IncomeProtectionPage() {
                 />
                 <Input
                   id="ff-recommendedCover"
-                  label={requiredLabel("Annual Cover Amount (€)")}
+                  label="Annual Cover Amount (€)"
                   onChange={(event) => updateField("recommendedCover", event.target.value)}
                   type="text"
                   value={resolvedDraft.recommendedCover}
@@ -1607,28 +1645,28 @@ export function IncomeProtectionPage() {
                 />
                 <Select
                   id="ff-deferredPeriod"
-                  label={requiredLabel("Deferred period")}
+                  label="Deferred period"
                   onChange={(event) => updateField("deferredPeriod", event.target.value)}
                   options={deferredPeriodOptions}
                   value={resolvedDraft.deferredPeriod}
                 />
                 <Select
                   id="ff-coverAge"
-                  label={requiredLabel("Cover to age")}
+                  label="Cover to age"
                   onChange={(event) => updateField("coverAge", event.target.value)}
                   options={coverAgeOptions}
                   value={resolvedDraft.coverAge}
                 />
                 <Select
                   id="ff-smokerStatus"
-                  label={requiredLabel("Smoker status")}
+                  label="Smoker status"
                   onChange={(event) => updateField("smokerStatus", event.target.value)}
                   options={smokerStatusOptions}
                   value={resolvedDraft.smokerStatus}
                 />
                 <Select
                   id="ff-phiOccupationalClass"
-                  label={requiredLabel("PHI occupational class")}
+                  label="PHI occupational class"
                   onChange={(event) => updateField("phiOccupationalClass", event.target.value)}
                   options={phiOccupationalClassOptions}
                   value={resolvedDraft.phiOccupationalClass}
@@ -2454,15 +2492,87 @@ export function IncomeProtectionPage() {
 
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem
-              indicator={getGeneratedDraftStatusLabel(quoteDraft.generationStatus)}
+              indicator={getSectionProgress([quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker])}
               isOpen={quoteWorkspaceAccordion.isOpen("quote-output")}
               onToggle={() => quoteWorkspaceAccordion.toggle("quote-output")}
-              title="Generated Output"
+              title="Quote Form"
             >
+              <div className="form-grid">
+                <Input
+                  id="quote-name"
+                  label="Name"
+                  type="text"
+                  value={resolvedDraft.fullName}
+                  disabled
+                />
+                <Input
+                  id="quote-dob"
+                  label="Date of Birth"
+                  type="date"
+                  value={resolvedDraft.dateOfBirth}
+                  disabled
+                />
+                <Input
+                  id="quote-age"
+                  label="Your Age"
+                  type="text"
+                  value={quoteYourAge}
+                  disabled
+                />
+                <Input
+                  id="quote-annualCoverAmount"
+                  label={requiredLabel("Annual Cover Amount")}
+                  onChange={(event) => setQuoteAnnualCoverAmount(event.target.value)}
+                  type="text"
+                  value={quoteAnnualCoverAmount}
+                />
+                <Select
+                  id="quote-coverToAge"
+                  label={requiredLabel("Cover to Age")}
+                  onChange={(event) => setQuoteCoverToAge(event.target.value)}
+                  options={coverAgeOptions}
+                  value={quoteCoverToAge}
+                />
+                <Select
+                  id="quote-occupationClass"
+                  label={requiredLabel("Occupation Class")}
+                  onChange={(event) => setQuoteOccupationClass(event.target.value)}
+                  options={phiOccupationalClassOptions}
+                  value={quoteOccupationClass}
+                />
+                <Select
+                  id="quote-deferredPeriod"
+                  label={requiredLabel("Deferred Period")}
+                  onChange={(event) => setQuoteDeferredPeriod(event.target.value)}
+                  options={deferredPeriodOptions}
+                  value={quoteDeferredPeriod}
+                />
+                <Select
+                  id="quote-smoker"
+                  label={requiredLabel("Smoker")}
+                  onChange={(event) => setQuoteSmoker(event.target.value)}
+                  options={smokerStatusOptions}
+                  value={quoteSmoker}
+                />
+                <Select
+                  id="quote-phiIndexation"
+                  label="PHI Indexation"
+                  onChange={(event) => setQuotePhiIndexation(event.target.value)}
+                  options={phiIndexationOptions}
+                  value={quotePhiIndexation}
+                />
+              </div>
               {renderGenerationRequirements("Quote generation requirements", quoteGenerationRequirements, quoteMissingFields, {
-                explainSharedFields: true,
+                explainSharedFields: false,
                 emphasiseMissing: showQuoteValidation,
               })}
+            </AccordionItem>
+            <AccordionItem
+              indicator={getGeneratedDraftStatusLabel(quoteDraft.generationStatus)}
+              isOpen={quoteWorkspaceAccordion.isOpen("generated-output")}
+              onToggle={() => quoteWorkspaceAccordion.toggle("generated-output")}
+              title="Generated Output"
+            >
               <GeneratedOutputWorkspace
                 draft={quoteDraft}
                 emptyMessage="Generate the quote comparison to open the quote workspace."

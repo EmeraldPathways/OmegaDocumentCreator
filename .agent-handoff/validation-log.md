@@ -1,5 +1,45 @@
 # Validation Log
 
+## 2026-07-13: Quote Tab Separation And Restart
+
+### Targeted frontend Quote request-body verification
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run src/app.test.tsx -t "posts Quote form values in the quote generation workflow snapshot" --no-cache
+```
+
+**Result**: passed
+
+### Known frontend follow-up
+
+```powershell
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run src/app.test.tsx -t "uses the dedicated quote response to render the quote table" --no-cache
+```
+
+**Result**: failed; the Quote rendering assertion still needs follow-up before a clean full-suite frontend claim
+
+### Live runtime restart and smoke check
+
+```powershell
+./run-omega.cmd
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3007 | Select-Object -ExpandProperty StatusCode
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8007/health | Select-Object -ExpandProperty StatusCode
+```
+
+**Result**:
+- `run-omega.cmd`: frontend and backend restarted successfully
+- `GET http://127.0.0.1:3007`: 200
+- `GET http://127.0.0.1:8007/health`: 200
+
+### Summary
+
+| Gate | Result |
+|------|--------|
+| Targeted Quote snapshot test | PASS |
+| Quote render follow-up test | NEEDS FOLLOW-UP |
+| Live frontend `3007` | PASS |
+| Live backend `8007/health` | PASS |
+
 ## 2026-06-25: Income Protection / Clients UI Cleanup Phase
 
 ### Frontend TypeScript

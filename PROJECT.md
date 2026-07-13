@@ -198,6 +198,8 @@ Implemented:
 - generated document history is backend-backed
 - Files tab uses real backend upload/list/download
 - Generated Documents tab uses real backend history/download/pack APIs
+- Quote generation now uses a Quote-tab-local input form for annual cover amount, cover-to-age, occupation class, deferred period, smoker status, and optional PHI indexation
+- Quote generation still renders through the existing Quote document builder, so the Quote-tab local values are injected into the Quote workflow snapshot at generation time rather than being persisted to the shared workflow draft
 
 ## Testing
 
@@ -224,13 +226,27 @@ Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
 
 GitHub Actions (`.github/workflows/ci.yml`): backend pytest (PostgreSQL) + frontend tsc + vitest on push/PR to main.
 
-Current results:
+Last known broad-suite baseline:
 
 | Gate | Result |
 |------|--------|
 | Frontend TypeScript | 0 errors |
 | Frontend vitest | 7 files, 80 tests, 0 failed |
 | Backend (full suite) | 166 passed, 0 failed |
+
+Latest Quote-tab follow-up verification:
+
+| Gate | Result |
+|------|--------|
+| `src/app.test.tsx -t "posts Quote form values in the quote generation workflow snapshot"` | passed |
+| `GET http://127.0.0.1:3007` | 200 |
+| `GET http://127.0.0.1:8007/health` | 200 |
+
+Known current frontend test limitations:
+
+- targeted Quote request-body verification passes
+- the broader `app.test.tsx` file still shows an existing/open-handle style vitest exit issue in this checkout
+- at least one Quote rendering assertion path still needs follow-up if a clean full-suite frontend claim is required
 
 ## Gaps Between Current Code and Final Product
 
@@ -259,6 +275,9 @@ The main remaining gaps are operational hardening and product polish rather than
 - Statement of Suitability now inserts a BIS quote comparison table after the introduction using fact find workflow values plus returned quote results
 - Statement PDF preview/export now shares the same page shell constants, footer content, and multi-page header logic; oversized Statement sections are split by child content before falling back to continuous slicing
 - Frontend document generation now retries `/documents/generate` once after bootstrapping the seeded staff session when the protected route returns `401`
+- Quote tab now has its own Quote Form accordion above Generated Output, with Name, Date of Birth, and derived Age shown read-only from the shared client profile and Quote-specific generation inputs collected locally on the Quote tab
+- Quote generation gating now depends on Quote-tab-local required inputs instead of the shared Fact Find income-protection fields, while the Fact Find income-protection accordion remains visible without required markers on the moved Quote-owned fields
+- Quote generation now posts a Quote-specific workflow snapshot so the request and generated Quote workspace use the Quote-tab local values instead of stale shared Fact Find values
 
 ## Delivery Plan
 

@@ -187,7 +187,24 @@ Before commit/push:
 ### Full validation
 - `.\scripts\validate.ps1`
 
-## 12. Response Quality Rules
+## 12. PowerShell Piping Warning — Chat Input Breaks With 2>&1
+
+When running long CLI commands with `2>&1` (stderr-to-stdout redirect) at the end of a PowerShell command, Cline sometimes fails to capture streaming output properly. This causes the terminal response to hang and eventually time out — even though the command ran successfully.
+
+**Rule:** Avoid appending `2>&1` to PowerShell test/build commands in this repo. Run them as:
+
+```
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache -- src/app.test.tsx
+```
+
+Not:
+```
+Push-Location apps\frontend; node_modules\.bin\vitest.cmd run --no-cache -- src/app.test.tsx 2>&1
+```
+
+This also applies to `tsc` and `pytest` commands. The `2>&1` redirect appears to interfere with Cline's output streaming protocol on Windows.
+
+## 13. Response Quality Rules
 
 When reporting back:
 

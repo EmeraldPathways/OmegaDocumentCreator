@@ -85,6 +85,14 @@ describe("App routes", () => {
     );
   }
 
+  function fillQuoteForm() {
+    fireEvent.change(document.getElementById("quote-annualCoverAmount") as HTMLInputElement, { target: { value: "50000" } });
+    fireEvent.change(document.getElementById("quote-coverToAge") as HTMLSelectElement, { target: { value: "65" } });
+    fireEvent.change(document.getElementById("quote-occupationClass") as HTMLSelectElement, { target: { value: "2" } });
+    fireEvent.change(document.getElementById("quote-deferredPeriod") as HTMLSelectElement, { target: { value: "13 weeks" } });
+    fireEvent.change(document.getElementById("quote-smoker") as HTMLSelectElement, { target: { value: "Non-Smoker" } });
+  }
+
   it("redirects the root route to Income Protection", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -676,6 +684,7 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
@@ -812,6 +821,7 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
@@ -866,15 +876,80 @@ describe("App routes", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Income Protection Quote Comparison")).toBeInTheDocument();
+      expect(screen.getByText("Aviva")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Aviva")).toBeInTheDocument();
     expect(screen.getByText("Date of birth: 08/11/1990")).toBeInTheDocument();
     expect(screen.queryByText("Age: Not recorded")).not.toBeInTheDocument();
+  });
+
+  it("posts Quote form values in the quote generation workflow snapshot", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.includes("/documents/statement-quote")) {
+        expect(init?.body).toBeDefined();
+        const body = JSON.parse(String(init?.body)) as {
+          workflow_snapshot: {
+            recommendedCover: string;
+            coverAge: string;
+            phiOccupationalClass: string;
+            deferredPeriod: string;
+            smokerStatus: string;
+            phiIndexation: string;
+          };
+        };
+
+        expect(body.workflow_snapshot.recommendedCover).toBe("50000");
+        expect(body.workflow_snapshot.coverAge).toBe("65");
+        expect(body.workflow_snapshot.phiOccupationalClass).toBe("2");
+        expect(body.workflow_snapshot.deferredPeriod).toBe("13 weeks");
+        expect(body.workflow_snapshot.smokerStatus).toBe("Non-Smoker");
+        expect(body.workflow_snapshot.phiIndexation).toBe("Index-linked");
+
+        return Promise.resolve(
+          createGenerateDocumentResponse({
+            title: "Income Protection Quote Comparison",
+            integrationRequests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "sent",
+                requested_at: "2026-06-19T10:00:00+00:00",
+                request_fields: [{ label: "AnnualAmount", value: "50000" }],
+                quote_results: [{ provider_name: "Aviva", level_premium: "102.50" }],
+                errors: [],
+              },
+            ],
+          }),
+        );
+      }
+
+      return Promise.resolve(createGenerateDocumentResponse());
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.change(document.getElementById("quote-phiIndexation") as HTMLSelectElement, {
+      target: { value: "Index-linked" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
+    });
   });
 
   it("preserves the last successful quote table when a regenerate returns failed PHI results", async () => {
@@ -2063,6 +2138,142 @@ describe("Document template state", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
     expect(screen.getByText("Income protection fact find draft generated for Test Client.")).toBeInTheDocument();
+  });
+
+  // Quote Form section tests
+  it("shows the new Quote Form accordion above Generated Output on the Quote tab", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    expect(screen.getByRole("button", { name: "Quote Form" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generated Output" })).toBeInTheDocument();
+  });
+
+  it("shows Name and DOB from shared profile state on the Quote form as disabled fields", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    const dobInput = screen.getByLabelText("Date of Birth") as HTMLInputElement;
+
+    expect(nameInput).toBeDisabled();
+    expect(nameInput.value).toBe("Jamie Murphy");
+    expect(dobInput).toBeDisabled();
+    expect(dobInput.value).toBe("1990-11-08");
+  });
+
+  it("derives Your Age from DOB on the Quote form", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    const ageInput = screen.getByLabelText("Your Age") as HTMLInputElement;
+    expect(ageInput).toBeDisabled();
+    expect(ageInput.value).not.toBe("");
+  });
+
+  it("provides independent user-editable Quote fields not linked to Fact Find", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    const annualCover = screen.getByLabelText(/Annual Cover Amount/) as HTMLInputElement;
+    const coverToAge = screen.getByLabelText(/Cover to Age/) as HTMLSelectElement;
+    const occupationClass = screen.getByLabelText(/Occupation Class/) as HTMLSelectElement;
+    const deferredPeriod = screen.getByLabelText(/Deferred Period/) as HTMLSelectElement;
+    const smoker = screen.getByLabelText(/^Smoker$/) as HTMLSelectElement;
+
+    // All editable fields start empty
+    expect(annualCover.value).toBe("");
+    expect(coverToAge.value).toBe("");
+    expect(occupationClass.value).toBe("");
+    expect(deferredPeriod.value).toBe("");
+    expect(smoker.value).toBe("");
+
+    // Fill them in locally
+    fireEvent.change(annualCover, { target: { value: "50000" } });
+    fireEvent.change(coverToAge, { target: { value: "65" } });
+    fireEvent.change(occupationClass, { target: { value: "2" } });
+    fireEvent.change(deferredPeriod, { target: { value: "13 weeks" } });
+    fireEvent.change(smoker, { target: { value: "Non-Smoker" } });
+
+    expect(annualCover.value).toBe("50000");
+    expect(coverToAge.value).toBe("65");
+    expect(occupationClass.value).toBe("2");
+    expect(deferredPeriod.value).toBe("13 weeks");
+    expect(smoker.value).toBe("Non-Smoker");
+  });
+
+  it("shows PHI Indexation on the Quote form but does not require it for generation gating", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    const phiIndexation = screen.getByLabelText("PHI Indexation") as HTMLSelectElement;
+    expect(phiIndexation).toBeInTheDocument();
+    // PHI indexation label does NOT have a required asterisk
+    expect(phiIndexation.closest(".field")?.textContent).not.toContain("*");
+  });
+
+  it("keeps Fact Find Income Protection fields visible but without required markers", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Fact Find" }));
+    fireEvent.click(screen.getByRole("button", { name: "Income Protection" }));
+
+    // Fact Find IP accordion is still present
+    const annualCoverLabel = screen.getByLabelText("Annual Cover Amount (€)") as HTMLInputElement;
+    const deferredLabel = screen.getByLabelText("Deferred period") as HTMLSelectElement;
+    const coverAgeLabel = screen.getByLabelText("Cover to age") as HTMLSelectElement;
+    const smokerLabel = screen.getByLabelText("Smoker status") as HTMLSelectElement;
+    const phiOccLabel = screen.getByLabelText("PHI occupational class") as HTMLSelectElement;
+
+    expect(annualCoverLabel).toBeInTheDocument();
+    expect(deferredLabel).toBeInTheDocument();
+    expect(coverAgeLabel).toBeInTheDocument();
+    expect(smokerLabel).toBeInTheDocument();
+    expect(phiOccLabel).toBeInTheDocument();
+
+    // None of these Fact Find IP fields have required asterisks after our change
+    const allLabels = [
+      annualCoverLabel,
+      deferredLabel,
+      coverAgeLabel,
+      smokerLabel,
+      phiOccLabel,
+    ];
+    for (const el of allLabels) {
+      const fieldWrapper = el.closest(".field");
+      if (fieldWrapper) {
+        expect(fieldWrapper.textContent).not.toContain("*");
+      }
+    }
   });
 });
 

@@ -1,15 +1,15 @@
 # Codex Task
 
-Status: pending
+Status: complete
 
 ## Objective
 
-Describe the exact task for the implementation agent to execute.
+Quote tab separation completed and documented. The Quote tab now owns its required generation inputs locally, generation posts a Quote-specific workflow snapshot, and the repo was restarted and verified on `3007` / `8007`.
 
 ## Scope
 
-- Allowed files:
-- Forbidden files:
+- Allowed files: `apps/frontend/src/pages/income-protection-page.tsx`, `apps/frontend/src/app.test.tsx`, `.clinerules`, `PROJECT.md`, `.agent-handoff/*`
+- Forbidden files: unrelated backend, infra, auth, and persistence files
 
 ## Implementation Notes
 
@@ -25,11 +25,18 @@ Describe the exact task for the implementation agent to execute.
 
 ## Validation Required
 
-- Add the commands Codex wants run before review.
+- `Push-Location apps\frontend; node_modules\.bin\vitest.cmd run src/app.test.tsx -t "posts Quote form values in the quote generation workflow snapshot" --no-cache`
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3007 | Select-Object -ExpandProperty StatusCode`
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8007/health | Select-Object -ExpandProperty StatusCode`
 
 ## Handoff To Agent
 
-Write the current task here before implementation starts.
+No active implementation handoff. Latest completed slice:
+
+- introduced a Quote Form accordion on the Quote tab with local Quote-only state
+- removed Quote generation gating dependence on shared Fact Find IP fields
+- fixed the functional gap so Quote generation and Quote workspace build from a Quote-specific workflow snapshot
+- updated task docs and handoff records
 
 ---
 
