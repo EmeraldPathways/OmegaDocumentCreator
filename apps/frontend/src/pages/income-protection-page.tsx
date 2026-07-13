@@ -80,7 +80,6 @@ import {
   SELECTED_CLIENT_STORAGE_KEY,
   SeededClientStringKey,
   smokerStatusOptions,
-  specialDiscountOptions,
   statementTypeOptions,
   toLower,
   useAccordionState,
@@ -546,7 +545,7 @@ export function IncomeProtectionPage() {
     { label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form" },
     { label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form" },
     { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
-    { label: "Special discount", complete: true, location: "Quote form (optional)" },
+    { label: "Zurich 17.5% discount", complete: true, location: "Quote form (optional)" },
   ];
 
   const quoteWorkflowSnapshot = useMemo(
@@ -558,7 +557,7 @@ export function IncomeProtectionPage() {
       deferredPeriod: quoteDeferredPeriod,
       smokerStatus: quoteSmoker,
       phiIndexation: quotePhiIndexation,
-      discountApplied: resolvedDraft.discountApplied,
+      zurichDiscountActive: resolvedDraft.zurichDiscountActive,
     }),
     [
       resolvedDraft,
@@ -582,11 +581,11 @@ export function IncomeProtectionPage() {
         deferredPeriod: quoteDeferredPeriod,
         smokerStatus: quoteSmoker,
         phiIndexation: quotePhiIndexation,
-        discountApplied: resolvedDraft.discountApplied,
+        zurichDiscountActive: resolvedDraft.zurichDiscountActive,
       }),
     [
       resolvedDraft.dateOfBirth,
-      resolvedDraft.discountApplied,
+      resolvedDraft.zurichDiscountActive,
       resolvedDraft.fullName,
       quoteAnnualCoverAmount,
       quoteCoverToAge,
@@ -2617,12 +2616,11 @@ export function IncomeProtectionPage() {
                   options={phiIndexationOptions}
                   value={quotePhiIndexation}
                 />
-                <Select
-                  id="quote-specialDiscount"
-                  label="Special Discount"
-                  onChange={(event) => updateField("discountApplied", event.target.value)}
-                  options={specialDiscountOptions}
-                  value={resolvedDraft.discountApplied}
+                <Toggle
+                  checked={isAffirmative(resolvedDraft.zurichDiscountActive)}
+                  id="quote-zurichDiscount"
+                  label="Apply Zurich 17.5% discount"
+                  onChange={(event) => updateField("zurichDiscountActive", event.target.checked ? "Yes" : "")}
                 />
               </div>
               <div style={{ marginTop: "var(--space-4)" }}>

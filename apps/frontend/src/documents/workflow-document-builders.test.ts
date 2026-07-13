@@ -148,7 +148,7 @@ describe("buildWorkflowDocument", () => {
     profile.coverAge = "65";
     profile.smokerStatus = "Non-Smoker";
     profile.phiOccupationalClass = "2";
-    (profile as SeededClientProfile & { discountApplied: string }).discountApplied = "17.5";
+    (profile as SeededClientProfile & { zurichDiscountActive?: string }).zurichDiscountActive = "Yes";
     profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
@@ -169,6 +169,16 @@ describe("buildWorkflowDocument", () => {
             levelPremium: "136.53",
             escalation5Premium: "149.78",
           },
+          {
+            providerName: "Royal London",
+            policyType: "Guaranteed",
+            levelPremium: "100.00",
+          },
+          {
+            providerName: "Zurich Life",
+            policyType: "Guaranteed",
+            levelPremium: "144.10",
+          },
         ],
         errors: [],
       },
@@ -184,14 +194,21 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Cover to age: 65");
     expect(document.html).toContain("Smoker status: Non-Smoker");
     expect(document.html).toContain("Occupation class: 2");
+    expect(document.html).toContain("Reviewable Rates");
+    expect(document.html).toContain("Guaranteed Rates");
+    expect(document.html).toContain("After Tax Discount");
+    expect(document.html).not.toContain("Policy Type");
     expect(document.html).toContain("Aviva");
-    expect(document.html).toContain("Reviewable");
     expect(document.html).toContain("102.50");
-    expect(document.html).toContain("17.5%");
-    expect(document.html).toContain("50.74");
+    expect(document.html).toContain("61.50");
     expect(document.html).toContain("Irish Life");
-    expect(document.html).toContain("Guaranteed");
-    expect(document.html).toContain("67.58");
+    expect(document.html).toContain("81.92");
+    expect(document.html).toContain("Royal London");
+    expect(document.html).toContain("51.00");
+    expect(document.html).toContain("Zurich Life");
+    expect(document.html).toContain("15%");
+    expect(document.html).toContain("17.5%");
+    expect(document.html).toContain("71.33");
     expect(document.html).not.toContain("Esc 3%");
     expect(document.html).not.toContain("Esc 5%");
     expect(document.html).not.toContain("Indexation:");
@@ -211,7 +228,6 @@ describe("buildWorkflowDocument", () => {
     profile.premium = "";
     profile.netMonthlyCost = "72.98";
     profile.recommendationAcknowledged = "Yes";
-    (profile as SeededClientProfile & { discountApplied: string }).discountApplied = "15";
     profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
@@ -241,6 +257,43 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("We have discussed affordability of this plan and you are happy to proceed.");
     expect(document.html).toContain("The premium offered by Aviva for this type of cover is competitive");
     expect(document.html).toContain("The monthly premium receives 40% tax relief on this plan.");
+  });
+
+  it("overrides Zurich to 17.5 percent whenever the toggle is active", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.dateOfBirth = "1996-06-29";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.occupation = "Teacher";
+    (profile as SeededClientProfile & { zurichDiscountActive?: string }).zurichDiscountActive = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
+        quoteResults: [
+          {
+            providerName: "Zurich Life",
+            policyType: "Guaranteed",
+            levelPremium: "144.10",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).toContain("Zurich Life");
+    expect(document.html).toContain("17.5%");
+    expect(document.html).toContain("71.33");
   });
 
   it.skip("prefers live quote premium and request deferred period over stale statement fields", () => {

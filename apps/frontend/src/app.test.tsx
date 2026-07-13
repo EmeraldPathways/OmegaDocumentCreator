@@ -2437,7 +2437,7 @@ describe("Document template state", () => {
     expect(phiIndexation.closest(".field")?.textContent).not.toContain("*");
   });
 
-  it("shows a Special Discount dropdown on the Quote form with a blank default and the supported discount options", () => {
+  it("shows a Zurich 17.5 percent discount toggle on the Quote form", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
         <App />
@@ -2446,14 +2446,13 @@ describe("Document template state", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
 
-    const specialDiscount = screen.getByLabelText("Special Discount") as HTMLSelectElement;
-    expect(specialDiscount.value).toBe("");
-    expect(screen.getByRole("option", { name: "No discount" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "17.5%" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "15%" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Special Discount")).not.toBeInTheDocument();
 
-    fireEvent.change(specialDiscount, { target: { value: "17.5" } });
-    expect(specialDiscount.value).toBe("17.5");
+    const zurichDiscountToggle = screen.getByLabelText("Apply Zurich 17.5% discount") as HTMLInputElement;
+    expect(zurichDiscountToggle.checked).toBe(false);
+
+    fireEvent.click(zurichDiscountToggle);
+    expect(zurichDiscountToggle.checked).toBe(true);
   });
 
   it("keeps Fact Find Income Protection fields visible but without required markers", () => {

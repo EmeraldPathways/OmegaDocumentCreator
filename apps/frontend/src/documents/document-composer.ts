@@ -4,12 +4,14 @@ import type {
   ComposedDocument,
   GeneratedDocumentSection,
   IntegrationRequestArtifact,
+  IntegrationQuoteResult,
   SupportedDocumentType,
 } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
 type StatementRecommendationProfile = SeededClientProfile &
   Partial<{
+    zurichDiscountActive: string;
     discountApplied: string;
     taxReliefPercentage: string;
     affordabilityDiscussed: string;
@@ -262,6 +264,10 @@ function formatEuroAmount(value: number | null, fractionDigits = 2) {
   }).format(value);
 }
 
+function formatDiscountPercentage(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function indefiniteArticle(value: string) {
   return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
 }
@@ -274,8 +280,60 @@ function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRe
   return quotes[0];
 }
 
-function resolveDiscountPercentage(profile: StatementRecommendationProfile) {
+function resolveLegacyDiscountPercentage(profile: StatementRecommendationProfile) {
   return parseNumber(profile.discountApplied);
+}
+
+function normalizeText(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function isReviewablePolicyType(policyType: string | undefined) {
+  return normalizeText(policyType) === "reviewable";
+}
+
+function isGuaranteedPolicyType(policyType: string | undefined) {
+  const normalized = normalizeText(policyType);
+  return normalized === "" || normalized === "guaranteed";
+}
+
+function hasZurichDiscountToggleEnabled(profile: StatementRecommendationProfile) {
+  return normalizeText(profile.zurichDiscountActive) === "yes";
+}
+
+function resolveFixedQuoteDiscountPercentage(quote: IntegrationQuoteResult) {
+  const provider = normalizeText(quote.providerName);
+  if (!isGuaranteedPolicyType(quote.policyType)) {
+    return null;
+  }
+
+  if (provider === "aviva" || provider === "royal london" || provider === "zurich life") {
+    return 15;
+  }
+
+  return null;
+}
+
+function resolveQuoteDiscountPercentage(profile: StatementRecommendationProfile, quote: IntegrationQuoteResult | null) {
+  if (!quote) {
+    return resolveLegacyDiscountPercentage(profile);
+  }
+
+  const provider = normalizeText(quote.providerName);
+  if (
+    provider === "zurich life" &&
+    isGuaranteedPolicyType(quote.policyType) &&
+    hasZurichDiscountToggleEnabled(profile)
+  ) {
+    return 17.5;
+  }
+
+  const fixedDiscount = resolveFixedQuoteDiscountPercentage(quote);
+  if (fixedDiscount !== null) {
+    return fixedDiscount;
+  }
+
+  return null;
 }
 
 function applyDiscount(grossPremium: number | null, discountPercentage: number | null) {
@@ -383,7 +441,7 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
   const grossPremiumNumber = resolveStatementGrossPremium(profile, selectedQuote);
   const configuredNetMonthlyCostNumber = parseNumber(profile.netMonthlyCost);
   const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremiumNumber, configuredNetMonthlyCostNumber);
-  const discountApplied = resolveDiscountPercentage(statementProfile);
+  const discountApplied = resolveQuoteDiscountPercentage(statementProfile, selectedQuote);
   const netMonthlyCostNumber = resolveStatementNetMonthlyCost(
     statementProfile,
     grossPremiumNumber,
@@ -465,42 +523,59 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     `Occupation class: ${valueOrFallback(profile.phiOccupationalClass)}`,
   ];
 
-  const discountApplied = resolveDiscountPercentage(statementProfile);
-  const headers = ["Provider", "Policy Type", "Level", "Special Discount", "Actual Amount Paid"];
-  const rows = quoteResults
-    .map((quote) => {
-      const grossPremium = parseNumber(quote.levelPremium);
-      const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremium, null);
-      const actualAmountPaid = resolveStatementNetMonthlyCost(
-        statementProfile,
-        grossPremium,
-        discountApplied,
-        taxReliefPercentage,
-      );
+  const headers = ["Provider", "Quote", "Discount", "After Tax Discount"];
+  const rows = quoteResults.map((quote) => {
+    const grossPremium = parseNumber(quote.levelPremium);
+    const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremium, null);
+    const discountApplied = resolveQuoteDiscountPercentage(statementProfile, quote);
+    const actualAmountPaid = resolveStatementNetMonthlyCost(
+      statementProfile,
+      grossPremium,
+      discountApplied,
+      taxReliefPercentage,
+    );
 
-      return [
+    return {
+      group: isReviewablePolicyType(quote.policyType) ? "reviewable" : "guaranteed",
+      html: [
         valueOrFallback(quote.providerName),
-        valueOrFallback(quote.policyType),
         valueOrFallback(quote.levelPremium),
-        discountApplied === null ? "No discount" : `${discountApplied}%`,
+        discountApplied === null ? "" : `${formatDiscountPercentage(discountApplied)}%`,
         actualAmountPaid === null ? "Not available" : `€${formatEuroAmount(actualAmountPaid)}`,
       ]
         .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)
-        .join("");
+        .join(""),
+    };
+  });
+
+  const groupedSections = [
+    { key: "reviewable", title: "Reviewable Rates" },
+    { key: "guaranteed", title: "Guaranteed Rates" },
+  ]
+    .map((group) => {
+      const groupRows = rows.filter((row) => row.group === group.key);
+      if (groupRows.length === 0) {
+        return "";
+      }
+
+      return [
+        `<h3>${escapeHtml(group.title)}</h3>`,
+        '<div class="statement-quote-table">',
+        `<div class="statement-quote-row statement-quote-row-header">${headers
+          .map((header) => `<div class="statement-quote-cell"><p>${escapeHtml(header)}</p></div>`)
+          .join("")}</div>`,
+        groupRows.map((row) => `<div class="statement-quote-row">${row.html}</div>`).join(""),
+        "</div>",
+      ].join("");
     })
-    .map((cells) => `<div class="statement-quote-row">${cells}</div>`)
+    .filter(Boolean)
     .join("");
 
   return [
     '<div class="statement-section statement-quote-block">',
     "<h2>Income Protection Quote Comparison</h2>",
     `<div class="statement-quote-summary">${summaryItems.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`,
-    '<div class="statement-quote-table">',
-    `<div class="statement-quote-row statement-quote-row-header">${headers
-      .map((header) => `<div class="statement-quote-cell"><p>${escapeHtml(header)}</p></div>`)
-      .join("")}</div>`,
-    rows,
-    "</div>",
+    groupedSections,
     "</div>",
   ].join("");
 }

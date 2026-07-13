@@ -188,6 +188,7 @@ export type SeededClientProfile = {
   statementType: string;
   productType: string;
   letterDate: string;
+  zurichDiscountActive: string;
   discountApplied: string;
   taxReliefPercentage: string;
   netMonthlyCost: string;
@@ -412,6 +413,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     statementType: "",
     productType: "",
     letterDate: "2026-01-15",
+    zurichDiscountActive: "",
     discountApplied: "",
     taxReliefPercentage: "",
     netMonthlyCost: "116",
@@ -660,6 +662,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     statementType: "Full Advice",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
+    zurichDiscountActive: "",
     discountApplied: "",
     taxReliefPercentage: "",
     netMonthlyCost: "132",

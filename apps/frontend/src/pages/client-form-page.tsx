@@ -68,6 +68,7 @@ function createBlankClient(nextReference: string, updatedBy: string): SeededClie
     statementType: "",
     productType: "",
     letterDate: "",
+    zurichDiscountActive: "",
     netMonthlyCost: "",
     coverSummary: "",
     mortgageProtection: "",
