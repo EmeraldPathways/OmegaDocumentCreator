@@ -188,6 +188,8 @@ export type SeededClientProfile = {
   statementType: string;
   productType: string;
   letterDate: string;
+  discountApplied: string;
+  taxReliefPercentage: string;
   netMonthlyCost: string;
   coverSummary: string;
   mortgageProtection: string;
@@ -410,6 +412,8 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     statementType: "",
     productType: "",
     letterDate: "2026-01-15",
+    discountApplied: "",
+    taxReliefPercentage: "",
     netMonthlyCost: "116",
     coverSummary: "",
     mortgageProtection: "No",
@@ -656,6 +660,8 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     statementType: "Full Advice",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
+    discountApplied: "",
+    taxReliefPercentage: "",
     netMonthlyCost: "132",
     coverSummary: "",
     mortgageProtection: "No",

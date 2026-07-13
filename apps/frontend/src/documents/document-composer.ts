@@ -56,11 +56,26 @@ function addressSummary(...lines: Array<string | undefined>) {
   return lines.map((line) => line?.trim() ?? "").filter(Boolean).join(", ");
 }
 
+function formatDocumentDate(value: string | undefined) {
+  const trimmedValue = value?.trim() ?? "";
+  if (!trimmedValue) {
+    return "";
+  }
+
+  const match = trimmedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+
+  return trimmedValue;
+}
+
 function summaryGridItems(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   const commonItems = [
     { label: "Client", value: profile.fullName },
     { label: "Reference", value: profile.clientReference },
-    { label: "Date of birth", value: profile.dateOfBirth },
+    { label: "Date of birth", value: formatDocumentDate(profile.dateOfBirth) },
     { label: "Occupation", value: profile.occupation },
     { label: "Advisor", value: profile.advisorName },
   ];
@@ -259,6 +274,22 @@ function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRe
   return quotes[0];
 }
 
+function resolveDiscountPercentage(profile: StatementRecommendationProfile) {
+  return parseNumber(profile.discountApplied);
+}
+
+function applyDiscount(grossPremium: number | null, discountPercentage: number | null) {
+  if (grossPremium === null) {
+    return null;
+  }
+
+  if (discountPercentage === null) {
+    return grossPremium;
+  }
+
+  return grossPremium * (1 - discountPercentage / 100);
+}
+
 function resolveIrishIncomeTaxReliefPercentage(profile: StatementRecommendationProfile) {
   const income = parseNumber(profile.income);
   if (income === null) {
@@ -310,14 +341,16 @@ function resolveStatementGrossPremium(profile: SeededClientProfile, selectedQuot
 function resolveStatementNetMonthlyCost(
   profile: StatementRecommendationProfile,
   grossPremium: number | null,
+  discountPercentage: number | null,
   taxReliefPercentage: number | null,
 ) {
   const configuredValue = parseNumber(profile.netMonthlyCost);
-  if (grossPremium === null || taxReliefPercentage === null) {
+  const discountedPremium = applyDiscount(grossPremium, discountPercentage);
+  if (discountedPremium === null || taxReliefPercentage === null) {
     return configuredValue;
   }
 
-  return grossPremium * (1 - taxReliefPercentage / 100);
+  return discountedPremium * (1 - taxReliefPercentage / 100);
 }
 
 function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: string | undefined) {
@@ -350,8 +383,13 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
   const grossPremiumNumber = resolveStatementGrossPremium(profile, selectedQuote);
   const configuredNetMonthlyCostNumber = parseNumber(profile.netMonthlyCost);
   const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremiumNumber, configuredNetMonthlyCostNumber);
-  const netMonthlyCostNumber = resolveStatementNetMonthlyCost(statementProfile, grossPremiumNumber, taxReliefPercentage);
-  const discountApplied = parseNumber(statementProfile.discountApplied);
+  const discountApplied = resolveDiscountPercentage(statementProfile);
+  const netMonthlyCostNumber = resolveStatementNetMonthlyCost(
+    statementProfile,
+    grossPremiumNumber,
+    discountApplied,
+    taxReliefPercentage,
+  );
   const productLabel = valueOrFallback(profile.productType, "Income Protection policy");
   const affordabilityConfirmed =
     (statementProfile.affordabilityDiscussed?.trim() ?? "").toLowerCase() === "yes" ||
@@ -407,6 +445,7 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
 }
 
 export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
+  const statementProfile = profile as StatementRecommendationProfile;
   const requests = getQuoteRequests(profile);
   const quoteResults = requests.flatMap((request) => request.quoteResults);
 
@@ -414,31 +453,41 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     return "";
   }
 
-  const phiDob = requestFieldValue(requests, "DOB", "Date of birth");
-  const requestedCoverAmount = requestFieldValue(requests, "AnnualAmount", "Cover amount");
+  const phiDob = formatDocumentDate(profile.dateOfBirth) || requestFieldValue(requests, "DOB", "Date of birth");
+  const requestedCoverAmount = profile.recommendedCover || requestFieldValue(requests, "AnnualAmount", "Cover amount");
 
   const summaryItems = [
-    `Cover amount: ${valueOrFallback(requestedCoverAmount || profile.recommendedCover)}`,
-    `Date of birth: ${valueOrFallback(phiDob || profile.dateOfBirth)}`,
+    `Cover amount: ${valueOrFallback(requestedCoverAmount)}`,
+    `Date of birth: ${valueOrFallback(phiDob)}`,
     `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
     `Cover to age: ${valueOrFallback(profile.coverAge)}`,
     `Smoker status: ${valueOrFallback(profile.smokerStatus)}`,
     `Occupation class: ${valueOrFallback(profile.phiOccupationalClass)}`,
   ];
 
-  const headers = ["Provider", "Policy Type", "Level", "Esc 3%", "Esc 5%"];
+  const discountApplied = resolveDiscountPercentage(statementProfile);
+  const headers = ["Provider", "Policy Type", "Level", "Special Discount", "Actual Amount Paid"];
   const rows = quoteResults
-    .map((quote) =>
-      [
+    .map((quote) => {
+      const grossPremium = parseNumber(quote.levelPremium);
+      const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremium, null);
+      const actualAmountPaid = resolveStatementNetMonthlyCost(
+        statementProfile,
+        grossPremium,
+        discountApplied,
+        taxReliefPercentage,
+      );
+
+      return [
         valueOrFallback(quote.providerName),
         valueOrFallback(quote.policyType),
         valueOrFallback(quote.levelPremium),
-        valueOrFallback(quote.escalation3Premium),
-        valueOrFallback(quote.escalation5Premium),
+        discountApplied === null ? "No discount" : `${discountApplied}%`,
+        actualAmountPaid === null ? "Not available" : `€${formatEuroAmount(actualAmountPaid)}`,
       ]
         .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)
-        .join(""),
-    )
+        .join("");
+    })
     .map((cells) => `<div class="statement-quote-row">${cells}</div>`)
     .join("");
 

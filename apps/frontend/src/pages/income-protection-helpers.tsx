@@ -83,6 +83,12 @@ export const phiIndexationOptions = [
   { value: "N", label: "N" },
 ];
 
+export const specialDiscountOptions = [
+  { value: "", label: "No discount" },
+  { value: "17.5", label: "17.5%" },
+  { value: "15", label: "15%" },
+];
+
 export const SELECTED_CLIENT_STORAGE_KEY = "omega-selected-income-protection-client";
 
 export type SeededClientStringKey = {

@@ -139,6 +139,8 @@ describe("buildWorkflowDocument", () => {
 
   it("renders BIS quote results in the standalone quote document using fact find values", () => {
     const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
     profile.dateOfBirth = "1996-06-29";
     profile.letterDate = "2026-06-29";
     profile.recommendedCover = "30000";
@@ -146,6 +148,7 @@ describe("buildWorkflowDocument", () => {
     profile.coverAge = "65";
     profile.smokerStatus = "Non-Smoker";
     profile.phiOccupationalClass = "2";
+    (profile as SeededClientProfile & { discountApplied: string }).discountApplied = "17.5";
     profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
@@ -176,7 +179,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-quote-table");
     expect(document.html).toContain("Income Protection Quote Comparison");
     expect(document.html).toContain("Cover amount: 30000");
-    expect(document.html).toContain("Age: 30");
+    expect(document.html).toContain("Date of birth: 29/06/1996");
     expect(document.html).toContain("Deferred period: 13 weeks");
     expect(document.html).toContain("Cover to age: 65");
     expect(document.html).toContain("Smoker status: Non-Smoker");
@@ -184,10 +187,13 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Aviva");
     expect(document.html).toContain("Reviewable");
     expect(document.html).toContain("102.50");
-    expect(document.html).toContain("116.40");
+    expect(document.html).toContain("17.5%");
+    expect(document.html).toContain("50.74");
     expect(document.html).toContain("Irish Life");
     expect(document.html).toContain("Guaranteed");
-    expect(document.html).toContain("149.78");
+    expect(document.html).toContain("67.58");
+    expect(document.html).not.toContain("Esc 3%");
+    expect(document.html).not.toContain("Esc 5%");
     expect(document.html).not.toContain("Indexation:");
     expect(document.html).not.toContain("statement-opening");
     expect(document.html).not.toContain("Personal Circumstances");
@@ -205,6 +211,7 @@ describe("buildWorkflowDocument", () => {
     profile.premium = "";
     profile.netMonthlyCost = "72.98";
     profile.recommendationAcknowledged = "Yes";
+    (profile as SeededClientProfile & { discountApplied: string }).discountApplied = "15";
     profile.documentDrafts["Quote"].integrationRequests = [
       {
         provider: "BestAdvice",
@@ -228,7 +235,9 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Recommendation: Aviva 13 Week deferred plan for €35,000 per annum");
     expect(document.html).toContain("We recommend an Aviva Income Protection 13 Week deferred plan for €35,000 to cover you to age 65.");
     expect(document.html).toContain("As this represents 75% of your salary");
-    expect(document.html).toContain("The gross cost of this 13 Week deferred period plan is €121.62 less tax relief @40% giving a net cost of €72.98pm.");
+    expect(document.html).toContain(
+      "The gross cost of this 13 Week deferred period plan is €121.62 (15.00% discount on premium applied) less tax relief @40% giving a net cost of €62.03pm.",
+    );
     expect(document.html).toContain("We have discussed affordability of this plan and you are happy to proceed.");
     expect(document.html).toContain("The premium offered by Aviva for this type of cover is competitive");
     expect(document.html).toContain("The monthly premium receives 40% tax relief on this plan.");

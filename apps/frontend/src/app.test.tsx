@@ -963,7 +963,14 @@ describe("App routes", () => {
     const { buildExportDocumentArtifact } = await vi.importActual<typeof import("./documents/export-generated-document")>(
       "./documents/export-generated-document",
     );
-    const exportedSnapshot = buildExportDocumentArtifact(storedClients["CLI-2026-0002"] as Parameters<typeof buildExportDocumentArtifact>[0], "Quote");
+    const exportedSnapshot = buildExportDocumentArtifact({
+      ...(storedClients["CLI-2026-0002"] as Parameters<typeof buildExportDocumentArtifact>[0]),
+      recommendedCover: "50000",
+      coverAge: "65",
+      phiOccupationalClass: "2",
+      deferredPeriod: "13 weeks",
+      smokerStatus: "Non-Smoker",
+    }, "Quote");
 
     expect(exportedSnapshot.title).toBe("Quote");
     expect(exportedSnapshot.html).toContain("Income Protection Quote Comparison");
@@ -976,34 +983,46 @@ describe("App routes", () => {
     expect(exportedSnapshot.html).toContain("Occupation class: 2");
   });
 
-  it("marks the Quote workspace as out of date after Quote form inputs change post-generation", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL) => {
-        const url = String(input);
+  it("rebuilds the Quote draft with live quotes when Quote form inputs change after generation", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
 
-        if (url.includes("/documents/statement-quote")) {
-          return Promise.resolve(
-            createGenerateDocumentResponse({
-              title: "Income Protection Quote Comparison",
-              integrationRequests: [
-                {
-                  provider: "BestAdvice",
-                  request_type: "Phi",
-                  status: "sent",
-                  requested_at: "2026-06-19T10:00:00+00:00",
-                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
-                  quote_results: [{ provider_name: "Aviva", level_premium: "102.50" }],
-                  errors: [],
-                },
-              ],
-            }),
-          );
-        }
+      if (url.includes("/documents/statement-quote")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as {
+          workflow_snapshot?: { recommendedCover?: string; phiOccupationalClass?: string };
+        };
+        const recommendedCover = body.workflow_snapshot?.recommendedCover ?? "";
 
-        return Promise.resolve(createGenerateDocumentResponse());
-      }),
-    );
+        return Promise.resolve(
+          createGenerateDocumentResponse({
+            title: "Income Protection Quote Comparison",
+            integrationRequests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "sent",
+                requested_at: "2026-06-19T10:00:00+00:00",
+                request_fields: [
+                  { label: "DOB", value: "08/11/1990" },
+                  { label: "AnnualAmount", value: recommendedCover },
+                ],
+                quote_results: [
+                  {
+                    provider_name: recommendedCover === "45000" ? "Irish Life" : "Aviva",
+                    level_premium: recommendedCover === "45000" ? "88.10" : "102.50",
+                  },
+                ],
+                errors: [],
+              },
+            ],
+          }),
+        );
+      }
+
+      return Promise.resolve(createGenerateDocumentResponse());
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
 
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
@@ -1023,18 +1042,49 @@ describe("App routes", () => {
         }
       >;
 
-      expect(storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml).toContain("Aviva");
+      expect(storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml).toContain("Cover amount: 50000");
     });
 
     fireEvent.change(document.getElementById("quote-annualCoverAmount") as HTMLInputElement, {
       target: { value: "45000" },
     });
+    fireEvent.change(document.getElementById("quote-occupationClass") as HTMLSelectElement, {
+      target: { value: "4" },
+    });
 
-    expect(screen.getByText("Quote inputs changed after the last generated draft. Generate the quote comparison again to refresh the workspace.")).toBeInTheDocument();
-    expect(screen.getAllByText("Draft out of date").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Aviva")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export DOCX" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Export PDF" })).toBeDisabled();
+    await waitFor(() => {
+      const statementQuoteCalls = fetchMock.mock.calls.filter(([request]) => String(request).includes("/documents/statement-quote"));
+      expect(statementQuoteCalls).toHaveLength(2);
+
+      const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<string, { editedHtml?: string }>;
+        }
+      >;
+      const quoteEditedHtml = storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml ?? "";
+
+      expect(quoteEditedHtml).toContain("Cover amount: 45000");
+      expect(quoteEditedHtml).toContain("Occupation class: 4");
+      expect(quoteEditedHtml).toContain("Irish Life");
+    });
+
+    const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<string, unknown>;
+    const { buildExportDocumentArtifact } = await vi.importActual<typeof import("./documents/export-generated-document")>(
+      "./documents/export-generated-document",
+    );
+    const exportedSnapshot = buildExportDocumentArtifact({
+      ...(storedClients["CLI-2026-0002"] as Parameters<typeof buildExportDocumentArtifact>[0]),
+      recommendedCover: "45000",
+      coverAge: "65",
+      phiOccupationalClass: "4",
+      deferredPeriod: "13 weeks",
+      smokerStatus: "Non-Smoker",
+    }, "Quote");
+
+    expect(exportedSnapshot.html).toContain("Cover amount: 45000");
+    expect(exportedSnapshot.html).toContain("Occupation class: 4");
+    expect(exportedSnapshot.html).toContain("Irish Life");
   });
 
   it("posts Quote form values in the quote generation workflow snapshot", async () => {
@@ -2385,6 +2435,25 @@ describe("Document template state", () => {
     expect(phiIndexation).toBeInTheDocument();
     // PHI indexation label does NOT have a required asterisk
     expect(phiIndexation.closest(".field")?.textContent).not.toContain("*");
+  });
+
+  it("shows a Special Discount dropdown on the Quote form with a blank default and the supported discount options", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+
+    const specialDiscount = screen.getByLabelText("Special Discount") as HTMLSelectElement;
+    expect(specialDiscount.value).toBe("");
+    expect(screen.getByRole("option", { name: "No discount" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "17.5%" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "15%" })).toBeInTheDocument();
+
+    fireEvent.change(specialDiscount, { target: { value: "17.5" } });
+    expect(specialDiscount.value).toBe("17.5");
   });
 
   it("keeps Fact Find Income Protection fields visible but without required markers", () => {
