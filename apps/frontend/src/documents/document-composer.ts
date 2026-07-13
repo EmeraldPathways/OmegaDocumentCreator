@@ -264,10 +264,6 @@ function formatEuroAmount(value: number | null, fractionDigits = 2) {
   }).format(value);
 }
 
-function formatDiscountPercentage(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function indefiniteArticle(value: string) {
   return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
 }
@@ -346,6 +342,14 @@ function applyDiscount(grossPremium: number | null, discountPercentage: number |
   }
 
   return grossPremium * (1 - discountPercentage / 100);
+}
+
+function resolveDiscountAmount(grossPremium: number | null, discountPercentage: number | null) {
+  if (grossPremium === null || discountPercentage === null) {
+    return null;
+  }
+
+  return grossPremium * (discountPercentage / 100);
 }
 
 function resolveIrishIncomeTaxReliefPercentage(profile: StatementRecommendationProfile) {
@@ -528,6 +532,7 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     const grossPremium = parseNumber(quote.levelPremium);
     const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremium, null);
     const discountApplied = resolveQuoteDiscountPercentage(statementProfile, quote);
+    const discountAmount = resolveDiscountAmount(grossPremium, discountApplied);
     const actualAmountPaid = resolveStatementNetMonthlyCost(
       statementProfile,
       grossPremium,
@@ -540,7 +545,7 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
       html: [
         valueOrFallback(quote.providerName),
         valueOrFallback(quote.levelPremium),
-        discountApplied === null ? "" : `${formatDiscountPercentage(discountApplied)}%`,
+        discountAmount === null ? "" : formatEuroAmount(discountAmount),
         actualAmountPaid === null ? "Not available" : `€${formatEuroAmount(actualAmountPaid)}`,
       ]
         .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)

@@ -206,8 +206,8 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Royal London");
     expect(document.html).toContain("51.00");
     expect(document.html).toContain("Zurich Life");
-    expect(document.html).toContain("15%");
-    expect(document.html).toContain("17.5%");
+    expect(document.html).toContain("15.00");
+    expect(document.html).toContain("25.22");
     expect(document.html).toContain("71.33");
     expect(document.html).not.toContain("Esc 3%");
     expect(document.html).not.toContain("Esc 5%");
@@ -292,7 +292,7 @@ describe("buildWorkflowDocument", () => {
     const document = buildWorkflowDocument(profile, "Quote");
 
     expect(document.html).toContain("Zurich Life");
-    expect(document.html).toContain("17.5%");
+    expect(document.html).toContain("25.22");
     expect(document.html).toContain("71.33");
   });
 

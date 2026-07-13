@@ -983,6 +983,100 @@ describe("App routes", () => {
     expect(exportedSnapshot.html).toContain("Occupation class: 2");
   });
 
+  it("renders the exact API quote results in the Quote workspace and export artifact", async () => {
+    const apiQuoteResults = [
+      { provider_name: "Aviva", policy_type: "Reviewable", level_premium: "102.50" },
+      { provider_name: "Royal London", policy_type: "Guaranteed", level_premium: "100.00" },
+      { provider_name: "Zurich Life", policy_type: "Guaranteed", level_premium: "144.10" },
+    ];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Income Protection Quote Comparison",
+              integrationRequests: [
+                {
+                  provider: "BestAdvice",
+                  request_type: "Phi",
+                  status: "sent",
+                  requested_at: "2026-06-19T10:00:00+00:00",
+                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                  quote_results: apiQuoteResults,
+                  errors: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<
+            string,
+            {
+              integrationRequests?: Array<{ quoteResults?: Array<{ providerName?: string; levelPremium?: string }> }>;
+              editedHtml?: string;
+            }
+          >;
+        }
+      >;
+
+      const quoteDraft = storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"];
+      expect(quoteDraft?.integrationRequests?.[0]?.quoteResults).toEqual([
+        expect.objectContaining({ providerName: "Aviva", policyType: "Reviewable", levelPremium: "102.50" }),
+        expect.objectContaining({ providerName: "Royal London", policyType: "Guaranteed", levelPremium: "100.00" }),
+        expect.objectContaining({ providerName: "Zurich Life", policyType: "Guaranteed", levelPremium: "144.10" }),
+      ]);
+      expect(quoteDraft?.editedHtml).toContain("Aviva");
+      expect(quoteDraft?.editedHtml).toContain("102.50");
+      expect(quoteDraft?.editedHtml).toContain("Royal London");
+      expect(quoteDraft?.editedHtml).toContain("100.00");
+      expect(quoteDraft?.editedHtml).toContain("Zurich Life");
+      expect(quoteDraft?.editedHtml).toContain("144.10");
+    });
+
+    const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<string, unknown>;
+    const { buildExportDocumentArtifact } = await vi.importActual<typeof import("./documents/export-generated-document")>(
+      "./documents/export-generated-document",
+    );
+    const exportedSnapshot = buildExportDocumentArtifact({
+      ...(storedClients["CLI-2026-0002"] as Parameters<typeof buildExportDocumentArtifact>[0]),
+      recommendedCover: "50000",
+      coverAge: "65",
+      phiOccupationalClass: "2",
+      deferredPeriod: "13 weeks",
+      smokerStatus: "Non-Smoker",
+    }, "Quote");
+
+    expect(exportedSnapshot.html).toContain("Aviva");
+    expect(exportedSnapshot.html).toContain("102.50");
+    expect(exportedSnapshot.html).toContain("Royal London");
+    expect(exportedSnapshot.html).toContain("100.00");
+    expect(exportedSnapshot.html).toContain("Zurich Life");
+    expect(exportedSnapshot.html).toContain("144.10");
+  });
+
   it("rebuilds the Quote draft with live quotes when Quote form inputs change after generation", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -1069,6 +1163,11 @@ describe("App routes", () => {
       expect(quoteEditedHtml).toContain("Irish Life");
     });
 
+    await waitFor(() => {
+      expect(screen.getByText("Irish Life")).toBeInTheDocument();
+      expect(screen.getByText("88.10")).toBeInTheDocument();
+    });
+
     const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<string, unknown>;
     const { buildExportDocumentArtifact } = await vi.importActual<typeof import("./documents/export-generated-document")>(
       "./documents/export-generated-document",
@@ -1085,6 +1184,59 @@ describe("App routes", () => {
     expect(exportedSnapshot.html).toContain("Cover amount: 45000");
     expect(exportedSnapshot.html).toContain("Occupation class: 4");
     expect(exportedSnapshot.html).toContain("Irish Life");
+  });
+
+  it("updates the Quote workspace table when the Zurich discount toggle is regenerated", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("/documents/statement-quote")) {
+        return Promise.resolve(
+          createGenerateDocumentResponse({
+            title: "Income Protection Quote Comparison",
+            integrationRequests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "sent",
+                requested_at: "2026-06-19T10:00:00+00:00",
+                request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                quote_results: [{ provider_name: "Zurich Life", policy_type: "Guaranteed", level_premium: "144.10" }],
+                errors: [],
+              },
+            ],
+          }),
+        );
+      }
+
+      return Promise.resolve(createGenerateDocumentResponse());
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Zurich Life")).toBeInTheDocument();
+      expect(screen.getByText("144.10")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText("Apply Zurich 17.5% discount"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      const statementQuoteCalls = fetchMock.mock.calls.filter(([request]) => String(request).includes("/documents/statement-quote"));
+      expect(statementQuoteCalls).toHaveLength(2);
+      expect(screen.getByText("25.22")).toBeInTheDocument();
+    });
   });
 
   it("posts Quote form values in the quote generation workflow snapshot", async () => {

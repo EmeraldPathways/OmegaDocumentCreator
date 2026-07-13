@@ -457,6 +457,29 @@ export function IncomeProtectionPage() {
   const resolvedDraft = draft;
   const factFindType = resolvedDraft.factFindType ?? "all";
 
+  function syncLocalGeneratedDraft(
+    documentType: SupportedDocumentType,
+    nextDraft: Partial<Omit<GeneratedDocumentDraft, "selectedTemplateId">>,
+  ) {
+    saveGeneratedDraft(resolvedDraft.clientReference, documentType, nextDraft);
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        documentDrafts: {
+          ...currentDraft.documentDrafts,
+          [documentType]: {
+            ...currentDraft.documentDrafts[documentType],
+            ...nextDraft,
+          },
+        },
+      };
+    });
+  }
+
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
 
   const factFindMissingFields = [
@@ -974,23 +997,7 @@ export function IncomeProtectionPage() {
 
   function updateGeneratedOutput(documentType: SupportedDocumentType, html: string) {
     const nextHtml = html.trim();
-    saveGeneratedDraft(resolvedDraft.clientReference, documentType, { editedHtml: nextHtml });
-    setDraft((currentDraft) => {
-      if (!currentDraft) {
-        return currentDraft;
-      }
-
-      return {
-        ...currentDraft,
-        documentDrafts: {
-          ...currentDraft.documentDrafts,
-          [documentType]: {
-            ...currentDraft.documentDrafts[documentType],
-            editedHtml: nextHtml,
-          },
-        },
-      };
-    });
+    syncLocalGeneratedDraft(documentType, { editedHtml: nextHtml });
   }
 
   function buildGeneratedEditorHtml(
@@ -1196,7 +1203,7 @@ export function IncomeProtectionPage() {
     setShowQuoteValidation(false);
     setLastSubmittedQuoteRequestKey(quoteRequestKey);
     setQuoteDocumentStatus("Document: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, "Quote", { generationStatus: "generating" });
+    syncLocalGeneratedDraft("Quote", { generationStatus: "generating" });
 
     try {
       const integrationRequests = await fetchStatementQuoteRequests({
@@ -1209,7 +1216,7 @@ export function IncomeProtectionPage() {
         integrationRequests,
       };
 
-      saveGeneratedDraft(resolvedDraft.clientReference, "Quote", {
+      syncLocalGeneratedDraft("Quote", {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
@@ -1219,7 +1226,7 @@ export function IncomeProtectionPage() {
       setQuoteDocumentStatus("Document: Draft generated");
       addToast("Quote draft generated", "success");
     } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, "Quote", { generationStatus: "failed" });
+      syncLocalGeneratedDraft("Quote", { generationStatus: "failed" });
       setQuoteDocumentStatus("Document: Draft generation failed");
       addToast("Failed to generate Quote draft", "error");
     }
