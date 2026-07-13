@@ -880,11 +880,161 @@ describe("App routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Aviva")).toBeInTheDocument();
+      const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<string, { editedHtml?: string }>;
+        }
+      >;
+
+      expect(storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml).toContain("Aviva");
     });
 
-    expect(screen.getByText("Date of birth: 08/11/1990")).toBeInTheDocument();
-    expect(screen.queryByText("Age: Not recorded")).not.toBeInTheDocument();
+    const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+      string,
+      {
+        documentDrafts?: Record<string, { editedHtml?: string }>;
+      }
+    >;
+    const quoteEditedHtml = storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml ?? "";
+
+    expect(quoteEditedHtml).toContain("statement-quote-table");
+    expect(quoteEditedHtml).toContain("Aviva");
+    expect(quoteEditedHtml).toContain("Cover amount: 50000");
+    expect(quoteEditedHtml).toContain("Date of birth: 08/11/1990");
+    expect(quoteEditedHtml).toContain("Deferred period: 13 weeks");
+    expect(quoteEditedHtml).toContain("Cover to age: 65");
+    expect(quoteEditedHtml).toContain("Smoker status: Non-Smoker");
+    expect(quoteEditedHtml).toContain("Occupation class: 2");
+    expect(quoteEditedHtml).not.toContain("Age: Not recorded");
+  });
+
+  it("uses Quote form values in the exported Quote preview artifact", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Income Protection Quote Comparison",
+              integrationRequests: [
+                {
+                  provider: "BestAdvice",
+                  request_type: "Phi",
+                  status: "sent",
+                  requested_at: "2026-06-19T10:00:00+00:00",
+                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                  quote_results: [{ provider_name: "Aviva", level_premium: "102.50" }],
+                  errors: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<string, { editedHtml?: string }>;
+        }
+      >;
+
+      expect(storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml).toContain("Aviva");
+    });
+
+    const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<string, unknown>;
+    const { buildExportDocumentArtifact } = await vi.importActual<typeof import("./documents/export-generated-document")>(
+      "./documents/export-generated-document",
+    );
+    const exportedSnapshot = buildExportDocumentArtifact(storedClients["CLI-2026-0002"] as Parameters<typeof buildExportDocumentArtifact>[0], "Quote");
+
+    expect(exportedSnapshot.title).toBe("Quote");
+    expect(exportedSnapshot.html).toContain("Income Protection Quote Comparison");
+    expect(exportedSnapshot.html).toContain("Aviva");
+    expect(exportedSnapshot.html).toContain("Cover amount: 50000");
+    expect(exportedSnapshot.html).toContain("Date of birth: 08/11/1990");
+    expect(exportedSnapshot.html).toContain("Deferred period: 13 weeks");
+    expect(exportedSnapshot.html).toContain("Cover to age: 65");
+    expect(exportedSnapshot.html).toContain("Smoker status: Non-Smoker");
+    expect(exportedSnapshot.html).toContain("Occupation class: 2");
+  });
+
+  it("marks the Quote workspace as out of date after Quote form inputs change post-generation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/documents/statement-quote")) {
+          return Promise.resolve(
+            createGenerateDocumentResponse({
+              title: "Income Protection Quote Comparison",
+              integrationRequests: [
+                {
+                  provider: "BestAdvice",
+                  request_type: "Phi",
+                  status: "sent",
+                  requested_at: "2026-06-19T10:00:00+00:00",
+                  request_fields: [{ label: "DOB", value: "08/11/1990" }],
+                  quote_results: [{ provider_name: "Aviva", level_premium: "102.50" }],
+                  errors: [],
+                },
+              ],
+            }),
+          );
+        }
+
+        return Promise.resolve(createGenerateDocumentResponse());
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      const storedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<string, { editedHtml?: string }>;
+        }
+      >;
+
+      expect(storedClients["CLI-2026-0002"]?.documentDrafts?.["Quote"]?.editedHtml).toContain("Aviva");
+    });
+
+    fireEvent.change(document.getElementById("quote-annualCoverAmount") as HTMLInputElement, {
+      target: { value: "45000" },
+    });
+
+    expect(screen.getByText("Quote inputs changed after the last generated draft. Generate the quote comparison again to refresh the workspace.")).toBeInTheDocument();
+    expect(screen.getAllByText("Draft out of date").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Aviva")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export DOCX" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export PDF" })).toBeDisabled();
   });
 
   it("posts Quote form values in the quote generation workflow snapshot", async () => {

@@ -251,6 +251,15 @@ function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<Se
 }
 
 export function IncomeProtectionPage() {
+  type QuoteInputSnapshot = {
+    annualCoverAmount: string;
+    coverToAge: string;
+    occupationClass: string;
+    deferredPeriod: string;
+    smoker: string;
+    phiIndexation: string;
+  };
+
   const { user } = useAuth();
   const canUseBackend = Boolean(user);
   const actorLabel = resolveActorLabel(user?.role);
@@ -281,6 +290,7 @@ export function IncomeProtectionPage() {
   const [showStatementValidation, setShowStatementValidation] = useState(false);
   const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
   const [showQuoteValidation, setShowQuoteValidation] = useState(false);
+  const [lastGeneratedQuoteInputSnapshot, setLastGeneratedQuoteInputSnapshot] = useState<QuoteInputSnapshot | null>(null);
   const [quoteAnnualCoverAmount, setQuoteAnnualCoverAmount] = useState("");
   const [quoteCoverToAge, setQuoteCoverToAge] = useState("");
   const [quoteOccupationClass, setQuoteOccupationClass] = useState("");
@@ -339,6 +349,7 @@ export function IncomeProtectionPage() {
       getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
     );
     setQuoteDocumentStatus(getGenerationHeaderStatus("Document", client.documentDrafts["Quote"].generationStatus));
+    setLastGeneratedQuoteInputSnapshot(null);
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
@@ -544,14 +555,13 @@ export function IncomeProtectionPage() {
     { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
   ];
 
-  const quoteWorkflowSnapshot = useMemo(
+  const currentQuoteInputSnapshot = useMemo<QuoteInputSnapshot>(
     () => ({
-      ...resolvedDraft,
-      recommendedCover: quoteAnnualCoverAmount,
-      coverAge: quoteCoverToAge,
-      phiOccupationalClass: quoteOccupationClass,
+      annualCoverAmount: quoteAnnualCoverAmount,
+      coverToAge: quoteCoverToAge,
+      occupationClass: quoteOccupationClass,
       deferredPeriod: quoteDeferredPeriod,
-      smokerStatus: quoteSmoker,
+      smoker: quoteSmoker,
       phiIndexation: quotePhiIndexation,
     }),
     [
@@ -561,9 +571,33 @@ export function IncomeProtectionPage() {
       quoteOccupationClass,
       quotePhiIndexation,
       quoteSmoker,
+    ],
+  );
+
+  const quoteWorkflowSnapshot = useMemo(
+    () => ({
+      ...resolvedDraft,
+      recommendedCover: currentQuoteInputSnapshot.annualCoverAmount,
+      coverAge: currentQuoteInputSnapshot.coverToAge,
+      phiOccupationalClass: currentQuoteInputSnapshot.occupationClass,
+      deferredPeriod: currentQuoteInputSnapshot.deferredPeriod,
+      smokerStatus: currentQuoteInputSnapshot.smoker,
+      phiIndexation: currentQuoteInputSnapshot.phiIndexation,
+    }),
+    [
+      currentQuoteInputSnapshot,
       resolvedDraft,
     ],
   );
+
+  const isQuoteDraftOutOfDate =
+    lastGeneratedQuoteInputSnapshot !== null &&
+    (currentQuoteInputSnapshot.annualCoverAmount !== lastGeneratedQuoteInputSnapshot.annualCoverAmount ||
+      currentQuoteInputSnapshot.coverToAge !== lastGeneratedQuoteInputSnapshot.coverToAge ||
+      currentQuoteInputSnapshot.occupationClass !== lastGeneratedQuoteInputSnapshot.occupationClass ||
+      currentQuoteInputSnapshot.deferredPeriod !== lastGeneratedQuoteInputSnapshot.deferredPeriod ||
+      currentQuoteInputSnapshot.smoker !== lastGeneratedQuoteInputSnapshot.smoker ||
+      currentQuoteInputSnapshot.phiIndexation !== lastGeneratedQuoteInputSnapshot.phiIndexation);
 
   const factFindUpdateGenerationRequirements = [
     { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
@@ -969,7 +1003,8 @@ export function IncomeProtectionPage() {
   }
 
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
-    const previewArtifact = buildExportDocumentArtifact(resolvedDraft, documentType);
+    const sourceProfile = documentType === "Quote" ? quoteWorkflowSnapshot : resolvedDraft;
+    const previewArtifact = buildExportDocumentArtifact(sourceProfile, documentType);
     if (!previewArtifact.html) {
       return;
     }
@@ -978,7 +1013,7 @@ export function IncomeProtectionPage() {
     const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
     try {
       const artifactBlob = await exportGeneratedDocument(
-        resolvedDraft,
+        sourceProfile,
         documentType,
         extension,
         nextDocument.documentName,
@@ -1163,6 +1198,7 @@ export function IncomeProtectionPage() {
         integrationRequests,
         editedHtml: buildGeneratedEditorHtml("Quote", generatedDocument),
       });
+      setLastGeneratedQuoteInputSnapshot(currentQuoteInputSnapshot);
       setQuoteDocumentStatus("Document: Draft generated");
       addToast("Quote draft generated", "success");
     } catch {
@@ -2486,6 +2522,20 @@ export function IncomeProtectionPage() {
 
     if (activeTab.id === "quote") {
       const quoteDraft = getWorkspaceDocumentDraft("Quote");
+      const quoteWorkspaceDraft = isQuoteDraftOutOfDate
+        ? {
+            ...quoteDraft,
+            generationStatus: "idle" as const,
+            lastGeneratedHtml: "",
+            lastGeneratedSections: [],
+            editedHtml: "",
+          }
+        : quoteDraft;
+      const quoteOutputIndicator = isQuoteDraftOutOfDate ? "Draft out of date" : getGeneratedDraftStatusLabel(quoteDraft.generationStatus);
+      const quoteStatusLabel = isQuoteDraftOutOfDate ? "Draft out of date" : quoteDocumentStatus.replace("Document: ", "");
+      const quoteEmptyMessage = isQuoteDraftOutOfDate
+        ? "Quote inputs changed after the last generated draft. Generate the quote comparison again to refresh the workspace."
+        : "Generate the quote comparison to open the quote workspace.";
 
       return (
         <div className="page-stack">
@@ -2568,20 +2618,20 @@ export function IncomeProtectionPage() {
               })}
             </AccordionItem>
             <AccordionItem
-              indicator={getGeneratedDraftStatusLabel(quoteDraft.generationStatus)}
+              indicator={quoteOutputIndicator}
               isOpen={quoteWorkspaceAccordion.isOpen("generated-output")}
               onToggle={() => quoteWorkspaceAccordion.toggle("generated-output")}
               title="Generated Output"
             >
               <GeneratedOutputWorkspace
-                draft={quoteDraft}
-                emptyMessage="Generate the quote comparison to open the quote workspace."
+                draft={quoteWorkspaceDraft}
+                emptyMessage={quoteEmptyMessage}
                 generateDisabled={quoteMissingFields.length > 0}
                 onContentChange={(html) => updateGeneratedOutput("Quote", html)}
                 onExportDocx={() => void handleGeneratedOutputExport("Quote", "docx")}
                 onExportPdf={() => void handleGeneratedOutputExport("Quote", "pdf")}
                 onGenerate={() => void handleQuoteGenerate()}
-                statusLabel={quoteDocumentStatus.replace("Document: ", "")}
+                statusLabel={quoteStatusLabel}
                 templatePicker={
                   <TemplatePicker
                     documentType="Quote"
