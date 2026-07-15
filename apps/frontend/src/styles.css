@@ -3162,7 +3162,7 @@ button {
 .workflow-document-statement-of-suitability .statement-quote-row,
 .workflow-document-quote .statement-quote-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.7fr 1fr 1fr 1.2fr;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -3195,11 +3195,17 @@ button {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #5b2230;
+  white-space: nowrap;
 }
 
 .workflow-document-statement-of-suitability .statement-quote-cell p,
 .workflow-document-quote .statement-quote-cell p {
   margin: 0;
+}
+
+.workflow-document-statement-of-suitability .statement-quote-cell:first-child p,
+.workflow-document-quote .statement-quote-cell:first-child p {
+  white-space: nowrap;
 }
 
 /* Footer contact line */
@@ -3382,7 +3388,7 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row,
 .generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.7fr 1fr 1fr 1.2fr;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -3415,6 +3421,12 @@ button {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #5b2230;
+  white-space: nowrap;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell:first-child p,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell:first-child p {
+  white-space: nowrap;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-footer-contact {

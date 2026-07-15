@@ -43,7 +43,7 @@ describe("buildWorkflowDocument", () => {
     const document = buildWorkflowDocument(profile, "Statement of Suitability");
 
     expect(document.title).toBe("Statement of Suitability");
-    // Statement uses only its own cleaner blocks — no banner, no footer
+    // Statement uses only its own cleaner blocks - no banner, no footer
     expect(document.html).toContain("statement-document-body");
     expect(document.html).not.toContain("class=\"document-section");
     expect(document.html).not.toContain("Signatures and Record");
@@ -200,15 +200,15 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("After Tax Discount");
     expect(document.html).not.toContain("Policy Type");
     expect(document.html).toContain("Aviva");
-    expect(document.html).toContain("102.50");
+    expect(document.html).toContain("€102.50");
     expect(document.html).toContain("61.50");
     expect(document.html).toContain("Irish Life");
     expect(document.html).toContain("81.92");
     expect(document.html).toContain("Royal London");
     expect(document.html).toContain("51.00");
     expect(document.html).toContain("Zurich Life");
-    expect(document.html).toContain("15.00");
-    expect(document.html).toContain("25.22");
+    expect(document.html).toContain("€15.00");
+    expect(document.html).toContain("€25.22");
     expect(document.html).toContain("71.33");
     expect(document.html).not.toContain("Esc 3%");
     expect(document.html).not.toContain("Esc 5%");
@@ -238,9 +238,9 @@ describe("buildWorkflowDocument", () => {
         requestFields: [{ label: "Age", value: "30" }],
         quoteResults: [
           {
-            providerName: "Aviva",
-            policyType: "Guaranteed",
-            levelPremium: "121.62",
+            providerName: "Royal London",
+            policyType: "Personal",
+            levelPremium: "167.69",
           },
         ],
         errors: [],
@@ -248,15 +248,14 @@ describe("buildWorkflowDocument", () => {
     ];
 
     const document = buildWorkflowDocument(profile, "Statement of Suitability");
-
-    expect(document.html).toContain("Recommendation: Aviva 13 Week deferred plan for €35,000 per annum");
-    expect(document.html).toContain("We recommend an Aviva Income Protection 13 Week deferred plan for €35,000 to cover you to age 65.");
+    expect(document.html).toContain("Recommendation: Royal London 13 Week deferred plan for €35,000 per annum");
+    expect(document.html).toContain("We recommend a Royal London Income Protection 13 Week deferred plan for €35,000 to cover you to age 65.");
     expect(document.html).toContain("As this represents 75% of your salary");
     expect(document.html).toContain(
-      "The gross cost of this 13 Week deferred period plan is €121.62 (15.00% discount on premium applied) less tax relief @40% giving a net cost of €62.03pm.",
+      "The gross cost of this 13 Week deferred period plan is €167.69 (15.00% discount on premium applied) less tax relief @40% giving a net cost of €85.52pm.",
     );
     expect(document.html).toContain("We have discussed affordability of this plan and you are happy to proceed.");
-    expect(document.html).toContain("The premium offered by Aviva for this type of cover is competitive");
+    expect(document.html).toContain("The premium offered by Royal London for this type of cover is competitive");
     expect(document.html).toContain("The monthly premium receives 40% tax relief on this plan.");
   });
 
@@ -293,8 +292,253 @@ describe("buildWorkflowDocument", () => {
     const document = buildWorkflowDocument(profile, "Quote");
 
     expect(document.html).toContain("Zurich Life");
-    expect(document.html).toContain("25.22");
+    expect(document.html).toContain("€25.22");
     expect(document.html).toContain("71.33");
+  });
+
+  it("applies the Zurich 17.5 percent discount to the selected statement quote", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.productType = "Income Protection";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.recommendationAcknowledged = "Yes";
+    profile.zurichDiscountActive = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Executive - Guaranteed",
+            levelPremium: "121.62",
+          },
+          {
+            providerName: "Zurich Life",
+            policyType: "Guaranteed",
+            levelPremium: "144.10",
+          },
+        ],
+        errors: [],
+      },
+    ];
+    profile.statementSelectedQuoteKey = buildStatementQuoteKey(
+      0,
+      1,
+      profile.documentDrafts["Quote"].integrationRequests[0].quoteResults[1],
+    );
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("The returned quote from Zurich Life");
+    expect(document.html).toContain("(17.50% discount on premium applied)");
+    expect(document.html).toContain("giving a net cost of €71.33pm");
+  });
+
+  it("treats Zurich guaranteed-premium variants as eligible for the 17.5 percent discount", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.dateOfBirth = "1996-06-29";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.occupation = "Teacher";
+    profile.zurichDiscountActive = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
+        quoteResults: [
+          {
+            providerName: "Zurich",
+            policyType: "Guaranteed Premium",
+            levelPremium: "144.10",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).toContain("€25.22");
+    expect(document.html).toContain("€71.33");
+  });
+
+  it("applies the fixed 15 percent discount to the live provider and plan combinations", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.dateOfBirth = "1996-06-29";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.occupation = "Teacher";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
+        quoteResults: [
+          { providerName: "Aviva", policyType: "Executive", levelPremium: "218.87" },
+          { providerName: "New Ireland", policyType: "Personal", levelPremium: "163.72" },
+          { providerName: "Royal London", policyType: "Personal", levelPremium: "167.69" },
+          { providerName: "Royal London", policyType: "Executive", levelPremium: "213.28" },
+          { providerName: "Zurich Life", policyType: "Personal", levelPremium: "142.12" },
+          { providerName: "Zurich Life", policyType: "Executive", levelPremium: "202.13" },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).not.toContain("€32.83");
+    expect(document.html).toContain("€25.15");
+    expect(document.html).toContain("€31.99");
+    expect(document.html).toContain("€21.32");
+    expect(document.html).toContain("€30.32");
+    expect(document.html).not.toContain("€24.56");
+  });
+
+  it("applies the fixed 15 percent discount in statement text for eligible live quote combinations", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.productType = "Income Protection";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 weeks" }],
+        quoteResults: [
+          {
+            providerName: "Royal London",
+            policyType: "Personal",
+            levelPremium: "167.69",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain(
+      "The returned quote from Royal London is on a personal premium basis at €167.69 per month before tax relief.",
+    );
+    expect(document.html).toContain("(15.00% discount on premium applied)");
+    expect(document.html).toContain("giving a net cost of €85.52pm");
+  });
+
+  it("shows provider and policy labels for distinct executive and personal quote rows", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.dateOfBirth = "1996-06-29";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.occupation = "Teacher";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
+        quoteResults: [
+          { providerName: "Aviva", policyType: "Executive", levelPremium: "218.87" },
+          { providerName: "Aviva", policyType: "Reviewable", levelPremium: "198.12" },
+          { providerName: "Royal London", policyType: "Personal", levelPremium: "167.69" },
+          { providerName: "Royal London", policyType: "Executive", levelPremium: "213.28" },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).toContain("Aviva - Executive");
+    expect(document.html).toContain(">Aviva<");
+    expect(document.html).toContain("Royal London - Personal");
+    expect(document.html).toContain("Royal London - Executive");
+    expect(document.html).not.toContain("Royal London - Executive - Guaranteed");
+    expect(document.html).not.toContain("Irish Life - Guaranteed");
+  });
+
+  it("applies five visible discounts for the live returned quote mix", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.maritalStatus = "Single";
+    profile.income = "50000";
+    profile.dateOfBirth = "1996-06-29";
+    profile.recommendedCover = "30000";
+    profile.deferredPeriod = "13 weeks";
+    profile.coverAge = "65";
+    profile.smokerStatus = "Non-Smoker";
+    profile.phiOccupationalClass = "2";
+    profile.occupation = "Teacher";
+    profile.zurichDiscountActive = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: "13 Week" }],
+        quoteResults: [
+          { providerName: "Irish Life", policyType: "Reviewable", levelPremium: "" },
+          { providerName: "Aviva", policyType: "Reviewable", levelPremium: "82.04" },
+          { providerName: "Aviva", policyType: "Executive - Reviewable", levelPremium: "121.84" },
+          { providerName: "Irish Life", policyType: "Guaranteed", levelPremium: "101.81" },
+          { providerName: "Friends First", policyType: "Guaranteed", levelPremium: "" },
+          { providerName: "New Ireland", policyType: "Guaranteed", levelPremium: "" },
+          { providerName: "Aviva", policyType: "Guaranteed", levelPremium: "89.10" },
+          { providerName: "Royal London", policyType: "Guaranteed", levelPremium: "103.23" },
+          { providerName: "Aviva", policyType: "Executive - Guaranteed", levelPremium: "132.47" },
+          { providerName: "Royal London", policyType: "Executive - Guaranteed", levelPremium: "123.47" },
+          { providerName: "Zurich", policyType: "Guaranteed", levelPremium: "94.25" },
+          { providerName: "Zurich", policyType: "Executive - Guaranteed", levelPremium: "123.40" },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).toContain("€15.48");
+    expect(document.html).toContain("€19.87");
+    expect(document.html).toContain("€18.52");
+    expect(document.html).toContain("€16.49");
+    expect(document.html).toContain("€21.60");
+    expect(document.html).not.toContain("€13.36");
+    expect(document.html).not.toContain("€18.28");
   });
 
   it.skip("prefers live quote premium and request deferred period over stale statement fields", () => {
@@ -318,9 +562,9 @@ describe("buildWorkflowDocument", () => {
         requestFields: [{ label: "DeferredPeriod", value: "13 weeks" }],
         quoteResults: [
           {
-            providerName: "Aviva",
-            policyType: "Guaranteed",
-            levelPremium: "121.62",
+            providerName: "Royal London",
+            policyType: "Personal",
+            levelPremium: "167.69",
           },
         ],
         errors: [],
@@ -329,10 +573,10 @@ describe("buildWorkflowDocument", () => {
 
     const document = buildWorkflowDocument(profile, "Statement of Suitability");
 
-    expect(document.html).toContain("Recommendation: Aviva 13 weeks deferred plan for â‚¬30,000 per annum");
-    expect(document.html).toContain("The gross cost of this 13 weeks deferred period plan is â‚¬121.62 less tax relief @18% giving a net cost of â‚¬100.00pm.");
+    expect(document.html).toContain("Recommendation: Aviva 13 weeks deferred plan for €30,000 per annum");
+    expect(document.html).toContain("The gross cost of this 13 weeks deferred period plan is €121.62 less tax relief @18% giving a net cost of €100.00pm.");
     expect(document.html).not.toContain("26 weeks deferred plan");
-    expect(document.html).not.toContain("â‚¬165.50");
+    expect(document.html).not.toContain("€165.50");
   });
 
   it("uses returned quote request fields and quote results in the statement recommendation text", () => {
@@ -360,9 +604,9 @@ describe("buildWorkflowDocument", () => {
         ],
         quoteResults: [
           {
-            providerName: "Aviva",
-            policyType: "Guaranteed",
-            levelPremium: "121.62",
+            providerName: "Royal London",
+            policyType: "Personal",
+            levelPremium: "167.69",
           },
         ],
         errors: [],
@@ -679,3 +923,5 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain('class="grid-label">Client</span><strong>Jamie Murphy</strong>');
   });
 });
+
+

@@ -937,17 +937,21 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1.7fr 1fr 1fr 1.2fr;
     background: #e8e8e8;
     border-bottom: 1px solid #000;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-row {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1.7fr 1fr 1fr 1.2fr;
     border-bottom: 1px solid #ccc;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-cell {
     padding: 8px 10px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p,
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell:first-child p {
+    white-space: nowrap;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-cell + .statement-quote-cell {
     border-left: 1px solid #ccc;

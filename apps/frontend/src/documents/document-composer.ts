@@ -265,6 +265,10 @@ function formatEuroAmount(value: number | null, fractionDigits = 2) {
   }).format(value);
 }
 
+function formatEuroValue(value: number | null) {
+  return value === null ? "Not available" : `€${formatEuroAmount(value)}`;
+}
+
 function indefiniteArticle(value: string) {
   return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
 }
@@ -290,25 +294,88 @@ function normalizeText(value: string | undefined) {
 }
 
 function isReviewablePolicyType(policyType: string | undefined) {
-  return normalizeText(policyType) === "reviewable";
+  return normalizeText(policyType).includes("reviewable");
 }
 
 function isGuaranteedPolicyType(policyType: string | undefined) {
   const normalized = normalizeText(policyType);
-  return normalized === "" || normalized === "guaranteed";
+  return normalized === "" || normalized.includes("guaranteed");
 }
 
 function hasZurichDiscountToggleEnabled(profile: StatementRecommendationProfile) {
   return normalizeText(profile.zurichDiscountActive) === "yes";
 }
 
-function resolveFixedQuoteDiscountPercentage(quote: IntegrationQuoteResult) {
-  const provider = normalizeText(quote.providerName);
-  if (!isGuaranteedPolicyType(quote.policyType)) {
-    return null;
+function isZurichProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("zurich");
+}
+
+function resolvePolicyDisplayLabel(policyType: string | undefined) {
+  const normalized = normalizeText(policyType);
+  if (!normalized) {
+    return "";
   }
 
-  if (provider === "aviva" || provider === "royal london" || provider === "zurich life") {
+  const parts: string[] = [];
+  if (normalized.includes("personal")) {
+    parts.push("Personal");
+  }
+  if (normalized.includes("executive")) {
+    parts.push("Executive");
+  }
+
+  return parts.join(" - ");
+}
+
+function buildQuoteDescriptor(providerName: string | undefined, policyType: string | undefined) {
+  return `${normalizeText(providerName)} ${normalizeText(policyType)}`.trim();
+}
+
+function isAvivaProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("aviva");
+}
+
+function isRoyalLondonProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("royal london");
+}
+
+function isExecutiveVariant(providerName: string | undefined, policyType: string | undefined) {
+  return buildQuoteDescriptor(providerName, policyType).includes("executive");
+}
+
+function isImplicitPersonalVariant(providerName: string | undefined, policyType: string | undefined) {
+  const descriptor = buildQuoteDescriptor(providerName, policyType);
+  return !descriptor.includes("executive");
+}
+
+function formatQuoteProviderLabel(providerName: string | undefined, policyType: string | undefined) {
+  const provider = providerName?.trim() ?? "";
+  const policy = resolvePolicyDisplayLabel(policyType);
+  if (provider && policy) {
+    return `${provider} - ${policy}`;
+  }
+
+  return valueOrFallback(provider || policy, "Unknown provider");
+}
+
+function hasFixedFifteenDiscount(providerName: string | undefined, policyType: string | undefined) {
+  if (isAvivaProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) && isGuaranteedPolicyType(policyType);
+  }
+
+  if (isRoyalLondonProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) || isImplicitPersonalVariant(providerName, policyType);
+  }
+
+  if (isZurichProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) || isImplicitPersonalVariant(providerName, policyType);
+  }
+
+  return false;
+}
+
+function resolveFixedQuoteDiscountPercentage(quote: IntegrationQuoteResult) {
+  if (hasFixedFifteenDiscount(quote.providerName, quote.policyType)) {
     return 15;
   }
 
@@ -320,10 +387,10 @@ function resolveQuoteDiscountPercentage(profile: StatementRecommendationProfile,
     return resolveLegacyDiscountPercentage(profile);
   }
 
-  const provider = normalizeText(quote.providerName);
   if (
-    provider === "zurich life" &&
-    isGuaranteedPolicyType(quote.policyType) &&
+    isZurichProvider(quote.providerName) &&
+    (isExecutiveVariant(quote.providerName, quote.policyType) ||
+      isImplicitPersonalVariant(quote.providerName, quote.policyType)) &&
     hasZurichDiscountToggleEnabled(profile)
   ) {
     return 17.5;
@@ -574,10 +641,10 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     return {
       group: isReviewablePolicyType(quote.policyType) ? "reviewable" : "guaranteed",
       html: [
-        valueOrFallback(quote.providerName),
-        valueOrFallback(quote.levelPremium),
-        discountAmount === null ? "" : formatEuroAmount(discountAmount),
-        actualAmountPaid === null ? "Not available" : `€${formatEuroAmount(actualAmountPaid)}`,
+        formatQuoteProviderLabel(quote.providerName, quote.policyType),
+        grossPremium === null ? valueOrFallback(quote.levelPremium) : formatEuroValue(grossPremium),
+        discountAmount === null ? "" : formatEuroValue(discountAmount),
+        formatEuroValue(actualAmountPaid),
       ]
         .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)
         .join(""),

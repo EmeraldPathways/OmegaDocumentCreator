@@ -1912,6 +1912,79 @@ describe("App routes", () => {
     expect(exportGeneratedDocumentMock).not.toHaveBeenCalled();
   });
 
+  it("carries the Zurich discount from the quote flow into the generated statement", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("/documents/statement-quote")) {
+        return Promise.resolve(
+          createGenerateDocumentResponse({
+            title: "Income Protection Quote Comparison",
+            integrationRequests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "sent",
+                requested_at: "2026-06-19T10:00:00+00:00",
+                request_fields: [{ label: "DeferredPeriod", value: "13 weeks" }],
+                quote_results: [{ provider_name: "Zurich Life", policy_type: "Guaranteed", level_premium: "144.10" }],
+                errors: [],
+              },
+            ],
+          }),
+        );
+      }
+
+      if (url.includes("/documents/generate")) {
+        return Promise.resolve(
+          createGenerateDocumentResponse({
+            title: "Statement of Suitability",
+            sectionTitle: "Recommendation",
+            sectionBodyHtml: "<p>Statement recommendation copy.</p>",
+            generatedHtml: "<section><h2>Recommendation</h2><p>Statement recommendation copy.</p></section>",
+          }),
+        );
+      }
+
+      return Promise.resolve(createGenerateDocumentResponse());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Quote" }));
+    fillQuoteForm();
+    fireEvent.click(screen.getByLabelText("Apply Zurich 17.5% discount"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Zurich Life")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate Draft" }));
+
+    await waitFor(() => {
+      const storedAfterGenerate = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as Record<
+        string,
+        {
+          documentDrafts?: Record<string, { editedHtml?: string }>;
+        }
+      >;
+
+      expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.editedHtml).toContain(
+        "(17.50% discount on premium applied)",
+      );
+      expect(storedAfterGenerate["CLI-2026-0002"].documentDrafts?.["Statement of Suitability"]?.editedHtml).toContain(
+        "giving a net cost of €71.33pm",
+      );
+    });
+  });
+
   it("disables Statement of Suitability generation when essential fields are missing", () => {
     render(
       <MemoryRouter initialEntries={["/clients/CLI-2026-0001/income-protection"]}>
