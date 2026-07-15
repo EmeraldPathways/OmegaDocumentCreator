@@ -8,6 +8,7 @@ import type {
   SupportedDocumentType,
 } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
+import { findStatementQuoteOption } from "./statement-quote-selection";
 
 type StatementRecommendationProfile = SeededClientProfile &
   Partial<{
@@ -269,11 +270,15 @@ function indefiniteArticle(value: string) {
 }
 
 function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
-  const quotes = requests.flatMap((request) => request.quoteResults);
-  if (quotes.length === 0) {
-    return null;
+  const selectedOption = findStatementQuoteOption(requests, profile.statementSelectedQuoteKey);
+
+  if (selectedOption) {
+    return requests[selectedOption.requestIndex]?.quoteResults[selectedOption.quoteIndex] ?? null;
   }
-  return quotes[0];
+
+  return requests
+    .flatMap((request) => request.quoteResults)
+    .find((quote) => (quote.levelPremium?.trim() ?? "").length > 0) ?? null;
 }
 
 function resolveLegacyDiscountPercentage(profile: StatementRecommendationProfile) {
@@ -396,6 +401,17 @@ function resolveStatementDeferredPeriod(profile: SeededClientProfile, requests: 
   );
 }
 
+function resolveStatementCoverAmount(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  return requestFieldValue(requests, "AnnualAmount", "Cover amount") || profile.recommendedCover;
+}
+
+function resolveStatementCoverAge(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  return valueOrFallback(
+    requestFieldValue(requests, "NRA", "CoverToAge", "Cover to age") || profile.coverAge,
+    "selected retirement age",
+  );
+}
+
 function resolveStatementGrossPremium(profile: SeededClientProfile, selectedQuote: ReturnType<typeof findSelectedQuote>) {
   return parseNumber(selectedQuote?.levelPremium) ?? parseNumber(profile.premium);
 }
@@ -436,9 +452,10 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
   const selectedQuote = findSelectedQuote(profile, requests);
   const provider = valueOrFallback(selectedQuote?.providerName || profile.provider, "Recommended provider");
   const deferredPeriod = resolveStatementDeferredPeriod(profile, requests);
-  const coverAmountNumber = parseNumber(profile.recommendedCover);
-  const coverAmount = coverAmountNumber === null ? valueOrFallback(profile.recommendedCover) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
-  const coverAge = valueOrFallback(profile.coverAge, "selected retirement age");
+  const resolvedCoverAmount = resolveStatementCoverAmount(profile, requests);
+  const coverAmountNumber = parseNumber(resolvedCoverAmount);
+  const coverAmount = coverAmountNumber === null ? valueOrFallback(resolvedCoverAmount) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
+  const coverAge = resolveStatementCoverAge(profile, requests);
   const incomeNumber = parseNumber(profile.income);
   const coverShare =
     incomeNumber !== null && incomeNumber > 0 && coverAmountNumber !== null ? Math.round((coverAmountNumber / incomeNumber) * 100) : null;
@@ -467,6 +484,19 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     coverShare === null
       ? "<p>This level of cover is intended to protect your income and support your standard of living if you are unable to work due to illness or injury.</p>"
       : `<p>As this represents ${escapeHtml(String(coverShare))}% of your salary, this keeps you within Revenue limits while giving you the cover needed to maintain your standard of living.</p>`;
+
+  const quoteDetailLine =
+    selectedQuote?.policyType || grossPremiumNumber !== null
+      ? `<p>${escapeHtml(
+          [
+            `The returned quote from ${provider}`,
+            selectedQuote?.policyType ? `is on a ${selectedQuote.policyType.toLowerCase()} premium basis` : "matches the returned premium basis",
+            grossPremiumNumber === null ? "" : `at €${formatEuroAmount(grossPremiumNumber)} per month before tax relief`,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        )}.</p>`
+      : "";
 
   const costParts = [
     grossPremiumNumber === null ? "" : `The gross cost of this ${deferredPeriod} deferred period plan is €${formatEuroAmount(grossPremiumNumber)}`,
@@ -497,6 +527,7 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     summaryLine,
     recommendationLine,
     rationaleLine,
+    quoteDetailLine,
     costLine,
     affordabilityLine,
     `<p>We recommend this ${escapeHtml(provider)} Income Protection policy for the following reasons:</p>`,

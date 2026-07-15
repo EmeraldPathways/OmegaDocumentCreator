@@ -1820,10 +1820,51 @@ describe("App routes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
 
-    expect(screen.getByDisplayValue("Full Advice")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Zurich Life")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("30000")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Statement date/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Policy picker/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Cover summary/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate Draft" })).toBeInTheDocument();
+  });
+
+  it("shows only statement date and a quote-derived policy picker in the statement top section", () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+
+    expect(screen.getByLabelText(/Statement date/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Policy picker/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Statement type/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Product type/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Advisor name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Annual Cover Amount/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Deferred period/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Cover to age/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Net monthly cost/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Cover summary/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Irish Life/i)).toBeInTheDocument();
+  });
+
+  it("updates the selected statement policy key when the user changes the policy picker", async () => {
+    render(
+      <MemoryRouter initialEntries={["/clients/CLI-2026-0002/income-protection"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Statement of Suitability" }));
+    const policyPicker = screen.getByLabelText(/Policy picker/i) as HTMLSelectElement;
+
+    fireEvent.change(policyPicker, {
+      target: { value: "0::1::Irish Life::Guaranteed::136.53" },
+    });
+
+    await waitFor(() => {
+      expect(policyPicker.value).toBe("0::1::Irish Life::Guaranteed::136.53");
+    });
   });
 
   it("updates the Statement of Suitability generation status and renders preview HTML", async () => {

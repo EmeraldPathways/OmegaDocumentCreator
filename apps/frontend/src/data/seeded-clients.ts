@@ -244,6 +244,7 @@ export type SeededClientProfile = {
   requestCompanyName: string;
   requestPolicies: string;
   requestLetterDate: string;
+  statementSelectedQuoteKey: string;
   documentDrafts: Record<SupportedDocumentType, GeneratedDocumentDraft>;
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
@@ -469,6 +470,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-01-15",
+    statementSelectedQuoteKey: "",
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Fact Find": {
@@ -718,6 +720,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "Zurich Life",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-06-06",
+    statementSelectedQuoteKey: "",
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Terms of Business": {

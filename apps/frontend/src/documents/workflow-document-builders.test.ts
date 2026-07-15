@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
+import { buildStatementQuoteKey } from "./statement-quote-selection";
 import { buildWorkflowDocument, buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 function cloneProfile(clientReference: string) {
@@ -334,6 +335,54 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("â‚¬165.50");
   });
 
+  it("uses returned quote request fields and quote results in the statement recommendation text", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.provider = "Old Provider";
+    profile.productType = "Income Protection";
+    profile.income = "50000";
+    profile.recommendedCover = "28000";
+    profile.deferredPeriod = "26 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+    profile.netMonthlyCost = "100.00";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [
+          { label: "AnnualAmount", value: "30000" },
+          { label: "DeferredPeriod", value: "13 weeks" },
+          { label: "NRA", value: "67" },
+        ],
+        quoteResults: [
+          {
+            providerName: "Aviva",
+            policyType: "Guaranteed",
+            levelPremium: "121.62",
+          },
+        ],
+        errors: [],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Recommendation: Aviva 13 weeks deferred plan");
+    expect(document.html).toContain("30,000 per annum");
+    expect(document.html).toContain("to cover you to age 67.");
+    expect(document.html).toContain("guaranteed premium basis");
+    expect(document.html).toContain("121.62 per month before tax relief");
+    expect(document.html).toContain("The gross cost of this 13 weeks deferred period plan is");
+    expect(document.html).not.toContain("26 weeks deferred plan");
+    expect(document.html).not.toContain("165.50");
+    expect(document.html).not.toContain("28,000");
+    expect(document.html).not.toContain("age 65");
+  });
+
   it("uses the first quote result for statement pricing and keeps the quote table out of the statement", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
@@ -381,6 +430,47 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("165.50");
     expect(document.html).not.toContain("statement-quote-table");
     expect(document.html).not.toContain("197.24");
+  });
+
+  it("uses the picked quote row for statement recommendation pricing", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [];
+    profile.recommendedCover = "55000";
+    profile.deferredPeriod = "26";
+    profile.coverAge = "65";
+    profile.premium = "132.00";
+    profile.netMonthlyCost = "79.20";
+    profile.income = "60000";
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent",
+        requestedAt: "2026-07-15T09:00:00+00:00",
+        requestFields: [
+          { label: "AnnualAmount", value: "55000" },
+          { label: "DeferredPeriod", value: "26" },
+          { label: "NRA", value: "65" },
+        ],
+        quoteResults: [
+          { providerName: "Aviva", policyType: "Reviewable", levelPremium: "177.74" },
+          { providerName: "Irish Life", policyType: "Reviewable", levelPremium: "165.00" },
+        ],
+        errors: [],
+      },
+    ];
+    profile.statementSelectedQuoteKey = buildStatementQuoteKey(
+      0,
+      1,
+      profile.documentDrafts["Quote"].integrationRequests[0].quoteResults[1],
+    );
+
+    const document = buildWorkflowDocument(profile, "Statement of Suitability");
+
+    expect(document.html).toContain("Irish Life");
+    expect(document.html).toContain("165.00 per month before tax relief");
+    expect(document.html).toContain("The gross cost of this 26 deferred period plan is €165.00");
+    expect(document.html).not.toContain("177.74");
   });
 
   it("uses 20 percent tax relief for single clients at or below the Irish cutoff", () => {

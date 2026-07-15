@@ -103,6 +103,7 @@ function createBlankClient(nextReference: string, updatedBy: string): SeededClie
     requestCompanyName: "",
     requestPolicies: "",
     requestLetterDate: "",
+    statementSelectedQuoteKey: "",
     documentDrafts: createDefaultDocumentDrafts(),
     files: [],
     generatedDocuments: [],
