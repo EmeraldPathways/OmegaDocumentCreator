@@ -484,8 +484,9 @@ describe("buildWorkflowDocument", () => {
     const document = buildWorkflowDocument(profile, "Fact Find");
 
     expect(document.title).toBe("Fact Find");
-    // Logo block present for Fact Find
-    expect(document.html).toContain("document-top-logo");
+    // Fact Find now uses the shared inline letter header before the page banner
+    expect(document.html).toContain("document-inline-header");
+    expect(document.html).toContain("statement-letter-header");
     expect(document.html).toContain("document-banner");
     expect(document.html).toContain("client-summary-grid");
     expect(document.html).toContain("Income Protection Fact Find");
@@ -579,7 +580,8 @@ describe("buildWorkflowDocument", () => {
     const document = buildWorkflowEditorDocument(profile, "Fact Find");
 
     expect(document.html).toContain('<article class="workflow-document workflow-document-fact-find">');
-    expect(document.html).toContain('class="document-top-logo"');
+    expect(document.html).toContain('class="document-inline-header"');
+    expect(document.html).toContain('class="statement-letter-header"');
     expect(document.html).toContain('class="document-banner"');
     expect(document.html).toContain("<h1>Income Protection Fact Find</h1>");
     expect(document.html).toContain('class="client-summary-grid"');
@@ -587,5 +589,19 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain('class="document-callout document-callout-warning"');
     expect(document.html).toContain('class="signatures-footer"');
     expect(document.html).toContain('class="grid-label">Client</span><strong>Jamie Murphy</strong>');
+  });
+
+  it("renders pensions documents with the shared quote and statement classes for preview/export parity", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+
+    const pensionsQuote = buildWorkflowDocument(profile, "Pensions Quote");
+    const pensionsStatement = buildWorkflowDocument(profile, "Pensions Statement");
+
+    expect(pensionsQuote.html).toContain('workflow-document workflow-document-pensions-quote workflow-document-quote');
+    expect(pensionsQuote.html).toContain("No Quote Data");
+    expect(pensionsStatement.html).toContain(
+      'workflow-document workflow-document-pensions-statement workflow-document-statement-of-suitability',
+    );
+    expect(pensionsStatement.html).toContain("<h2>Recommendation</h2>");
   });
 });

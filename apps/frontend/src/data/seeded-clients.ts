@@ -186,6 +186,7 @@ export type SeededClientProfile = {
   termsIssuedDate: string;
   termsNotes: string;
   statementType: string;
+  statementSelectedQuoteKey: string;
   productType: string;
   letterDate: string;
   zurichDiscountActive: string;
@@ -411,6 +412,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsIssuedDate: "",
     termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "",
+    statementSelectedQuoteKey: "",
     productType: "",
     letterDate: "2026-01-15",
     zurichDiscountActive: "",
@@ -660,6 +662,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsIssuedDate: "2026-06-06",
     termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "Full Advice",
+    statementSelectedQuoteKey: "",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
     zurichDiscountActive: "",

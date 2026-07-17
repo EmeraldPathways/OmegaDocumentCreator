@@ -2,58 +2,61 @@
 
 ## Overview
 
-Omega Document Creator is an internal office web application for Omega Financial Management.
+Omega Document Creator is an internal office application for Omega Financial Management.
 
-The live implementation now covers:
+The current product is a PostgreSQL-backed React + FastAPI system for:
 
-- secure login with persisted PostgreSQL session rows
-- staff/admin role separation
-- PostgreSQL-backed users, clients, workflows, documents, audit logs, backups, restore attempts, and sessions
-- Income Protection workflow persistence
-- AI-assisted document generation with persisted preview snapshots
-- durable file upload/download storage
-- generated document history, artifact upload, download, pack download, and deletion
-- audit logging for key write actions
-- backup manifest creation, restore validation, dry-run, execution, and scheduler wiring
-- remote-access automation guidance via Cloudflare Tunnel
+- authenticated client management
+- shared fact-find capture
+- separate Income Protection quote and statement generation
+- separate Pensions quote and statement generation
+- client file storage and generated document history
+- admin user, audit, backup, and restore operations
+
+This document reflects the current implementation state on Friday, July 17, 2026.
 
 ## Product Scope
 
-### Primary module
+### Top-level pages
 
+- `Clients`
+- `Fact Find`
 - `Income Protection`
+- `Pensions`
+- `Files/Docs`
 
-### Main navigation
+### Workflow rules
 
-- Clients
-- Income Protection
-- Files
-- Admin
-- Settings
+- `Clients` stays functionally unchanged.
+- `Fact Find` is the shared information source for both downstream workflows.
+- `Fact Find` contains only `Fact Find` and `Fact Find Update`.
+- `Income Protection` contains only `Quote` and `Statement of Suitability`.
+- `Pensions` contains only `Pensions Quote` and `Pensions Statement`.
+- `Files/Docs` contains the current `Files` and `Generated Documents` workspaces.
+- The current design, layout, preview flow, editor behavior, and export behavior are preserved through the split.
 
 ### Roles
 
 #### Admin
 
-- create, edit, disable, and manage staff accounts
+- create, edit, and disable staff accounts
 - view all clients
 - create, edit, and archive client records
 - review audit logs
 - create and review backup runs
 - validate, dry-run, and execute restores
-- review scheduler status
-- access security summary
+- review scheduler and security status
+- access admin-only settings
 
 #### Staff
 
 - log in securely
 - create and edit client records
-- complete Income Protection workflow fields
+- complete shared fact-find workflow fields
 - upload, download, and delete client files
-- generate AI-backed document drafts
-- review and edit generated content
+- generate and edit document drafts
 - export PDF and DOCX artifacts
-- view and download generated document history
+- review generated document history
 
 ## Technical Direction
 
@@ -63,8 +66,8 @@ The live implementation now covers:
 - Backend: FastAPI + Python
 - Database: PostgreSQL via SQLAlchemy
 - File storage: local server filesystem
-- Auth: cookie session auth plus PostgreSQL session table
-- AI generation: Google Gemini with seeded fallback
+- Auth: cookie-session auth plus persisted PostgreSQL session rows
+- AI generation: Gemini-backed generation with seeded fallback
 - Deployment: Windows-first local scripts plus Docker Compose
 
 ## Repository Structure
@@ -73,6 +76,8 @@ The live implementation now covers:
 apps/
   api/
   frontend/
+docs/
+  superpowers/
 infra/
   cloudflared/
   docker/
@@ -90,37 +95,42 @@ phases.md
 
 ## Current Implementation Status
 
-### Stages 1-16
+### Core platform
 
-Stages 1-16 are complete in the current codebase.
+Live in the current codebase:
 
-That includes:
-
-- runtime PostgreSQL wiring
+- PostgreSQL runtime wiring
 - SQLAlchemy models and repositories
-- auth and client persistence cutover
+- persisted sessions in PostgreSQL
+- authenticated client CRUD
 - workflow persistence
-- file upload/download storage and client folders
-- generated document persistence and artifact storage
+- backend-backed file upload/list/download/delete
+- backend-backed generated document history, artifact upload, download, pack download, and deletion
 - audit logging
-- backup manifests and backup history
-- restore validation, dry-run, execution, and restore-attempt persistence
-- backup scheduling wiring
-- generated document pack ZIP download
-- file and document deletion endpoints
-- PostgreSQL-backed exact-row session persistence
-- backend workflow persistence as the source of truth; client record cache uses `localStorage` for quick rehydration
-- Cloudflare Tunnel automation and remote-access setup guidance
+- backup manifests, restore validation, dry-run, execution, and restore-attempt persistence
+- backup scheduler wiring
+- Cloudflare Tunnel setup guidance and automation scripts
 
-### Stage 17
+### Current workflow split
 
-Stage 17 is also live:
+Live in the current codebase:
 
-- `POST /documents/generate`
-- Gemini-backed document generation
-- seeded fallback when AI is unavailable
-- persisted preview HTML snapshots
-- frontend preview/edit/export flow
+- top navigation split into five primary pages
+- `/fact-find` page narrowed to `Fact Find` and `Fact Find Update`
+- `/income-protection` page narrowed to `Quote` and `Statement of Suitability`
+- `/pensions` page narrowed to `Pensions Quote` and `Pensions Statement`
+- `/files-docs` page narrowed to `Files` and `Generated Documents`
+- legacy `/files` kept as a redirect to `/files-docs`
+- root route redirects to `/fact-find`
+
+### Current document flows
+
+- `Fact Find` and `Fact Find Update` generate from the shared workflow draft
+- Income Protection quote generation uses a local quote form and sends a Quote-specific workflow snapshot
+- Income Protection statement generation uses the selected quote results and statement workflow fields
+- Pensions uses its own `Pensions Quote` and `Pensions Statement` draft keys
+- Pensions quote generation now builds a pensions-specific snapshot and routes to the pension integration path
+- Files and generated documents remain client-scoped and backend-backed
 
 ## Backend Details
 
@@ -151,6 +161,7 @@ Implemented:
 - `GET /clients/{client_reference}/workflow`
 - `PUT /clients/{client_reference}/workflow`
 - `POST /documents/generate`
+- `POST /documents/statement-quote`
 - `GET /clients/{client_reference}/documents`
 - `POST /clients/{client_reference}/documents`
 - `GET /clients/{client_reference}/documents/{document_id}/download`
@@ -173,6 +184,13 @@ Implemented:
 - `GET /admin/audit-logs`
 - `GET /admin/security-summary`
 
+### Integration behavior
+
+- PHI quote requests are supported through the BestAdvice PHI endpoint
+- pensions quote requests are supported through the BestAdvice pension calculator endpoint
+- statement quote requests are routed through `/documents/statement-quote`
+- pensions snapshots are detected and routed to the pensions request builder instead of the PHI request builder
+
 ## Frontend Details
 
 ### Current routes
@@ -184,7 +202,10 @@ Implemented:
 - `/clients/:clientReference`
 - `/clients/:clientReference/edit`
 - `/clients/:clientReference/income-protection`
+- `/fact-find`
 - `/income-protection`
+- `/pensions`
+- `/files-docs`
 - `/documents`
 - `/documents/:clientReference`
 - `/files`
@@ -194,127 +215,117 @@ Implemented:
 ### Current workflow behavior
 
 - backend workflow persistence is authoritative
-- client record cache uses `localStorage` for quick rehydration; workflow fields are backend-backed
+- client record cache uses `localStorage` for quick rehydration
 - generated document history is backend-backed
-- Files tab uses real backend upload/list/download
-- Generated Documents tab uses real backend history/download/pack APIs
-- Quote generation now uses a Quote-tab-local input form for annual cover amount, cover-to-age, occupation class, deferred period, smoker status, and optional PHI indexation
-- Quote generation still renders through the existing Quote document builder, so the Quote-tab local values are injected into the Quote workflow snapshot at generation time rather than being persisted to the shared workflow draft
+- `Fact Find` and `Fact Find Update` are generated from the shared draft
+- Income Protection quote generation uses Quote-tab-local inputs rather than shared fact-find quote fields
+- Pensions quote generation uses a pensions-specific quote form with its own request shape
+- `Files/Docs` reuses the existing upload, list, preview, pack, and export surfaces under its own route
+- the shared workflow shell preserves the current layout while constraining visible tabs per page
+
+### Current document types
+
+- `Fact Find`
+- `Fact Find Update`
+- `Terms of Business`
+- `Statement of Suitability`
+- `Quote`
+- `Pensions Statement`
+- `Pensions Quote`
+
+## Security And Operations
+
+Current hardening in the codebase includes:
+
+- authentication required for client routes
+- CSRF Origin/Referer validation for state-changing endpoints
+- persisted session invalidation and startup cleanup
+- failed-login auditing and rate limiting
+- upload size limit via `MAX_UPLOAD_SIZE_BYTES`
+- localhost-bound PostgreSQL in Docker Compose
+- health checks and restart policies in Docker Compose
+- migration runner via `python -m app.migrate`
 
 ## Testing
 
-### One-command validation
+### Focused commands in active use
+
+Backend:
 
 ```powershell
-.\scripts\validate.ps1
+cd apps/api
+.venv\Scripts\python.exe -m unittest tests.test_pension_quote_unit
 ```
 
-### Backend
+Frontend:
 
 ```powershell
-$env:PYTHONPATH="apps\api"; apps\api\.venv\Scripts\python -m pytest apps/api/tests/test_api.py -v
+cd apps/frontend
+npm.cmd test -- --no-cache src/app.test.tsx
+npx.cmd tsc --noEmit --project tsconfig.app.json
 ```
 
-### Frontend
+### Current verification snapshot
 
-```powershell
-Push-Location apps\frontend; node_modules\.bin\tsc.cmd --noEmit --project tsconfig.app.json
-Push-Location apps\frontend; node_modules\.bin\vitest.cmd run
-```
+Confirmed during the current workflow split work:
 
-### CI
+- focused pensions backend quote-routing test passes
+- focused frontend route/workflow split test file passes
+- frontend TypeScript check passes
 
-GitHub Actions (`.github/workflows/ci.yml`): backend pytest (PostgreSQL) + frontend tsc + vitest on push/PR to main.
+This file does not claim a fresh full-suite verification beyond those focused checks.
 
-Last known broad-suite baseline:
+## Open Gaps
 
-| Gate | Result |
-|------|--------|
-| Frontend TypeScript | 0 errors |
-| Frontend vitest | 7 files, 80 tests, 0 failed |
-| Backend (full suite) | 166 passed, 0 failed |
+The main remaining work is follow-up and hardening rather than foundational platform build-out:
 
-Latest Quote-tab follow-up verification:
-
-| Gate | Result |
-|------|--------|
-| `src/app.test.tsx -t "posts Quote form values in the quote generation workflow snapshot"` | passed |
-| `GET http://127.0.0.1:3007` | 200 |
-| `GET http://127.0.0.1:8007/health` | 200 |
-
-Known current frontend test limitations:
-
-- targeted Quote request-body verification passes
-- the broader `app.test.tsx` file still shows an existing/open-handle style vitest exit issue in this checkout
-- at least one Quote rendering assertion path still needs follow-up if a clean full-suite frontend claim is required
-
-## Gaps Between Current Code and Final Product
-
-The main remaining gaps are operational hardening and product polish rather than core persistence cutover:
-
-- backup/restore operator workflow still needs broader production hardening
-- ~~`cleanup_expired()` for persisted sessions is implemented but not yet wired into scheduled cleanup~~ → session cleanup runs on startup
-- document pack skips preview-only documents that have no stored artifact files
-- Cloudflare Tunnel automation is documented and scripted, but deployment remains operator-driven
-- `income-protection-page.tsx` partially decomposed (helpers + Files tab + Generated Documents tab extracted into colocated modules, 2,178 lines); workflow tabs still inline — deeper decomposition deferred
-
-## Post-Fix Security & Operations Improvements (2026-06)
-
-- All client GET routes now require authentication (`_current_user` guard)
-- Hardcoded demo credentials removed from shipped frontend JavaScript
-- CSRF protection added — same-origin Origin/Referer validation for state-changing routes
-- File upload size limit enforced (MAX_UPLOAD_SIZE_BYTES, default 50MB)
-- Session cleanup runs on startup via `SessionRepository.cleanup_expired()`
-- Failed login attempts now audited and rate-limited (5/minute per IP)
-- Session timestamp parsing hardened (malformed timestamps treated as expired)
-- Migration runner available: `python -m app.migrate [--status|--dry-run|--force]`
-- Docker Compose includes health checks and restart policies for all services
-- PostgreSQL port bound to localhost only in Docker Compose
-- Security summary endpoint now reflects live configuration instead of static template
-- BestAdvice PHI quote parsing now reads live quote rows from `Result > Outputs > Quotes > Company`
-- Statement of Suitability now inserts a BIS quote comparison table after the introduction using fact find workflow values plus returned quote results
-- Statement PDF preview/export now shares the same page shell constants, footer content, and multi-page header logic; oversized Statement sections are split by child content before falling back to continuous slicing
-- Frontend document generation now retries `/documents/generate` once after bootstrapping the seeded staff session when the protected route returns `401`
-- Quote tab now has its own Quote Form accordion above Generated Output, with Name, Date of Birth, and derived Age shown read-only from the shared client profile and Quote-specific generation inputs collected locally on the Quote tab
-- Quote generation gating now depends on Quote-tab-local required inputs instead of the shared Fact Find income-protection fields, while the Fact Find income-protection accordion remains visible without required markers on the moved Quote-owned fields
-- Quote generation now posts a Quote-specific workflow snapshot so the request and generated Quote workspace use the Quote-tab local values instead of stale shared Fact Find values
-
-## Delivery Plan
-
-The original persistence roadmap is complete. Any next roadmap should be framed as post-cutover hardening and UX follow-up rather than core Phase 1-16 implementation.
-
-## Constraints
-
-- Keep changes small and surgical
-- Match `AGENTS.md`
-- Prefer production-shaped code over demo shortcuts
-- Use the smallest relevant verification command after each slice
-- Use `apply_patch` for manual edits
+- broader regression coverage beyond the focused route and pensions quote checks
+- possible additional seeded-profile defaults or preview assertions for the split flows
+- further decomposition of the large shared workflow page if the current inline complexity becomes a maintenance burden
+- operational deployment remains operator-driven even though Docker and Cloudflare Tunnel support are in place
 
 ## Environment
 
 Important variables:
 
 - `DATABASE_URL`
+- `TEST_DATABASE_URL`
 - `FILE_STORAGE_PATH`
 - `BACKUP_PATH`
 - `SESSION_SECRET`
 - `SESSION_TIMEOUT_MINUTES`
 - `COOKIE_SECURE`
 - `COOKIE_SAMESITE`
+- `APP_URL`
 - `ENVIRONMENT`
 - `REMOTE_ACCESS_MODE`
 - `CORS_ORIGINS`
 - `TRUSTED_PROXY_COUNT`
+- `CSRF_TRUSTED_ORIGINS`
+- `PDF_CONVERTER_BIN`
 - `PG_DUMP_BIN`
 - `PG_RESTORE_BIN`
+- `MAX_UPLOAD_SIZE_BYTES`
 - `BACKUP_SCHEDULE_ENABLED`
 - `BACKUP_SCHEDULE_INTERVAL_MINUTES`
+- `LOCAL_AI_ENABLED`
+- `LOCAL_AI_PROVIDER`
+- `LOCAL_AI_MODEL`
+- `LOCAL_AI_EMBEDDING_MODEL`
 - `AI_ENABLED`
 - `AI_PROVIDER`
 - `AI_API_KEY`
+- `GEMINI_API_KEY`
 - `AI_MODEL`
 - `AI_TEMPERATURE`
+- `PHI_ENDPOINT_URL`
+- `PHI_USERNAME`
+- `PHI_PASSWORD`
+- `PHI_REQUEST_FROM`
+- `PHI_REQUEST_FROM_CODE`
+- `PENSION_ENDPOINT_URL`
+- `PENSION_REQUEST_FROM`
+- `PENSION_REQUEST_FROM_CODE`
 
 ## Important Files
 
@@ -329,49 +340,29 @@ Backend:
 - `apps/api/app/services/`
 - `apps/api/migrations/`
 - `apps/api/tests/test_api.py`
-- `apps/api/tests/test_backup_restore.py`
+- `apps/api/tests/test_pension_quote_unit.py`
 
 Frontend:
 
 - `apps/frontend/src/App.tsx`
+- `apps/frontend/src/components/app-shell.tsx`
 - `apps/frontend/src/auth/auth-context.tsx`
 - `apps/frontend/src/data/client-data-context.tsx`
 - `apps/frontend/src/data/file-api.ts`
 - `apps/frontend/src/data/workflow-api.ts`
 - `apps/frontend/src/documents/generated-document-api.ts`
+- `apps/frontend/src/pages/fact-find-page.tsx`
+- `apps/frontend/src/pages/income-protection-documents-page.tsx`
+- `apps/frontend/src/pages/pensions-page.tsx`
+- `apps/frontend/src/pages/files-docs-page.tsx`
 - `apps/frontend/src/pages/income-protection-page.tsx`
 - `apps/frontend/src/pages/admin-page.tsx`
 
 Infrastructure:
 
+- `run-omega.cmd`
+- `apps/frontend/run-frontend.cmd`
+- `apps/api/run-api.cmd`
 - `infra/docker/compose.yaml`
 - `infra/cloudflared/config.yaml.example`
 - `infra/cloudflared/setup-tunnel.sh`
-
-## Stage Status Summary
-
-- Stage 1: complete
-- Stage 2: complete
-- Stage 3: complete
-- Stage 4: complete
-- Stage 5: complete
-- Stage 6: complete
-- Stage 7: complete
-- Stage 8: complete
-- Stage 9: complete
-- Stage 10: complete
-- Stage 11: complete
-- Stage 12: complete
-- Stage 13: complete
-- Stage 14: complete
-- Stage 15: complete
-- Stage 16: complete
-- Stage 17: complete
-- Stage 18: complete
-- Stage 19: complete
-- Stage 20: complete
-- Stage 21: complete
-- Stage 22: complete
-- Stage 23: complete (admin-audit-only pass; frontend decomposition deferred)
-- Stage 24: complete (helper extraction delivered; `income-protection-helpers.tsx` is 282 lines)
-- Stage 25: complete (Files + Generated Documents tabs extracted into colocated components)

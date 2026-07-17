@@ -2,7 +2,7 @@
 
 ## Active Branch
 
-- `page-split`
+- `page-split2`
 
 ## Active Goal
 
@@ -51,11 +51,18 @@
   - added top-level `Files/Docs`
   - moved the current `Files` and `Generated Documents` workspace into its own route
   - preserved legacy `/files` as a redirect
+- Task 6 complete inline:
+  - added the top-level `Pensions` page
+  - reused the shared workflow shell with separate `Pensions Quote` and `Pensions Statement` draft keys
+  - preserved the existing quote/statement layout pattern while keeping pensions namespaced away from income protection
+- Task 7 complete inline:
+  - replaced stale route assertions with focused five-page route coverage in `app.test.tsx`
+  - restored statement recommendation merge behavior while filtering stale saved pricing paragraphs
+  - restored guaranteed Aviva statement discount handling expected by the legacy quote/statement flow
+  - aligned fact-find document assertions with the current inline-header layout
+  - confirmed `app.test.tsx`, `app-shell.test.tsx`, `workflow-document-builders.test.ts`, and `npx.cmd tsc --noEmit --project tsconfig.app.json` pass on Friday, July 17, 2026
 
 ## Next Review Gate
 
-- Start the first real top-level page split from the new extraction seam
-- Add top-level `Income Protection` page with only `Quote` and `Statement`
-- Add top-level `Files/Docs` page with the current `Files` and `Generated Documents`
-- Start the separate `Pensions` flow
-- keep shared Fact Find input but separate pensions draft/output state
+- Verify broader regression coverage beyond route-level split checks
+- Decide whether any extra seeded profile defaults or preview assertions should be promoted into dedicated regression tests

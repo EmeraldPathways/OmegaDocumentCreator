@@ -384,7 +384,7 @@ function formatQuoteProviderLabel(providerName: string | undefined, policyType: 
 
 function hasFixedFifteenDiscount(providerName: string | undefined, policyType: string | undefined) {
   if (isAvivaProvider(providerName)) {
-    return isExecutiveVariant(providerName, policyType) && isGuaranteedPolicyType(policyType);
+    return isGuaranteedPolicyType(policyType);
   }
 
   if (isRoyalLondonProvider(providerName)) {
@@ -532,7 +532,10 @@ function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: str
   const looksGeneric =
     normalized.includes("prepared for") ||
     normalized.includes("is proposed with cover of") ||
-    normalized.includes("seeded fallback content");
+    normalized.includes("seeded fallback content") ||
+    normalized.includes("gross cost of this") ||
+    normalized.includes("net cost of") ||
+    normalized.includes("less tax relief");
 
   return looksGeneric ? computedHtml : `${computedHtml}${trimmed}`;
 }
@@ -1149,7 +1152,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
   const recommendationHtml =
     isStatementDocumentType(documentType)
-      ? computedRecommendationHtml
+      ? mergeStatementRecommendationHtml(computedRecommendationHtml, recommendationSection?.bodyHtml)
       : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);
   const warningHtml = warningSection?.bodyHtml ?? buildWarningHtml(profile, documentType);
@@ -1310,13 +1313,27 @@ function renderEditorBlock(block: ComposedBlock) {
 }
 
 export function renderComposedDocumentHtml(document: ComposedDocument) {
-  return `<article class="workflow-document workflow-document-${escapeHtml(document.documentType.toLowerCase().replace(/\s+/g, "-"))}">${document.blocks
+  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document.documentType))}">${document.blocks
     .map((block) => renderBlock(block))
     .join("")}</article>`;
 }
 
 export function renderComposedDocumentEditorHtml(document: ComposedDocument) {
-  return `<article class="workflow-document workflow-document-${escapeHtml(document.documentType.toLowerCase().replace(/\s+/g, "-"))}">${document.blocks
+  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document.documentType))}">${document.blocks
     .map((block) => renderEditorBlock(block))
     .join("")}</article>`;
+}
+
+function getWorkflowDocumentClassNames(documentType: SupportedDocumentType) {
+  const classes = ["workflow-document", `workflow-document-${documentType.toLowerCase().replace(/\s+/g, "-")}`];
+
+  if (documentType === "Pensions Statement") {
+    classes.push("workflow-document-statement-of-suitability");
+  }
+
+  if (documentType === "Pensions Quote") {
+    classes.push("workflow-document-quote");
+  }
+
+  return classes.join(" ");
 }

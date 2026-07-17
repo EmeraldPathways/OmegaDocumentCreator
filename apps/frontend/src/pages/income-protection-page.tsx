@@ -143,6 +143,10 @@ function getStatementQuoteRequests(
   return quoteRequests.length > 0 ? quoteRequests : statementRequests;
 }
 
+function stripNumericFormatting(value: string | undefined) {
+  return (value ?? "").replace(/[^\d.]/g, "").trim();
+}
+
 function mergeDocumentDrafts(
   currentDrafts: SeededClientProfile["documentDrafts"],
   incomingDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>,
@@ -360,6 +364,16 @@ export function IncomeProtectionPage({
   const [quoteDeferredPeriod, setQuoteDeferredPeriod] = useState("");
   const [quoteSmoker, setQuoteSmoker] = useState("");
   const [quotePhiIndexation, setQuotePhiIndexation] = useState("");
+  const [quotePensionGender, setQuotePensionGender] = useState("");
+  const [quotePensionRetirementAge, setQuotePensionRetirementAge] = useState("");
+  const [quotePensionSpousesPension, setQuotePensionSpousesPension] = useState("No");
+  const [quotePensionEscalation, setQuotePensionEscalation] = useState("0");
+  const [quotePensionNetGrowth, setQuotePensionNetGrowth] = useState("6");
+  const [quotePensionPremiumEscalation, setQuotePensionPremiumEscalation] = useState("5");
+  const [quotePensionInflation, setQuotePensionInflation] = useState("3");
+  const [quotePensionExistingFund, setQuotePensionExistingFund] = useState("");
+  const [quotePensionRequired, setQuotePensionRequired] = useState("");
+  const [quotePensionMonthlyContribution, setQuotePensionMonthlyContribution] = useState("");
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -426,6 +440,27 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
+
+  useEffect(() => {
+    if (!client || (workflowKind !== "pensions" && quoteDocumentType !== "Pensions Quote")) {
+      return;
+    }
+
+    setQuotePensionGender(client.gender || "");
+    setQuotePensionRetirementAge(client.selfRetirementAge || "");
+    setQuotePensionSpousesPension(client.partnerName ? "Yes" : "No");
+    setQuotePensionEscalation("0");
+    setQuotePensionNetGrowth("6");
+    setQuotePensionPremiumEscalation("5");
+    setQuotePensionInflation("3");
+    setQuotePensionExistingFund(stripNumericFormatting(client.selfPersonalPensionCurrentValue));
+    setQuotePensionRequired("");
+    setQuotePensionMonthlyContribution(
+      stripNumericFormatting(
+        client.selfPersonalPensionContribution || client.selfEmployeeDirectorPersonalContribution,
+      ),
+    );
+  }, [client, quoteDocumentType, workflowKind]);
 
   useEffect(() => {
     if (!selectedClientReference && clients[0]?.clientReference) {
@@ -538,6 +573,7 @@ export function IncomeProtectionPage({
   const factFindType = resolvedDraft.factFindType ?? "all";
   const isIncomeProtectionDocumentFlow =
     quoteDocumentType === "Quote" && statementDocumentType === "Statement of Suitability";
+  const isPensionsQuoteWorkflow = workflowKind === "pensions" || quoteDocumentType === "Pensions Quote";
   const statementQuoteRequests = isIncomeProtectionDocumentFlow
     ? getStatementQuoteRequests(resolvedDraft, quoteDocumentType, statementDocumentType)
     : [];
@@ -684,40 +720,97 @@ export function IncomeProtectionPage({
     return String(age);
   }, [resolvedDraft.dateOfBirth]);
 
-  const quoteMissingFields = [
-    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-    !hasValue(quoteAnnualCoverAmount) ? "Annual cover amount" : null,
-    !hasValue(quoteCoverToAge) ? "Cover to age" : null,
-    !hasValue(quoteOccupationClass) ? "Occupation class" : null,
-    !hasValue(quoteDeferredPeriod) ? "Deferred period" : null,
-    !hasValue(quoteSmoker) ? "Smoker" : null,
-  ].filter(isPresent);
+  const quoteMissingFields = (isPensionsQuoteWorkflow
+    ? [
+        !hasValue(resolvedDraft.fullName) ? "Client name" : null,
+        !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
+        !hasValue(quotePensionGender) ? "Gender" : null,
+        !hasValue(quotePensionRetirementAge) ? "Retirement age" : null,
+        !hasValue(quotePensionRequired) ? "Required pension income" : null,
+        !hasValue(quotePensionMonthlyContribution) ? "Monthly contribution" : null,
+      ]
+    : [
+        !hasValue(resolvedDraft.fullName) ? "Client name" : null,
+        !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
+        !hasValue(quoteAnnualCoverAmount) ? "Annual cover amount" : null,
+        !hasValue(quoteCoverToAge) ? "Cover to age" : null,
+        !hasValue(quoteOccupationClass) ? "Occupation class" : null,
+        !hasValue(quoteDeferredPeriod) ? "Deferred period" : null,
+        !hasValue(quoteSmoker) ? "Smoker" : null,
+      ]).filter(isPresent);
 
-  const quoteGenerationRequirements = [
-    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
-    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
-    { label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form" },
-    { label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form" },
-    { label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form" },
-    { label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form" },
-    { label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form" },
-    { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
-    { label: "Zurich 17.5% discount", complete: true, location: "Quote form (optional)" },
-  ];
+  const quoteGenerationRequirements = isPensionsQuoteWorkflow
+    ? [
+        { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
+        { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
+        { label: "Gender", complete: hasValue(quotePensionGender), location: "Quote form" },
+        { label: "Retirement age", complete: hasValue(quotePensionRetirementAge), location: "Quote form" },
+        { label: "Spouse's pension", complete: true, location: "Quote form (optional)" },
+        { label: "Pension escalation", complete: true, location: "Quote form (optional)" },
+        { label: "Net growth", complete: true, location: "Quote form (optional)" },
+        { label: "Premium escalation", complete: true, location: "Quote form (optional)" },
+        { label: "Inflation", complete: true, location: "Quote form (optional)" },
+        { label: "Existing fund", complete: true, location: "Quote form (optional)" },
+        { label: "Required pension income", complete: hasValue(quotePensionRequired), location: "Quote form" },
+        { label: "Monthly contribution", complete: hasValue(quotePensionMonthlyContribution), location: "Quote form" },
+      ]
+    : [
+        { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
+        { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
+        { label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form" },
+        { label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form" },
+        { label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form" },
+        { label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form" },
+        { label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form" },
+        { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
+        { label: "Zurich 17.5% discount", complete: true, location: "Quote form (optional)" },
+      ];
 
   const quoteWorkflowSnapshot = useMemo(
-    () => ({
-      ...resolvedDraft,
-      recommendedCover: quoteAnnualCoverAmount,
-      coverAge: quoteCoverToAge,
-      phiOccupationalClass: quoteOccupationClass,
-      deferredPeriod: quoteDeferredPeriod,
-      smokerStatus: quoteSmoker,
-      phiIndexation: quotePhiIndexation,
-      zurichDiscountActive: resolvedDraft.zurichDiscountActive,
-    }),
+    () =>
+      isPensionsQuoteWorkflow
+        ? {
+            ...resolvedDraft,
+            workflowKind: "pensions",
+            quoteDocumentType,
+            statementDocumentType,
+            pensionAge: quoteYourAge,
+            gender: quotePensionGender,
+            pensionRetirementAge: quotePensionRetirementAge,
+            spousesPension: quotePensionSpousesPension,
+            pensionEscalation: quotePensionEscalation,
+            pensionNetGrowth: quotePensionNetGrowth,
+            pensionPremiumEscalation: quotePensionPremiumEscalation,
+            pensionInflation: quotePensionInflation,
+            pensionExistingFund: quotePensionExistingFund,
+            pensionRequired: quotePensionRequired,
+            monthlyContribution: quotePensionMonthlyContribution,
+          }
+        : {
+            ...resolvedDraft,
+            recommendedCover: quoteAnnualCoverAmount,
+            coverAge: quoteCoverToAge,
+            phiOccupationalClass: quoteOccupationClass,
+            deferredPeriod: quoteDeferredPeriod,
+            smokerStatus: quoteSmoker,
+            phiIndexation: quotePhiIndexation,
+            zurichDiscountActive: resolvedDraft.zurichDiscountActive,
+          },
     [
+      isPensionsQuoteWorkflow,
+      quoteDocumentType,
+      statementDocumentType,
+      quotePensionEscalation,
+      quotePensionExistingFund,
+      quotePensionGender,
+      quotePensionInflation,
+      quotePensionMonthlyContribution,
+      quotePensionNetGrowth,
+      quotePensionPremiumEscalation,
+      quotePensionRequired,
+      quotePensionRetirementAge,
+      quotePensionSpousesPension,
+      quoteYourAge,
       resolvedDraft,
       quoteAnnualCoverAmount,
       quoteCoverToAge,
@@ -730,18 +823,36 @@ export function IncomeProtectionPage({
 
   const quoteRequestKey = useMemo(
     () =>
-      JSON.stringify({
-        fullName: resolvedDraft.fullName,
-        dateOfBirth: resolvedDraft.dateOfBirth,
-        recommendedCover: quoteAnnualCoverAmount,
-        coverAge: quoteCoverToAge,
-        phiOccupationalClass: quoteOccupationClass,
-        deferredPeriod: quoteDeferredPeriod,
-        smokerStatus: quoteSmoker,
-        phiIndexation: quotePhiIndexation,
-        zurichDiscountActive: resolvedDraft.zurichDiscountActive,
-      }),
+      JSON.stringify(
+        isPensionsQuoteWorkflow
+          ? {
+              fullName: resolvedDraft.fullName,
+              dateOfBirth: resolvedDraft.dateOfBirth,
+              gender: quotePensionGender,
+              pensionRetirementAge: quotePensionRetirementAge,
+              spousesPension: quotePensionSpousesPension,
+              pensionEscalation: quotePensionEscalation,
+              pensionNetGrowth: quotePensionNetGrowth,
+              pensionPremiumEscalation: quotePensionPremiumEscalation,
+              pensionInflation: quotePensionInflation,
+              pensionExistingFund: quotePensionExistingFund,
+              pensionRequired: quotePensionRequired,
+              monthlyContribution: quotePensionMonthlyContribution,
+            }
+          : {
+              fullName: resolvedDraft.fullName,
+              dateOfBirth: resolvedDraft.dateOfBirth,
+              recommendedCover: quoteAnnualCoverAmount,
+              coverAge: quoteCoverToAge,
+              phiOccupationalClass: quoteOccupationClass,
+              deferredPeriod: quoteDeferredPeriod,
+              smokerStatus: quoteSmoker,
+              phiIndexation: quotePhiIndexation,
+              zurichDiscountActive: resolvedDraft.zurichDiscountActive,
+            },
+      ),
     [
+      isPensionsQuoteWorkflow,
       resolvedDraft.dateOfBirth,
       resolvedDraft.zurichDiscountActive,
       resolvedDraft.fullName,
@@ -749,6 +860,16 @@ export function IncomeProtectionPage({
       quoteCoverToAge,
       quoteDeferredPeriod,
       quoteOccupationClass,
+      quotePensionEscalation,
+      quotePensionExistingFund,
+      quotePensionGender,
+      quotePensionInflation,
+      quotePensionMonthlyContribution,
+      quotePensionNetGrowth,
+      quotePensionPremiumEscalation,
+      quotePensionRequired,
+      quotePensionRetirementAge,
+      quotePensionSpousesPension,
       quotePhiIndexation,
       quoteSmoker,
     ],
@@ -2722,7 +2843,11 @@ export function IncomeProtectionPage({
 
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem
-              indicator={getSectionProgress([quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker])}
+              indicator={getSectionProgress(
+                isPensionsQuoteWorkflow
+                  ? [quotePensionGender, quotePensionRetirementAge, quotePensionRequired, quotePensionMonthlyContribution]
+                  : [quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker],
+              )}
               isOpen={quoteWorkspaceAccordion.isOpen("quote-output")}
               onToggle={() => quoteWorkspaceAccordion.toggle("quote-output")}
               title="Quote Form"
@@ -2749,54 +2874,134 @@ export function IncomeProtectionPage({
                   value={quoteYourAge}
                   disabled
                 />
-                <Input
-                  id="quote-annualCoverAmount"
-                  label={requiredLabel("Annual Cover Amount")}
-                  onChange={(event) => setQuoteAnnualCoverAmount(event.target.value)}
-                  type="text"
-                  value={quoteAnnualCoverAmount}
-                />
-                <Select
-                  id="quote-coverToAge"
-                  label={requiredLabel("Cover to Age")}
-                  onChange={(event) => setQuoteCoverToAge(event.target.value)}
-                  options={coverAgeOptions}
-                  value={quoteCoverToAge}
-                />
-                <Select
-                  id="quote-occupationClass"
-                  label={requiredLabel("Occupation Class")}
-                  onChange={(event) => setQuoteOccupationClass(event.target.value)}
-                  options={phiOccupationalClassOptions}
-                  value={quoteOccupationClass}
-                />
-                <Select
-                  id="quote-deferredPeriod"
-                  label={requiredLabel("Deferred Period")}
-                  onChange={(event) => setQuoteDeferredPeriod(event.target.value)}
-                  options={deferredPeriodOptions}
-                  value={quoteDeferredPeriod}
-                />
-                <Select
-                  id="quote-smoker"
-                  label={requiredLabel("Smoker")}
-                  onChange={(event) => setQuoteSmoker(event.target.value)}
-                  options={smokerStatusOptions}
-                  value={quoteSmoker}
-                />
-                <Select
-                  id="quote-phiIndexation"
-                  label="PHI Indexation"
-                  onChange={(event) => setQuotePhiIndexation(event.target.value)}
-                  options={phiIndexationOptions}
-                  value={quotePhiIndexation}
-                />
-                <Toggle
-                  checked={isAffirmative(resolvedDraft.zurichDiscountActive)}
-                  id="quote-zurichDiscount"
-                  label="Apply Zurich 17.5% discount"
-                  onChange={(event) => updateField("zurichDiscountActive", event.target.checked ? "Yes" : "")}
-                />
+                {isPensionsQuoteWorkflow ? (
+                  <>
+                    <Select
+                      id="quote-pensionGender"
+                      label={requiredLabel("Gender")}
+                      onChange={(event) => setQuotePensionGender(event.target.value)}
+                      options={genderOptions}
+                      value={quotePensionGender}
+                    />
+                    <Input
+                      id="quote-pensionRetirementAge"
+                      label={requiredLabel("Retirement Age")}
+                      onChange={(event) => setQuotePensionRetirementAge(event.target.value)}
+                      type="text"
+                      value={quotePensionRetirementAge}
+                    />
+                    <Select
+                      id="quote-pensionSpousesPension"
+                      label="Spouse's Pension"
+                      onChange={(event) => setQuotePensionSpousesPension(event.target.value)}
+                      options={[
+                        { label: "No", value: "No" },
+                        { label: "Yes", value: "Yes" },
+                      ]}
+                      value={quotePensionSpousesPension}
+                    />
+                    <Input
+                      id="quote-pensionEscalation"
+                      label="Pension Escalation"
+                      onChange={(event) => setQuotePensionEscalation(event.target.value)}
+                      type="text"
+                      value={quotePensionEscalation}
+                    />
+                    <Input
+                      id="quote-pensionNetGrowth"
+                      label="Net Growth"
+                      onChange={(event) => setQuotePensionNetGrowth(event.target.value)}
+                      type="text"
+                      value={quotePensionNetGrowth}
+                    />
+                    <Input
+                      id="quote-pensionPremiumEscalation"
+                      label="Premium Escalation"
+                      onChange={(event) => setQuotePensionPremiumEscalation(event.target.value)}
+                      type="text"
+                      value={quotePensionPremiumEscalation}
+                    />
+                    <Input
+                      id="quote-pensionInflation"
+                      label="Inflation"
+                      onChange={(event) => setQuotePensionInflation(event.target.value)}
+                      type="text"
+                      value={quotePensionInflation}
+                    />
+                    <Input
+                      id="quote-pensionExistingFund"
+                      label="Existing Fund"
+                      onChange={(event) => setQuotePensionExistingFund(event.target.value)}
+                      type="text"
+                      value={quotePensionExistingFund}
+                    />
+                    <Input
+                      id="quote-pensionRequired"
+                      label={requiredLabel("Required Pension Income")}
+                      onChange={(event) => setQuotePensionRequired(event.target.value)}
+                      type="text"
+                      value={quotePensionRequired}
+                    />
+                    <Input
+                      id="quote-pensionMonthlyContribution"
+                      label={requiredLabel("Monthly Contribution")}
+                      onChange={(event) => setQuotePensionMonthlyContribution(event.target.value)}
+                      type="text"
+                      value={quotePensionMonthlyContribution}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      id="quote-annualCoverAmount"
+                      label={requiredLabel("Annual Cover Amount")}
+                      onChange={(event) => setQuoteAnnualCoverAmount(event.target.value)}
+                      type="text"
+                      value={quoteAnnualCoverAmount}
+                    />
+                    <Select
+                      id="quote-coverToAge"
+                      label={requiredLabel("Cover to Age")}
+                      onChange={(event) => setQuoteCoverToAge(event.target.value)}
+                      options={coverAgeOptions}
+                      value={quoteCoverToAge}
+                    />
+                    <Select
+                      id="quote-occupationClass"
+                      label={requiredLabel("Occupation Class")}
+                      onChange={(event) => setQuoteOccupationClass(event.target.value)}
+                      options={phiOccupationalClassOptions}
+                      value={quoteOccupationClass}
+                    />
+                    <Select
+                      id="quote-deferredPeriod"
+                      label={requiredLabel("Deferred Period")}
+                      onChange={(event) => setQuoteDeferredPeriod(event.target.value)}
+                      options={deferredPeriodOptions}
+                      value={quoteDeferredPeriod}
+                    />
+                    <Select
+                      id="quote-smoker"
+                      label={requiredLabel("Smoker")}
+                      onChange={(event) => setQuoteSmoker(event.target.value)}
+                      options={smokerStatusOptions}
+                      value={quoteSmoker}
+                    />
+                    <Select
+                      id="quote-phiIndexation"
+                      label="PHI Indexation"
+                      onChange={(event) => setQuotePhiIndexation(event.target.value)}
+                      options={phiIndexationOptions}
+                      value={quotePhiIndexation}
+                    />
+                    <Toggle
+                      checked={isAffirmative(resolvedDraft.zurichDiscountActive)}
+                      id="quote-zurichDiscount"
+                      label="Apply Zurich 17.5% discount"
+                      onChange={(event) => updateField("zurichDiscountActive", event.target.checked ? "Yes" : "")}
+                    />
+                  </>
+                )}
               </div>
               <div style={{ marginTop: "var(--space-4)" }}>
                 {renderGenerationRequirements("Quote generation requirements", quoteGenerationRequirements, quoteMissingFields, {

@@ -105,7 +105,6 @@ function PdfPreview({ html }: { html: string }) {
     [html],
   );
   const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
-  const pagination = isStatement ? paginatePdfContent(styledHtml) : null;
   const showShellFooter = isStatement;
   const previewBodyPadding = editorDocumentPadding;
 
@@ -122,6 +121,8 @@ function PdfPreview({ html }: { html: string }) {
       </PreviewPage>
     );
   }
+
+  const pagination = paginatePdfContent(styledHtml);
 
   if (pagination.mode === "continuous") {
     return (

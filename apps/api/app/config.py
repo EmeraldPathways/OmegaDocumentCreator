@@ -48,6 +48,9 @@ class AppSettings:
     phi_password: str = ""
     phi_request_from: str = ""
     phi_request_from_code: str = ""
+    pension_endpoint_url: str = ""
+    pension_request_from: str = ""
+    pension_request_from_code: str = ""
     csrf_trusted_origins: list[str] | None = None
 
     max_upload_size_bytes: int = 50_000_000  # 50 MB default
@@ -129,6 +132,10 @@ def get_settings(**overrides: str) -> AppSettings:
         "phi_password": overrides.get("PHI_PASSWORD") or _env_or("PHI_PASSWORD", ""),
         "phi_request_from": overrides.get("PHI_REQUEST_FROM") or _env_or("PHI_REQUEST_FROM", ""),
         "phi_request_from_code": overrides.get("PHI_REQUEST_FROM_CODE") or _env_or("PHI_REQUEST_FROM_CODE", ""),
+        "pension_endpoint_url": overrides.get("PENSION_ENDPOINT_URL") or _env_or("PENSION_ENDPOINT_URL", ""),
+        "pension_request_from": overrides.get("PENSION_REQUEST_FROM") or _env_or("PENSION_REQUEST_FROM", _env_or("PHI_REQUEST_FROM", "")),
+        "pension_request_from_code": overrides.get("PENSION_REQUEST_FROM_CODE")
+        or _env_or("PENSION_REQUEST_FROM_CODE", _env_or("PHI_REQUEST_FROM_CODE", "")),
         "csrf_trusted_origins": _parse_origin_list(_env_or("CSRF_TRUSTED_ORIGINS", "")),
         "max_upload_size_bytes": int(
             overrides.get("MAX_UPLOAD_SIZE_BYTES") or _env_or("MAX_UPLOAD_SIZE_BYTES", "50000000")

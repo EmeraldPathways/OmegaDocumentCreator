@@ -36,6 +36,20 @@ def _format_phi_date(value: str) -> str:
     return value
 
 
+def _calculate_age_from_date_of_birth(value: str) -> str:
+    try:
+        year, month, day = [int(part) for part in value.split("-")]
+        date_of_birth = datetime(year, month, day)
+    except ValueError:
+        return ""
+
+    today = datetime.now(UTC)
+    age = today.year - date_of_birth.year - (
+        (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+    )
+    return str(age)
+
+
 def _normalize_phi_deferred_period(value: str) -> str:
     if value.startswith("13"):
         return "13"
@@ -44,6 +58,25 @@ def _normalize_phi_deferred_period(value: str) -> str:
     if value.startswith("52"):
         return "52"
     return value
+
+
+def _is_pensions_workflow_snapshot(workflow_snapshot: dict[str, Any]) -> bool:
+    markers = [
+        _get_snapshot_value(workflow_snapshot, "workflowKind", "workflow_kind"),
+        _get_snapshot_value(workflow_snapshot, "quoteDocumentType", "quote_document_type"),
+        _get_snapshot_value(workflow_snapshot, "statementDocumentType", "statement_document_type"),
+    ]
+    if any("pension" in marker.lower() for marker in markers if marker):
+        return True
+
+    return bool(
+        _get_snapshot_value(
+            workflow_snapshot,
+            "pensionRetirementAge",
+            "pensionRequired",
+            "monthlyContribution",
+        )
+    )
 
 
 def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -103,6 +136,68 @@ def build_phi_request_payload(settings: AppSettings, workflow_snapshot: dict[str
     return {"xml": xml, "request_fields": request_fields}
 
 
+def build_pension_request_payload(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
+    request_fields = [
+        {
+            "label": "Age",
+            "value": _get_snapshot_value(workflow_snapshot, "pensionAge", "age")
+            or _calculate_age_from_date_of_birth(_get_snapshot_value(workflow_snapshot, "dateOfBirth", "date_of_birth")),
+        },
+        {"label": "Gender", "value": _get_snapshot_value(workflow_snapshot, "gender", "pensionGender")},
+        {"label": "RetirementAge", "value": _get_snapshot_value(workflow_snapshot, "pensionRetirementAge", "retirementAge")},
+        {"label": "SpousesPension", "value": _get_snapshot_value(workflow_snapshot, "spousesPension") or "No"},
+        {"label": "PensionEscalation", "value": _get_snapshot_value(workflow_snapshot, "pensionEscalation") or "0"},
+        {"label": "NetGrowth", "value": _get_snapshot_value(workflow_snapshot, "pensionNetGrowth") or "6"},
+        {"label": "PremiumEscalation", "value": _get_snapshot_value(workflow_snapshot, "pensionPremiumEscalation") or "5"},
+        {"label": "Inflation", "value": _get_snapshot_value(workflow_snapshot, "pensionInflation") or "3"},
+        {"label": "ExistingFund", "value": _get_snapshot_value(workflow_snapshot, "pensionExistingFund") or "0"},
+        {"label": "PensionRequired", "value": _get_snapshot_value(workflow_snapshot, "pensionRequired")},
+        {"label": "MonthlyContribution", "value": _get_snapshot_value(workflow_snapshot, "monthlyContribution")},
+    ]
+
+    missing_fields = [
+        field["label"]
+        for field in request_fields
+        if field["label"] in {"Age", "Gender", "RetirementAge", "PensionRequired", "MonthlyContribution"}
+        and not field["value"]
+    ]
+    if missing_fields:
+        raise ValueError(f"Missing pension request fields: {', '.join(missing_fields)}")
+
+    if not all(
+        [
+            settings.pension_endpoint_url,
+            settings.pension_request_from,
+            settings.pension_request_from_code,
+        ]
+    ):
+        raise RuntimeError("Pension integration is not configured.")
+
+    xml = (
+        "<Inputs>"
+        "<Authentication>"
+        f"<RequestFrom>{escape(settings.pension_request_from)}</RequestFrom>"
+        f"<RequestFromCode>{escape(settings.pension_request_from_code)}</RequestFromCode>"
+        "</Authentication>"
+        "<Parameters>"
+        f"<Age>{escape(request_fields[0]['value'])}</Age>"
+        f"<Gender>{escape(request_fields[1]['value'])}</Gender>"
+        f"<RetirementAge>{escape(request_fields[2]['value'])}</RetirementAge>"
+        f"<SpousesPension>{escape(request_fields[3]['value'])}</SpousesPension>"
+        f"<PensionEscalation>{escape(request_fields[4]['value'])}</PensionEscalation>"
+        f"<NetGrowth>{escape(request_fields[5]['value'])}</NetGrowth>"
+        f"<PremiumEscalation>{escape(request_fields[6]['value'])}</PremiumEscalation>"
+        f"<Inflation>{escape(request_fields[7]['value'])}</Inflation>"
+        f"<ExistingFund>{escape(request_fields[8]['value'])}</ExistingFund>"
+        f"<PensionRequired>{escape(request_fields[9]['value'])}</PensionRequired>"
+        f"<MonthlyContribution>{escape(request_fields[10]['value'])}</MonthlyContribution>"
+        "</Parameters>"
+        "</Inputs>"
+    )
+
+    return {"xml": xml, "request_fields": request_fields}
+
+
 def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
     payload = build_phi_request_payload(settings, workflow_snapshot)
     body = urlencode({"xml": payload["xml"]}).encode("utf-8")
@@ -134,6 +229,103 @@ def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any])
     return {
         "provider": "BestAdvice",
         "request_type": "Phi",
+        "status": "failed" if errors_text else "sent",
+        "requested_at": datetime.now(UTC).isoformat(),
+        "request_fields": payload["request_fields"],
+        "quote_results": quote_results,
+        "errors": [errors_text] if errors_text else [],
+    }
+
+
+def _first_present_text(node: ET.Element, *paths: str) -> str:
+    for path in paths:
+        value = (node.findtext(path) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def submit_pension_request(settings: AppSettings, workflow_snapshot: dict[str, Any]) -> dict[str, Any]:
+    payload = build_pension_request_payload(settings, workflow_snapshot)
+    body = urlencode({"xml": payload["xml"]}).encode("utf-8")
+    request = Request(
+        settings.pension_endpoint_url,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+
+    with urlopen(request, timeout=20) as response:
+        xml_result = response.read().decode("utf-8")
+
+    root = ET.fromstring(xml_result)
+    errors_text = (root.findtext("Errors") or root.findtext("Results/Errors") or "").strip()
+    quote_results: list[dict[str, str]] = []
+
+    for quote_type in root.findall("./Outputs/Quotes/Type"):
+        policy_type = (quote_type.findtext("Desc") or "").strip()
+        for company in quote_type.findall("./Company"):
+            quote_results.append(
+                {
+                    "provider_name": _first_present_text(company, "Name"),
+                    "policy_type": policy_type,
+                    "level_premium": _first_present_text(
+                        company,
+                        "Premium",
+                        "MonthlyContribution",
+                        "Contribution",
+                        "Level",
+                        "SLevel",
+                        "SMortgage",
+                        "JLevel",
+                        "JMortgage",
+                        "DLevel",
+                    ),
+                    "escalation_3_premium": "",
+                    "escalation_5_premium": "",
+                }
+            )
+
+    if not quote_results:
+        for company in root.findall("./Outputs/Quotes/Company"):
+            quote_results.append(
+                {
+                    "provider_name": _first_present_text(company, "Name"),
+                    "policy_type": _first_present_text(company, "Type", "Desc"),
+                    "level_premium": _first_present_text(
+                        company,
+                        "Premium",
+                        "MonthlyContribution",
+                        "Contribution",
+                        "Level",
+                    ),
+                    "escalation_3_premium": "",
+                    "escalation_5_premium": "",
+                }
+            )
+
+    if not quote_results:
+        summary_premium = _first_present_text(
+            root,
+            "./Outputs/Summary/MonthlyContribution",
+            "./Outputs/Summary/Premium",
+            "./Summary/MonthlyContribution",
+            "./Summary/Premium",
+        )
+        if summary_premium:
+            quote_results.append(
+                {
+                    "provider_name": "Pension Calculator",
+                    "policy_type": "Projection",
+                    "level_premium": summary_premium,
+                    "escalation_3_premium": "",
+                    "escalation_5_premium": "",
+                }
+            )
+
+    return {
+        "provider": "BestAdvice",
+        "request_type": "Pension",
         "status": "failed" if errors_text else "sent",
         "requested_at": datetime.now(UTC).isoformat(),
         "request_fields": payload["request_fields"],
@@ -225,12 +417,38 @@ def build_statement_quote_requests(
     workflow_snapshot: dict[str, Any],
 ) -> list[dict[str, Any]]:
     warnings: list[str] = []
-    return _build_integration_requests(
+    return _build_quote_requests_for_snapshot(
         settings=settings,
-        document_type="Statement of Suitability",
         workflow_snapshot=workflow_snapshot,
         warnings=warnings,
     )
+
+
+def _build_quote_requests_for_snapshot(
+    *,
+    settings: AppSettings,
+    workflow_snapshot: dict[str, Any],
+    warnings: list[str],
+) -> list[dict[str, Any]]:
+    is_pensions_workflow = _is_pensions_workflow_snapshot(workflow_snapshot)
+
+    try:
+        if is_pensions_workflow:
+            return [submit_pension_request(settings, workflow_snapshot)]
+        return [submit_phi_request(settings, workflow_snapshot)]
+    except Exception as exc:
+        warnings.append(f"{'Pension' if is_pensions_workflow else 'PHI'} integration failed: {exc}")
+        return [
+            {
+                "provider": "BestAdvice",
+                "request_type": "Pension" if is_pensions_workflow else "Phi",
+                "status": "failed",
+                "requested_at": datetime.now(UTC).isoformat(),
+                "request_fields": [],
+                "quote_results": [],
+                "errors": [str(exc)],
+            }
+        ]
 
 
 def _build_integration_requests(
@@ -240,24 +458,13 @@ def _build_integration_requests(
     workflow_snapshot: dict[str, Any],
     warnings: list[str],
 ) -> list[dict[str, Any]]:
-    if document_type != "Statement of Suitability":
+    if document_type not in {"Statement of Suitability", "Pensions Statement"}:
         return []
-
-    try:
-        return [submit_phi_request(settings, workflow_snapshot)]
-    except Exception as exc:
-        warnings.append(f"PHI integration failed: {exc}")
-        return [
-            {
-                "provider": "BestAdvice",
-                "request_type": "Phi",
-                "status": "failed",
-                "requested_at": datetime.now(UTC).isoformat(),
-                "request_fields": [],
-                "quote_results": [],
-                "errors": [str(exc)],
-            }
-        ]
+    return _build_quote_requests_for_snapshot(
+        settings=settings,
+        workflow_snapshot=workflow_snapshot,
+        warnings=warnings,
+    )
 
 
 def _normalize_sections(raw_sections: Any) -> list[dict[str, Any]]:
