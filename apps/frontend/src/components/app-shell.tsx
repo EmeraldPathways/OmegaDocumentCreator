@@ -10,7 +10,7 @@ const navItems = [
   { label: "Fact Find", to: "/fact-find", icon: ClipboardList },
   { label: "Income Protection", to: "/income-protection", icon: Shield },
   { label: "Pensions", icon: Landmark },
-  { label: "Files/Docs", icon: FolderOpen },
+  { label: "Files/Docs", to: "/files-docs", icon: FolderOpen },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 

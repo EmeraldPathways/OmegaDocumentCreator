@@ -11,7 +11,7 @@ import { ClientFormPage } from "./pages/client-form-page";
 import { ClientProfilePage } from "./pages/client-profile-page";
 import { ClientsPage } from "./pages/clients-page";
 import { FactFindPage } from "./pages/fact-find-page";
-import { FilesPage } from "./pages/files-page";
+import { FilesDocsPage } from "./pages/files-docs-page";
 import { IncomeProtectionDocumentsPage } from "./pages/income-protection-documents-page";
 import { LoginPage } from "./pages/login-page";
 import { SettingsPage } from "./pages/settings-page";
@@ -39,6 +39,10 @@ function RedirectFactFindHome() {
   return <FactFindPage />;
 }
 
+function RedirectFilesDocsHome() {
+  return <FilesDocsPage />;
+}
+
 function RedirectIncomeProtectionClient() {
   const { clientReference = "" } = useParams();
 
@@ -59,9 +63,10 @@ function AppRoutes() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/fact-find" element={<RedirectFactFindHome />} />
         <Route path="/income-protection" element={<RedirectIncomeProtectionHome />} />
+        <Route path="/files-docs" element={<RedirectFilesDocsHome />} />
         <Route path="/documents" element={<Navigate replace to="/clients" />} />
         <Route path="/documents/:clientReference" element={<RedirectDocumentFolder />} />
-        <Route path="/files" element={<FilesPage />} />
+        <Route path="/files" element={<Navigate replace to="/files-docs" />} />
         <Route path="/clients/new" element={<ClientFormPage />} />
         <Route path="/clients/:clientReference" element={<ClientProfilePage />} />
         <Route path="/clients/:clientReference/income-protection" element={<RedirectIncomeProtectionClient />} />

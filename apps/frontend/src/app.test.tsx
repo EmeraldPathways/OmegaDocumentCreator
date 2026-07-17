@@ -220,16 +220,30 @@ describe("App routes", () => {
     expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
   });
 
-  it("renders the Files route with tracked client uploads", () => {
+  it("renders files and generated documents on the files-docs route", () => {
+    render(
+      <MemoryRouter initialEntries={["/files-docs"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Files/Docs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Files" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Generated Documents" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Fact Find" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Quote" })).not.toBeInTheDocument();
+  });
+
+  it("redirects the legacy files route to files-docs", () => {
     render(
       <MemoryRouter initialEntries={["/files"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
-    expect(screen.getByText("jamie-murphy-passport.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Proof of Age")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Files/Docs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Files" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Generated Documents" })).toBeInTheDocument();
   });
 
   it("renders the client profile page for an individual client route", () => {

@@ -20,8 +20,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("link", { name: "Income Protection" })).toHaveAttribute("href", "/income-protection");
     expect(screen.queryByRole("link", { name: "Pensions" })).not.toBeInTheDocument();
     expect(screen.getByText("Pensions").closest(".nav-link")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.queryByRole("link", { name: "Files/Docs" })).not.toBeInTheDocument();
-    expect(screen.getByText("Files/Docs").closest(".nav-link")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("link", { name: "Files/Docs" })).toHaveAttribute("href", "/files-docs");
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(screen.queryByText("Documents")).not.toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
