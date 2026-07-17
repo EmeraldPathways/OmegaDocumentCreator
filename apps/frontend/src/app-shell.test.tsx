@@ -15,8 +15,11 @@ describe("AppShell", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Clients")).toBeInTheDocument();
-    expect(screen.getByText("Income Protection")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Clients" })).toHaveAttribute("href", "/clients");
+    expect(screen.getByRole("link", { name: "Fact Find" })).toHaveAttribute("href", "/income-protection");
+    expect(screen.getByRole("link", { name: "Income Protection" })).toHaveAttribute("href", "/income-protection");
+    expect(screen.getByRole("link", { name: "Pensions" })).toHaveAttribute("href", "/income-protection");
+    expect(screen.getByRole("link", { name: "Files/Docs" })).toHaveAttribute("href", "/files");
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(screen.queryByText("Documents")).not.toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
