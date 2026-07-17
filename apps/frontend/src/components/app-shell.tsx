@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { PropsWithChildren } from "react";
-import { Users, ClipboardList, Shield, Landmark, FolderOpen, Settings, Lock, User, LogOut, ChevronDown } from "lucide-react";
+import { Users, ClipboardList, Shield, FolderOpen, Settings, Lock, User, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 
@@ -9,7 +9,6 @@ const navItems = [
   { label: "Clients", to: "/clients", icon: Users },
   { label: "Fact Find", to: "/fact-find", icon: ClipboardList },
   { label: "Income Protection", to: "/income-protection", icon: Shield },
-  { label: "Pensions", to: "/pensions", icon: Landmark },
   { label: "Files/Docs", to: "/files-docs", icon: FolderOpen },
   { label: "Settings", to: "/settings", icon: Settings },
 ];

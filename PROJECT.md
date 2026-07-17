@@ -115,7 +115,8 @@ Live in the current codebase:
 
 Live in the current codebase:
 
-- top navigation split into five primary pages
+- top navigation currently shows four primary workflow links: `Clients`, `Fact Find`, `Income Protection`, and `Files/Docs`
+- the `Pensions` route and page remain implemented but are intentionally hidden from the top navigation for now
 - `/fact-find` page narrowed to `Fact Find` and `Fact Find Update`
 - `/income-protection` page narrowed to `Quote` and `Statement of Suitability`
 - `/pensions` page narrowed to `Pensions Quote` and `Pensions Statement`

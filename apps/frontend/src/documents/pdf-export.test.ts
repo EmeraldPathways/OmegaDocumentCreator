@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
+import { buildPdfStyledHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
 
 const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
@@ -87,5 +90,19 @@ describe("shouldShowPdfShellHeader", () => {
     expect(shouldShowPdfShellHeader(true, 0)).toBe(true);
     expect(shouldShowPdfShellHeader(true, 1)).toBe(true);
     expect(shouldShowPdfShellHeader(false, 0)).toBe(true);
+  });
+});
+
+describe("quote table layout", () => {
+  it("uses four columns across editor and PDF styling for quote rows", () => {
+    const stylesPath = path.resolve(process.cwd(), "src/styles.css");
+    const styles = readFileSync(stylesPath, "utf8");
+    const styledHtml = buildPdfStyledHtml(
+      '<article class="workflow-document workflow-document-quote"><div class="statement-quote-row"></div></article>',
+      true,
+    );
+
+    expect(styles).toContain("grid-template-columns: 1.4fr 1fr 1fr 1fr;");
+    expect(styledHtml).toContain("grid-template-columns:1.4fr 1fr 1fr 1fr");
   });
 });

@@ -182,11 +182,11 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-quote-row-header")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;background:#e8e8e8;border-bottom:1px solid #000";
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;background:#e8e8e8;border-bottom:1px solid #000";
   }
 
   if (classList.contains("statement-quote-row")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;border-bottom:1px solid #ccc";
+    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-bottom:1px solid #ccc";
   }
 
   if (classList.contains("statement-quote-cell")) {
@@ -937,13 +937,13 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
     background: #e8e8e8;
     border-bottom: 1px solid #000;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-row {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
     border-bottom: 1px solid #ccc;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-cell {
