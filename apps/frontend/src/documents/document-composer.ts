@@ -8,6 +8,7 @@ import type {
   SupportedDocumentType,
 } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
+import { findStatementQuoteOption } from "./statement-quote-selection";
 
 type StatementRecommendationProfile = SeededClientProfile &
   Partial<{
@@ -110,9 +111,29 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
   };
 }
 
-function getQuoteRequests(profile: SeededClientProfile) {
-  const quoteRequests = profile.documentDrafts["Quote"]?.integrationRequests ?? [];
-  const statementRequests = profile.documentDrafts["Statement of Suitability"]?.integrationRequests ?? [];
+function isStatementDocumentType(documentType: SupportedDocumentType) {
+  return documentType === "Statement of Suitability" || documentType === "Pensions Statement";
+}
+
+function isQuoteDocumentType(documentType: SupportedDocumentType) {
+  return documentType === "Quote" || documentType === "Pensions Quote";
+}
+
+function resolveQuoteDocumentType(documentType: SupportedDocumentType) {
+  return documentType === "Pensions Quote" || documentType === "Pensions Statement" ? "Pensions Quote" : "Quote";
+}
+
+function resolveStatementDocumentType(documentType: SupportedDocumentType) {
+  return documentType === "Pensions Quote" || documentType === "Pensions Statement"
+    ? "Pensions Statement"
+    : "Statement of Suitability";
+}
+
+function getQuoteRequests(profile: SeededClientProfile, documentType: SupportedDocumentType) {
+  const quoteDocumentType = resolveQuoteDocumentType(documentType);
+  const statementDocumentType = resolveStatementDocumentType(documentType);
+  const quoteRequests = profile.documentDrafts[quoteDocumentType]?.integrationRequests ?? [];
+  const statementRequests = profile.documentDrafts[statementDocumentType]?.integrationRequests ?? [];
 
   return quoteRequests.length > 0 ? quoteRequests : statementRequests;
 }
@@ -135,8 +156,8 @@ function buildRecommendationHtml(profile: SeededClientProfile, documentType: Sup
     return paragraphHtml(profile.termsNotes || "Terms of Business issued for client review and record keeping.");
   }
 
-  if (documentType === "Statement of Suitability") {
-    return buildStatementRecommendationHtml(profile);
+  if (isStatementDocumentType(documentType)) {
+    return buildStatementRecommendationHtml(profile, documentType);
   }
 
   const lines = [
@@ -264,16 +285,28 @@ function formatEuroAmount(value: number | null, fractionDigits = 2) {
   }).format(value);
 }
 
+function formatEuroValue(value: number | null) {
+  return value === null ? "Not available" : `€${formatEuroAmount(value)}`;
+}
+
+function formatDiscountPercentage(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function indefiniteArticle(value: string) {
   return /^[aeiou]/i.test(value.trim()) ? "an" : "a";
 }
 
 function findSelectedQuote(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
-  const quotes = requests.flatMap((request) => request.quoteResults);
-  if (quotes.length === 0) {
-    return null;
+  const selectedOption = findStatementQuoteOption(requests, profile.statementSelectedQuoteKey);
+
+  if (selectedOption) {
+    return requests[selectedOption.requestIndex]?.quoteResults[selectedOption.quoteIndex] ?? null;
   }
-  return quotes[0];
+
+  return requests
+    .flatMap((request) => request.quoteResults)
+    .find((quote) => (quote.levelPremium?.trim() ?? "").length > 0) ?? null;
 }
 
 function resolveLegacyDiscountPercentage(profile: StatementRecommendationProfile) {
@@ -285,25 +318,88 @@ function normalizeText(value: string | undefined) {
 }
 
 function isReviewablePolicyType(policyType: string | undefined) {
-  return normalizeText(policyType) === "reviewable";
+  return normalizeText(policyType).includes("reviewable");
 }
 
 function isGuaranteedPolicyType(policyType: string | undefined) {
   const normalized = normalizeText(policyType);
-  return normalized === "" || normalized === "guaranteed";
+  return normalized === "" || normalized.includes("guaranteed");
 }
 
 function hasZurichDiscountToggleEnabled(profile: StatementRecommendationProfile) {
   return normalizeText(profile.zurichDiscountActive) === "yes";
 }
 
-function resolveFixedQuoteDiscountPercentage(quote: IntegrationQuoteResult) {
-  const provider = normalizeText(quote.providerName);
-  if (!isGuaranteedPolicyType(quote.policyType)) {
-    return null;
+function isZurichProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("zurich");
+}
+
+function resolvePolicyDisplayLabel(policyType: string | undefined) {
+  const normalized = normalizeText(policyType);
+  if (!normalized) {
+    return "";
   }
 
-  if (provider === "aviva" || provider === "royal london" || provider === "zurich life") {
+  const parts: string[] = [];
+  if (normalized.includes("personal")) {
+    parts.push("Personal");
+  }
+  if (normalized.includes("executive")) {
+    parts.push("Executive");
+  }
+
+  return parts.join(" - ");
+}
+
+function buildQuoteDescriptor(providerName: string | undefined, policyType: string | undefined) {
+  return `${normalizeText(providerName)} ${normalizeText(policyType)}`.trim();
+}
+
+function isAvivaProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("aviva");
+}
+
+function isRoyalLondonProvider(providerName: string | undefined) {
+  return normalizeText(providerName).includes("royal london");
+}
+
+function isExecutiveVariant(providerName: string | undefined, policyType: string | undefined) {
+  return buildQuoteDescriptor(providerName, policyType).includes("executive");
+}
+
+function isImplicitPersonalVariant(providerName: string | undefined, policyType: string | undefined) {
+  const descriptor = buildQuoteDescriptor(providerName, policyType);
+  return !descriptor.includes("executive");
+}
+
+function formatQuoteProviderLabel(providerName: string | undefined, policyType: string | undefined) {
+  const provider = providerName?.trim() ?? "";
+  const policy = resolvePolicyDisplayLabel(policyType);
+  if (provider && policy) {
+    return `${provider} - ${policy}`;
+  }
+
+  return valueOrFallback(provider || policy, "Unknown provider");
+}
+
+function hasFixedFifteenDiscount(providerName: string | undefined, policyType: string | undefined) {
+  if (isAvivaProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) && isGuaranteedPolicyType(policyType);
+  }
+
+  if (isRoyalLondonProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) || isImplicitPersonalVariant(providerName, policyType);
+  }
+
+  if (isZurichProvider(providerName)) {
+    return isExecutiveVariant(providerName, policyType) || isImplicitPersonalVariant(providerName, policyType);
+  }
+
+  return false;
+}
+
+function resolveFixedQuoteDiscountPercentage(quote: IntegrationQuoteResult) {
+  if (hasFixedFifteenDiscount(quote.providerName, quote.policyType)) {
     return 15;
   }
 
@@ -315,10 +411,10 @@ function resolveQuoteDiscountPercentage(profile: StatementRecommendationProfile,
     return resolveLegacyDiscountPercentage(profile);
   }
 
-  const provider = normalizeText(quote.providerName);
   if (
-    provider === "zurich life" &&
-    isGuaranteedPolicyType(quote.policyType) &&
+    isZurichProvider(quote.providerName) &&
+    (isExecutiveVariant(quote.providerName, quote.policyType) ||
+      isImplicitPersonalVariant(quote.providerName, quote.policyType)) &&
     hasZurichDiscountToggleEnabled(profile)
   ) {
     return 17.5;
@@ -396,6 +492,17 @@ function resolveStatementDeferredPeriod(profile: SeededClientProfile, requests: 
   );
 }
 
+function resolveStatementCoverAmount(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  return requestFieldValue(requests, "AnnualAmount", "Cover amount") || profile.recommendedCover;
+}
+
+function resolveStatementCoverAge(profile: SeededClientProfile, requests: IntegrationRequestArtifact[]) {
+  return valueOrFallback(
+    requestFieldValue(requests, "NRA", "CoverToAge", "Cover to age") || profile.coverAge,
+    "selected retirement age",
+  );
+}
+
 function resolveStatementGrossPremium(profile: SeededClientProfile, selectedQuote: ReturnType<typeof findSelectedQuote>) {
   return parseNumber(selectedQuote?.levelPremium) ?? parseNumber(profile.premium);
 }
@@ -430,15 +537,16 @@ function mergeStatementRecommendationHtml(computedHtml: string, sectionHtml: str
   return looksGeneric ? computedHtml : `${computedHtml}${trimmed}`;
 }
 
-function buildStatementRecommendationHtml(profile: SeededClientProfile) {
+function buildStatementRecommendationHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   const statementProfile = profile as StatementRecommendationProfile;
-  const requests = getQuoteRequests(profile);
+  const requests = getQuoteRequests(profile, documentType);
   const selectedQuote = findSelectedQuote(profile, requests);
   const provider = valueOrFallback(selectedQuote?.providerName || profile.provider, "Recommended provider");
   const deferredPeriod = resolveStatementDeferredPeriod(profile, requests);
-  const coverAmountNumber = parseNumber(profile.recommendedCover);
-  const coverAmount = coverAmountNumber === null ? valueOrFallback(profile.recommendedCover) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
-  const coverAge = valueOrFallback(profile.coverAge, "selected retirement age");
+  const resolvedCoverAmount = resolveStatementCoverAmount(profile, requests);
+  const coverAmountNumber = parseNumber(resolvedCoverAmount);
+  const coverAmount = coverAmountNumber === null ? valueOrFallback(resolvedCoverAmount) : `€${formatEuroAmount(coverAmountNumber, 0)}`;
+  const coverAge = resolveStatementCoverAge(profile, requests);
   const incomeNumber = parseNumber(profile.income);
   const coverShare =
     incomeNumber !== null && incomeNumber > 0 && coverAmountNumber !== null ? Math.round((coverAmountNumber / incomeNumber) * 100) : null;
@@ -467,6 +575,19 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     coverShare === null
       ? "<p>This level of cover is intended to protect your income and support your standard of living if you are unable to work due to illness or injury.</p>"
       : `<p>As this represents ${escapeHtml(String(coverShare))}% of your salary, this keeps you within Revenue limits while giving you the cover needed to maintain your standard of living.</p>`;
+
+  const quoteDetailLine =
+    selectedQuote?.policyType || grossPremiumNumber !== null
+      ? `<p>${escapeHtml(
+          [
+            `The returned quote from ${provider}`,
+            selectedQuote?.policyType ? `is on a ${selectedQuote.policyType.toLowerCase()} premium basis` : "matches the returned premium basis",
+            grossPremiumNumber === null ? "" : `at €${formatEuroAmount(grossPremiumNumber)} per month before tax relief`,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        )}.</p>`
+      : "";
 
   const costParts = [
     grossPremiumNumber === null ? "" : `The gross cost of this ${deferredPeriod} deferred period plan is €${formatEuroAmount(grossPremiumNumber)}`,
@@ -497,6 +618,7 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     summaryLine,
     recommendationLine,
     rationaleLine,
+    quoteDetailLine,
     costLine,
     affordabilityLine,
     `<p>We recommend this ${escapeHtml(provider)} Income Protection policy for the following reasons:</p>`,
@@ -506,9 +628,9 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile) {
     .join("");
 }
 
-export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
+export function buildQuoteComparisonHtml(profile: SeededClientProfile, documentType: SupportedDocumentType = "Quote") {
   const statementProfile = profile as StatementRecommendationProfile;
-  const requests = getQuoteRequests(profile);
+  const requests = getQuoteRequests(profile, documentType);
   const quoteResults = requests.flatMap((request) => request.quoteResults);
 
   if (quoteResults.length === 0) {
@@ -543,10 +665,10 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
     return {
       group: isReviewablePolicyType(quote.policyType) ? "reviewable" : "guaranteed",
       html: [
-        valueOrFallback(quote.providerName),
-        valueOrFallback(quote.levelPremium),
-        discountAmount === null ? "" : formatEuroAmount(discountAmount),
-        actualAmountPaid === null ? "Not available" : `€${formatEuroAmount(actualAmountPaid)}`,
+        formatQuoteProviderLabel(quote.providerName, quote.policyType),
+        grossPremium === null ? valueOrFallback(quote.levelPremium) : formatEuroValue(grossPremium),
+        discountAmount === null ? "" : formatEuroValue(discountAmount),
+        formatEuroValue(actualAmountPaid),
       ]
         .map((value) => `<div class="statement-quote-cell"><p>${escapeHtml(value)}</p></div>`)
         .join(""),
@@ -578,7 +700,7 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile) {
 
   return [
     '<div class="statement-section statement-quote-block">',
-    "<h2>Income Protection Quote Comparison</h2>",
+    `<h2>${escapeHtml(documentType === "Pensions Quote" ? "Pensions Quote Comparison" : "Income Protection Quote Comparison")}</h2>`,
     `<div class="statement-quote-summary">${summaryItems.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`,
     groupedSections,
     "</div>",
@@ -985,8 +1107,8 @@ function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: 
   ];
 }
 
-function buildQuoteBlocks(profile: SeededClientProfile): ComposedBlock[] {
-  const quoteHtml = buildQuoteComparisonHtml(profile);
+function buildQuoteBlocks(profile: SeededClientProfile, documentType: SupportedDocumentType): ComposedBlock[] {
+  const quoteHtml = buildQuoteComparisonHtml(profile, documentType);
 
   if (!quoteHtml) {
     return [
@@ -1011,6 +1133,8 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const title =
     documentType === "Fact Find" ? "Income Protection Fact Find"
       : documentType === "Quote" ? "Income Protection Quote Comparison"
+      : documentType === "Pensions Quote" ? "Pensions Quote Comparison"
+      : documentType === "Pensions Statement" ? "Pensions Statement"
       : documentType === "Terms of Business" ? "Terms of Business"
       : documentType;
   const draftSections = getDraftSections(profile, documentType);
@@ -1018,13 +1142,13 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const personalCircumstancesSection = findDraftSection(draftSections, "personal circumstance");
   const financialSituationSection = findDraftSection(draftSections, "financial situation");
   const needsSection =
-    documentType === "Statement of Suitability"
+    isStatementDocumentType(documentType)
       ? findDraftSection(draftSections, "needs", "objective", "circumstance")
       : findDraftSection(draftSections, "needs", "objective");
   const warningSection = findDraftSection(draftSections, "warning", "disclaimer", "risk");
   const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
   const recommendationHtml =
-    documentType === "Statement of Suitability"
+    isStatementDocumentType(documentType)
       ? computedRecommendationHtml
       : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);
@@ -1049,13 +1173,13 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
           )
         : documentType === "Terms of Business"
           ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
-          : documentType === "Quote"
-            ? buildQuoteBlocks(profile)
+          : isQuoteDocumentType(documentType)
+            ? buildQuoteBlocks(profile, documentType)
             : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
 
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
-  const isStatement = documentType === "Statement of Suitability";
-  const usesStatementHeader = isStatement || documentType === "Quote" || isFactFind;
+  const isStatement = isStatementDocumentType(documentType);
+  const usesStatementHeader = isStatement || isQuoteDocumentType(documentType) || isFactFind;
 
   const sharedBlocks: ComposedBlock[] = [
     ...(usesStatementHeader

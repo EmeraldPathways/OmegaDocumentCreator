@@ -1,4 +1,11 @@
-export type SupportedDocumentType = "Fact Find" | "Fact Find Update" | "Terms of Business" | "Statement of Suitability" | "Quote";
+export type SupportedDocumentType =
+  | "Fact Find"
+  | "Fact Find Update"
+  | "Terms of Business"
+  | "Statement of Suitability"
+  | "Quote"
+  | "Pensions Statement"
+  | "Pensions Quote";
 
 export type DocumentTemplateDefinition = {
   id: string;

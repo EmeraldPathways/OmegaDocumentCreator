@@ -2,11 +2,17 @@ import type { SeededClientProfile } from "../data/seeded-clients";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "./document-types";
 import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
-const STATEMENT_DOCUMENT_TYPE = "Statement of Suitability" satisfies SupportedDocumentType;
 const FACT_FIND_DOCUMENT_TYPE = "Fact Find" satisfies SupportedDocumentType;
+const statementDocumentTypes = ["Statement of Suitability", "Pensions Statement"] as const satisfies SupportedDocumentType[];
+type StatementDocumentType = (typeof statementDocumentTypes)[number];
 
 function hasComposedStatementHtml(editedHtml: string) {
-  return editedHtml.includes("workflow-document-statement-of-suitability") && editedHtml.includes("statement-document-body");
+  return (
+    editedHtml.includes("statement-document-body") &&
+    statementDocumentTypes.some((documentType) =>
+      editedHtml.includes(`workflow-document-${documentType.toLowerCase().replace(/\s+/g, "-")}`),
+    )
+  );
 }
 
 function hasLegacyFactFindHeaderHtml(editedHtml: string) {
@@ -41,8 +47,11 @@ export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   );
 }
 
-export function resolveStatementDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
-  const statementDraft = profile.documentDrafts[STATEMENT_DOCUMENT_TYPE];
+export function resolveStatementDraft(
+  profile: SeededClientProfile,
+  documentType: StatementDocumentType = "Statement of Suitability",
+): GeneratedDocumentDraft {
+  const statementDraft = profile.documentDrafts[documentType];
   const editedHtml = statementDraft.editedHtml.trim();
   const shouldRebuildComposedHtml = hasComposedStatementHtml(editedHtml);
 
@@ -54,7 +63,7 @@ export function resolveStatementDraft(profile: SeededClientProfile): GeneratedDo
     ...profile,
     documentDrafts: {
       ...profile.documentDrafts,
-      [STATEMENT_DOCUMENT_TYPE]: {
+      [documentType]: {
         ...statementDraft,
         editedHtml: "",
       },
@@ -63,7 +72,7 @@ export function resolveStatementDraft(profile: SeededClientProfile): GeneratedDo
 
   return {
     ...statementDraft,
-    editedHtml: buildWorkflowEditorDocument(statementProfile, STATEMENT_DOCUMENT_TYPE).html,
+    editedHtml: buildWorkflowEditorDocument(statementProfile, documentType).html,
   };
 }
 
@@ -96,8 +105,8 @@ export function resolveWorkspaceDocumentDraft(
   profile: SeededClientProfile,
   documentType: SupportedDocumentType,
 ): GeneratedDocumentDraft {
-  if (documentType === STATEMENT_DOCUMENT_TYPE) {
-    return resolveStatementDraft(profile);
+  if (statementDocumentTypes.includes(documentType as StatementDocumentType)) {
+    return resolveStatementDraft(profile, documentType as StatementDocumentType);
   }
 
   if (documentType === FACT_FIND_DOCUMENT_TYPE) {

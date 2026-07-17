@@ -171,6 +171,48 @@ describe("App routes", () => {
     expect(screen.queryByRole("tab", { name: "Files" })).not.toBeInTheDocument();
   });
 
+  it("renders the pensions route with separate quote and statement tabs", () => {
+    render(
+      <MemoryRouter initialEntries={["/pensions"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Pensions" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "Quote" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Statement of Suitability" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Fact Find" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Files" })).not.toBeInTheDocument();
+  });
+
+  it("preserves pension quote drafts separately from income protection quote drafts", () => {
+    const storedClients = createSeededClientProfiles();
+    storedClients["CLI-2026-0001"].documentDrafts["Quote"] = {
+      ...storedClients["CLI-2026-0001"].documentDrafts["Quote"],
+      editedHtml: "<p>Income protection quote</p>",
+    };
+    storedClients["CLI-2026-0001"].documentDrafts["Pensions Quote"] = {
+      ...storedClients["CLI-2026-0001"].documentDrafts["Pensions Quote"],
+      editedHtml: "<p>Pensions quote</p>",
+    };
+
+    window.localStorage.setItem("omega-client-records", JSON.stringify(storedClients));
+    window.localStorage.setItem("omega-client-records-version", "3");
+
+    render(
+      <MemoryRouter initialEntries={["/pensions"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const persistedClients = JSON.parse(window.localStorage.getItem("omega-client-records") ?? "{}") as ReturnType<
+      typeof createSeededClientProfiles
+    >;
+    expect(persistedClients["CLI-2026-0001"].documentDrafts["Quote"].editedHtml).toContain("Income protection quote");
+    expect(persistedClients["CLI-2026-0001"].documentDrafts["Pensions Quote"].editedHtml).toContain("Pensions quote");
+  });
+
   it("resets stale stored clients and renders Income Protection from fresh seeded state", () => {
     const staleClients = createSeededClientProfiles();
     staleClients["CLI-2026-0001"].fullName = "Broken Legacy Client";

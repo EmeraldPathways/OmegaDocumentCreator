@@ -36,6 +36,20 @@ export const builtInDocumentTemplates: DocumentTemplateDefinition[] = [
     description: "Quote comparison table for income protection products.",
     sectionTitles: ["Quote Summary", "Quote Table"],
   },
+  {
+    id: "pensions-statement",
+    documentType: "Pensions Statement",
+    title: "Pensions Statement",
+    description: "Recommendation summary template for pension suitability output.",
+    sectionTitles: ["Recommendation Basics", "Plan Summary", "Needs and Objectives", "Adviser Declaration"],
+  },
+  {
+    id: "pensions-quote",
+    documentType: "Pensions Quote",
+    title: "Pensions Quote Comparison",
+    description: "Quote comparison table for pension products.",
+    sectionTitles: ["Quote Summary", "Quote Table"],
+  },
 ];
 
 export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<Record<SupportedDocumentType, string>>(
@@ -49,6 +63,8 @@ export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<R
     "Terms of Business": "",
     "Statement of Suitability": "",
     "Quote": "",
+    "Pensions Statement": "",
+    "Pensions Quote": "",
   },
 );
 
@@ -88,6 +104,22 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     },
     "Quote": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Quote"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    },
+    "Pensions Statement": {
+      selectedTemplateId: defaultTemplateIdByDocumentType["Pensions Statement"],
+      generationStatus: "idle",
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    },
+    "Pensions Quote": {
+      selectedTemplateId: defaultTemplateIdByDocumentType["Pensions Quote"],
       generationStatus: "idle",
       lastGeneratedHtml: "",
       lastGeneratedSections: [],

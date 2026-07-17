@@ -35,6 +35,7 @@ import type {
 import { fetchStatementQuoteRequests, generateDocument } from "../documents/document-api";
 import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
+import { buildStatementQuoteOptions } from "../documents/statement-quote-selection";
 import { resolveWorkspaceDocumentDraft } from "../documents/statement-draft";
 import { builtInDocumentTemplates } from "../documents/document-templates";
 import { TemplatePicker } from "../documents/template-picker";
@@ -93,6 +94,8 @@ import { WorkflowPageLayout } from "./workflow-page-layout";
 
 type IncomeProtectionPageProps = {
   pageTitle?: string;
+  quoteDocumentType?: "Quote" | "Pensions Quote";
+  statementDocumentType?: "Statement of Suitability" | "Pensions Statement";
   visibleTabIds?: Array<(typeof moduleTabs)[number]["id"]>;
   workflowKind?: "fact-find" | "income-protection" | "pensions" | "files-docs";
 };
@@ -127,6 +130,17 @@ function resolveStatementIntegrationRequests(
   }
 
   return currentRequests;
+}
+
+function getStatementQuoteRequests(
+  profile: SeededClientProfile,
+  quoteDocumentType: "Quote" | "Pensions Quote",
+  statementDocumentType: "Statement of Suitability" | "Pensions Statement",
+) {
+  const quoteRequests = profile.documentDrafts[quoteDocumentType]?.integrationRequests ?? [];
+  const statementRequests = profile.documentDrafts[statementDocumentType]?.integrationRequests ?? [];
+
+  return quoteRequests.length > 0 ? quoteRequests : statementRequests;
 }
 
 function mergeDocumentDrafts(
@@ -232,6 +246,46 @@ function mergeDocumentDrafts(
         ? incomingDrafts["Quote"]?.generationStatus ?? currentDrafts["Quote"].generationStatus
         : currentDrafts["Quote"].generationStatus,
     },
+    "Pensions Statement": {
+      ...currentDrafts["Pensions Statement"],
+      ...incomingDrafts["Pensions Statement"],
+      lastGeneratedHtml:
+        incomingDrafts["Pensions Statement"]?.lastGeneratedHtml ||
+        currentDrafts["Pensions Statement"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Pensions Statement"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? (incomingDrafts["Pensions Statement"]?.lastGeneratedSections ?? currentDrafts["Pensions Statement"].lastGeneratedSections)
+          : currentDrafts["Pensions Statement"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Pensions Statement"]?.integrationRequests?.length ?? 0) > 0
+          ? (incomingDrafts["Pensions Statement"]?.integrationRequests ?? currentDrafts["Pensions Statement"].integrationRequests)
+          : currentDrafts["Pensions Statement"].integrationRequests,
+      editedHtml:
+        incomingDrafts["Pensions Statement"]?.editedHtml ||
+        currentDrafts["Pensions Statement"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Pensions Statement"])
+        ? incomingDrafts["Pensions Statement"]?.generationStatus ??
+          currentDrafts["Pensions Statement"].generationStatus
+        : currentDrafts["Pensions Statement"].generationStatus,
+    },
+    "Pensions Quote": {
+      ...currentDrafts["Pensions Quote"],
+      ...incomingDrafts["Pensions Quote"],
+      lastGeneratedHtml:
+        incomingDrafts["Pensions Quote"]?.lastGeneratedHtml || currentDrafts["Pensions Quote"].lastGeneratedHtml,
+      lastGeneratedSections:
+        (incomingDrafts["Pensions Quote"]?.lastGeneratedSections?.length ?? 0) > 0
+          ? (incomingDrafts["Pensions Quote"]?.lastGeneratedSections ?? currentDrafts["Pensions Quote"].lastGeneratedSections)
+          : currentDrafts["Pensions Quote"].lastGeneratedSections,
+      integrationRequests:
+        (incomingDrafts["Pensions Quote"]?.integrationRequests?.length ?? 0) > 0
+          ? (incomingDrafts["Pensions Quote"]?.integrationRequests ?? currentDrafts["Pensions Quote"].integrationRequests)
+          : currentDrafts["Pensions Quote"].integrationRequests,
+      editedHtml: incomingDrafts["Pensions Quote"]?.editedHtml || currentDrafts["Pensions Quote"].editedHtml,
+      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Pensions Quote"])
+        ? incomingDrafts["Pensions Quote"]?.generationStatus ?? currentDrafts["Pensions Quote"].generationStatus
+        : currentDrafts["Pensions Quote"].generationStatus,
+    },
   };
 }
 
@@ -262,6 +316,8 @@ function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<Se
 
 export function IncomeProtectionPage({
   pageTitle = "Income Protection",
+  quoteDocumentType = "Quote",
+  statementDocumentType = "Statement of Suitability",
   visibleTabIds,
   workflowKind = "income-protection",
 }: IncomeProtectionPageProps = {}) {
@@ -362,14 +418,14 @@ export function IncomeProtectionPage({
       getGenerationHeaderStatus("Generation", client.documentDrafts["Fact Find Update"].generationStatus),
     );
     setStatementDocumentStatus(
-      getGenerationHeaderStatus("Document", client.documentDrafts["Statement of Suitability"].generationStatus),
+      getGenerationHeaderStatus("Document", client.documentDrafts[statementDocumentType].generationStatus),
     );
-    setQuoteDocumentStatus(getGenerationHeaderStatus("Document", client.documentDrafts["Quote"].generationStatus));
+    setQuoteDocumentStatus(getGenerationHeaderStatus("Document", client.documentDrafts[quoteDocumentType].generationStatus));
     setLastSubmittedQuoteRequestKey(null);
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
-  }, [selectedClientReference]);
+  }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
     if (!selectedClientReference && clients[0]?.clientReference) {
@@ -390,7 +446,7 @@ export function IncomeProtectionPage({
       return;
     }
 
-    const documentType = "Statement of Suitability" satisfies SupportedDocumentType;
+    const documentType = statementDocumentType satisfies SupportedDocumentType;
     const currentStatementDraft = draft.documentDrafts[documentType];
     const resolvedStatementDraft = resolveWorkspaceDocumentDraft(draft, documentType);
 
@@ -425,7 +481,7 @@ export function IncomeProtectionPage({
         },
       };
     });
-  }, [draft, saveGeneratedDraft]);
+  }, [draft, saveGeneratedDraft, statementDocumentType]);
 
   useEffect(() => {
     if (!draft) {
@@ -480,6 +536,12 @@ export function IncomeProtectionPage({
 
   const resolvedDraft = draft;
   const factFindType = resolvedDraft.factFindType ?? "all";
+  const isIncomeProtectionDocumentFlow =
+    quoteDocumentType === "Quote" && statementDocumentType === "Statement of Suitability";
+  const statementQuoteRequests = isIncomeProtectionDocumentFlow
+    ? getStatementQuoteRequests(resolvedDraft, quoteDocumentType, statementDocumentType)
+    : [];
+  const statementQuoteOptions = isIncomeProtectionDocumentFlow ? buildStatementQuoteOptions(statementQuoteRequests) : [];
 
   function syncLocalGeneratedDraft(
     documentType: SupportedDocumentType,
@@ -505,6 +567,34 @@ export function IncomeProtectionPage({
   }
 
   useEffect(() => {
+    if (!isIncomeProtectionDocumentFlow || !draft || activeTabId !== "statement-of-suitability") {
+      return;
+    }
+
+    if (statementQuoteOptions.length === 0) {
+      return;
+    }
+
+    if (
+      draft.statementSelectedQuoteKey &&
+      statementQuoteOptions.some((option) => option.key === draft.statementSelectedQuoteKey)
+    ) {
+      return;
+    }
+
+    setDraft((currentDraft) => {
+      if (!currentDraft || currentDraft.statementSelectedQuoteKey === statementQuoteOptions[0].key) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        statementSelectedQuoteKey: statementQuoteOptions[0].key,
+      };
+    });
+  }, [activeTabId, draft, isIncomeProtectionDocumentFlow, statementQuoteOptions]);
+
+  useEffect(() => {
     if (!visibleTabs.some((tab) => tab.id === activeTabId)) {
       setActiveTabId(visibleTabs[0]?.id ?? moduleTabs[0].id);
     }
@@ -512,6 +602,10 @@ export function IncomeProtectionPage({
 
   const activeTab = visibleTabs.find((tab) => tab.id === activeTabId) ?? visibleTabs[0] ?? moduleTabs[0];
   const activeSectionId = workflowSectionByTabId[activeTab.id];
+  const statementHasSelectedQuote =
+    !isIncomeProtectionDocumentFlow ||
+    (statementQuoteOptions.length > 0 &&
+      statementQuoteOptions.some((option) => option.key === resolvedDraft.statementSelectedQuoteKey));
 
   const factFindMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
@@ -527,11 +621,13 @@ export function IncomeProtectionPage({
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
     !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
     !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-    !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
-    !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
-    !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
-    !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
-    !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
+    isIncomeProtectionDocumentFlow
+      ? !statementHasSelectedQuote ? "Policy picker" : null
+      : !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
+    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
+    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
+    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
+    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
     !hasValue(resolvedDraft.gender) ? "Gender" : null,
     !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
     !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
@@ -554,11 +650,19 @@ export function IncomeProtectionPage({
     { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
     { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
     { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
-    { label: "Statement type", complete: hasValue(resolvedDraft.statementType), location: "Statement" },
-    { label: "Product recommended", complete: hasValue(resolvedDraft.productType), location: "Statement" },
-    { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
-    { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
-    { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
+    {
+      label: isIncomeProtectionDocumentFlow ? "Policy picker" : "Statement type",
+      complete: isIncomeProtectionDocumentFlow ? statementHasSelectedQuote : hasValue(resolvedDraft.statementType),
+      location: "Statement",
+    },
+    ...(isIncomeProtectionDocumentFlow
+      ? []
+      : [
+          { label: "Product recommended", complete: hasValue(resolvedDraft.productType), location: "Statement" },
+          { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
+          { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
+          { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
+        ]),
     { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
     { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
     { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
@@ -667,7 +771,7 @@ export function IncomeProtectionPage({
   }
 
   function getWorkspaceDocumentDraft(documentType: SupportedDocumentType) {
-    return resolveWorkspaceDocumentDraft(documentType === "Quote" ? quoteWorkflowSnapshot : resolvedDraft, documentType);
+    return resolveWorkspaceDocumentDraft(documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft, documentType);
   }
 
   useEffect(() => {
@@ -679,7 +783,7 @@ export function IncomeProtectionPage({
       return;
     }
 
-    if (getDocumentDraft("Quote").generationStatus === "generating") {
+    if (getDocumentDraft(quoteDocumentType).generationStatus === "generating") {
       return;
     }
 
@@ -688,7 +792,7 @@ export function IncomeProtectionPage({
     }, 500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [lastSubmittedQuoteRequestKey, quoteMissingFields.length, quoteRequestKey, resolvedDraft]);
+  }, [lastSubmittedQuoteRequestKey, quoteDocumentType, quoteMissingFields.length, quoteRequestKey, resolvedDraft]);
 
   async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
     const normalizedDraft = {
@@ -1039,7 +1143,7 @@ export function IncomeProtectionPage({
       integrationRequests?: GeneratedDocumentDraft["integrationRequests"];
     },
   ) {
-    const sourceProfile = documentType === "Quote" ? quoteWorkflowSnapshot : resolvedDraft;
+    const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
     const nextProfile = {
       ...sourceProfile,
       documentDrafts: {
@@ -1058,7 +1162,7 @@ export function IncomeProtectionPage({
   }
 
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
-    const sourceProfile = documentType === "Quote" ? quoteWorkflowSnapshot : resolvedDraft;
+    const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
     const previewArtifact = buildExportDocumentArtifact(sourceProfile, documentType);
     if (!previewArtifact.html) {
       return;
@@ -1193,34 +1297,34 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     await saveStatementDraft();
     setStatementDocumentStatus("Document: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "generating" });
+    saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, { generationStatus: "generating" });
     try {
       const generatedDocument = await generateDocument({
         clientReference: resolvedDraft.clientReference,
-        documentType: "Statement of Suitability",
-        templateId: getDocumentDraft("Statement of Suitability").selectedTemplateId,
+        documentType: statementDocumentType,
+        templateId: getDocumentDraft(statementDocumentType).selectedTemplateId,
         workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
       });
       const integrationRequests = resolveStatementIntegrationRequests(
-        getDocumentDraft("Quote").integrationRequests,
+        getDocumentDraft(quoteDocumentType).integrationRequests,
         generatedDocument.integrationRequests,
       );
-      saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", {
+      saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
         integrationRequests,
-        editedHtml: buildGeneratedEditorHtml("Statement of Suitability", {
+        editedHtml: buildGeneratedEditorHtml(statementDocumentType, {
           ...generatedDocument,
           integrationRequests,
         }),
       });
       setStatementDocumentStatus("Document: Draft generated");
-      addToast("Statement of Suitability draft generated", "success");
+      addToast(`${statementDocumentType} draft generated`, "success");
     } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, "Statement of Suitability", { generationStatus: "failed" });
+      saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, { generationStatus: "failed" });
       setStatementDocumentStatus("Document: Draft generation failed");
-      addToast("Failed to generate Statement of Suitability draft", "error");
+      addToast(`Failed to generate ${statementDocumentType} draft`, "error");
     }
   }
 
@@ -1234,7 +1338,7 @@ export function IncomeProtectionPage({
     setShowQuoteValidation(false);
     setLastSubmittedQuoteRequestKey(quoteRequestKey);
     setQuoteDocumentStatus("Document: Generating");
-    syncLocalGeneratedDraft("Quote", { generationStatus: "generating" });
+    syncLocalGeneratedDraft(quoteDocumentType, { generationStatus: "generating" });
 
     try {
       const integrationRequests = await fetchStatementQuoteRequests({
@@ -1247,19 +1351,19 @@ export function IncomeProtectionPage({
         integrationRequests,
       };
 
-      syncLocalGeneratedDraft("Quote", {
+      syncLocalGeneratedDraft(quoteDocumentType, {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
         integrationRequests,
-        editedHtml: buildGeneratedEditorHtml("Quote", generatedDocument),
+        editedHtml: buildGeneratedEditorHtml(quoteDocumentType, generatedDocument),
       });
       setQuoteDocumentStatus("Document: Draft generated");
-      addToast("Quote draft generated", "success");
+      addToast(`${quoteDocumentType} draft generated`, "success");
     } catch {
-      syncLocalGeneratedDraft("Quote", { generationStatus: "failed" });
+      syncLocalGeneratedDraft(quoteDocumentType, { generationStatus: "failed" });
       setQuoteDocumentStatus("Document: Draft generation failed");
-      addToast("Failed to generate Quote draft", "error");
+      addToast(`Failed to generate ${quoteDocumentType} draft`, "error");
     }
   }
 
@@ -1407,9 +1511,9 @@ export function IncomeProtectionPage({
       void handleFactFindGenerate();
     } else if (type === "Fact Find Update") {
       void handleFactFindUpdateGenerate();
-    } else if (type === "Quote") {
+    } else if (type === quoteDocumentType) {
       void handleQuoteGenerate();
-    } else if (type === "Statement of Suitability") {
+    } else if (type === statementDocumentType) {
       void handleStatementGenerate();
     }
   }
@@ -2426,7 +2530,12 @@ export function IncomeProtectionPage({
     }
 
     if (tabId === "statement-of-suitability") {
-      const statementDraft = getWorkspaceDocumentDraft("Statement of Suitability");
+      const statementDraft = getWorkspaceDocumentDraft(statementDocumentType);
+      const selectedPolicyPickerValue = statementQuoteOptions.some(
+        (option) => option.key === resolvedDraft.statementSelectedQuoteKey,
+      )
+        ? resolvedDraft.statementSelectedQuoteKey
+        : (statementQuoteOptions[0]?.key ?? "");
 
       return (
         <div className="page-stack">
@@ -2438,104 +2547,132 @@ export function IncomeProtectionPage({
               onToggle={() => statementWorkspaceAccordion.toggle("statement-form")}
               title="Statement Form"
             >
-              <section className="form-section">
-                <h3 className="form-section-title">Recommendation basics</h3>
-                <div className="form-grid">
-              <Input
-                id="sos-letterDate"
-                label={requiredLabel("Letter date")}
-                onChange={(event) => updateField("letterDate", event.target.value)}
-                type="date"
-                value={resolvedDraft.letterDate}
-              />
-              <Select
-                id="sos-statementType"
-                label={requiredLabel("Statement type")}
-                onChange={(event) => updateField("statementType", event.target.value)}
-                options={statementTypeOptions}
-                value={resolvedDraft.statementType}
-              />
-              <Input
-                id="sos-productType"
-                label={requiredLabel("Product type")}
-                onChange={(event) => updateField("productType", event.target.value)}
-                type="text"
-                value={resolvedDraft.productType}
-              />
-              <Input
-                id="sos-advisorName"
-                label={requiredLabel("Advisor name")}
-                onChange={(event) => updateField("advisorName", event.target.value)}
-                type="text"
-                value={resolvedDraft.advisorName}
-              />
-            </div>
-          </section>
+              {isIncomeProtectionDocumentFlow ? (
+                <section className="form-section">
+                  <h3 className="form-section-title">Statement basics</h3>
+                  <div className="form-grid">
+                    <Input
+                      id="sos-letterDate"
+                      label={requiredLabel("Statement date")}
+                      onChange={(event) => updateField("letterDate", event.target.value)}
+                      type="date"
+                      value={resolvedDraft.letterDate}
+                    />
+                    <Select
+                      id="sos-statementSelectedQuoteKey"
+                      label={requiredLabel("Policy picker")}
+                      onChange={(event) => updateField("statementSelectedQuoteKey", event.target.value)}
+                      options={
+                        statementQuoteOptions.length > 0
+                          ? statementQuoteOptions.map((option) => ({ label: option.label, value: option.key }))
+                          : [{ label: "Generate a quote first", value: "" }]
+                      }
+                      value={selectedPolicyPickerValue}
+                    />
+                  </div>
+                </section>
+              ) : (
+                <>
+                  <section className="form-section">
+                    <h3 className="form-section-title">Recommendation basics</h3>
+                    <div className="form-grid">
+                      <Input
+                        id="sos-letterDate"
+                        label={requiredLabel("Letter date")}
+                        onChange={(event) => updateField("letterDate", event.target.value)}
+                        type="date"
+                        value={resolvedDraft.letterDate}
+                      />
+                      <Select
+                        id="sos-statementType"
+                        label={requiredLabel("Statement type")}
+                        onChange={(event) => updateField("statementType", event.target.value)}
+                        options={statementTypeOptions}
+                        value={resolvedDraft.statementType}
+                      />
+                      <Input
+                        id="sos-productType"
+                        label={requiredLabel("Product type")}
+                        onChange={(event) => updateField("productType", event.target.value)}
+                        type="text"
+                        value={resolvedDraft.productType}
+                      />
+                      <Input
+                        id="sos-advisorName"
+                        label={requiredLabel("Advisor name")}
+                        onChange={(event) => updateField("advisorName", event.target.value)}
+                        type="text"
+                        value={resolvedDraft.advisorName}
+                      />
+                    </div>
+                  </section>
 
-          <section className="form-section">
-            <h3 className="form-section-title">Cover summary</h3>
-            <div className="form-grid">
-              <Input
-                id="sos-recommendedCover"
-                label={requiredLabel("Annual Cover Amount (€)")}
-                onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
-                onChange={(event) => updateField("recommendedCover", event.target.value)}
-                prefix="EUR"
-                inputMode="decimal"
-                step="0.01"
-                type="text"
-                value={resolvedDraft.recommendedCover}
-              />
-              <Select
-                id="sos-deferredPeriod"
-                label={requiredLabel("Deferred period")}
-                onChange={(event) => updateField("deferredPeriod", event.target.value)}
-                options={deferredPeriodOptions}
-                value={resolvedDraft.deferredPeriod}
-              />
-              <Select
-                id="sos-coverAge"
-                label={requiredLabel("Cover to age")}
-                onChange={(event) => updateField("coverAge", event.target.value)}
-                options={coverAgeOptions}
-                value={resolvedDraft.coverAge}
-              />
-              {false ? <Input
-                id="sos-premium"
-                label={requiredLabel("Gross monthly premium")}
-                onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
-                onChange={(event) => updateField("premium", event.target.value)}
-                prefix="€"
-                inputMode="decimal"
-                step="0.01"
-                type="text"
-                value={resolvedDraft.premium}
-              /> : null}
-              <Input
-                hint="Gross premium minus tax relief at your marginal rate"
-                id="sos-netMonthlyCost"
-                label={requiredLabel("Net monthly cost")}
-                onBlur={(event) => updateField("netMonthlyCost", formatCurrency(event.target.value))}
-                onChange={(event) => updateField("netMonthlyCost", event.target.value)}
-                prefix="€"
-                inputMode="decimal"
-                step="0.01"
-                type="text"
-                value={resolvedDraft.netMonthlyCost}
-              />
-              <Textarea
-                className="form-grid-full"
-                hint="Summarise the recommended cover and rationale"
-                id="sos-coverSummary"
-                label="Cover summary"
-                onChange={(event) => updateField("coverSummary", event.target.value)}
-                placeholder="Brief overview of the recommended cover and why it suits the client..."
-                rows={4}
-                value={resolvedDraft.coverSummary}
-              />
-            </div>
-          </section>
-              {renderGenerationRequirements("Statement of Suitability generation requirements", statementGenerationRequirements, statementMissingFields, {
+                  <section className="form-section">
+                    <h3 className="form-section-title">Cover summary</h3>
+                    <div className="form-grid">
+                      <Input
+                        id="sos-recommendedCover"
+                        label={requiredLabel("Annual Cover Amount (€)")}
+                        onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
+                        onChange={(event) => updateField("recommendedCover", event.target.value)}
+                        prefix="EUR"
+                        inputMode="decimal"
+                        step="0.01"
+                        type="text"
+                        value={resolvedDraft.recommendedCover}
+                      />
+                      <Select
+                        id="sos-deferredPeriod"
+                        label={requiredLabel("Deferred period")}
+                        onChange={(event) => updateField("deferredPeriod", event.target.value)}
+                        options={deferredPeriodOptions}
+                        value={resolvedDraft.deferredPeriod}
+                      />
+                      <Select
+                        id="sos-coverAge"
+                        label={requiredLabel("Cover to age")}
+                        onChange={(event) => updateField("coverAge", event.target.value)}
+                        options={coverAgeOptions}
+                        value={resolvedDraft.coverAge}
+                      />
+                      {false ? <Input
+                        id="sos-premium"
+                        label={requiredLabel("Gross monthly premium")}
+                        onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
+                        onChange={(event) => updateField("premium", event.target.value)}
+                        prefix="€"
+                        inputMode="decimal"
+                        step="0.01"
+                        type="text"
+                        value={resolvedDraft.premium}
+                      /> : null}
+                      <Input
+                        hint="Gross premium minus tax relief at your marginal rate"
+                        id="sos-netMonthlyCost"
+                        label={requiredLabel("Net monthly cost")}
+                        onBlur={(event) => updateField("netMonthlyCost", formatCurrency(event.target.value))}
+                        onChange={(event) => updateField("netMonthlyCost", event.target.value)}
+                        prefix="€"
+                        inputMode="decimal"
+                        step="0.01"
+                        type="text"
+                        value={resolvedDraft.netMonthlyCost}
+                      />
+                      <Textarea
+                        className="form-grid-full"
+                        hint="Summarise the recommended cover and rationale"
+                        id="sos-coverSummary"
+                        label="Cover summary"
+                        onChange={(event) => updateField("coverSummary", event.target.value)}
+                        placeholder="Brief overview of the recommended cover and why it suits the client..."
+                        rows={4}
+                        value={resolvedDraft.coverSummary}
+                      />
+                    </div>
+                  </section>
+                </>
+              )}
+              {renderGenerationRequirements(`${statementDocumentType} generation requirements`, statementGenerationRequirements, statementMissingFields, {
                 explainSharedFields: true,
                 emphasiseMissing: showStatementValidation,
               })}
@@ -2556,16 +2693,16 @@ export function IncomeProtectionPage({
               <GeneratedOutputWorkspace
                 draft={statementDraft}
                 generateDisabled={statementMissingFields.length > 0}
-                onContentChange={(html) => updateGeneratedOutput("Statement of Suitability", html)}
-                onExportDocx={() => void handleGeneratedOutputExport("Statement of Suitability", "docx")}
-                onExportPdf={() => void handleGeneratedOutputExport("Statement of Suitability", "pdf")}
+                onContentChange={(html) => updateGeneratedOutput(statementDocumentType, html)}
+                onExportDocx={() => void handleGeneratedOutputExport(statementDocumentType, "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport(statementDocumentType, "pdf")}
                 onGenerate={() => void handleStatementGenerate()}
                 statusLabel={statementDocumentStatus.replace("Document: ", "")}
                 templatePicker={
                   <TemplatePicker
-                    documentType="Statement of Suitability"
+                    documentType={statementDocumentType}
                     onChange={(templateId) =>
-                      updateSelectedTemplate(resolvedDraft.clientReference, "Statement of Suitability", templateId)
+                      updateSelectedTemplate(resolvedDraft.clientReference, statementDocumentType, templateId)
                     }
                     selectedTemplateId={statementDraft.selectedTemplateId}
                   />
@@ -2578,7 +2715,7 @@ export function IncomeProtectionPage({
     }
 
     if (tabId === "quote") {
-      const quoteDraft = getWorkspaceDocumentDraft("Quote");
+      const quoteDraft = getWorkspaceDocumentDraft(quoteDocumentType);
 
       return (
         <div className="page-stack">
@@ -2678,15 +2815,15 @@ export function IncomeProtectionPage({
                 draft={quoteDraft}
                 emptyMessage="Generate the quote comparison to open the quote workspace."
                 generateDisabled={quoteMissingFields.length > 0}
-                onContentChange={(html) => updateGeneratedOutput("Quote", html)}
-                onExportDocx={() => void handleGeneratedOutputExport("Quote", "docx")}
-                onExportPdf={() => void handleGeneratedOutputExport("Quote", "pdf")}
+                onContentChange={(html) => updateGeneratedOutput(quoteDocumentType, html)}
+                onExportDocx={() => void handleGeneratedOutputExport(quoteDocumentType, "docx")}
+                onExportPdf={() => void handleGeneratedOutputExport(quoteDocumentType, "pdf")}
                 onGenerate={() => void handleQuoteGenerate()}
                 statusLabel={quoteDocumentStatus.replace("Document: ", "")}
                 templatePicker={
                   <TemplatePicker
-                    documentType="Quote"
-                    onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, "Quote", templateId)}
+                    documentType={quoteDocumentType}
+                    onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, quoteDocumentType, templateId)}
                     selectedTemplateId={quoteDraft.selectedTemplateId}
                   />
                 }

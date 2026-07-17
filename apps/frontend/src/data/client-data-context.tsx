@@ -90,6 +90,8 @@ function normalizeDocumentDrafts(
       documentDrafts?.["Statement of Suitability"],
     ),
     "Quote": normalizeDraft(defaultDrafts["Quote"], documentDrafts?.["Quote"]),
+    "Pensions Statement": normalizeDraft(defaultDrafts["Pensions Statement"], documentDrafts?.["Pensions Statement"]),
+    "Pensions Quote": normalizeDraft(defaultDrafts["Pensions Quote"], documentDrafts?.["Pensions Quote"]),
   };
 }
 
@@ -106,7 +108,11 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   };
 
   const statementDraft = normalizedClient.documentDrafts["Statement of Suitability"];
-  if (!isLegacyStatementDraft(statementDraft)) {
+  const pensionsStatementDraft = normalizedClient.documentDrafts["Pensions Statement"];
+  const needsStatementMigration = isLegacyStatementDraft(statementDraft);
+  const needsPensionsStatementMigration = isLegacyStatementDraft(pensionsStatementDraft);
+
+  if (!needsStatementMigration && !needsPensionsStatementMigration) {
     return normalizedClient;
   }
 
@@ -118,6 +124,10 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
         ...statementDraft,
         editedHtml: "",
       },
+      "Pensions Statement": {
+        ...pensionsStatementDraft,
+        editedHtml: "",
+      },
     },
   };
 
@@ -125,7 +135,8 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
     ...normalizedClient,
     documentDrafts: {
       ...normalizedDocumentDrafts,
-      "Statement of Suitability": resolveStatementDraft(statementProfile),
+      "Statement of Suitability": resolveStatementDraft(statementProfile, "Statement of Suitability"),
+      "Pensions Statement": resolveStatementDraft(statementProfile, "Pensions Statement"),
     },
   };
 }

@@ -14,6 +14,7 @@ import { FactFindPage } from "./pages/fact-find-page";
 import { FilesDocsPage } from "./pages/files-docs-page";
 import { IncomeProtectionDocumentsPage } from "./pages/income-protection-documents-page";
 import { LoginPage } from "./pages/login-page";
+import { PensionsPage } from "./pages/pensions-page";
 import { SettingsPage } from "./pages/settings-page";
 
 function RequireAdmin({ children }: { children: JSX.Element }) {
@@ -43,6 +44,10 @@ function RedirectFilesDocsHome() {
   return <FilesDocsPage />;
 }
 
+function RedirectPensionsHome() {
+  return <PensionsPage />;
+}
+
 function RedirectIncomeProtectionClient() {
   const { clientReference = "" } = useParams();
 
@@ -63,6 +68,7 @@ function AppRoutes() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/fact-find" element={<RedirectFactFindHome />} />
         <Route path="/income-protection" element={<RedirectIncomeProtectionHome />} />
+        <Route path="/pensions" element={<RedirectPensionsHome />} />
         <Route path="/files-docs" element={<RedirectFilesDocsHome />} />
         <Route path="/documents" element={<Navigate replace to="/clients" />} />
         <Route path="/documents/:clientReference" element={<RedirectDocumentFolder />} />
