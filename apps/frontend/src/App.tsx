@@ -12,7 +12,7 @@ import { ClientProfilePage } from "./pages/client-profile-page";
 import { ClientsPage } from "./pages/clients-page";
 import { FactFindPage } from "./pages/fact-find-page";
 import { FilesPage } from "./pages/files-page";
-import { IncomeProtectionPage } from "./pages/income-protection-page";
+import { IncomeProtectionDocumentsPage } from "./pages/income-protection-documents-page";
 import { LoginPage } from "./pages/login-page";
 import { SettingsPage } from "./pages/settings-page";
 
@@ -32,7 +32,7 @@ function RedirectDocumentFolder() {
 }
 
 function RedirectIncomeProtectionHome() {
-  return <IncomeProtectionPage />;
+  return <IncomeProtectionDocumentsPage />;
 }
 
 function RedirectFactFindHome() {

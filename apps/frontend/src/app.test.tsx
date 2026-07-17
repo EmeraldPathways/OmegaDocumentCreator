@@ -165,7 +165,10 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
     expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
     expect(screen.getByLabelText("Select workflow client")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Search workflow clients")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Quote" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Statement of Suitability" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Fact Find" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Files" })).not.toBeInTheDocument();
   });
 
   it("resets stale stored clients and renders Income Protection from fresh seeded state", () => {
