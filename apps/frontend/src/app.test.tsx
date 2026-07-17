@@ -112,16 +112,34 @@ describe("App routes", () => {
     fireEvent.change(document.getElementById("quote-smoker") as HTMLSelectElement, { target: { value: "Non-Smoker" } });
   }
 
-  it("redirects the root route to Income Protection", () => {
+  it("redirects the root route to Fact Find", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Income Protection" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Fact Find" })).toBeInTheDocument();
     expect(screen.getAllByText(/Test Client\s+\(CLI-2026-0001\)/)).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Create Client" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Fact Find" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Fact Find Update" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Quote" })).not.toBeInTheDocument();
+  });
+
+  it("renders only fact-find sections on the fact-find route", () => {
+    render(
+      <MemoryRouter initialEntries={["/fact-find"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Fact Find" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Fact Find" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Fact Find Update" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Quote" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Statement of Suitability" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Generated Documents" })).not.toBeInTheDocument();
   });
 
   it("renders the clients page for the clients route", () => {

@@ -10,6 +10,7 @@ import { AdminPage } from "./pages/admin-page";
 import { ClientFormPage } from "./pages/client-form-page";
 import { ClientProfilePage } from "./pages/client-profile-page";
 import { ClientsPage } from "./pages/clients-page";
+import { FactFindPage } from "./pages/fact-find-page";
 import { FilesPage } from "./pages/files-page";
 import { IncomeProtectionPage } from "./pages/income-protection-page";
 import { LoginPage } from "./pages/login-page";
@@ -34,6 +35,10 @@ function RedirectIncomeProtectionHome() {
   return <IncomeProtectionPage />;
 }
 
+function RedirectFactFindHome() {
+  return <FactFindPage />;
+}
+
 function RedirectIncomeProtectionClient() {
   const { clientReference = "" } = useParams();
 
@@ -49,9 +54,10 @@ function AppRoutes() {
     <AppShell>
       <ErrorBoundary>
         <Routes>
-        <Route path="/" element={<Navigate replace to="/income-protection" />} />
+        <Route path="/" element={<Navigate replace to="/fact-find" />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/fact-find" element={<RedirectFactFindHome />} />
         <Route path="/income-protection" element={<RedirectIncomeProtectionHome />} />
         <Route path="/documents" element={<Navigate replace to="/clients" />} />
         <Route path="/documents/:clientReference" element={<RedirectDocumentFolder />} />

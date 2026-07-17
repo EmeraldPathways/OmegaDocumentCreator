@@ -7,7 +7,7 @@ import { useAuth } from "../auth/auth-context";
 
 const navItems = [
   { label: "Clients", to: "/clients", icon: Users },
-  { label: "Fact Find", icon: ClipboardList },
+  { label: "Fact Find", to: "/fact-find", icon: ClipboardList },
   { label: "Income Protection", to: "/income-protection", icon: Shield },
   { label: "Pensions", icon: Landmark },
   { label: "Files/Docs", icon: FolderOpen },
@@ -130,7 +130,7 @@ export function AppShell({ children }: PropsWithChildren) {
                       onClick={() => {
                         setIsUserMenuOpen(false);
                         signOut();
-                        navigate("/income-protection");
+                        navigate("/fact-find");
                       }}
                       type="button"
                     >

@@ -91,6 +91,12 @@ import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-gener
 import { WorkflowDocumentSections } from "./workflow-document-sections";
 import { WorkflowPageLayout } from "./workflow-page-layout";
 
+type IncomeProtectionPageProps = {
+  pageTitle?: string;
+  visibleTabIds?: Array<(typeof moduleTabs)[number]["id"]>;
+  workflowKind?: "fact-find" | "income-protection" | "pensions" | "files-docs";
+};
+
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
     return false;
@@ -254,7 +260,11 @@ function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<Se
   return workflowFields;
 }
 
-export function IncomeProtectionPage() {
+export function IncomeProtectionPage({
+  pageTitle = "Income Protection",
+  visibleTabIds,
+  workflowKind = "income-protection",
+}: IncomeProtectionPageProps = {}) {
   const { user } = useAuth();
   const canUseBackend = Boolean(user);
   const actorLabel = resolveActorLabel(user?.role);
@@ -273,7 +283,9 @@ export function IncomeProtectionPage() {
     return clients[0]?.clientReference ?? "";
   });
   const client = getClient(selectedClientReference);
-  const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(moduleTabs[0].id);
+  const [activeTabId, setActiveTabId] = useState<(typeof moduleTabs)[number]["id"]>(
+    visibleTabIds?.[0] ?? moduleTabs[0].id,
+  );
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
   const [factFindDraftSavedLabel, setFactFindDraftSavedLabel] = useState("Not saved yet");
   const [factFindGenerationStatus, setFactFindGenerationStatus] = useState("Generation: Draft");
@@ -308,6 +320,14 @@ export function IncomeProtectionPage() {
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
   const quoteWorkspaceAccordion = useAccordionState(["quote-output", "generated-output"]);
+  const visibleTabs = useMemo(() => {
+    if (!visibleTabIds || visibleTabIds.length === 0) {
+      return moduleTabs;
+    }
+
+    const allowedTabIds = new Set(visibleTabIds);
+    return moduleTabs.filter((tab) => allowedTabIds.has(tab.id));
+  }, [visibleTabIds]);
 
   useEffect(() => {
     if (!canUseBackend || !selectedClientReference) return;
@@ -484,7 +504,13 @@ export function IncomeProtectionPage() {
     });
   }
 
-  const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTabId)) {
+      setActiveTabId(visibleTabs[0]?.id ?? moduleTabs[0].id);
+    }
+  }, [activeTabId, visibleTabs]);
+
+  const activeTab = visibleTabs.find((tab) => tab.id === activeTabId) ?? visibleTabs[0] ?? moduleTabs[0];
   const activeSectionId = workflowSectionByTabId[activeTab.id];
 
   const factFindMissingFields = [
@@ -2738,13 +2764,13 @@ export function IncomeProtectionPage() {
     <WorkflowPageLayout
       className="income-protection-page"
       clientReference={selectedClientReference}
-      workflowKind="income-protection"
+      workflowKind={workflowKind}
     >
       <section className="workflow-header" aria-label="Selected client summary">
         <div className="workflow-header-top">
           <div className="workflow-header-title">
             <div className="flex items-center gap-3">
-              <h1>Income Protection</h1>
+              <h1>{pageTitle}</h1>
               <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
             </div>
           </div>
@@ -2788,8 +2814,8 @@ export function IncomeProtectionPage() {
         </div>
       </section>
 
-      <div aria-label="Income Protection sections" className="tab-list" role="tablist">
-          {moduleTabs.map((tab) => {
+      <div aria-label={`${pageTitle} sections`} className="tab-list" role="tablist">
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const progress = tabProgress[tab.id];
             return (
@@ -2819,7 +2845,7 @@ export function IncomeProtectionPage() {
           clientReference={selectedClientReference}
           renderSection={renderDocumentSection}
           sectionIds={[activeSectionId]}
-          workflowKind="income-protection"
+          workflowKind={workflowKind}
         />
       </section>
     </WorkflowPageLayout>
