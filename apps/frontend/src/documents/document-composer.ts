@@ -809,6 +809,25 @@ function buildFactFindUpdateBlocks(
       title: "Data Protection & Marketing Preferences",
       bodyHtml: paragraphHtml(profile.factFindUpdateDataProtectionText || DATA_PROTECTION_MARKETING_COPY),
     },
+    detailGrid("Marketing Preferences", [
+      { label: "Do not contact", value: profile.doNotContact },
+      { label: "Marketing agreed", value: profile.agreeToMarketing },
+      { label: "Phone", value: profile.contactByPhone },
+      { label: "SMS", value: profile.contactBySms },
+      { label: "Email", value: profile.contactByEmail },
+      { label: "Post", value: profile.contactByPost },
+    ]),
+    detailGrid("PEP Confirmation", [
+      { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
+    ]),
+    detailGrid("Signatures", [
+      { label: "Client signature 1", value: profile.clientSignature1 },
+      { label: "Client signature 1 date", value: profile.clientSignature1Date },
+      { label: "Client signature 2", value: profile.clientSignature2 },
+      { label: "Client signature 2 date", value: profile.clientSignature2Date },
+      { label: "Financial Advisor signature", value: profile.financialAdvisorSignature },
+      { label: "Financial Advisor signature date", value: profile.financialAdvisorSignatureDate },
+    ]),
   ];
 }
 

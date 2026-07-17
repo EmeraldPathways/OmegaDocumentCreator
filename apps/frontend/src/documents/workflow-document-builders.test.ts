@@ -545,6 +545,15 @@ describe("buildWorkflowDocument", () => {
     profile.factFindUpdatePersonalCircumstances = "Update personal line 1\nUpdate personal line 2";
     profile.factFindUpdateFinancialSituation = "Update financial line 1\nUpdate financial line 2";
     profile.factFindUpdateNeedsAndObjectives = "Update needs line 1\nUpdate needs line 2";
+    profile.factFindUpdateExecutionOnlyBasis = "Yes";
+    profile.factFindUpdateTermsReviewedReceived = "Yes";
+    profile.doNotContact = "Yes";
+    profile.contactByEmail = "Yes";
+    profile.pepDeclarationConfirmed = "Yes";
+    profile.clientSignature1 = "Jamie Murphy";
+    profile.clientSignature1Date = "2026-07-17";
+    profile.financialAdvisorSignature = "Advisor Name";
+    profile.financialAdvisorSignatureDate = "2026-07-17";
 
     const document = buildWorkflowDocument(profile, "Fact Find Update");
 
@@ -554,6 +563,13 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Update financial line 1<br />Update financial line 2");
     expect(document.html).toContain("<h2>Needs and Objectives</h2>");
     expect(document.html).toContain("Update needs line 1<br />Update needs line 2");
+    expect(document.html).toContain("Client Declarations");
+    expect(document.html).toContain("Data Protection &amp; Marketing Preferences");
+    expect(document.html).toContain("Marketing Preferences");
+    expect(document.html).toContain("PEP Confirmation");
+    expect(document.html).toContain("Signatures");
+    expect(document.html).toContain("Jamie Murphy");
+    expect(document.html).toContain("Advisor Name");
   });
 
   it("preserves terms of business issue confirmations and contact preferences", () => {

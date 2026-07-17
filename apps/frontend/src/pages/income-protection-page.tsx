@@ -1858,7 +1858,7 @@ export function IncomeProtectionPage({
                   <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     The purpose of this review is to ensure that the plans in place will meet the needs of you and your dependants into the future. If you have a particular area of concern on which you wish to focus, we can limit or review that particular area.
                   </p>
-                  <div className="form-grid form-grid-desktop-3">
+                  <div className="form-grid form-grid-desktop-4">
                     {renderToggleField("ff-services-lifeProtection", "Life Protection", "servicesRequestedLifeProtection")}
                     {renderToggleField("ff-services-incomeProtection", "Income Protection", "servicesRequestedIncomeProtection")}
                     {renderToggleField("ff-services-savingsProtection", "Savings & Protection", "servicesRequestedSavingsProtection")}
@@ -1939,7 +1939,7 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("employment-details")}
               title="Employment Details"
             >
-              <div className="form-grid form-grid-desktop-3">
+              <div className="form-grid form-grid-desktop-3 form-grid-desktop-3-tight">
                 {renderTextInput("ff-occupation", requiredLabel("Occupation"), "occupation")}
                 <Select
                   id="ff-employmentStatus"
@@ -2311,26 +2311,26 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("additional-info")}
               title="Additional Relevant Information"
             >
-              <div className="form-grid">
+              <div className="form-grid form-grid-desktop-3">
                 <Textarea
                   id="ff-personalCircumstances"
                   label="Personal circumstances"
                   onChange={(event) => updateField("personalCircumstances", event.target.value)}
-                  rows={4}
+                  rows={8}
                   value={resolvedDraft.personalCircumstances}
                 />
                 <Textarea
                   id="ff-financialSituation"
                   label="Financial situation"
                   onChange={(event) => updateField("financialSituation", event.target.value)}
-                  rows={4}
+                  rows={8}
                   value={resolvedDraft.financialSituation}
                 />
                 <Textarea
                   id="ff-needsObjectives"
                   label="Needs and objectives"
                   onChange={(event) => updateField("needsObjectives", event.target.value)}
-                  rows={4}
+                  rows={8}
                   value={resolvedDraft.needsObjectives}
                 />
               </div>
@@ -2342,17 +2342,26 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("client-declarations")}
               title="Client Declarations"
             >
-              <div className="form-grid">
-                {renderToggleField(
-                  "ff-executionOnlyConfirmation",
-                  "I confirm that I wish to proceed with this financial agreement on an execution only basis",
-                  "executionOnlyConfirmation",
-                )}
-                {renderToggleField(
-                  "ff-termsReviewedReceived",
-                  "I confirm that I have reviewed the Terms of Business and received a copy",
-                  "termsReviewedReceived",
-                )}
+              <div className="marketing-preferences-layout">
+                <div className="marketing-preferences-group">
+                  <p className="marketing-preferences-title">Client confirmations</p>
+                  <div className="marketing-preferences-primary">
+                    <div className="marketing-preferences-card">
+                      {renderToggleField(
+                        "ff-executionOnlyConfirmation",
+                        "I confirm that I wish to proceed with this financial agreement on an execution only basis",
+                        "executionOnlyConfirmation",
+                      )}
+                    </div>
+                    <div className="marketing-preferences-card">
+                      {renderToggleField(
+                        "ff-termsReviewedReceived",
+                        "I confirm that I have reviewed the Terms of Business and received a copy",
+                        "termsReviewedReceived",
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </AccordionItem>
 
@@ -2372,21 +2381,35 @@ export function IncomeProtectionPage({
               <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                 Let us know whether you wish to receive product and service information and which contact methods you consent to for marketing communications.
               </p>
-              <div className="form-grid">
-                {renderToggleField(
-                  "ff-doNotContact",
-                  "I/We do not wish to be contacted and/or receive information on products and services",
-                  "doNotContact",
-                )}
-                {renderToggleField(
-                  "ff-agreeToMarketing",
-                  "I/We agree to be contacted for the provision of marketing information on the products and services offered by Omega Financial Management",
-                  "agreeToMarketing",
-                )}
-                {renderToggleField("ff-contactByPhone", "Phone", "contactByPhone")}
-                {renderToggleField("ff-contactBySms", "SMS", "contactBySms")}
-                {renderToggleField("ff-contactByEmail", "Email", "contactByEmail")}
-                {renderToggleField("ff-contactByPost", "Post", "contactByPost")}
+              <div className="marketing-preferences-layout">
+                <div className="marketing-preferences-group">
+                  <p className="marketing-preferences-title">Consent choices</p>
+                  <div className="marketing-preferences-primary">
+                    <div className="marketing-preferences-card">
+                      {renderToggleField(
+                        "ff-doNotContact",
+                        "I/We do not wish to be contacted and/or receive information on products and services",
+                        "doNotContact",
+                      )}
+                    </div>
+                    <div className="marketing-preferences-card">
+                      {renderToggleField(
+                        "ff-agreeToMarketing",
+                        "I/We agree to be contacted for the provision of marketing information on the products and services offered by Omega Financial Management",
+                        "agreeToMarketing",
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="marketing-preferences-group">
+                  <p className="marketing-preferences-title">Marketing contact methods</p>
+                  <div className={`marketing-preferences-methods${isAffirmative(resolvedDraft.doNotContact) ? " is-muted" : ""}`}>
+                    {renderToggleField("ff-contactByPhone", "Phone", "contactByPhone")}
+                    {renderToggleField("ff-contactBySms", "SMS", "contactBySms")}
+                    {renderToggleField("ff-contactByEmail", "Email", "contactByEmail")}
+                    {renderToggleField("ff-contactByPost", "Post", "contactByPost")}
+                  </div>
+                </div>
               </div>
             </AccordionItem>
 
@@ -2401,12 +2424,17 @@ export function IncomeProtectionPage({
               <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                 A politically exposed person (PEP) is an individual who is or has been entrusted with a prominent public function. Many PEPs hold positions of influence and as a result carry a greater risk if their influence is abused for the purpose of money laundering, corruption or bribery.
               </p>
-              <div className="form-grid">
-                {renderToggleField(
-                  "ff-pepDeclarationConfirmed",
-                  "I/We confirm that I/We are not PEP's nor are we directly related to a PEP as defined by the Criminal Justice Act 2010",
-                  "pepDeclarationConfirmed",
-                )}
+              <div className="marketing-preferences-layout">
+                <div className="marketing-preferences-group">
+                  <p className="marketing-preferences-title">PEP declaration</p>
+                  <div className="marketing-preferences-card">
+                    {renderToggleField(
+                      "ff-pepDeclarationConfirmed",
+                      "I/We confirm that I/We are not PEP's nor are we directly related to a PEP as defined by the Criminal Justice Act 2010",
+                      "pepDeclarationConfirmed",
+                    )}
+                  </div>
+                </div>
               </div>
             </AccordionItem>
 
@@ -2436,8 +2464,13 @@ export function IncomeProtectionPage({
                   <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     I/We understood the recommendation is based on the information disclosed and that the actions agreed are to my / our satisfaction.
                   </p>
-                  <div className="form-grid">
-                    {renderToggleField("ff-recommendationAcknowledged", "Confirmed / agreed", "recommendationAcknowledged")}
+                  <div className="marketing-preferences-layout">
+                    <div className="marketing-preferences-group">
+                      <p className="marketing-preferences-title">Acknowledgement</p>
+                      <div className="marketing-preferences-card">
+                        {renderToggleField("ff-recommendationAcknowledged", "Confirmed / agreed", "recommendationAcknowledged")}
+                      </div>
+                    </div>
                   </div>
                 </AccordionItem>
 
@@ -2453,55 +2486,53 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("signatures")}
               title="Signatures"
             >
-              <div className="form-section" style={{ marginBottom: "var(--space-4)" }}>
-                <div className="form-grid">
-                  <Input
-                    id="ff-clientSignature1"
-                    label="Client signature 1"
-                    onChange={(event) => updateField("clientSignature1", event.target.value)}
-                    type="text"
-                    value={resolvedDraft.clientSignature1}
-                  />
-                  <Input
-                    id="ff-clientSignature1Date"
-                    label="Date"
-                    onChange={(event) => updateField("clientSignature1Date", event.target.value)}
-                    type="date"
-                    value={resolvedDraft.clientSignature1Date}
-                  />
-                  {showPartnerFields ? (
-                    <>
-                      <Input
-                        id="ff-clientSignature2"
-                        label="Client signature 2"
-                        onChange={(event) => updateField("clientSignature2", event.target.value)}
-                        type="text"
-                        value={resolvedDraft.clientSignature2}
-                      />
-                      <Input
-                        id="ff-clientSignature2Date"
-                        label="Client signature 2 date"
-                        onChange={(event) => updateField("clientSignature2Date", event.target.value)}
-                        type="date"
-                        value={resolvedDraft.clientSignature2Date}
-                      />
-                    </>
-                  ) : null}
-                  <Input
-                    id="ff-financialAdvisorSignature"
-                    label="Financial Advisor's Signature"
-                    onChange={(event) => updateField("financialAdvisorSignature", event.target.value)}
-                    type="text"
-                    value={resolvedDraft.financialAdvisorSignature}
-                  />
-                  <Input
-                    id="ff-financialAdvisorSignatureDate"
-                    label="Financial Advisor Signature Date"
-                    onChange={(event) => updateField("financialAdvisorSignatureDate", event.target.value)}
-                    type="date"
-                    value={resolvedDraft.financialAdvisorSignatureDate}
-                  />
-                </div>
+              <div className="form-grid">
+                <Input
+                  id="ff-clientSignature1"
+                  label="Client signature 1"
+                  onChange={(event) => updateField("clientSignature1", event.target.value)}
+                  type="text"
+                  value={resolvedDraft.clientSignature1}
+                />
+                <Input
+                  id="ff-clientSignature1Date"
+                  label="Date"
+                  onChange={(event) => updateField("clientSignature1Date", event.target.value)}
+                  type="date"
+                  value={resolvedDraft.clientSignature1Date}
+                />
+                {showPartnerFields ? (
+                  <>
+                    <Input
+                      id="ff-clientSignature2"
+                      label="Client signature 2"
+                      onChange={(event) => updateField("clientSignature2", event.target.value)}
+                      type="text"
+                      value={resolvedDraft.clientSignature2}
+                    />
+                    <Input
+                      id="ff-clientSignature2Date"
+                      label="Client signature 2 date"
+                      onChange={(event) => updateField("clientSignature2Date", event.target.value)}
+                      type="date"
+                      value={resolvedDraft.clientSignature2Date}
+                    />
+                  </>
+                ) : null}
+                <Input
+                  id="ff-financialAdvisorSignature"
+                  label="Financial Advisor's Signature"
+                  onChange={(event) => updateField("financialAdvisorSignature", event.target.value)}
+                  type="text"
+                  value={resolvedDraft.financialAdvisorSignature}
+                />
+                <Input
+                  id="ff-financialAdvisorSignatureDate"
+                  label="Financial Advisor Signature Date"
+                  onChange={(event) => updateField("financialAdvisorSignatureDate", event.target.value)}
+                  type="date"
+                  value={resolvedDraft.financialAdvisorSignatureDate}
+                />
               </div>
             </AccordionItem>
 
@@ -2518,20 +2549,28 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("request-for-information")}
               title="Request for Information"
             >
+              <div className="request-information-top">
+                <p className="request-information-title">Client details</p>
+                <div className="request-information-top-grid">
+                  {renderTextInput("ff-requestClientNames", "Client Name(s)", "requestClientNames")}
+                  {renderTextInput("ff-requestDateOfBirth", "Date of Birth", "requestDateOfBirth", "date")}
+                  {renderTextInput("ff-requestInfoAddressLine1", "Request information address line 1", "requestInfoAddressLine1")}
+                  {renderTextInput("ff-requestInfoAddressLine2", "Request information address line 2", "requestInfoAddressLine2")}
+                  {renderTextInput("ff-requestInfoAddressLine3", "Request information address line 3", "requestInfoAddressLine3")}
+                  {renderTextInput("ff-requestInfoAddressLine4", "Request information address line 4", "requestInfoAddressLine4")}
+                </div>
+              </div>
               <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                 I/We request that you furnish Omega Financial Management, Suite 31 The Mall, Beacon Court, Sandyford, Dublin 18 with all of the information they require to prepare a full analysis of all of my Pension, Life Assurance, Income Protection and Investment Policies.
               </p>
-              <div className="form-grid">
-                {renderTextInput("ff-requestClientNames", "Client Name(s)", "requestClientNames")}
-                {renderTextInput("ff-requestInfoAddressLine1", "Request information address line 1", "requestInfoAddressLine1")}
-                {renderTextInput("ff-requestInfoAddressLine2", "Request information address line 2", "requestInfoAddressLine2")}
-                {renderTextInput("ff-requestInfoAddressLine3", "Request information address line 3", "requestInfoAddressLine3")}
-                {renderTextInput("ff-requestInfoAddressLine4", "Request information address line 4", "requestInfoAddressLine4")}
-                {renderTextInput("ff-requestDateOfBirth", "Date of Birth", "requestDateOfBirth", "date")}
-                {renderTextInput("ff-requestClientSignature", "Client(s) signature", "requestClientSignature")}
-                {renderTextInput("ff-requestLetterDate", "Date", "requestLetterDate", "date")}
-                {renderTextInput("ff-requestCompanyName", "Request information company", "requestCompanyName")}
-                {renderTextInput("ff-requestPolicies", "Policies", "requestPolicies")}
+              <div className="request-information-bottom">
+                <p className="request-information-title">Authorization</p>
+                <div className="request-information-bottom-grid">
+                  {renderTextInput("ff-requestCompanyName", "Request information company", "requestCompanyName")}
+                  {renderTextInput("ff-requestPolicies", "Policies", "requestPolicies")}
+                  {renderTextInput("ff-requestClientSignature", "Client(s) signature", "requestClientSignature")}
+                  {renderTextInput("ff-requestLetterDate", "Date", "requestLetterDate", "date")}
+                </div>
               </div>
               <p className="text-muted text-small">OFM Financial Ltd T/A Omega Financial Management, regulated by the Central Bank of Ireland.</p>
             </AccordionItem>
@@ -2605,7 +2644,7 @@ export function IncomeProtectionPage({
                   <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     Please use an additional page if required
                   </p>
-                  <div className="form-grid form-grid-desktop-3">
+                  <div className="form-grid form-grid-desktop-3 form-grid-desktop-3-tight">
                     {renderTextarea(
                       "ffu-personalCircumstances",
                       "Personal Circumstances",
@@ -2651,12 +2690,19 @@ export function IncomeProtectionPage({
                 </AccordionItem>
 
                 <AccordionItem
-                  indicator={<Check size={16} className="text-success" />}
+                  indicator={getSectionProgress([
+                    resolvedDraft.doNotContact,
+                    resolvedDraft.agreeToMarketing,
+                    resolvedDraft.contactByPhone,
+                    resolvedDraft.contactBySms,
+                    resolvedDraft.contactByEmail,
+                    resolvedDraft.contactByPost,
+                  ])}
                   isOpen={factFindUpdateWorkspaceAccordion.isOpen("data-protection-marketing-preferences")}
                   onToggle={() => factFindUpdateWorkspaceAccordion.toggle("data-protection-marketing-preferences")}
                   title="Data Protection & Marketing Preferences"
                 >
-                  <p>
+                  <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     We collect your personal details in order to provide the highest standard of service to you. We
                     take great care with the information provided; taking steps to keep it secure and to ensure it is
                     used only for legitimate purposes. The information you have provided will be treated as confidential
@@ -2665,6 +2711,121 @@ export function IncomeProtectionPage({
                     of the policy(ies) that you have with us. Under the General Data Protection Regulation 2018 you have
                     various rights relating to your Personal Data.
                   </p>
+                  <div className="marketing-preferences-layout">
+                    <div className="marketing-preferences-group">
+                      <p className="marketing-preferences-title">Consent choices</p>
+                      <div className="marketing-preferences-primary">
+                        <div className="marketing-preferences-card">
+                          {renderToggleField(
+                            "ffu-doNotContact",
+                            "I/We do not wish to be contacted and/or receive information on products and services",
+                            "doNotContact",
+                          )}
+                        </div>
+                        <div className="marketing-preferences-card">
+                          {renderToggleField(
+                            "ffu-agreeToMarketing",
+                            "I/We agree to be contacted for the provision of marketing information on the products and services offered by Omega Financial Management",
+                            "agreeToMarketing",
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="marketing-preferences-group">
+                      <p className="marketing-preferences-title">Marketing contact methods</p>
+                      <div className={`marketing-preferences-methods${isAffirmative(resolvedDraft.doNotContact) ? " is-muted" : ""}`}>
+                        {renderToggleField("ffu-contactByPhone", "Phone", "contactByPhone")}
+                        {renderToggleField("ffu-contactBySms", "SMS", "contactBySms")}
+                        {renderToggleField("ffu-contactByEmail", "Email", "contactByEmail")}
+                        {renderToggleField("ffu-contactByPost", "Post", "contactByPost")}
+                      </div>
+                    </div>
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([resolvedDraft.pepDeclarationConfirmed])}
+                  isOpen={factFindUpdateWorkspaceAccordion.isOpen("pep-confirmation")}
+                  onToggle={() => factFindUpdateWorkspaceAccordion.toggle("pep-confirmation")}
+                  title="PEP Confirmation"
+                >
+                  <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
+                    A politically exposed person (PEP) is an individual who is or has been entrusted with a prominent public function. Many PEPs hold positions of influence and as a result carry a greater risk if their influence is abused for the purpose of money laundering, corruption or bribery.
+                  </p>
+                  <div className="marketing-preferences-layout">
+                    <div className="marketing-preferences-group">
+                      <p className="marketing-preferences-title">PEP declaration</p>
+                      <div className="marketing-preferences-card">
+                        {renderToggleField(
+                          "ffu-pepDeclarationConfirmed",
+                          "I/We confirm that I/We are not PEP's nor are we directly related to a PEP as defined by the Criminal Justice Act 2010",
+                          "pepDeclarationConfirmed",
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  indicator={getSectionProgress([
+                    resolvedDraft.clientSignature1,
+                    resolvedDraft.clientSignature1Date,
+                    ...(showPartnerFields ? [resolvedDraft.clientSignature2, resolvedDraft.clientSignature2Date] : []),
+                    resolvedDraft.financialAdvisorSignature,
+                    resolvedDraft.financialAdvisorSignatureDate,
+                  ])}
+                  isOpen={factFindUpdateWorkspaceAccordion.isOpen("signatures")}
+                  onToggle={() => factFindUpdateWorkspaceAccordion.toggle("signatures")}
+                  title="Signatures"
+                >
+                  <div className="form-grid">
+                    <Input
+                      id="ffu-clientSignature1"
+                      label="Client signature 1"
+                      onChange={(event) => updateField("clientSignature1", event.target.value)}
+                      type="text"
+                      value={resolvedDraft.clientSignature1}
+                    />
+                    <Input
+                      id="ffu-clientSignature1Date"
+                      label="Date"
+                      onChange={(event) => updateField("clientSignature1Date", event.target.value)}
+                      type="date"
+                      value={resolvedDraft.clientSignature1Date}
+                    />
+                    {showPartnerFields ? (
+                      <>
+                        <Input
+                          id="ffu-clientSignature2"
+                          label="Client signature 2"
+                          onChange={(event) => updateField("clientSignature2", event.target.value)}
+                          type="text"
+                          value={resolvedDraft.clientSignature2}
+                        />
+                        <Input
+                          id="ffu-clientSignature2Date"
+                          label="Client signature 2 date"
+                          onChange={(event) => updateField("clientSignature2Date", event.target.value)}
+                          type="date"
+                          value={resolvedDraft.clientSignature2Date}
+                        />
+                      </>
+                    ) : null}
+                    <Input
+                      id="ffu-financialAdvisorSignature"
+                      label="Financial Advisor's Signature"
+                      onChange={(event) => updateField("financialAdvisorSignature", event.target.value)}
+                      type="text"
+                      value={resolvedDraft.financialAdvisorSignature}
+                    />
+                    <Input
+                      id="ffu-financialAdvisorSignatureDate"
+                      label="Financial Advisor Signature Date"
+                      onChange={(event) => updateField("financialAdvisorSignatureDate", event.target.value)}
+                      type="date"
+                      value={resolvedDraft.financialAdvisorSignatureDate}
+                    />
+                  </div>
                 </AccordionItem>
               </Accordion>
               {renderGenerationRequirements(
