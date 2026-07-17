@@ -25,6 +25,34 @@ export const moduleTabs = [
   { id: "generated-documents", label: "Generated Documents", icon: Download },
 ] as const;
 
+export type WorkflowSectionId =
+  | "fact-find"
+  | "fact-find-update"
+  | "income-protection-quote"
+  | "income-protection-statement"
+  | "pensions-quote"
+  | "pensions-statement"
+  | "files"
+  | "generated-documents";
+
+export type WorkflowPageKind = "fact-find" | "income-protection" | "pensions" | "files-docs";
+
+export const workflowPageSections: Record<WorkflowPageKind, WorkflowSectionId[]> = {
+  "fact-find": ["fact-find", "fact-find-update"],
+  "income-protection": ["income-protection-quote", "income-protection-statement"],
+  pensions: ["pensions-quote", "pensions-statement"],
+  "files-docs": ["files", "generated-documents"],
+};
+
+export const workflowSectionByTabId: Record<(typeof moduleTabs)[number]["id"], WorkflowSectionId> = {
+  "fact-find": "fact-find",
+  "fact-find-update": "fact-find-update",
+  quote: "income-protection-quote",
+  "statement-of-suitability": "income-protection-statement",
+  files: "files",
+  "generated-documents": "generated-documents",
+};
+
 export const employmentStatusOptions = [
   { value: "", label: "Select employment status" },
   { value: "Employed", label: "Employed" },

@@ -83,9 +83,13 @@ import {
   statementTypeOptions,
   toLower,
   useAccordionState,
+  workflowSectionByTabId,
+  type WorkflowSectionId,
 } from "./income-protection-helpers";
 import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
 import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
+import { WorkflowDocumentSections } from "./workflow-document-sections";
+import { WorkflowPageLayout } from "./workflow-page-layout";
 
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
@@ -481,6 +485,7 @@ export function IncomeProtectionPage() {
   }
 
   const activeTab = moduleTabs.find((tab) => tab.id === activeTabId) ?? moduleTabs[0];
+  const activeSectionId = workflowSectionByTabId[activeTab.id];
 
   const factFindMissingFields = [
     !hasValue(resolvedDraft.fullName) ? "Client name" : null,
@@ -1513,8 +1518,8 @@ export function IncomeProtectionPage() {
     );
   }
 
-  function renderTabPanel() {
-    if (activeTab.id === "fact-find") {
+  function renderTabPanel(tabId: (typeof moduleTabs)[number]["id"] = activeTab.id) {
+    if (tabId === "fact-find") {
       const factFindDraft = getDocumentDraft("Fact Find");
 
       return (
@@ -2257,7 +2262,7 @@ export function IncomeProtectionPage() {
       );
     }
 
-    if (activeTab.id === "fact-find-update") {
+    if (tabId === "fact-find-update") {
       const factFindUpdateDraft = getDocumentDraft("Fact Find Update");
 
       return (
@@ -2394,7 +2399,7 @@ export function IncomeProtectionPage() {
       );
     }
 
-    if (activeTab.id === "statement-of-suitability") {
+    if (tabId === "statement-of-suitability") {
       const statementDraft = getWorkspaceDocumentDraft("Statement of Suitability");
 
       return (
@@ -2546,7 +2551,7 @@ export function IncomeProtectionPage() {
       );
     }
 
-    if (activeTab.id === "quote") {
+    if (tabId === "quote") {
       const quoteDraft = getWorkspaceDocumentDraft("Quote");
 
       return (
@@ -2666,7 +2671,7 @@ export function IncomeProtectionPage() {
       );
     }
 
-    if (activeTab.id === "files") {
+    if (tabId === "files") {
       return (
         <IncomeProtectionFilesTab
           fileFilter={fileFilter}
@@ -2710,8 +2715,31 @@ export function IncomeProtectionPage() {
     );
   }
 
+  function renderDocumentSection(sectionId: WorkflowSectionId) {
+    switch (sectionId) {
+      case "fact-find":
+        return renderTabPanel("fact-find");
+      case "fact-find-update":
+        return renderTabPanel("fact-find-update");
+      case "income-protection-statement":
+        return renderTabPanel("statement-of-suitability");
+      case "income-protection-quote":
+        return renderTabPanel("quote");
+      case "files":
+        return renderTabPanel("files");
+      case "generated-documents":
+        return renderTabPanel("generated-documents");
+      default:
+        return null;
+    }
+  }
+
   return (
-    <div className="page-stack income-protection-page">
+    <WorkflowPageLayout
+      className="income-protection-page"
+      clientReference={selectedClientReference}
+      workflowKind="income-protection"
+    >
       <section className="workflow-header" aria-label="Selected client summary">
         <div className="workflow-header-top">
           <div className="workflow-header-title">
@@ -2787,8 +2815,13 @@ export function IncomeProtectionPage() {
         </div>
 
       <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
-        {renderTabPanel()}
+        <WorkflowDocumentSections
+          clientReference={selectedClientReference}
+          renderSection={renderDocumentSection}
+          sectionIds={[activeSectionId]}
+          workflowKind="income-protection"
+        />
       </section>
-    </div>
+    </WorkflowPageLayout>
   );
 }

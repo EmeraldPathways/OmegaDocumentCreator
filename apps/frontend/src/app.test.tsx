@@ -59,6 +59,25 @@ import { App } from "./App";
 import { ClientDataProvider, useClientData } from "./data/client-data-context";
 import { createSeededClientProfiles } from "./data/seeded-clients";
 import { builtInDocumentTemplates } from "./documents/document-templates";
+import { WorkflowDocumentSections } from "./pages/workflow-document-sections";
+
+describe("WorkflowDocumentSections", () => {
+  it("shows only the sections configured for the page", () => {
+    render(
+      <WorkflowDocumentSections
+        sectionIds={["fact-find", "fact-find-update"]}
+        clientReference="C-1001"
+        renderSection={(sectionId) => <h2>{sectionId}</h2>}
+        workflowKind="fact-find"
+      />,
+    );
+
+    expect(screen.getByText("fact-find")).toBeInTheDocument();
+    expect(screen.getByText("fact-find-update")).toBeInTheDocument();
+    expect(screen.queryByText("income-protection-quote")).not.toBeInTheDocument();
+    expect(screen.queryByText("income-protection-statement")).not.toBeInTheDocument();
+  });
+});
 
 function setStoredClients(clients: unknown) {
   window.localStorage.setItem("omega-client-records-version", "3");
