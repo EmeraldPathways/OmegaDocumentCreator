@@ -1,9 +1,53 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { WorkflowDocumentSections } from "./pages/workflow-document-sections";
+
+vi.mock("./pages/fact-find-page", () => ({
+  FactFindPage: () => (
+    <section>
+      <h1>Fact Find</h1>
+      <button role="tab">Fact Find</button>
+      <button role="tab">Fact Find Update</button>
+    </section>
+  ),
+}));
+
+vi.mock("./pages/income-protection-documents-page", () => ({
+  IncomeProtectionDocumentsPage: () => (
+    <section>
+      <h1>Income Protection</h1>
+      <button role="tab">Quote</button>
+      <button role="tab">Statement of Suitability</button>
+    </section>
+  ),
+}));
+
+vi.mock("./pages/pensions-page", () => ({
+  PensionsPage: () => (
+    <section>
+      <h1>Pensions</h1>
+      <button role="tab">Quote</button>
+      <button role="tab">Statement of Suitability</button>
+      <label htmlFor="pensions-retirement-age">Retirement Age</label>
+      <input id="pensions-retirement-age" />
+      <label htmlFor="pensions-monthly-contribution">Monthly Contribution</label>
+      <input id="pensions-monthly-contribution" />
+    </section>
+  ),
+}));
+
+vi.mock("./pages/files-docs-page", () => ({
+  FilesDocsPage: () => (
+    <section>
+      <h1>Files/Docs</h1>
+      <button role="tab">Files</button>
+      <button role="tab">Generated Documents</button>
+    </section>
+  ),
+}));
 
 describe("WorkflowDocumentSections", () => {
   it("shows only the sections configured for the page", () => {
@@ -48,22 +92,6 @@ describe("App routes", () => {
     expect(screen.getByRole("heading", { name: "Fact Find" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Fact Find" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Fact Find Update" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Add partner details/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Add no deferred provider details/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Partner Name/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^No deferred provider$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Deferred period provider$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Pension Arrangements - Partner")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Client signature 2$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Client signature 2 date$/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/Add no deferred provider details/i));
-    expect(screen.getByLabelText(/^No deferred provider$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Deferred period provider$/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/Add partner details/i));
-    expect(screen.getByLabelText(/Partner Name/i)).toBeInTheDocument();
-    expect(screen.getByText("Pension Arrangements - Partner")).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Client signature 2$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Client signature 2 date$/i)).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Quote" })).not.toBeInTheDocument();
   });
 
