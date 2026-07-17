@@ -374,6 +374,8 @@ export function IncomeProtectionPage({
   const [quotePensionExistingFund, setQuotePensionExistingFund] = useState("");
   const [quotePensionRequired, setQuotePensionRequired] = useState("");
   const [quotePensionMonthlyContribution, setQuotePensionMonthlyContribution] = useState("");
+  const [showPartnerFields, setShowPartnerFields] = useState(false);
+  const [showNoDeferredFields, setShowNoDeferredFields] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -439,6 +441,8 @@ export function IncomeProtectionPage({
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
+    setShowPartnerFields(false);
+    setShowNoDeferredFields(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
@@ -1769,6 +1773,45 @@ export function IncomeProtectionPage({
     );
   }
 
+  function renderPartnerDetailsToggle() {
+    return (
+      <div className="form-grid-full">
+        <div className="form-section">
+          <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
+            Most policies are for one person. Turn this on only if you need to capture partner details.
+          </p>
+          <Toggle
+            checked={showPartnerFields}
+            id="ff-showPartnerDetails"
+            label="Add partner details"
+            onChange={(event) => setShowPartnerFields(event.target.checked)}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  function renderIncomeProtectionProviderDetailsToggle() {
+    return (
+      <div
+        className="form-grid-full"
+        style={{ marginBlock: "var(--space-4)" }}
+      >
+        <div className="form-section">
+          <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
+            Turn this on only if you need to capture the no deferred provider details.
+          </p>
+          <Toggle
+            checked={showNoDeferredFields}
+            id="ff-showNoDeferredDetails"
+            label="Add no deferred provider details"
+            onChange={(event) => setShowNoDeferredFields(event.target.checked)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   function renderTabPanel(tabId: (typeof moduleTabs)[number]["id"] = activeTab.id) {
     if (tabId === "fact-find") {
       const factFindDraft = getDocumentDraft("Fact Find");
@@ -1815,7 +1858,7 @@ export function IncomeProtectionPage({
                   <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     The purpose of this review is to ensure that the plans in place will meet the needs of you and your dependants into the future. If you have a particular area of concern on which you wish to focus, we can limit or review that particular area.
                   </p>
-                  <div className="form-grid">
+                  <div className="form-grid form-grid-desktop-3">
                     {renderToggleField("ff-services-lifeProtection", "Life Protection", "servicesRequestedLifeProtection")}
                     {renderToggleField("ff-services-incomeProtection", "Income Protection", "servicesRequestedIncomeProtection")}
                     {renderToggleField("ff-services-savingsProtection", "Savings & Protection", "servicesRequestedSavingsProtection")}
@@ -1836,7 +1879,7 @@ export function IncomeProtectionPage({
                   onToggle={() => factFindAccordion.toggle("personal-details")}
                   title="Personal Details"
                 >
-                  <div className="form-grid">
+                  <div className="form-grid form-grid-desktop-3">
                     {renderTextInput("ff-fullName", requiredLabel("Name"), "fullName")}
                     <Select
                       id="ff-maritalStatus"
@@ -1872,26 +1915,31 @@ export function IncomeProtectionPage({
                     {renderTextInput("ff-email", "Email", "email", "email")}
                     {renderTextInput("ff-phone", requiredLabel("Home / Mobile"), "mobileNumber", "tel")}
                     {renderTextInput("ff-workPhone", "Work Phone", "workPhone", "tel")}
-                    {renderTextInput("ff-partnerName", "Partner Name", "partnerName")}
-                    {renderTextInput("ff-partnerDob", "Partner Date of Birth", "partnerDateOfBirth", "date")}
-                    {renderTextInput("ff-partnerAddress1", "Partner address line 1", "partnerAddressLine1")}
-                    {renderTextInput("ff-partnerAddress2", "Partner address line 2", "partnerAddressLine2")}
-                    {renderTextInput("ff-partnerAddress3", "Partner address line 3", "partnerAddressLine3")}
-                    {renderTextInput("ff-partnerAddress4", "Partner address line 4", "partnerAddressLine4")}
-                    {renderTextInput("ff-partnerHomeMobile", "Partner Home / Mobile", "partnerHomeMobile", "tel")}
-                    {renderTextInput("ff-partnerWorkPhone", "Partner Work Phone", "partnerWorkPhone", "tel")}
-                    {renderTextInput("ff-partnerEmail", "Partner Email", "partnerEmail", "email")}
                     {renderTextInput("ff-dependantsSummary", "Dependants", "dependantsSummary")}
+                    {renderPartnerDetailsToggle()}
+                    {showPartnerFields ? (
+                      <>
+                        {renderTextInput("ff-partnerName", "Partner Name", "partnerName")}
+                        {renderTextInput("ff-partnerDob", "Partner Date of Birth", "partnerDateOfBirth", "date")}
+                        {renderTextInput("ff-partnerAddress1", "Partner address line 1", "partnerAddressLine1")}
+                        {renderTextInput("ff-partnerAddress2", "Partner address line 2", "partnerAddressLine2")}
+                        {renderTextInput("ff-partnerAddress3", "Partner address line 3", "partnerAddressLine3")}
+                        {renderTextInput("ff-partnerAddress4", "Partner address line 4", "partnerAddressLine4")}
+                        {renderTextInput("ff-partnerHomeMobile", "Partner Home / Mobile", "partnerHomeMobile", "tel")}
+                        {renderTextInput("ff-partnerWorkPhone", "Partner Work Phone", "partnerWorkPhone", "tel")}
+                        {renderTextInput("ff-partnerEmail", "Partner Email", "partnerEmail", "email")}
+                      </>
+                    ) : null}
                   </div>
                 </AccordionItem>
 
             <AccordionItem
-              indicator={getSectionProgress([resolvedDraft.occupation, resolvedDraft.employmentStatus, resolvedDraft.income, resolvedDraft.advisorName])}
+              indicator={getSectionProgress([resolvedDraft.occupation, resolvedDraft.employmentStatus, resolvedDraft.income])}
               isOpen={factFindAccordion.isOpen("employment-details")}
               onToggle={() => factFindAccordion.toggle("employment-details")}
               title="Employment Details"
             >
-              <div className="form-grid">
+              <div className="form-grid form-grid-desktop-3">
                 {renderTextInput("ff-occupation", requiredLabel("Occupation"), "occupation")}
                 <Select
                   id="ff-employmentStatus"
@@ -1911,13 +1959,6 @@ export function IncomeProtectionPage({
                   type="text"
                   value={resolvedDraft.income}
                 />
-                <Input
-                  id="ff-advisorName"
-                  label={requiredLabel("Advisor name")}
-                  onChange={(event) => updateField("advisorName", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.advisorName}
-                />
                 {renderToggleField("ff-employed", "Employed", "employed")}
                 {renderToggleField("ff-selfEmployed", "Self Employed", "selfEmployed")}
               </div>
@@ -1935,7 +1976,7 @@ export function IncomeProtectionPage({
               onToggle={() => factFindAccordion.toggle("income-protection")}
               title="Income Protection"
             >
-              <div className="form-grid">
+              <div className="form-grid form-grid-desktop-3">
                 <Input
                   id="ff-provider"
                   label="Provider"
@@ -1997,37 +2038,64 @@ export function IncomeProtectionPage({
                   value={resolvedDraft.phiIndexation}
                 />
               </div>
+              {renderIncomeProtectionProviderDetailsToggle()}
               <div className="form-section">
                 <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
                   Income Protection with No Deferred Period
                 </p>
-                <div className="form-grid">
-                  {renderTextInput("ff-noDeferredProvider", "No deferred provider", "incomeProtectionNoDeferredProvider")}
-                  {renderCurrencyInput("ff-noDeferredWeeklyCover", "No deferred current weekly cover", "incomeProtectionNoDeferredCurrentWeeklyCover")}
-                  {renderCurrencyInput("ff-noDeferredMonthlyPremium", "No deferred monthly premium", "incomeProtectionNoDeferredMonthlyPremium")}
-                  {renderToggleField("ff-noDeferredDentistProvident", "Dentist Provident", "incomeProtectionNoDeferredDentistProvident")}
-                  {renderToggleField("ff-noDeferredDentistGeneral", "Dentist & General", "incomeProtectionNoDeferredDentistGeneral")}
-                  {renderToggleField("ff-noDeferredOther", "Other", "incomeProtectionNoDeferredOther")}
-                  {renderToggleField("ff-noDeferredAge60", "Cover to Age 60", "incomeProtectionNoDeferredCoverToAge60")}
-                  {renderToggleField("ff-noDeferredAge65", "Cover to Age 65", "incomeProtectionNoDeferredCoverToAge65")}
+                <div className="provider-detail-grid">
+                  {showNoDeferredFields ? (
+                    <>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Policy details</p>
+                        {renderTextInput("ff-noDeferredProvider", "No deferred provider", "incomeProtectionNoDeferredProvider")}
+                        {renderCurrencyInput("ff-noDeferredMonthlyPremium", "No deferred monthly premium", "incomeProtectionNoDeferredMonthlyPremium")}
+                      </div>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Cover details</p>
+                        {renderCurrencyInput("ff-noDeferredWeeklyCover", "No deferred current weekly cover", "incomeProtectionNoDeferredCurrentWeeklyCover")}
+                        {renderToggleField("ff-noDeferredAge60", "Cover to Age 60", "incomeProtectionNoDeferredCoverToAge60")}
+                        {renderToggleField("ff-noDeferredAge65", "Cover to Age 65", "incomeProtectionNoDeferredCoverToAge65")}
+                      </div>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Provider options</p>
+                        {renderToggleField("ff-noDeferredDentistProvident", "Dentist Provident", "incomeProtectionNoDeferredDentistProvident")}
+                        {renderToggleField("ff-noDeferredDentistGeneral", "Dentist & General", "incomeProtectionNoDeferredDentistGeneral")}
+                        {renderToggleField("ff-noDeferredOther", "Other", "incomeProtectionNoDeferredOther")}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
               <div className="form-section">
                 <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
                   Income Protection with Deferred Period
                 </p>
-                <div className="form-grid">
-                  {renderTextInput("ff-deferredProviderDetailed", "Deferred period provider", "incomeProtectionDeferredProvider")}
-                  {renderCurrencyInput("ff-deferredWeeklyCover", "Deferred current weekly cover", "incomeProtectionDeferredCurrentWeeklyCover")}
-                  {renderCurrencyInput("ff-deferredMonthlyPremium", "Deferred monthly premium", "incomeProtectionDeferredMonthlyPremium")}
-                  {renderToggleField("ff-deferredFriendsFirst", "Friends First", "incomeProtectionDeferredFriendsFirst")}
-                  {renderToggleField("ff-deferredIrishLife", "Irish Life", "incomeProtectionDeferredIrishLife")}
-                  {renderToggleField("ff-deferredOther", "Other", "incomeProtectionDeferredOther")}
-                  {renderToggleField("ff-deferred13Weeks", "13 Weeks", "incomeProtectionDeferred13Weeks")}
-                  {renderToggleField("ff-deferred26Weeks", "26 Weeks", "incomeProtectionDeferred26Weeks")}
-                  {renderToggleField("ff-deferred52Weeks", "52 Weeks", "incomeProtectionDeferred52Weeks")}
-                  {renderToggleField("ff-deferredAge60", "Deferred Cover to Age 60", "incomeProtectionDeferredCoverToAge60")}
-                  {renderToggleField("ff-deferredAge65", "Deferred Cover to Age 65", "incomeProtectionDeferredCoverToAge65")}
+                <div className="provider-detail-grid">
+                  {showNoDeferredFields ? (
+                    <>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Policy details</p>
+                        {renderTextInput("ff-deferredProviderDetailed", "Deferred period provider", "incomeProtectionDeferredProvider")}
+                        {renderCurrencyInput("ff-deferredMonthlyPremium", "Deferred monthly premium", "incomeProtectionDeferredMonthlyPremium")}
+                      </div>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Deferred options</p>
+                        {renderCurrencyInput("ff-deferredWeeklyCover", "Deferred current weekly cover", "incomeProtectionDeferredCurrentWeeklyCover")}
+                        {renderToggleField("ff-deferred13Weeks", "13 Weeks", "incomeProtectionDeferred13Weeks")}
+                        {renderToggleField("ff-deferred26Weeks", "26 Weeks", "incomeProtectionDeferred26Weeks")}
+                        {renderToggleField("ff-deferred52Weeks", "52 Weeks", "incomeProtectionDeferred52Weeks")}
+                        {renderToggleField("ff-deferredAge60", "Deferred Cover to Age 60", "incomeProtectionDeferredCoverToAge60")}
+                        {renderToggleField("ff-deferredAge65", "Deferred Cover to Age 65", "incomeProtectionDeferredCoverToAge65")}
+                      </div>
+                      <div className="provider-detail-column">
+                        <p className="provider-detail-column-title">Provider options</p>
+                        {renderToggleField("ff-deferredFriendsFirst", "Friends First", "incomeProtectionDeferredFriendsFirst")}
+                        {renderToggleField("ff-deferredIrishLife", "Irish Life", "incomeProtectionDeferredIrishLife")}
+                        {renderToggleField("ff-deferredOther", "Other", "incomeProtectionDeferredOther")}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </AccordionItem>
@@ -2111,7 +2179,7 @@ export function IncomeProtectionPage({
                 </AccordionItem>
                 )}
 
-                {factFindType !== "small" && (
+                {factFindType !== "small" && showPartnerFields && (
                 <AccordionItem
                   indicator={getSectionProgress([
                     resolvedDraft.partnerRetirementAge,
@@ -2324,10 +2392,7 @@ export function IncomeProtectionPage({
 
             <AccordionItem
               indicator={getSectionProgress([
-                resolvedDraft.pepConfirmation,
-                resolvedDraft.pepRelatedConfirmation,
                 resolvedDraft.pepDeclarationConfirmed,
-                resolvedDraft.pepDirectlyRelatedConfirmed,
               ])}
               isOpen={factFindAccordion.isOpen("pep")}
               onToggle={() => factFindAccordion.toggle("pep")}
@@ -2342,9 +2407,6 @@ export function IncomeProtectionPage({
                   "I/We confirm that I/We are not PEP's nor are we directly related to a PEP as defined by the Criminal Justice Act 2010",
                   "pepDeclarationConfirmed",
                 )}
-                {renderToggleField("ff-pepConfirmation", "Politically exposed person confirmation", "pepConfirmation")}
-                {renderToggleField("ff-pepRelatedConfirmation", "Related to a PEP confirmation", "pepRelatedConfirmation")}
-                {renderToggleField("ff-pepDirectlyRelatedConfirmed", "Directly related to a PEP", "pepDirectlyRelatedConfirmed")}
               </div>
             </AccordionItem>
 
@@ -2383,8 +2445,7 @@ export function IncomeProtectionPage({
               indicator={getSectionProgress([
                 resolvedDraft.clientSignature1,
                 resolvedDraft.clientSignature1Date,
-                resolvedDraft.clientSignature2,
-                resolvedDraft.clientSignature2Date,
+                ...(showPartnerFields ? [resolvedDraft.clientSignature2, resolvedDraft.clientSignature2Date] : []),
                 resolvedDraft.financialAdvisorSignature,
                 resolvedDraft.financialAdvisorSignatureDate,
               ])}
@@ -2408,20 +2469,24 @@ export function IncomeProtectionPage({
                     type="date"
                     value={resolvedDraft.clientSignature1Date}
                   />
-                  <Input
-                    id="ff-clientSignature2"
-                    label="Client signature 2"
-                    onChange={(event) => updateField("clientSignature2", event.target.value)}
-                    type="text"
-                    value={resolvedDraft.clientSignature2}
-                  />
-                  <Input
-                    id="ff-clientSignature2Date"
-                    label="Client signature 2 date"
-                    onChange={(event) => updateField("clientSignature2Date", event.target.value)}
-                    type="date"
-                    value={resolvedDraft.clientSignature2Date}
-                  />
+                  {showPartnerFields ? (
+                    <>
+                      <Input
+                        id="ff-clientSignature2"
+                        label="Client signature 2"
+                        onChange={(event) => updateField("clientSignature2", event.target.value)}
+                        type="text"
+                        value={resolvedDraft.clientSignature2}
+                      />
+                      <Input
+                        id="ff-clientSignature2Date"
+                        label="Client signature 2 date"
+                        onChange={(event) => updateField("clientSignature2Date", event.target.value)}
+                        type="date"
+                        value={resolvedDraft.clientSignature2Date}
+                      />
+                    </>
+                  ) : null}
                   <Input
                     id="ff-financialAdvisorSignature"
                     label="Financial Advisor's Signature"
@@ -2540,27 +2605,24 @@ export function IncomeProtectionPage({
                   <p className="text-muted text-small" style={{ marginBottom: "var(--space-3)" }}>
                     Please use an additional page if required
                   </p>
-                  <div className="form-grid">
+                  <div className="form-grid form-grid-desktop-3">
                     {renderTextarea(
                       "ffu-personalCircumstances",
                       "Personal Circumstances",
                       "factFindUpdatePersonalCircumstances",
-                      6,
-                      "form-grid-full",
+                      8,
                     )}
                     {renderTextarea(
                       "ffu-financialSituation",
                       "Financial Situation",
                       "factFindUpdateFinancialSituation",
-                      6,
-                      "form-grid-full",
+                      8,
                     )}
                     {renderTextarea(
                       "ffu-needsAndObjectives",
                       "Needs & Objectives",
                       "factFindUpdateNeedsAndObjectives",
-                      6,
-                      "form-grid-full",
+                      8,
                     )}
                   </div>
                 </AccordionItem>
@@ -2671,7 +2733,7 @@ export function IncomeProtectionPage({
               {isIncomeProtectionDocumentFlow ? (
                 <section className="form-section">
                   <h3 className="form-section-title">Statement basics</h3>
-                  <div className="form-grid">
+                  <div className="form-grid form-grid-desktop-3">
                     <Input
                       id="sos-letterDate"
                       label={requiredLabel("Statement date")}
@@ -2852,7 +2914,7 @@ export function IncomeProtectionPage({
               onToggle={() => quoteWorkspaceAccordion.toggle("quote-output")}
               title="Quote Form"
             >
-              <div className="form-grid">
+              <div className="form-grid form-grid-desktop-3">
                 <Input
                   id="quote-name"
                   label="Name"

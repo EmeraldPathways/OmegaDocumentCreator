@@ -726,7 +726,7 @@ button {
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 4px;
 }
 
 .field-label {
@@ -2472,6 +2472,10 @@ button {
   gap: var(--space-4);
 }
 
+.form-grid.form-grid-desktop-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .form-grid-full {
   grid-column: 1 / -1;
 }
@@ -2501,6 +2505,27 @@ button {
   margin-bottom: var(--space-4);
   padding-bottom: var(--space-2);
   border-bottom: 2px solid var(--color-border-strong);
+}
+
+.provider-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.provider-detail-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.provider-detail-column-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .field-group {
@@ -3162,7 +3187,7 @@ button {
 .workflow-document-statement-of-suitability .statement-quote-row,
 .workflow-document-quote .statement-quote-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -3382,7 +3407,7 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-row,
 .generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -3604,7 +3629,7 @@ button {
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-quote-row,
 .generated-output-pdf-page-body .workflow-document-quote .statement-quote-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
   border-top: 1px solid #e5e7eb;
 }
 
@@ -3664,6 +3689,14 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .form-grid.form-grid-desktop-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .provider-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .profile-grid {
     grid-template-columns: 1fr;
   }
@@ -3685,6 +3718,12 @@ button {
 
   .session-actions {
     order: 2;
+  }
+}
+
+@media (max-width: 820px) {
+  .form-grid.form-grid-desktop-3 {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -926,7 +926,7 @@ function buildFactFindBlocks(
       { label: "Terms reviewed", value: profile.termsReviewedReceived },
       { label: "Do not contact", value: profile.doNotContact },
       { label: "Marketing agreed", value: profile.agreeToMarketing },
-      { label: "PEP confirmation", value: profile.pepConfirmation },
+      { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
       { label: "Recommendation Acknowledgement", value: profile.recommendationAcknowledged },
     ]),
     detailGrid("Request for Information", [
