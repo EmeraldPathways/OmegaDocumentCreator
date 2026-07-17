@@ -7,10 +7,10 @@ import { useAuth } from "../auth/auth-context";
 
 const navItems = [
   { label: "Clients", to: "/clients", icon: Users },
-  { label: "Fact Find", to: "/income-protection", icon: ClipboardList },
+  { label: "Fact Find", icon: ClipboardList },
   { label: "Income Protection", to: "/income-protection", icon: Shield },
-  { label: "Pensions", to: "/income-protection", icon: Landmark },
-  { label: "Files/Docs", to: "/files", icon: FolderOpen },
+  { label: "Pensions", icon: Landmark },
+  { label: "Files/Docs", icon: FolderOpen },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 
@@ -61,7 +61,7 @@ export function AppShell({ children }: PropsWithChildren) {
           <nav className="top-nav">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
-              return (
+              return item.to ? (
                 <NavLink
                   key={item.label}
                   className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
@@ -70,6 +70,11 @@ export function AppShell({ children }: PropsWithChildren) {
                   <Icon size={18} />
                   <span>{item.label}</span>
                 </NavLink>
+              ) : (
+                <span aria-disabled="true" className="nav-link" key={item.label}>
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </span>
               );
             })}
           </nav>
