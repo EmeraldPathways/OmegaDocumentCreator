@@ -1746,30 +1746,50 @@ export function IncomeProtectionPage({
     options?: { explainSharedFields?: boolean; emphasiseMissing?: boolean },
   ) {
     const incompleteCount = requirements.filter((item) => !item.complete).length;
+    const statusLabel = incompleteCount === 0 ? "Ready" : `${incompleteCount} missing`;
+    const summaryLabel =
+      incompleteCount === 0
+        ? "All required fields are complete."
+        : `Still missing: ${missingFields.join(", ")}`;
 
     return (
-      <div className={`validation-banner generation-requirements${options?.emphasiseMissing ? " generation-requirements-active" : ""}`}>
-        <AlertTriangle size={18} />
-        <div className="generation-requirements-copy">
-          <strong>{title}</strong>
-          <div className="generation-requirements-meta">
-            <span>* Required for generation</span>
-            <span>{incompleteCount === 0 ? "All required fields are complete." : `Still missing: ${missingFields.join(", ")}`}</span>
+      <section
+        className={`generation-requirements-card${options?.emphasiseMissing ? " generation-requirements-card-active" : ""}`}
+        aria-label={title}
+      >
+        <div className="generation-requirements-card-header">
+          <div className="generation-requirements-card-title">
+            <AlertTriangle size={18} />
+            <strong>{title}</strong>
           </div>
-          {options?.explainSharedFields ? (
-            <span className="text-small">
-              Some shared required fields live outside this section. Complete them in Fact Find or client details before generating.
-            </span>
-          ) : null}
-          <div className="generation-requirements-list">
-            {requirements.map((item) => (
-              <Badge key={item.label} variant={item.complete ? "ready" : "pending"}>
-                {item.label} - {item.complete ? "ready" : `fill in ${item.location}`}
-              </Badge>
-            ))}
-          </div>
+          <Badge variant={incompleteCount === 0 ? "ready" : "pending"}>{statusLabel}</Badge>
         </div>
-      </div>
+        <div className="generation-requirements-card-summary">
+          <span>* Required for generation</span>
+          <span>{summaryLabel}</span>
+        </div>
+        {options?.explainSharedFields ? (
+          <p className="generation-requirements-card-note">
+            Some shared required fields live outside this section. Complete them in Fact Find or client details before generating.
+          </p>
+        ) : null}
+        <div className="generation-requirements-rows">
+          {requirements.map((item) => (
+            <div
+              key={item.label}
+              className={`generation-requirements-row${item.complete ? " is-complete" : " is-missing"}`}
+            >
+              <span className="generation-requirements-row-dot" aria-hidden="true" />
+              <div className="generation-requirements-row-copy">
+                <span className="generation-requirements-row-label">{item.label}</span>
+                <span className="generation-requirements-row-meta">
+                  {item.complete ? "Ready" : `Fill in ${item.location}`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     );
   }
 
