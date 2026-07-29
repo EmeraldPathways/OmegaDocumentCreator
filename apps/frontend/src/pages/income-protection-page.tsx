@@ -1218,6 +1218,7 @@ export function IncomeProtectionPage({
         : workflowSaveState === "local"
           ? `Saved locally${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`
           : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
+  const showWorkflowHeaderSummary = workflowKind !== "fact-find" && workflowKind !== "income-protection";
 
   function confirmPendingChanges(message = "You have unsaved changes. Continue without waiting for them to save?") {
     if (workflowSaveState !== "dirty" && workflowSaveState !== "saving") {
@@ -3976,24 +3977,26 @@ export function IncomeProtectionPage({
           </div>
         </div>
 
-        <div className="workflow-summary-bar">
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Client</span>
-            <strong>{resolvedDraft.fullName || "Client not named"}</strong>
+        {showWorkflowHeaderSummary ? (
+          <div className="workflow-summary-bar">
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Client</span>
+              <strong>{resolvedDraft.fullName || "Client not named"}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Reference</span>
+              <strong>{resolvedDraft.clientReference}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Active workspace</span>
+              <strong>{activeTab.label}</strong>
+            </div>
+            <div className="workflow-summary-item">
+              <span className="workflow-summary-label">Document readiness</span>
+              <strong>{activeMissingCount > 0 ? `${activeMissingCount} blockers remaining` : "Ready to generate"}</strong>
+            </div>
           </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Reference</span>
-            <strong>{resolvedDraft.clientReference}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Active workspace</span>
-            <strong>{activeTab.label}</strong>
-          </div>
-          <div className="workflow-summary-item">
-            <span className="workflow-summary-label">Document readiness</span>
-            <strong>{activeMissingCount > 0 ? `${activeMissingCount} blockers remaining` : "Ready to generate"}</strong>
-          </div>
-        </div>
+        ) : null}
 
         <div className="income-protection-header-controls">
           <div className="workflow-client-field income-protection-client-field">
@@ -4066,7 +4069,7 @@ export function IncomeProtectionPage({
         </div>
 
       <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
-        {workflowProgressItems.length > 0 ? (
+        {showWorkflowHeaderSummary && workflowProgressItems.length > 0 ? (
           <div className="workflow-progress-banner" aria-label={`${activeTab.label} progress`}>
             <div className="workflow-progress-banner-header">
               <span className="workflow-summary-label">Progress map</span>
