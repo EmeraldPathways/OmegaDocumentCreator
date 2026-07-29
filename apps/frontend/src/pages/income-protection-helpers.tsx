@@ -5,7 +5,6 @@ import {
   Shield,
   FolderOpen,
   Download,
-  Check,
   File,
   FileText as FileTextIcon,
   FileType2,
@@ -279,7 +278,27 @@ export function useAccordionState(defaultOpen: string[] = []) {
     return openSections.has(sectionId);
   }
 
-  return { isOpen, toggle };
+  function open(sectionId: string) {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      next.add(sectionId);
+      return next;
+    });
+  }
+
+  function close(sectionId: string) {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      next.delete(sectionId);
+      return next;
+    });
+  }
+
+  function setOpen(sectionIds: string[]) {
+    setOpenSections(new Set(sectionIds));
+  }
+
+  return { close, isOpen, open, setOpen, toggle };
 }
 
 export const PENSION_SECTION_CONFIGS = {
@@ -331,9 +350,9 @@ export function getSectionProgress(fields: string[]) {
   const completed = fields.filter((field) => hasValue(String(field ?? "").replace(/,/g, "").trim())).length;
   const total = fields.length;
   if (completed === total) {
-    return <Check size={16} className="text-success" />;
+    return <span className="section-progress-label is-complete">Complete</span>;
   }
-  return <span className="text-muted text-small">{`${completed}/${total}`}</span>;
+  return <span className="section-progress-label">{`${completed} of ${total} required complete`}</span>;
 }
 
 export function formatFileSize(bytes: number) {

@@ -2,16 +2,18 @@ import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface AccordionItemProps {
+  id?: string;
   title: ReactNode;
   indicator?: ReactNode;
   children: ReactNode;
   isOpen: boolean;
   onToggle: () => void;
+  className?: string;
 }
 
-export function AccordionItem({ title, indicator, children, isOpen, onToggle }: AccordionItemProps) {
+export function AccordionItem({ id, title, indicator, children, isOpen, onToggle, className = "" }: AccordionItemProps) {
   return (
-    <div className={`accordion-item${isOpen ? " is-open" : ""}`}>
+    <div className={`accordion-item${isOpen ? " is-open" : ""}${className ? ` ${className}` : ""}`} id={id}>
       <button
         aria-expanded={isOpen}
         className="accordion-header"

@@ -10,7 +10,6 @@ import {
   FileDown,
   Upload,
   AlertTriangle,
-  Check,
   Plus,
   Eye,
   RefreshCw,
@@ -98,6 +97,31 @@ type IncomeProtectionPageProps = {
   statementDocumentType?: "Statement of Suitability" | "Pensions Statement";
   visibleTabIds?: Array<(typeof moduleTabs)[number]["id"]>;
   workflowKind?: "fact-find" | "income-protection" | "pensions" | "files-docs";
+};
+
+type WorkflowSaveState = "saved" | "saving" | "dirty" | "local";
+
+type RequirementTarget = {
+  tabId: string;
+  sectionId?: string;
+  fieldId: string;
+};
+
+type WorkflowRequirement = {
+  key: string;
+  label: string;
+  complete: boolean;
+  location: string;
+  target: RequirementTarget;
+  helperText?: string;
+};
+
+type SectionProgressItem = {
+  id: string;
+  title: string;
+  completeCount: number;
+  requiredCount: number;
+  complete: boolean;
 };
 
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
@@ -318,6 +342,27 @@ function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<Se
   return workflowFields;
 }
 
+function buildWorkflowSnapshot(draft: SeededClientProfile, actorLabel: string) {
+  return JSON.stringify({
+    ...buildWorkflowPersistencePayload(draft),
+    fullName: buildFullName(draft.firstName, draft.surname),
+    updatedBy: actorLabel,
+  });
+}
+
+function formatSavedTime(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function IncomeProtectionPage({
   pageTitle = "Income Protection",
   quoteDocumentType = "Quote",
@@ -347,6 +392,9 @@ export function IncomeProtectionPage({
     visibleTabIds?.[0] ?? moduleTabs[0].id,
   );
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
+  const [workflowSaveState, setWorkflowSaveState] = useState<WorkflowSaveState>("saved");
+  const [workflowSavedAt, setWorkflowSavedAt] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [factFindDraftSavedLabel, setFactFindDraftSavedLabel] = useState("Not saved yet");
   const [factFindGenerationStatus, setFactFindGenerationStatus] = useState("Generation: Draft");
   const [showFactFindValidation, setShowFactFindValidation] = useState(false);
@@ -375,6 +423,8 @@ export function IncomeProtectionPage({
   const [quotePensionRequired, setQuotePensionRequired] = useState("");
   const [quotePensionMonthlyContribution, setQuotePensionMonthlyContribution] = useState("");
   const [showPartnerFields, setShowPartnerFields] = useState(false);
+  const [showExtraHomeAddressLines, setShowExtraHomeAddressLines] = useState(false);
+  const [showDifferentWorkAddress, setShowDifferentWorkAddress] = useState(false);
   const [showNoDeferredFields, setShowNoDeferredFields] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -387,6 +437,8 @@ export function IncomeProtectionPage({
   const [hasLoadedBackendGeneratedDocuments, setHasLoadedBackendGeneratedDocuments] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const quoteGenerateRef = useRef<(() => Promise<void>) | null>(null);
+  const lastPersistedSnapshotRef = useRef("");
+  const activeValidationFieldRef = useRef<string | null>(null);
   const factFindWorkspaceAccordion = useAccordionState(["fact-find-form"]);
   const factFindAccordion = useAccordionState(["personal-details"]);
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
@@ -406,10 +458,18 @@ export function IncomeProtectionPage({
     let cancelled = false;
     fetchWorkflow(selectedClientReference).then((fields) => {
       if (cancelled) return;
-      setDraft((current) => current ? mergeWorkflowFieldsIntoDraft(current, fields) : current);
+      setDraft((current) => {
+        if (!current) {
+          return current;
+        }
+        const mergedDraft = mergeWorkflowFieldsIntoDraft(current, fields);
+        lastPersistedSnapshotRef.current = buildWorkflowSnapshot(mergedDraft, actorLabel);
+        setWorkflowSaveState("saved");
+        return mergedDraft;
+      });
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [canUseBackend, selectedClientReference]);
+  }, [actorLabel, canUseBackend, selectedClientReference]);
 
   useEffect(() => {
     setDraft((currentDraft) => {
@@ -424,6 +484,26 @@ export function IncomeProtectionPage({
       return currentDraft;
     });
   }, [client]);
+
+  useEffect(() => {
+    if (!client) {
+      return;
+    }
+
+    lastPersistedSnapshotRef.current = buildWorkflowSnapshot(client, actorLabel);
+    setWorkflowSaveState("saved");
+    setWorkflowSavedAt(null);
+    setFieldErrors({});
+    setShowExtraHomeAddressLines(Boolean(client.clientHomeAddressLine3 || client.clientHomeAddressLine4));
+    setShowDifferentWorkAddress(
+      Boolean(
+        client.clientWorkAddressLine1 ||
+        client.clientWorkAddressLine2 ||
+        client.clientWorkAddressLine3 ||
+        client.clientWorkAddressLine4,
+      ),
+    );
+  }, [actorLabel, client]);
 
   useEffect(() => {
     if (!client) {
@@ -646,70 +726,170 @@ export function IncomeProtectionPage({
     !isIncomeProtectionDocumentFlow ||
     (statementQuoteOptions.length > 0 &&
       statementQuoteOptions.some((option) => option.key === resolvedDraft.statementSelectedQuoteKey));
+  const fieldToInputId: Partial<Record<keyof SeededClientProfile, string>> = {
+    advisorName: "ff-advisorName",
+    county: "ff-county",
+    coverAge: "sos-coverAge",
+    dateOfBirth: "ff-dob",
+    deferredPeriod: "sos-deferredPeriod",
+    email: "ff-email",
+    fullName: "ff-fullName",
+    gender: "ff-gender",
+    income: "ff-income",
+    letterDate: "sos-letterDate",
+    mobileNumber: "ff-phone",
+    occupation: "ff-occupation",
+    phiIndexation: "ff-phiIndexation",
+    phiOccupationalClass: "ff-phiOccupationalClass",
+    productType: "sos-productType",
+    recommendedCover: "sos-recommendedCover",
+    smokerStatus: "ff-smokerStatus",
+    statementSelectedQuoteKey: "sos-statementSelectedQuoteKey",
+    statementType: "sos-statementType",
+    townCity: "ff-townCity",
+  };
 
-  const factFindMissingFields = [
-    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-    !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
-    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-    !hasValue(resolvedDraft.occupation) ? "Occupation" : null,
-    !hasValue(resolvedDraft.income) ? "Income / salary" : null,
-    !hasValue(resolvedDraft.email) && !hasValue(resolvedDraft.mobileNumber) ? "Email or phone" : null,
-    !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
-  ].filter(isPresent);
-
-  const statementMissingFields = [
-    !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-    !hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()) ? "Address" : null,
-    !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-    isIncomeProtectionDocumentFlow
-      ? !statementHasSelectedQuote ? "Policy picker" : null
-      : !hasValue(resolvedDraft.statementType) ? "Statement type" : null,
-    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.productType) ? "Product recommended" : null,
-    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.recommendedCover) ? "Recommended cover" : null,
-    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.deferredPeriod) ? "Deferred period" : null,
-    isIncomeProtectionDocumentFlow ? null : !hasValue(resolvedDraft.coverAge) ? "Cover to age" : null,
-    !hasValue(resolvedDraft.gender) ? "Gender" : null,
-    !hasValue(resolvedDraft.smokerStatus) ? "Smoker status" : null,
-    !hasValue(resolvedDraft.phiOccupationalClass) ? "PHI occupational class" : null,
-    !hasValue(resolvedDraft.phiIndexation) ? "PHI indexation" : null,
-    !hasValue(resolvedDraft.advisorName) ? "Advisor name" : null,
-    !hasValue(resolvedDraft.letterDate) ? "Letter date" : null,
-  ].filter(isPresent);
-
-  const factFindGenerationRequirements = [
-    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
-    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
-    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
-    { label: "Occupation", complete: hasValue(resolvedDraft.occupation), location: "Fact Find" },
-    { label: "Income / salary", complete: hasValue(resolvedDraft.income), location: "Fact Find" },
-    { label: "Email or phone", complete: hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber), location: "Fact Find" },
-    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Fact Find" },
+  const factFindGenerationRequirements: WorkflowRequirement[] = [
+    {
+      key: "fullName",
+      label: "Client name",
+      complete: hasValue(resolvedDraft.fullName),
+      location: "Identity",
+      target: { tabId: "fact-find", sectionId: "personal-details", fieldId: "ff-fullName" },
+    },
+    {
+      key: "address",
+      label: "Address (town/county)",
+      complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()),
+      location: "Home address",
+      target: { tabId: "fact-find", sectionId: "personal-details", fieldId: "ff-townCity" },
+      helperText: "Required for document",
+    },
+    {
+      key: "dateOfBirth",
+      label: "Date of birth",
+      complete: hasValue(resolvedDraft.dateOfBirth),
+      location: "Identity",
+      target: { tabId: "fact-find", sectionId: "personal-details", fieldId: "ff-dob" },
+    },
+    {
+      key: "occupation",
+      label: "Occupation",
+      complete: hasValue(resolvedDraft.occupation),
+      location: "Employment details",
+      target: { tabId: "fact-find", sectionId: "employment-details", fieldId: "ff-occupation" },
+    },
+    {
+      key: "income",
+      label: "Income / salary",
+      complete: hasValue(resolvedDraft.income),
+      location: "Employment details",
+      target: { tabId: "fact-find", sectionId: "employment-details", fieldId: "ff-income" },
+    },
+    {
+      key: "email-or-phone",
+      label: "Email or phone",
+      complete: hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber),
+      location: "Contact",
+      target: {
+        tabId: "fact-find",
+        sectionId: "personal-details",
+        fieldId: hasValue(resolvedDraft.email) ? "ff-phone" : "ff-email",
+      },
+      helperText: "Provide either email or phone",
+    },
+    {
+      key: "advisorName",
+      label: "Advisor name",
+      complete: hasValue(resolvedDraft.advisorName),
+      location: "Employment details",
+      target: { tabId: "fact-find", sectionId: "employment-details", fieldId: "ff-advisorName" },
+    },
   ];
 
-  const statementGenerationRequirements = [
-    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
-    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
-    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
+  const factFindMissingFields = factFindGenerationRequirements.filter((item) => !item.complete).map((item) => item.label);
+
+  const statementGenerationRequirements: WorkflowRequirement[] = [
+    ...factFindGenerationRequirements.map((item) => ({
+      ...item,
+      target: item.key === "advisorName"
+        ? { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-advisorName" }
+        : item.target,
+    })),
     {
+      key: isIncomeProtectionDocumentFlow ? "policy-picker" : "statementType",
       label: isIncomeProtectionDocumentFlow ? "Policy picker" : "Statement type",
       complete: isIncomeProtectionDocumentFlow ? statementHasSelectedQuote : hasValue(resolvedDraft.statementType),
-      location: "Statement",
+      location: "Statement basics",
+      target: {
+        tabId: "statement-of-suitability",
+        sectionId: "statement-form",
+        fieldId: isIncomeProtectionDocumentFlow ? "sos-statementSelectedQuoteKey" : "sos-statementType",
+      },
     },
     ...(isIncomeProtectionDocumentFlow
       ? []
       : [
-          { label: "Product recommended", complete: hasValue(resolvedDraft.productType), location: "Statement" },
-          { label: "Recommended cover", complete: hasValue(resolvedDraft.recommendedCover), location: "Statement or Fact Find" },
-          { label: "Deferred period", complete: hasValue(resolvedDraft.deferredPeriod), location: "Statement or Fact Find" },
-          { label: "Cover to age", complete: hasValue(resolvedDraft.coverAge), location: "Statement or Fact Find" },
+          {
+            key: "productType",
+            label: "Product recommended",
+            complete: hasValue(resolvedDraft.productType),
+            location: "Recommendation basics",
+            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-productType" },
+          },
+          {
+            key: "recommendedCover",
+            label: "Recommended cover",
+            complete: hasValue(resolvedDraft.recommendedCover),
+            location: "Cover summary",
+            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-recommendedCover" },
+          },
+          {
+            key: "deferredPeriod",
+            label: "Deferred period",
+            complete: hasValue(resolvedDraft.deferredPeriod),
+            location: "Cover summary",
+            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-deferredPeriod" },
+          },
+          {
+            key: "coverAge",
+            label: "Cover to age",
+            complete: hasValue(resolvedDraft.coverAge),
+            location: "Cover summary",
+            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-coverAge" },
+          },
         ]),
-    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
-    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
-    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
-    { label: "PHI indexation", complete: hasValue(resolvedDraft.phiIndexation), location: "Fact Find" },
-    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Statement or Fact Find" },
-    { label: "Letter date", complete: hasValue(resolvedDraft.letterDate), location: "Statement" },
+    {
+      key: "smokerStatus",
+      label: "Smoker status",
+      complete: hasValue(resolvedDraft.smokerStatus),
+      location: "Income protection",
+      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-smokerStatus" },
+    },
+    {
+      key: "phiOccupationalClass",
+      label: "PHI occupational class",
+      complete: hasValue(resolvedDraft.phiOccupationalClass),
+      location: "Income protection",
+      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiOccupationalClass" },
+    },
+    {
+      key: "phiIndexation",
+      label: "PHI indexation",
+      complete: hasValue(resolvedDraft.phiIndexation),
+      location: "Income protection",
+      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiIndexation" },
+    },
+    {
+      key: "letterDate",
+      label: "Letter date",
+      complete: hasValue(resolvedDraft.letterDate),
+      location: "Statement basics",
+      target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-letterDate" },
+    },
   ];
+
+  const statementMissingFields = statementGenerationRequirements.filter((item) => !item.complete).map((item) => item.label);
 
   const quoteYourAge = useMemo(() => {
     if (!resolvedDraft.dateOfBirth) return "";
@@ -743,31 +923,23 @@ export function IncomeProtectionPage({
         !hasValue(quoteSmoker) ? "Smoker" : null,
       ]).filter(isPresent);
 
-  const quoteGenerationRequirements = isPensionsQuoteWorkflow
+  const quoteGenerationRequirements: WorkflowRequirement[] = isPensionsQuoteWorkflow
     ? [
-        { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
-        { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
-        { label: "Gender", complete: hasValue(quotePensionGender), location: "Quote form" },
-        { label: "Retirement age", complete: hasValue(quotePensionRetirementAge), location: "Quote form" },
-        { label: "Spouse's pension", complete: true, location: "Quote form (optional)" },
-        { label: "Pension escalation", complete: true, location: "Quote form (optional)" },
-        { label: "Net growth", complete: true, location: "Quote form (optional)" },
-        { label: "Premium escalation", complete: true, location: "Quote form (optional)" },
-        { label: "Inflation", complete: true, location: "Quote form (optional)" },
-        { label: "Existing fund", complete: true, location: "Quote form (optional)" },
-        { label: "Required pension income", complete: hasValue(quotePensionRequired), location: "Quote form" },
-        { label: "Monthly contribution", complete: hasValue(quotePensionMonthlyContribution), location: "Quote form" },
+        { key: "fullName", label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
+        { key: "dateOfBirth", label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
+        { key: "quote-pensionGender", label: "Gender", complete: hasValue(quotePensionGender), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionGender" } },
+        { key: "quote-pensionRetirementAge", label: "Retirement age", complete: hasValue(quotePensionRetirementAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionRetirementAge" } },
+        { key: "quote-pensionRequired", label: "Required pension income", complete: hasValue(quotePensionRequired), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionRequired" } },
+        { key: "quote-pensionMonthlyContribution", label: "Monthly contribution", complete: hasValue(quotePensionMonthlyContribution), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionMonthlyContribution" } },
       ]
     : [
-        { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form" },
-        { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form" },
-        { label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form" },
-        { label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form" },
-        { label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form" },
-        { label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form" },
-        { label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form" },
-        { label: "PHI indexation", complete: true, location: "Quote form (optional)" },
-        { label: "Zurich 17.5% discount", complete: true, location: "Quote form (optional)" },
+        { key: "fullName", label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
+        { key: "dateOfBirth", label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
+        { key: "quote-annualCoverAmount", label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" } },
+        { key: "quote-coverToAge", label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" } },
+        { key: "quote-occupationClass", label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" } },
+        { key: "quote-deferredPeriod", label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-deferredPeriod" } },
+        { key: "quote-smoker", label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-smoker" } },
       ];
 
   const quoteWorkflowSnapshot = useMemo(
@@ -879,17 +1051,309 @@ export function IncomeProtectionPage({
     ],
   );
 
-  const factFindUpdateGenerationRequirements = [
-    { label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Fact Find" },
-    { label: "Address (town/county)", complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()), location: "Client details" },
-    { label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Fact Find" },
-    { label: "Occupation", complete: hasValue(resolvedDraft.occupation), location: "Fact Find" },
-    { label: "Income / salary", complete: hasValue(resolvedDraft.income), location: "Fact Find" },
-    { label: "Advisor name", complete: hasValue(resolvedDraft.advisorName), location: "Fact Find" },
-    { label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find" },
-    { label: "Smoker status", complete: hasValue(resolvedDraft.smokerStatus), location: "Fact Find" },
-    { label: "PHI occupational class", complete: hasValue(resolvedDraft.phiOccupationalClass), location: "Fact Find" },
+  const factFindUpdateGenerationRequirements: WorkflowRequirement[] = [
+    ...factFindGenerationRequirements,
+    {
+      key: "factFindUpdatePersonalCircumstances",
+      label: "Updated personal circumstances",
+      complete: hasValue(resolvedDraft.factFindUpdatePersonalCircumstances),
+      location: "Additional relevant information",
+      target: { tabId: "fact-find-update", sectionId: "additional-relevant-information", fieldId: "ffu-personalCircumstances" },
+    },
   ];
+
+  const validationMessages: Record<string, string> = {
+    "ff-advisorName": hasValue(resolvedDraft.advisorName) ? "" : "Advisor name is required for document generation.",
+    "ff-county": hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim())
+      ? ""
+      : "Town/county is required for document generation.",
+    "ff-dob": hasValue(resolvedDraft.dateOfBirth) ? "" : "Date of birth is required for document generation.",
+    "ff-email": hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)
+      ? ""
+      : "Provide either an email or a phone number.",
+    "ff-fullName": hasValue(resolvedDraft.fullName) ? "" : "Client name is required for document generation.",
+    "ff-gender": hasValue(resolvedDraft.gender) ? "" : "Gender is required for the downstream documents.",
+    "ff-income": hasValue(resolvedDraft.income) ? "" : "Income / salary is required for document generation.",
+    "ff-occupation": hasValue(resolvedDraft.occupation) ? "" : "Occupation is required for document generation.",
+    "ff-phone": hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)
+      ? ""
+      : "Provide either a phone number or an email address.",
+    "ff-phiIndexation": hasValue(resolvedDraft.phiIndexation) ? "" : "PHI indexation is required for the statement output.",
+    "ff-phiOccupationalClass": hasValue(resolvedDraft.phiOccupationalClass)
+      ? ""
+      : "PHI occupational class is required for the statement output.",
+    "ff-smokerStatus": hasValue(resolvedDraft.smokerStatus) ? "" : "Smoker status is required for the statement output.",
+    "ff-townCity": hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim())
+      ? ""
+      : "Town/county is required for document generation.",
+    "ffu-personalCircumstances": hasValue(resolvedDraft.factFindUpdatePersonalCircumstances)
+      ? ""
+      : "Add updated personal circumstances before generating the update.",
+    "quote-annualCoverAmount": hasValue(quoteAnnualCoverAmount) ? "" : "Annual cover amount is required.",
+    "quote-coverToAge": hasValue(quoteCoverToAge) ? "" : "Cover to age is required.",
+    "quote-deferredPeriod": hasValue(quoteDeferredPeriod) ? "" : "Deferred period is required.",
+    "quote-occupationClass": hasValue(quoteOccupationClass) ? "" : "Occupation class is required.",
+    "quote-pensionGender": hasValue(quotePensionGender) ? "" : "Gender is required.",
+    "quote-pensionMonthlyContribution": hasValue(quotePensionMonthlyContribution) ? "" : "Monthly contribution is required.",
+    "quote-pensionRequired": hasValue(quotePensionRequired) ? "" : "Required pension income is required.",
+    "quote-pensionRetirementAge": hasValue(quotePensionRetirementAge) ? "" : "Retirement age is required.",
+    "quote-smoker": hasValue(quoteSmoker) ? "" : "Smoker status is required.",
+    "sos-advisorName": hasValue(resolvedDraft.advisorName) ? "" : "Advisor name is required for document generation.",
+    "sos-coverAge": hasValue(resolvedDraft.coverAge) ? "" : "Cover to age is required.",
+    "sos-deferredPeriod": hasValue(resolvedDraft.deferredPeriod) ? "" : "Deferred period is required.",
+    "sos-letterDate": hasValue(resolvedDraft.letterDate) ? "" : "Letter date is required for the statement.",
+    "sos-productType": hasValue(resolvedDraft.productType) ? "" : "Product type is required.",
+    "sos-recommendedCover": hasValue(resolvedDraft.recommendedCover) ? "" : "Recommended cover is required.",
+    "sos-statementSelectedQuoteKey": statementHasSelectedQuote ? "" : "Choose a policy before generating the statement.",
+    "sos-statementType": hasValue(resolvedDraft.statementType) ? "" : "Statement type is required.",
+  };
+
+  const fieldHints: Record<string, string> = {
+    "ff-advisorName": "Required for document",
+    "ff-county": "Required for document",
+    "ff-email": "Required for document if phone is blank",
+    "ff-fullName": "Required for document",
+    "ff-gender": "Required for statement output",
+    "ff-income": "Required for document",
+    "ff-occupation": "Required for document",
+    "ff-phone": "Required for document if email is blank",
+    "ff-phiIndexation": "Required for statement output",
+    "ff-phiOccupationalClass": "Required for statement output",
+    "ff-smokerStatus": "Required for statement output",
+    "ff-townCity": "Required for document",
+    "ffu-personalCircumstances": "Required for this update document",
+  };
+
+  const factFindSectionProgressItems: SectionProgressItem[] = [
+    {
+      id: "personal-details",
+      title: "Personal details",
+      completeCount: [
+        hasValue(resolvedDraft.fullName),
+        hasValue(resolvedDraft.dateOfBirth),
+        hasValue(resolvedDraft.gender),
+        hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()),
+        hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber),
+      ].filter(Boolean).length,
+      requiredCount: 5,
+      complete: factFindGenerationRequirements.slice(0, 4).every((item) => item.complete) && (hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)),
+    },
+    {
+      id: "employment-details",
+      title: "Employment details",
+      completeCount: [hasValue(resolvedDraft.occupation), hasValue(resolvedDraft.income), hasValue(resolvedDraft.advisorName)].filter(Boolean).length,
+      requiredCount: 3,
+      complete: hasValue(resolvedDraft.occupation) && hasValue(resolvedDraft.income) && hasValue(resolvedDraft.advisorName),
+    },
+    {
+      id: "income-protection",
+      title: "Income protection",
+      completeCount: [hasValue(resolvedDraft.smokerStatus), hasValue(resolvedDraft.phiOccupationalClass), hasValue(resolvedDraft.phiIndexation)].filter(Boolean).length,
+      requiredCount: 3,
+      complete: hasValue(resolvedDraft.smokerStatus) && hasValue(resolvedDraft.phiOccupationalClass) && hasValue(resolvedDraft.phiIndexation),
+    },
+  ];
+
+  const factFindUpdateSectionProgressItems: SectionProgressItem[] = [
+    {
+      id: "additional-relevant-information",
+      title: "Additional relevant information",
+      completeCount: [hasValue(resolvedDraft.factFindUpdatePersonalCircumstances)].filter(Boolean).length,
+      requiredCount: 1,
+      complete: hasValue(resolvedDraft.factFindUpdatePersonalCircumstances),
+    },
+    {
+      id: "client-declarations",
+      title: "Client declarations",
+      completeCount: [hasValue(resolvedDraft.factFindUpdateExecutionOnlyBasis), hasValue(resolvedDraft.factFindUpdateTermsReviewedReceived)].filter(Boolean).length,
+      requiredCount: 2,
+      complete: hasValue(resolvedDraft.factFindUpdateExecutionOnlyBasis) && hasValue(resolvedDraft.factFindUpdateTermsReviewedReceived),
+    },
+  ];
+
+  const statementSectionProgressItems: SectionProgressItem[] = [
+    {
+      id: "statement-form",
+      title: "Statement readiness",
+      completeCount: statementGenerationRequirements.filter((item) => item.complete).length,
+      requiredCount: statementGenerationRequirements.length,
+      complete: statementMissingFields.length === 0,
+    },
+  ];
+
+  const quoteSectionProgressItems: SectionProgressItem[] = [
+    {
+      id: "quote-output",
+      title: "Quote readiness",
+      completeCount: quoteGenerationRequirements.filter((item) => item.complete).length,
+      requiredCount: quoteGenerationRequirements.length,
+      complete: quoteMissingFields.length === 0,
+    },
+  ];
+
+  const workflowProgressItems = activeTab.id === "fact-find"
+    ? factFindSectionProgressItems
+    : activeTab.id === "fact-find-update"
+      ? factFindUpdateSectionProgressItems
+      : activeTab.id === "statement-of-suitability"
+        ? statementSectionProgressItems
+        : activeTab.id === "quote"
+          ? quoteSectionProgressItems
+          : [];
+  const activeRequirements = activeTab.id === "fact-find"
+    ? factFindGenerationRequirements
+    : activeTab.id === "fact-find-update"
+      ? factFindUpdateGenerationRequirements
+      : activeTab.id === "statement-of-suitability"
+        ? statementGenerationRequirements
+        : activeTab.id === "quote"
+          ? quoteGenerationRequirements
+          : [];
+  const activeMissingCount = activeRequirements.filter((item) => !item.complete).length;
+  const workflowSaveLabel =
+    workflowSaveState === "saving"
+      ? "Saving..."
+      : workflowSaveState === "dirty"
+        ? "Unsaved changes"
+        : workflowSaveState === "local"
+          ? `Saved locally${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`
+          : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
+
+  function confirmPendingChanges(message = "You have unsaved changes. Continue without waiting for them to save?") {
+    if (workflowSaveState !== "dirty" && workflowSaveState !== "saving") {
+      return true;
+    }
+
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.confirm(message);
+  }
+
+  function getFieldError(fieldId: string) {
+    return fieldErrors[fieldId];
+  }
+
+  function getFieldHint(fieldId: string, fallback?: string) {
+    return fieldHints[fieldId] ?? fallback;
+  }
+
+  function validateField(fieldId: string) {
+    const message = validationMessages[fieldId] ?? "";
+    setFieldErrors((currentErrors) => {
+      if (!message && !currentErrors[fieldId]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      if (message) {
+        nextErrors[fieldId] = message;
+      } else {
+        delete nextErrors[fieldId];
+      }
+      return nextErrors;
+    });
+
+    return message.length === 0;
+  }
+
+  function jumpToRequirement(target: RequirementTarget) {
+    setActiveTabId(target.tabId as (typeof moduleTabs)[number]["id"]);
+
+    if (target.tabId === "fact-find") {
+      factFindWorkspaceAccordion.open("fact-find-form");
+      if (target.sectionId) {
+        factFindAccordion.open(target.sectionId);
+      }
+    }
+
+    if (target.tabId === "fact-find-update") {
+      factFindUpdateWorkspaceAccordion.open("fact-find-update-form");
+      if (target.sectionId) {
+        factFindUpdateWorkspaceAccordion.open(target.sectionId);
+      }
+    }
+
+    if (target.tabId === "statement-of-suitability") {
+      statementWorkspaceAccordion.open("statement-form");
+    }
+
+    if (target.tabId === "quote") {
+      quoteWorkspaceAccordion.open("quote-output");
+    }
+
+    window.setTimeout(() => {
+      const field = document.getElementById(target.fieldId) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+      if (!field) {
+        return;
+      }
+
+      field.scrollIntoView({ behavior: "smooth", block: "center" });
+      field.focus();
+    }, 160);
+  }
+
+  function openProgressSection(sectionId: string) {
+    if (activeTab.id === "fact-find") {
+      factFindWorkspaceAccordion.open("fact-find-form");
+      factFindAccordion.open(sectionId);
+    }
+
+    if (activeTab.id === "fact-find-update") {
+      factFindUpdateWorkspaceAccordion.open("fact-find-update-form");
+      factFindUpdateWorkspaceAccordion.open(sectionId);
+    }
+
+    if (activeTab.id === "statement-of-suitability") {
+      statementWorkspaceAccordion.open("statement-form");
+    }
+
+    if (activeTab.id === "quote") {
+      quoteWorkspaceAccordion.open("quote-output");
+    }
+
+    window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
+
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    const nextSnapshot = buildWorkflowSnapshot(draft, actorLabel);
+    if (!lastPersistedSnapshotRef.current) {
+      lastPersistedSnapshotRef.current = nextSnapshot;
+      return;
+    }
+
+    if (nextSnapshot === lastPersistedSnapshotRef.current) {
+      return;
+    }
+
+    setWorkflowSaveState("dirty");
+    const timeoutId = window.setTimeout(() => {
+      void persistDraft(draft, { silent: true });
+    }, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [actorLabel, draft]);
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (workflowSaveState !== "dirty" && workflowSaveState !== "saving") {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [workflowSaveState]);
 
   function getDocumentDraft(documentType: SupportedDocumentType) {
     return resolvedDraft.documentDrafts[documentType];
@@ -919,19 +1383,36 @@ export function IncomeProtectionPage({
     return () => window.clearTimeout(timeoutId);
   }, [lastSubmittedQuoteRequestKey, quoteDocumentType, quoteMissingFields.length, quoteRequestKey, resolvedDraft]);
 
-  async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean }) {
+  function clearFieldError(fieldId: string) {
+    setFieldErrors((currentErrors) => {
+      if (!currentErrors[fieldId]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[fieldId];
+      return nextErrors;
+    });
+  }
+
+  async function persistDraft(nextDraft: SeededClientProfile, options?: { showToast?: boolean; silent?: boolean }) {
     const normalizedDraft = {
       ...nextDraft,
       fullName: buildFullName(nextDraft.firstName, nextDraft.surname),
       updatedBy: actorLabel,
     };
+    const nextSnapshot = buildWorkflowSnapshot(normalizedDraft, actorLabel);
+    setWorkflowSaveState("saving");
     setDraft(normalizedDraft);
     saveClient(normalizedDraft);
+    lastPersistedSnapshotRef.current = nextSnapshot;
 
     if (!canUseBackend) {
       if (options?.showToast) {
         addToast("Changes saved", "success");
       }
+      setWorkflowSaveState("saved");
+      setWorkflowSavedAt(new Date().toISOString());
       return { draft: normalizedDraft, savedRemotely: true };
     }
 
@@ -940,11 +1421,15 @@ export function IncomeProtectionPage({
       if (options?.showToast) {
         addToast("Changes saved", "success");
       }
+      setWorkflowSaveState("saved");
+      setWorkflowSavedAt(new Date().toISOString());
       return { draft: normalizedDraft, savedRemotely: true };
     } catch {
       if (options?.showToast) {
         addToast("Save failed - server unavailable", "error");
       }
+      setWorkflowSaveState(options?.silent ? "local" : "saved");
+      setWorkflowSavedAt(new Date().toISOString());
       return { draft: normalizedDraft, savedRemotely: false };
     }
   }
@@ -961,8 +1446,14 @@ export function IncomeProtectionPage({
           field === "surname" ? value : currentDraft.surname,
         );
       }
+      if (field === "employmentStatus") {
+        nextDraft.employed = value === "Employed" ? "Yes" : "";
+        nextDraft.selfEmployed = value === "Self-employed" ? "Yes" : "";
+      }
       return nextDraft;
     });
+    setWorkflowSaveState("dirty");
+    clearFieldError(fieldToInputId[field] ?? "");
   }
 
   function updateSavingsInvestmentRow(index: number, field: keyof SeededSavingsInvestmentRow, value: string) {
@@ -993,8 +1484,11 @@ export function IncomeProtectionPage({
   function renderTextInput(id: string, label: ReactNode, field: SeededClientStringKey, type = "text") {
     return (
       <Input
+        error={getFieldError(id)}
+        hint={getFieldHint(id)}
         id={id}
         label={label}
+        onBlur={() => validateField(id)}
         onChange={(event) => updateField(field, event.target.value)}
         type={type}
         value={resolvedDraft[field]}
@@ -1005,11 +1499,16 @@ export function IncomeProtectionPage({
   function renderCurrencyInput(id: string, label: ReactNode, field: SeededClientStringKey) {
     return (
       <Input
+        error={getFieldError(id)}
+        hint={getFieldHint(id)}
         id={id}
         label={label}
-        onBlur={(event) => updateField(field, formatCurrency(event.target.value))}
+        onBlur={(event) => {
+          updateField(field, formatCurrency(event.target.value));
+          validateField(id);
+        }}
         onChange={(event) => updateField(field, event.target.value)}
-        prefix="EUR"
+        prefix="€"
         inputMode="decimal"
         step="0.01"
         type="text"
@@ -1022,8 +1521,11 @@ export function IncomeProtectionPage({
     return (
       <Textarea
         className={className}
+        error={getFieldError(id)}
+        hint={getFieldHint(id)}
         id={id}
         label={label}
+        onBlur={() => validateField(id)}
         onChange={(event) => updateField(field, event.target.value)}
         rows={rows}
         value={resolvedDraft[field]}
@@ -1343,10 +1845,27 @@ export function IncomeProtectionPage({
     }
   }
 
+  function surfaceRequirementErrors(requirements: WorkflowRequirement[]) {
+    const nextErrors: Record<string, string> = {};
+    requirements
+      .filter((item) => !item.complete)
+      .forEach((item) => {
+        const fieldId = item.target.fieldId;
+        nextErrors[fieldId] = validationMessages[fieldId] || `${item.label} is required before generating this document.`;
+      });
+    setFieldErrors((currentErrors) => ({ ...currentErrors, ...nextErrors }));
+
+    const firstMissing = requirements.find((item) => !item.complete);
+    if (firstMissing) {
+      jumpToRequirement(firstMissing.target);
+    }
+  }
+
   async function handleFactFindGenerate() {
     if (factFindMissingFields.length > 0) {
       setShowFactFindValidation(true);
       setFactFindGenerationStatus("Generation: Blocked by missing required fields");
+      surfaceRequirementErrors(factFindGenerationRequirements);
       return;
     }
     setShowFactFindValidation(false);
@@ -1387,6 +1906,10 @@ export function IncomeProtectionPage({
   }
 
   async function handleFactFindUpdateGenerate() {
+    if (factFindUpdateGenerationRequirements.some((item) => !item.complete)) {
+      surfaceRequirementErrors(factFindUpdateGenerationRequirements);
+      return;
+    }
     await saveFactFindUpdateDraft();
     setFactFindUpdateGenerationStatus("Generation: Generating");
     saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "generating" });
@@ -1417,6 +1940,7 @@ export function IncomeProtectionPage({
     if (statementMissingFields.length > 0) {
       setShowStatementValidation(true);
       setStatementDocumentStatus("Document: Blocked by missing required fields");
+      surfaceRequirementErrors(statementGenerationRequirements);
       return;
     }
     setShowStatementValidation(false);
@@ -1457,6 +1981,7 @@ export function IncomeProtectionPage({
     if (quoteMissingFields.length > 0) {
       setShowQuoteValidation(true);
       setQuoteDocumentStatus("Document: Blocked by missing required fields");
+      surfaceRequirementErrors(quoteGenerationRequirements);
       return;
     }
 
@@ -1733,15 +2258,16 @@ export function IncomeProtectionPage({
 
   function requiredLabel(label: string) {
     return (
-      <>
-        {label} <span className="required">*</span>
-      </>
+      <span className="field-label-with-meta">
+        <span>{label}</span>
+        <span className="field-label-meta">Required for document</span>
+      </span>
     );
   }
 
   function renderGenerationRequirements(
     title: string,
-    requirements: Array<{ label: string; complete: boolean; location: string }>,
+    requirements: WorkflowRequirement[],
     missingFields: string[],
     options?: { explainSharedFields?: boolean; emphasiseMissing?: boolean },
   ) {
@@ -1775,18 +2301,20 @@ export function IncomeProtectionPage({
         ) : null}
         <div className="generation-requirements-rows">
           {requirements.map((item) => (
-            <div
+            <button
               key={item.label}
+              type="button"
               className={`generation-requirements-row${item.complete ? " is-complete" : " is-missing"}`}
+              onClick={() => jumpToRequirement(item.target)}
             >
               <span className="generation-requirements-row-dot" aria-hidden="true" />
               <div className="generation-requirements-row-copy">
                 <span className="generation-requirements-row-label">{item.label}</span>
                 <span className="generation-requirements-row-meta">
-                  {item.complete ? "Ready" : `Fill in ${item.location}`}
+                  {item.complete ? "Complete" : item.helperText ?? `Fill in ${item.location}`}
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -1841,6 +2369,7 @@ export function IncomeProtectionPage({
           <div className="page-heading page-heading-compact">
             <div className="fact-find-type-selector">
                 <Select
+                hint="Choose the full intake or the shorter review version."
                 id="ff-type"
                 label="Fact Find type"
                 onChange={(event) => {
@@ -1887,74 +2416,143 @@ export function IncomeProtectionPage({
                 </AccordionItem>
 
                 <AccordionItem
+                  id="personal-details"
                   indicator={getSectionProgress([
                     resolvedDraft.fullName,
                     resolvedDraft.dateOfBirth,
-                    resolvedDraft.email,
-                    resolvedDraft.mobileNumber,
-                    resolvedDraft.homeAddressLine1,
-                    resolvedDraft.maritalStatus,
+                    resolvedDraft.gender,
+                    resolvedDraft.townCity,
+                    resolvedDraft.county,
+                    resolvedDraft.email || resolvedDraft.mobileNumber,
                   ])}
                   isOpen={factFindAccordion.isOpen("personal-details")}
                   onToggle={() => factFindAccordion.toggle("personal-details")}
                   title="Personal Details"
                 >
-                  <div className="form-grid form-grid-desktop-3">
-                    {renderTextInput("ff-fullName", requiredLabel("Name"), "fullName")}
-                    <Select
-                      id="ff-maritalStatus"
-                      label="Marital status"
-                      onChange={(event) => updateField("maritalStatus", event.target.value)}
-                      options={[
-                        { value: "", label: "Select status" },
-                        { value: "Single", label: "Single" },
-                        { value: "Married", label: "Married" },
-                        { value: "Civil Partnership", label: "Civil Partnership" },
-                        { value: "Divorced", label: "Divorced" },
-                        { value: "Widowed", label: "Widowed" },
-                        { value: "Separated", label: "Separated" },
-                      ]}
-                      value={resolvedDraft.maritalStatus}
-                    />
-                    {renderTextInput("ff-homeAddress1", "Home address line 1", "homeAddressLine1")}
-                    {renderTextInput("ff-homeAddress2", "Home address line 2", "homeAddressLine2")}
-                    {renderTextInput("ff-homeAddress3", "Home address line 3", "clientHomeAddressLine3")}
-                    {renderTextInput("ff-homeAddress4", "Home address line 4", "clientHomeAddressLine4")}
-                    {renderTextInput("ff-workAddress1", "Work address line 1", "clientWorkAddressLine1")}
-                    {renderTextInput("ff-workAddress2", "Work address line 2", "clientWorkAddressLine2")}
-                    {renderTextInput("ff-workAddress3", "Work address line 3", "clientWorkAddressLine3")}
-                    {renderTextInput("ff-workAddress4", "Work address line 4", "clientWorkAddressLine4")}
-                    {renderTextInput("ff-dob", requiredLabel("Date of Birth"), "dateOfBirth", "date")}
-                    <Select
-                      id="ff-gender"
-                      label={requiredLabel("Gender")}
-                      onChange={(event) => updateField("gender", event.target.value)}
-                      options={genderOptions}
-                      value={resolvedDraft.gender}
-                    />
-                    {renderTextInput("ff-email", "Email", "email", "email")}
-                    {renderTextInput("ff-phone", requiredLabel("Home / Mobile"), "mobileNumber", "tel")}
-                    {renderTextInput("ff-workPhone", "Work Phone", "workPhone", "tel")}
-                    {renderTextInput("ff-dependantsSummary", "Dependants", "dependantsSummary")}
-                    {renderPartnerDetailsToggle()}
+                  <div className="workflow-subsection-stack">
+                    <section className="workflow-subsection-card">
+                      <div className="workflow-subsection-card-header">
+                        <h3>Identity</h3>
+                        <p>Core client details used in the generated document.</p>
+                      </div>
+                      <div className="form-grid form-grid-desktop-2">
+                        {renderTextInput("ff-fullName", requiredLabel("Name"), "fullName")}
+                        <Select
+                          id="ff-maritalStatus"
+                          label="Marital status"
+                          onChange={(event) => updateField("maritalStatus", event.target.value)}
+                          options={[
+                            { value: "", label: "Select status" },
+                            { value: "Single", label: "Single" },
+                            { value: "Married", label: "Married" },
+                            { value: "Civil Partnership", label: "Civil Partnership" },
+                            { value: "Divorced", label: "Divorced" },
+                            { value: "Widowed", label: "Widowed" },
+                            { value: "Separated", label: "Separated" },
+                          ]}
+                          value={resolvedDraft.maritalStatus}
+                        />
+                        {renderTextInput("ff-dob", requiredLabel("Date of birth"), "dateOfBirth", "date")}
+                        <Select
+                          error={getFieldError("ff-gender")}
+                          hint={getFieldHint("ff-gender")}
+                          id="ff-gender"
+                          label="Gender"
+                          onBlur={() => validateField("ff-gender")}
+                          onChange={(event) => updateField("gender", event.target.value)}
+                          options={genderOptions}
+                          value={resolvedDraft.gender}
+                        />
+                        {renderTextInput("ff-dependantsSummary", "Dependants", "dependantsSummary")}
+                        <div className="workflow-inline-toggle-card">{renderPartnerDetailsToggle()}</div>
+                      </div>
+                    </section>
+
+                    <section className="workflow-subsection-card">
+                      <div className="workflow-subsection-card-header">
+                        <h3>Contact</h3>
+                        <p>Provide either an email or a phone number so the document can be generated.</p>
+                      </div>
+                      <div className="form-grid form-grid-desktop-2">
+                        {renderTextInput("ff-email", "Email", "email", "email")}
+                        {renderTextInput("ff-phone", "Home / Mobile", "mobileNumber", "tel")}
+                        {renderTextInput("ff-workPhone", "Work phone", "workPhone", "tel")}
+                      </div>
+                    </section>
+
+                    <section className="workflow-subsection-card">
+                      <div className="workflow-subsection-card-header">
+                        <h3>Home address</h3>
+                        <p>Town and county are required for the generated document.</p>
+                      </div>
+                      <div className="form-grid form-grid-desktop-2">
+                        {renderTextInput("ff-homeAddress1", "Home address line 1", "homeAddressLine1")}
+                        {renderTextInput("ff-homeAddress2", "Home address line 2", "homeAddressLine2")}
+                        {renderTextInput("ff-townCity", requiredLabel("Town / city"), "townCity")}
+                        {renderTextInput("ff-county", requiredLabel("County"), "county")}
+                        {renderTextInput("ff-eircode", "Eircode", "eircode")}
+                      </div>
+                      <div className="workflow-inline-actions">
+                        <Button onClick={() => setShowExtraHomeAddressLines((current) => !current)} variant="secondary">
+                          {showExtraHomeAddressLines ? "Hide extra address lines" : "Add another line"}
+                        </Button>
+                      </div>
+                      {showExtraHomeAddressLines ? (
+                        <div className="form-grid form-grid-desktop-2">
+                          {renderTextInput("ff-homeAddress3", "Home address line 3", "clientHomeAddressLine3")}
+                          {renderTextInput("ff-homeAddress4", "Home address line 4", "clientHomeAddressLine4")}
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="workflow-subsection-card">
+                      <div className="workflow-subsection-card-header">
+                        <h3>Work address</h3>
+                        <p>Only expand this when the client uses a different work address.</p>
+                      </div>
+                      <div className="workflow-inline-toggle-card">
+                        <Toggle
+                          checked={showDifferentWorkAddress}
+                          id="ff-differentWorkAddress"
+                          label="Different work address"
+                          onChange={(event) => setShowDifferentWorkAddress(event.target.checked)}
+                        />
+                      </div>
+                      {showDifferentWorkAddress ? (
+                        <div className="form-grid form-grid-desktop-2">
+                          {renderTextInput("ff-workAddress1", "Work address line 1", "clientWorkAddressLine1")}
+                          {renderTextInput("ff-workAddress2", "Work address line 2", "clientWorkAddressLine2")}
+                          {renderTextInput("ff-workAddress3", "Work address line 3", "clientWorkAddressLine3")}
+                          {renderTextInput("ff-workAddress4", "Work address line 4", "clientWorkAddressLine4")}
+                        </div>
+                      ) : null}
+                    </section>
+
                     {showPartnerFields ? (
-                      <>
-                        {renderTextInput("ff-partnerName", "Partner Name", "partnerName")}
-                        {renderTextInput("ff-partnerDob", "Partner Date of Birth", "partnerDateOfBirth", "date")}
-                        {renderTextInput("ff-partnerAddress1", "Partner address line 1", "partnerAddressLine1")}
-                        {renderTextInput("ff-partnerAddress2", "Partner address line 2", "partnerAddressLine2")}
-                        {renderTextInput("ff-partnerAddress3", "Partner address line 3", "partnerAddressLine3")}
-                        {renderTextInput("ff-partnerAddress4", "Partner address line 4", "partnerAddressLine4")}
-                        {renderTextInput("ff-partnerHomeMobile", "Partner Home / Mobile", "partnerHomeMobile", "tel")}
-                        {renderTextInput("ff-partnerWorkPhone", "Partner Work Phone", "partnerWorkPhone", "tel")}
-                        {renderTextInput("ff-partnerEmail", "Partner Email", "partnerEmail", "email")}
-                      </>
+                      <section className="workflow-subsection-card">
+                        <div className="workflow-subsection-card-header">
+                          <h3>Partner details</h3>
+                          <p>Capture these when partner details are part of the recommendation.</p>
+                        </div>
+                        <div className="form-grid form-grid-desktop-2">
+                          {renderTextInput("ff-partnerName", "Partner name", "partnerName")}
+                          {renderTextInput("ff-partnerDob", "Partner date of birth", "partnerDateOfBirth", "date")}
+                          {renderTextInput("ff-partnerAddress1", "Partner address line 1", "partnerAddressLine1")}
+                          {renderTextInput("ff-partnerAddress2", "Partner address line 2", "partnerAddressLine2")}
+                          {renderTextInput("ff-partnerAddress3", "Partner address line 3", "partnerAddressLine3")}
+                          {renderTextInput("ff-partnerAddress4", "Partner address line 4", "partnerAddressLine4")}
+                          {renderTextInput("ff-partnerHomeMobile", "Partner home / mobile", "partnerHomeMobile", "tel")}
+                          {renderTextInput("ff-partnerWorkPhone", "Partner work phone", "partnerWorkPhone", "tel")}
+                          {renderTextInput("ff-partnerEmail", "Partner email", "partnerEmail", "email")}
+                        </div>
+                      </section>
                     ) : null}
                   </div>
                 </AccordionItem>
 
             <AccordionItem
-              indicator={getSectionProgress([resolvedDraft.occupation, resolvedDraft.employmentStatus, resolvedDraft.income])}
+              id="employment-details"
+              indicator={getSectionProgress([resolvedDraft.occupation, resolvedDraft.employmentStatus, resolvedDraft.income, resolvedDraft.advisorName])}
               isOpen={factFindAccordion.isOpen("employment-details")}
               onToggle={() => factFindAccordion.toggle("employment-details")}
               title="Employment Details"
@@ -1979,8 +2577,7 @@ export function IncomeProtectionPage({
                   type="text"
                   value={resolvedDraft.income}
                 />
-                {renderToggleField("ff-employed", "Employed", "employed")}
-                {renderToggleField("ff-selfEmployed", "Self Employed", "selfEmployed")}
+                {renderTextInput("ff-advisorName", requiredLabel("Advisor name"), "advisorName")}
               </div>
             </AccordionItem>
 
@@ -2600,7 +3197,7 @@ export function IncomeProtectionPage({
                 emphasiseMissing: showFactFindValidation,
               })}
               <div className="form-action-row">
-                <span className="form-action-row-status">{factFindDraftSavedLabel}</span>
+                <span className="form-action-row-status">{workflowSaveLabel}</span>
                 <Button onClick={() => void saveFactFindDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find
@@ -2855,7 +3452,7 @@ export function IncomeProtectionPage({
                 { explainSharedFields: true },
               )}
               <div className="form-action-row">
-                <span className="form-action-row-status">{factFindUpdateSavedLabel}</span>
+                <span className="form-action-row-status">{workflowSaveLabel}</span>
                 <Button onClick={() => void saveFactFindUpdateDraft()} variant="primary">
                   <Save size={18} />
                   Save Fact Find Update
@@ -3041,7 +3638,7 @@ export function IncomeProtectionPage({
                 emphasiseMissing: showStatementValidation,
               })}
               <div className="form-action-row">
-                <span className="form-action-row-status">{statementSaveStatus}</span>
+                <span className="form-action-row-status">{workflowSaveLabel}</span>
                 <Button onClick={() => void saveStatementDraft()} variant="primary">
                   <Save size={18} />
                   Save Statement
@@ -3358,6 +3955,43 @@ export function IncomeProtectionPage({
               <h1>{pageTitle}</h1>
               <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
             </div>
+            <div className={`workflow-save-indicator is-${workflowSaveState}`}>
+              <span className="workflow-save-indicator-dot" aria-hidden="true" />
+              <span>{workflowSaveLabel}</span>
+            </div>
+          </div>
+          <div className="workflow-header-summary-chip-row">
+            <button
+              className={`workflow-summary-chip${activeMissingCount > 0 ? " is-warning" : " is-ready"}`}
+              onClick={() => {
+                const firstMissing = activeRequirements.find((item) => !item.complete);
+                if (firstMissing) {
+                  jumpToRequirement(firstMissing.target);
+                }
+              }}
+              type="button"
+            >
+              {activeMissingCount > 0 ? `${activeMissingCount} required items need attention` : "All required fields are complete"}
+            </button>
+          </div>
+        </div>
+
+        <div className="workflow-summary-bar">
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Client</span>
+            <strong>{resolvedDraft.fullName || "Client not named"}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Reference</span>
+            <strong>{resolvedDraft.clientReference}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Active workspace</span>
+            <strong>{activeTab.label}</strong>
+          </div>
+          <div className="workflow-summary-item">
+            <span className="workflow-summary-label">Document readiness</span>
+            <strong>{activeMissingCount > 0 ? `${activeMissingCount} blockers remaining` : "Ready to generate"}</strong>
           </div>
         </div>
 
@@ -3372,6 +4006,9 @@ export function IncomeProtectionPage({
                 id="client-select"
                 onChange={(event) => {
                   if (event.target.value) {
+                    if (!confirmPendingChanges("You have unsaved workflow changes. Switch client anyway?")) {
+                      return;
+                    }
                     setSelectedClientReference(event.target.value);
                   }
                 }}
@@ -3410,22 +4047,58 @@ export function IncomeProtectionPage({
                 aria-selected={tab.id === activeTab.id}
                 className={`tab${tab.id === activeTab.id ? " is-active" : ""}`}
                 id={`tab-${tab.id}`}
-                onClick={() => setActiveTabId(tab.id)}
+                onClick={() => {
+                  if (tab.id !== activeTab.id && !confirmPendingChanges("You have unsaved workflow changes. Switch tabs anyway?")) {
+                    return;
+                  }
+                  setActiveTabId(tab.id);
+                }}
                 role="tab"
                 type="button"
               >
                 <Icon size={18} />
-                {tab.label}
-                <span
-                  aria-hidden="true"
-                  className={`tab-progress ${progress}`}
-                />
+                <span>{tab.label}</span>
+                <span aria-hidden="true" className={`tab-progress ${progress}`} />
+                <span className="tab-status-label">{progress === "complete" ? "Complete" : progress === "partial" ? "Needs attention" : "Not started"}</span>
               </button>
             );
           })}
         </div>
 
       <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
+        {workflowProgressItems.length > 0 ? (
+          <div className="workflow-progress-banner" aria-label={`${activeTab.label} progress`}>
+            <div className="workflow-progress-banner-header">
+              <span className="workflow-summary-label">Progress map</span>
+              <Button
+                onClick={() => {
+                  const nextSection = workflowProgressItems.find((item) => !item.complete);
+                  if (nextSection) {
+                    openProgressSection(nextSection.id);
+                  }
+                }}
+                variant="secondary"
+              >
+                Next incomplete
+              </Button>
+            </div>
+            <div className="workflow-progress-banner-grid">
+              {workflowProgressItems.map((item) => (
+                <button
+                  key={item.id}
+                  className={`workflow-progress-item${item.complete ? " is-complete" : ""}`}
+                  onClick={() => openProgressSection(item.id)}
+                  type="button"
+                >
+                  <span className="workflow-progress-item-title">{item.title}</span>
+                  <span className="workflow-progress-item-meta">
+                    {item.complete ? "Complete" : `${item.completeCount} of ${item.requiredCount} required complete`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <WorkflowDocumentSections
           clientReference={selectedClientReference}
           renderSection={renderDocumentSection}
