@@ -1299,7 +1299,7 @@ button {
 
 /* Tabs */
 .workflow-toolbar {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .workflow-toolbar.workflow-toolbar-unified {
@@ -1420,6 +1420,14 @@ button {
   white-space: nowrap;
 }
 
+.workflow-readiness-indicator {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .workflow-save-indicator-dot {
   width: 10px;
   height: 10px;
@@ -1441,6 +1449,14 @@ button {
 
 .workflow-save-indicator.is-local .workflow-save-indicator-dot {
   background: var(--color-secondary);
+}
+
+.workflow-readiness-indicator.is-ready .workflow-save-indicator-dot {
+  background: var(--color-success);
+}
+
+.workflow-readiness-indicator.is-warning .workflow-save-indicator-dot {
+  background: var(--color-warning);
 }
 
 .workflow-header-summary-chip-row {
@@ -1494,6 +1510,7 @@ button {
   flex-direction: row;
   align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .income-protection-page .workflow-header.workflow-header-inline .workflow-header-top {
@@ -1514,6 +1531,14 @@ button {
 .income-protection-page .workflow-header.workflow-header-inline .income-protection-client-field {
   flex: 1 1 320px;
   max-width: 420px;
+}
+
+.income-protection-page .workflow-header-select-control {
+  margin-left: 0;
+  flex: 0 1 240px;
+  min-width: 200px;
+  max-width: 240px;
+  padding-left: 0;
 }
 
 .income-protection-page .workflow-header.workflow-header-inline .workflow-client-field {
@@ -1559,6 +1584,13 @@ button {
   border-top: 0;
   border-radius: 0;
   gap: var(--space-2);
+}
+
+.income-protection-page .income-protection-header-actions .btn {
+  min-height: 36px;
+  padding: 0 14px;
+  gap: 8px;
+  font-size: var(--font-size-small);
 }
 
 .income-protection-page .workflow-header h1 {
@@ -2237,13 +2269,56 @@ button {
 
 .tab-list.tab-list-embedded {
   margin-bottom: 0;
+  flex-wrap: wrap;
 }
 
 .tab-list-control {
   margin-left: auto;
+  flex: 0 1 320px;
   min-width: 260px;
   max-width: 320px;
   padding-left: var(--space-2);
+}
+
+@media (max-width: 1280px) {
+  .income-protection-page .workflow-header.workflow-header-inline {
+    align-items: stretch;
+  }
+
+  .income-protection-page .workflow-header.workflow-header-inline .workflow-header-top {
+    flex: 1 1 100%;
+  }
+
+  .income-protection-page .workflow-header.workflow-header-inline .income-protection-header-controls {
+    flex: 1 1 100%;
+  }
+
+  .income-protection-page .income-protection-header-controls {
+    flex-wrap: wrap;
+  }
+
+  .income-protection-page .workflow-header.workflow-header-inline .income-protection-client-field {
+    flex: 1 1 280px;
+    max-width: none;
+  }
+
+  .income-protection-page .workflow-header-select-control {
+    flex: 1 1 220px;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .income-protection-page .workflow-header.workflow-header-inline .workflow-header-summary-chip-row {
+    margin-left: 0;
+  }
+
+  .tab-list-control {
+    margin-left: 0;
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+    padding-left: 0;
+  }
 }
 
 .tab-list-control .field {
@@ -2284,7 +2359,7 @@ button {
 }
 
 .tab-status-label {
-  padding-left: var(--space-1);
+  display: none;
 }
 
 .tab.is-active .tab-status-label {

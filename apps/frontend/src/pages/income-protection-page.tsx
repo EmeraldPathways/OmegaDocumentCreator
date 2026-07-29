@@ -1220,6 +1220,9 @@ export function IncomeProtectionPage({
           : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
   const useUnifiedWorkflowBar =
     workflowKind === "fact-find" || workflowKind === "income-protection" || workflowKind === "files-docs";
+  const workflowReadinessLabel =
+    activeMissingCount > 0 ? `${activeMissingCount} required items need attention` : "All required fields are complete";
+  const workflowReadinessState = activeMissingCount > 0 ? "warning" : "ready";
   const showWorkflowHeaderSummary = !useUnifiedWorkflowBar;
 
   function confirmPendingChanges(message = "You have unsaved changes. Continue without waiting for them to save?") {
@@ -3941,12 +3944,20 @@ export function IncomeProtectionPage({
             <div className="workflow-header-title">
               <div className="flex items-center gap-3">
                 <h1>{pageTitle}</h1>
-                <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
               </div>
-              <div className={`workflow-save-indicator is-${workflowSaveState}`}>
+              <button
+                className={`workflow-save-indicator workflow-readiness-indicator is-${workflowReadinessState}`}
+                onClick={() => {
+                  const firstMissing = activeRequirements.find((item) => !item.complete);
+                  if (firstMissing) {
+                    jumpToRequirement(firstMissing.target);
+                  }
+                }}
+                type="button"
+              >
                 <span className="workflow-save-indicator-dot" aria-hidden="true" />
-                <span>{workflowSaveLabel}</span>
-              </div>
+                <span>{workflowReadinessLabel}</span>
+              </button>
             </div>
           </div>
 
@@ -3997,6 +4008,23 @@ export function IncomeProtectionPage({
               </div>
             </div>
 
+            {workflowKind === "fact-find" ? (
+              <div className="tab-list-control workflow-header-select-control">
+                <Select
+                  id="ff-type-inline"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    updateField("factFindType" as keyof SeededClientProfile, value);
+                  }}
+                  options={[
+                    { value: "all", label: "Fact Find All" },
+                    { value: "small", label: "Fact Find Small" },
+                  ]}
+                  value={factFindType}
+                />
+              </div>
+            ) : null}
+
             <div className="workflow-header-actions income-protection-header-actions">
               <Link className="btn btn-primary" to="/clients/new">
                 <Plus size={18} />
@@ -4006,21 +4034,6 @@ export function IncomeProtectionPage({
                 <Edit size={18} />
                 Edit Client
               </Link>
-            </div>
-
-            <div className="workflow-header-summary-chip-row">
-              <button
-                className={`workflow-summary-chip${activeMissingCount > 0 ? " is-warning" : " is-ready"}`}
-                onClick={() => {
-                  const firstMissing = activeRequirements.find((item) => !item.complete);
-                  if (firstMissing) {
-                    jumpToRequirement(firstMissing.target);
-                  }
-                }}
-                type="button"
-              >
-                {activeMissingCount > 0 ? `${activeMissingCount} required items need attention` : "All required fields are complete"}
-              </button>
             </div>
           </div>
         </section>
@@ -4033,9 +4046,12 @@ export function IncomeProtectionPage({
           {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const progress = tabProgress[tab.id];
+            const progressLabel = progress === "complete" ? "Complete" : progress === "partial" ? "Needs attention" : "Not started";
+            const progressTone = progress === "complete" ? "complete" : progress === "partial" ? "partial" : "error";
             return (
               <button
                 key={tab.id}
+                aria-label={`${tab.label} ${progressLabel}`}
                 aria-controls={`panel-${tab.id}`}
                 aria-selected={tab.id === activeTab.id}
                 className={`tab${tab.id === activeTab.id ? " is-active" : ""}`}
@@ -4051,27 +4067,10 @@ export function IncomeProtectionPage({
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
-                <span aria-hidden="true" className={`tab-progress ${progress}`} />
-                <span className="tab-status-label">{progress === "complete" ? "Complete" : progress === "partial" ? "Needs attention" : "Not started"}</span>
+                <span aria-hidden="true" className={`tab-progress ${progressTone}`} />
               </button>
             );
           })}
-          {workflowKind === "fact-find" ? (
-            <div className="tab-list-control">
-              <Select
-                id="ff-type-inline"
-                onChange={(event) => {
-                  const value = event.target.value;
-                  updateField("factFindType" as keyof SeededClientProfile, value);
-                }}
-                options={[
-                  { value: "all", label: "Fact Find All" },
-                  { value: "small", label: "Fact Find Small" },
-                ]}
-                value={factFindType}
-              />
-            </div>
-          ) : null}
         </div>
       </div>
 
