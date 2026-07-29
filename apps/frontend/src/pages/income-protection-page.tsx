@@ -1218,7 +1218,9 @@ export function IncomeProtectionPage({
         : workflowSaveState === "local"
           ? `Saved locally${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`
           : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
-  const showWorkflowHeaderSummary = workflowKind !== "fact-find" && workflowKind !== "income-protection";
+  const useUnifiedWorkflowBar =
+    workflowKind === "fact-find" || workflowKind === "income-protection" || workflowKind === "files-docs";
+  const showWorkflowHeaderSummary = !useUnifiedWorkflowBar;
 
   function confirmPendingChanges(message = "You have unsaved changes. Continue without waiting for them to save?") {
     if (workflowSaveState !== "dirty" && workflowSaveState !== "saving") {
@@ -2367,25 +2369,6 @@ export function IncomeProtectionPage({
 
       return (
         <div className="page-stack">
-          <div className="page-heading page-heading-compact">
-            <div className="fact-find-type-selector">
-                <Select
-                hint="Choose the full intake or the shorter review version."
-                id="ff-type"
-                label="Fact Find type"
-                onChange={(event) => {
-                  const value = event.target.value;
-                  updateField("factFindType" as keyof SeededClientProfile, value);
-                }}
-                options={[
-                  { value: "all", label: "Fact Find All" },
-                  { value: "small", label: "Fact Find Small" },
-                ]}
-                value={factFindType}
-              />
-            </div>
-          </div>
-
           <Accordion flush className="workflow-form-accordion">
             <AccordionItem
               indicator={tabProgress["fact-find"]}
@@ -3949,97 +3932,104 @@ export function IncomeProtectionPage({
       clientReference={selectedClientReference}
       workflowKind={workflowKind}
     >
-      <section className="workflow-header" aria-label="Selected client summary">
-        <div className="workflow-header-top">
-          <div className="workflow-header-title">
-            <div className="flex items-center gap-3">
-              <h1>{pageTitle}</h1>
-              <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
-            </div>
-            <div className={`workflow-save-indicator is-${workflowSaveState}`}>
-              <span className="workflow-save-indicator-dot" aria-hidden="true" />
-              <span>{workflowSaveLabel}</span>
+      <div className={`workflow-toolbar${useUnifiedWorkflowBar ? " workflow-toolbar-unified" : ""}`}>
+        <section
+          className={`workflow-header${useUnifiedWorkflowBar ? " workflow-header-inline" : ""}`}
+          aria-label="Selected client summary"
+        >
+          <div className="workflow-header-top">
+            <div className="workflow-header-title">
+              <div className="flex items-center gap-3">
+                <h1>{pageTitle}</h1>
+                <Badge variant={getDocumentStatusVariant(resolvedDraft.status)}>{resolvedDraft.status ?? "Draft"}</Badge>
+              </div>
+              <div className={`workflow-save-indicator is-${workflowSaveState}`}>
+                <span className="workflow-save-indicator-dot" aria-hidden="true" />
+                <span>{workflowSaveLabel}</span>
+              </div>
             </div>
           </div>
-          <div className="workflow-header-summary-chip-row">
-            <button
-              className={`workflow-summary-chip${activeMissingCount > 0 ? " is-warning" : " is-ready"}`}
-              onClick={() => {
-                const firstMissing = activeRequirements.find((item) => !item.complete);
-                if (firstMissing) {
-                  jumpToRequirement(firstMissing.target);
-                }
-              }}
-              type="button"
-            >
-              {activeMissingCount > 0 ? `${activeMissingCount} required items need attention` : "All required fields are complete"}
-            </button>
-          </div>
-        </div>
 
-        {showWorkflowHeaderSummary ? (
-          <div className="workflow-summary-bar">
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Client</span>
-              <strong>{resolvedDraft.fullName || "Client not named"}</strong>
+          {showWorkflowHeaderSummary ? (
+            <div className="workflow-summary-bar">
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Client</span>
+                <strong>{resolvedDraft.fullName || "Client not named"}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Reference</span>
+                <strong>{resolvedDraft.clientReference}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Active workspace</span>
+                <strong>{activeTab.label}</strong>
+              </div>
+              <div className="workflow-summary-item">
+                <span className="workflow-summary-label">Document readiness</span>
+                <strong>{activeMissingCount > 0 ? `${activeMissingCount} blockers remaining` : "Ready to generate"}</strong>
+              </div>
             </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Reference</span>
-              <strong>{resolvedDraft.clientReference}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Active workspace</span>
-              <strong>{activeTab.label}</strong>
-            </div>
-            <div className="workflow-summary-item">
-              <span className="workflow-summary-label">Document readiness</span>
-              <strong>{activeMissingCount > 0 ? `${activeMissingCount} blockers remaining` : "Ready to generate"}</strong>
-            </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <div className="income-protection-header-controls">
-          <div className="workflow-client-field income-protection-client-field">
-            <label className="field-label" htmlFor="client-select">
-              Select workflow client
-            </label>
-            <div className="field-select-wrap">
-              <select
-                className="field-select"
-                id="client-select"
-                onChange={(event) => {
-                  if (event.target.value) {
-                    if (!confirmPendingChanges("You have unsaved workflow changes. Switch client anyway?")) {
-                      return;
+          <div className="income-protection-header-controls">
+            <div className="workflow-client-field income-protection-client-field">
+              <div className="field-select-wrap">
+                <select
+                  aria-label="Select workflow client"
+                  className="field-select"
+                  id="client-select"
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      if (!confirmPendingChanges("You have unsaved workflow changes. Switch client anyway?")) {
+                        return;
+                      }
+                      setSelectedClientReference(event.target.value);
                     }
-                    setSelectedClientReference(event.target.value);
+                  }}
+                  value={resolvedDraft.clientReference}
+                >
+                  {clients.map((entry) => (
+                    <option key={entry.clientReference} value={entry.clientReference}>
+                      {entry.fullName} ({entry.clientReference})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="workflow-header-actions income-protection-header-actions">
+              <Link className="btn btn-primary" to="/clients/new">
+                <Plus size={18} />
+                Create Client
+              </Link>
+              <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
+                <Edit size={18} />
+                Edit Client
+              </Link>
+            </div>
+
+            <div className="workflow-header-summary-chip-row">
+              <button
+                className={`workflow-summary-chip${activeMissingCount > 0 ? " is-warning" : " is-ready"}`}
+                onClick={() => {
+                  const firstMissing = activeRequirements.find((item) => !item.complete);
+                  if (firstMissing) {
+                    jumpToRequirement(firstMissing.target);
                   }
                 }}
-                value={resolvedDraft.clientReference}
+                type="button"
               >
-                {clients.map((entry) => (
-                  <option key={entry.clientReference} value={entry.clientReference}>
-                    {entry.fullName} ({entry.clientReference})
-                  </option>
-                ))}
-              </select>
+                {activeMissingCount > 0 ? `${activeMissingCount} required items need attention` : "All required fields are complete"}
+              </button>
             </div>
           </div>
+        </section>
 
-          <div className="workflow-header-actions income-protection-header-actions">
-            <Link className="btn btn-primary" to="/clients/new">
-              <Plus size={18} />
-              Create Client
-            </Link>
-            <Link className="btn btn-secondary" to={`/clients/${resolvedDraft.clientReference}`}>
-              <Edit size={18} />
-              Edit Client
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <div aria-label={`${pageTitle} sections`} className="tab-list" role="tablist">
+        <div
+          aria-label={`${pageTitle} sections`}
+          className={`tab-list${useUnifiedWorkflowBar ? " tab-list-embedded" : ""}`}
+          role="tablist"
+        >
           {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const progress = tabProgress[tab.id];
@@ -4066,7 +4056,24 @@ export function IncomeProtectionPage({
               </button>
             );
           })}
+          {workflowKind === "fact-find" ? (
+            <div className="tab-list-control">
+              <Select
+                id="ff-type-inline"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  updateField("factFindType" as keyof SeededClientProfile, value);
+                }}
+                options={[
+                  { value: "all", label: "Fact Find All" },
+                  { value: "small", label: "Fact Find Small" },
+                ]}
+                value={factFindType}
+              />
+            </div>
+          ) : null}
         </div>
+      </div>
 
       <section aria-labelledby={`tab-${activeTab.id}`} className="tab-panel" id={`panel-${activeTab.id}`} role="tabpanel">
         {showWorkflowHeaderSummary && workflowProgressItems.length > 0 ? (
