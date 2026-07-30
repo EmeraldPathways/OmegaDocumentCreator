@@ -2441,8 +2441,10 @@ button {
 
 .field-label-with-meta {
   display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .field-label-meta {

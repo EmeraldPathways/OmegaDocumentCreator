@@ -1189,9 +1189,9 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
       : documentType === "Fact Find Update"
         ? buildFactFindUpdateBlocks(
             profile,
-            personalCircumstancesSection?.bodyHtml ?? buildFactFindPersonalCircumstancesHtml(profile, documentType),
-            financialSituationSection?.bodyHtml ?? buildFactFindFinancialSituationHtml(profile, documentType),
-            needsHtml,
+            buildFactFindPersonalCircumstancesHtml(profile, documentType),
+            buildFactFindFinancialSituationHtml(profile, documentType),
+            buildNeedsNarrativeHtml(profile, documentType),
           )
         : documentType === "Terms of Business"
           ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
