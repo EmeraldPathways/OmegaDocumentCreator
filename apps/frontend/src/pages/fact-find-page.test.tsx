@@ -7,9 +7,14 @@ import { ToastProvider } from "../components/ui";
 import { ClientDataProvider } from "../data/client-data-context";
 import { FactFindPage } from "./fact-find-page";
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const;
+
 function renderFactFindPage() {
   render(
-    <MemoryRouter>
+    <MemoryRouter future={routerFuture}>
       <AuthProvider>
         <ClientDataProvider>
           <ToastProvider>
@@ -38,9 +43,9 @@ describe("FactFindPage", () => {
     expect(screen.getByLabelText(/Add partner details/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Add no deferred provider details/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Partner Name/i)).not.toBeInTheDocument();
+    expect(screen.queryAllByLabelText(/Partner Address/i)).toHaveLength(0);
     expect(screen.queryByLabelText(/^No deferred provider$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Deferred period provider$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Pension Arrangements - Partner")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Client signature 2$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Client signature 2 date$/i)).not.toBeInTheDocument();
 
@@ -50,7 +55,7 @@ describe("FactFindPage", () => {
 
     fireEvent.click(screen.getByLabelText(/Add partner details/i));
     expect(screen.getByLabelText(/Partner Name/i)).toBeInTheDocument();
-    expect(screen.getByText("Pension Arrangements - Partner")).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Partner Address/i)).toHaveLength(4);
     expect(screen.getByLabelText(/^Client signature 2$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Client signature 2 date$/i)).toBeInTheDocument();
   }, 15000);

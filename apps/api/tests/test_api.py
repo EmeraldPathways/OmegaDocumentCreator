@@ -6,6 +6,7 @@ or DATABASE_URL.  Falls back to postgresql://postgres:postgres@localhost:5432/om
 
 from __future__ import annotations
 
+import os
 import uuid
 import unittest
 from unittest.mock import Mock, patch
@@ -13,12 +14,21 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
+os.environ.setdefault("ADMIN_EMAIL", "admin@omega.local")
+os.environ.setdefault("ADMIN_PASSWORD", "ChangeMe123!")
+os.environ.setdefault("STAFF_EMAIL", "staff@omega.local")
+os.environ.setdefault("STAFF_PASSWORD", "ChangeMe123!")
+
 # Import test helpers from the tests package
 import db_test_helpers  # noqa: E402
 
 import app.db  # noqa: E402
+import app.main as app_main  # noqa: E402
 
 from app.main import app  # noqa: E402
+
+app_main.SYSTEM_ACCESS_EMAILS = set(app_main.SYSTEM_ACCESS_EMAILS) | {"admin@omega.local"}
+app_main.FULL_RECORD_ACCESS_EMAILS = set(app_main.FULL_RECORD_ACCESS_EMAILS) | {"staff@omega.local"}
 
 
 def _db_is_available() -> bool:
@@ -732,6 +742,10 @@ class ApiTests(unittest.TestCase):
             "termsVersion": "June 2026",
             "occupation": "Developer",
             "recommendedCover": "2500",
+            "gender": "Female",
+            "smokerStatus": "Non-Smoker",
+            "phiOccupationalClass": "2",
+            "phiIndexation": "Y",
         }
         save_resp = self.client.put(
             "/clients/CLI-2026-0002/workflow",
@@ -746,6 +760,10 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(item["termsVersion"], "June 2026")
         self.assertEqual(item["occupation"], "Developer")
         self.assertIn("2500", item["recommendedCover"])
+        self.assertEqual(item["gender"], "Female")
+        self.assertEqual(item["smokerStatus"], "Non-Smoker")
+        self.assertEqual(item["phiOccupationalClass"], "2")
+        self.assertEqual(item["phiIndexation"], "Y")
 
     def test_workflow_clearing_previously_saved_values(self) -> None:
         self._login_as_admin()

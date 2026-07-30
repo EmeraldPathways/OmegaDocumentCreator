@@ -18,4 +18,4 @@ class ClientDomainTests(unittest.TestCase):
 
         slug = build_client_storage_slug("CLI-2026-0042", record)
 
-        self.assertEqual(slug, "CLI-2026-0042-obrien-smith-aoife")
+        self.assertEqual(slug, "O'Brien Smith, Aoife - omega-00042")

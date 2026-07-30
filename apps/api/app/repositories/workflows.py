@@ -31,6 +31,10 @@ _FACT_FIND_MAP: list[tuple[str, str]] = [
     ("contact_email", "contactByEmail"),
     ("contact_post", "contactByPost"),
     ("pep_confirmation", "pepConfirmation"),
+    ("gender", "gender"),
+    ("smoker_status", "smokerStatus"),
+    ("phi_occupational_class", "phiOccupationalClass"),
+    ("phi_indexation", "phiIndexation"),
     ("business_source", "businessSource"),
     ("recommendation_understood", "recommendationAcknowledged"),
 ]

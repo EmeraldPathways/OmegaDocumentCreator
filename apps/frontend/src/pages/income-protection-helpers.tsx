@@ -116,9 +116,31 @@ export type SeededClientStringKey = {
   [Key in keyof SeededClientProfile]: SeededClientProfile[Key] extends string ? Key : never;
 }[keyof SeededClientProfile];
 
+export type IncomeProtectionQuoteFieldOverrides = Pick<
+  SeededClientProfile,
+  "recommendedCover" | "coverAge" | "phiOccupationalClass" | "deferredPeriod" | "smokerStatus" | "phiIndexation"
+>;
+
 export function hasValue(value: unknown) {
   if (value == null) return false;
   return String(value).trim().length > 0;
+}
+
+export function mergeIncomeProtectionQuoteFields(
+  draft: SeededClientProfile,
+  overrides: IncomeProtectionQuoteFieldOverrides,
+): SeededClientProfile {
+  return {
+    ...draft,
+    recommendedCover: hasValue(overrides.recommendedCover) ? overrides.recommendedCover : draft.recommendedCover,
+    coverAge: hasValue(overrides.coverAge) ? overrides.coverAge : draft.coverAge,
+    phiOccupationalClass: hasValue(overrides.phiOccupationalClass)
+      ? overrides.phiOccupationalClass
+      : draft.phiOccupationalClass,
+    deferredPeriod: hasValue(overrides.deferredPeriod) ? overrides.deferredPeriod : draft.deferredPeriod,
+    smokerStatus: hasValue(overrides.smokerStatus) ? overrides.smokerStatus : draft.smokerStatus,
+    phiIndexation: hasValue(overrides.phiIndexation) ? overrides.phiIndexation : draft.phiIndexation,
+  };
 }
 
 export function toLower(value: unknown) {

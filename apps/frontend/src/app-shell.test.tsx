@@ -5,10 +5,15 @@ import { describe, expect, it } from "vitest";
 import { AuthProvider } from "./auth/auth-context";
 import { AppShell } from "./components/app-shell";
 
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const;
+
 describe("AppShell", () => {
   it("shows the primary navigation items", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter future={routerFuture}>
         <AuthProvider>
           <AppShell />
         </AuthProvider>

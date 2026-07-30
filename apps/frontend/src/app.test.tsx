@@ -1,9 +1,23 @@
+import type { ReactNode } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { WorkflowDocumentSections } from "./pages/workflow-document-sections";
+
+const routerFuture = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+} as const;
+
+vi.mock("./auth/auth-context", () => ({
+  AuthProvider: ({ children }: { children: ReactNode }) => children,
+  useAuth: () => ({
+    isSignedIn: true,
+    isAdmin: true,
+  }),
+}));
 
 vi.mock("./pages/fact-find-page", () => ({
   FactFindPage: () => (
@@ -69,7 +83,7 @@ describe("WorkflowDocumentSections", () => {
 
 function renderAppAt(route: string) {
   render(
-    <MemoryRouter initialEntries={[route]}>
+    <MemoryRouter initialEntries={[route]} future={routerFuture}>
       <App />
     </MemoryRouter>,
   );

@@ -16,6 +16,8 @@ logger = logging.getLogger("omega.scheduler")
 
 # ---- module-level state ----
 _scheduler_task: asyncio.Task[object] | None = None
+_scheduler_loop: asyncio.AbstractEventLoop | None = None
+_scheduler_enabled_without_loop: bool = False
 _scheduled_backup_running: bool = False
 _last_scheduled_run: datetime | None = None
 _next_scheduled_run: datetime | None = None
@@ -24,7 +26,7 @@ _next_scheduled_run: datetime | None = None
 def get_scheduler_status() -> dict[str, object]:
     """Return scheduler state for status endpoints."""
     return {
-        "enabled": _scheduler_task is not None,
+        "enabled": _scheduler_task is not None or _scheduler_enabled_without_loop,
         "running": _scheduled_backup_running,
         "last_scheduled_run": _last_scheduled_run.isoformat() if _last_scheduled_run else None,
         "next_scheduled_run": _next_scheduled_run.isoformat() if _next_scheduled_run else None,
@@ -128,15 +130,22 @@ def start_scheduler(
     times — only one scheduler task will exist.
     """
     global _scheduler_task
+    global _scheduler_loop
+    global _scheduler_enabled_without_loop
 
-    if _scheduler_task is not None:
+    if _scheduler_task is not None or _scheduler_enabled_without_loop:
         logger.info("Scheduler already running — not starting a second one")
         return
 
     interval_seconds = interval_minutes * 60
     logger.info("Starting backup scheduler: interval=%d minutes", interval_minutes)
-
-    _scheduler_task = asyncio.ensure_future(
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _scheduler_enabled_without_loop = True
+        return
+    _scheduler_loop = loop
+    _scheduler_task = loop.create_task(
         _run_scheduled_backup(
             interval_seconds=interval_seconds,
             backup_path=backup_path,
@@ -150,7 +159,17 @@ def start_scheduler(
 def stop_scheduler() -> None:
     """Cancel the scheduler task if running."""
     global _scheduler_task
+    global _scheduler_loop
+    global _scheduler_enabled_without_loop
+    _scheduler_enabled_without_loop = False
     if _scheduler_task is not None:
         _scheduler_task.cancel()
+        if _scheduler_loop is not None and not _scheduler_loop.is_running():
+            try:
+                _scheduler_loop.run_until_complete(asyncio.gather(_scheduler_task, return_exceptions=True))
+            except Exception:
+                logger.debug("Scheduler loop drain failed during stop", exc_info=True)
+            _scheduler_loop.close()
         _scheduler_task = None
+        _scheduler_loop = None
         logger.info("Scheduler stopped")

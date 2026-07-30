@@ -25,6 +25,7 @@ import { deleteFile, downloadFile, listFiles, uploadFile, type BackendFile } fro
 import { createDocument, deleteDocument, downloadDocument, downloadDocumentPack, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
+import { createSeededClientProfiles } from "../data/seeded-clients";
 import type {
   SeededClientFile,
   SeededClientProfile,
@@ -69,6 +70,7 @@ import {
   getGenerationHeaderStatus,
   getSectionProgress,
   hasValue,
+  mergeIncomeProtectionQuoteFields,
   isAffirmative,
   isPresent,
   moduleTabs,
@@ -443,6 +445,7 @@ export function IncomeProtectionPage({
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
   const quoteWorkspaceAccordion = useAccordionState(["quote-output", "generated-output"]);
+  const emptyClientFallback = useMemo(() => createSeededClientProfiles()["CLI-2026-0001"], []);
   const visibleTabs = useMemo(() => {
     if (!visibleTabIds || visibleTabIds.length === 0) {
       return moduleTabs;
@@ -642,24 +645,55 @@ export function IncomeProtectionPage({
     });
   }, [draft, saveGeneratedDraft]);
 
-  if (!client || !draft) {
-    return (
-      <section className="card">
-        <h1>Client Not Found</h1>
-        <p className="text-muted">Select a client to continue with income protection workflow.</p>
-      </section>
-    );
-  }
-
-  const resolvedDraft = draft;
+  const hasResolvedClient = Boolean(client && draft);
+  const resolvedDraft = draft ?? client ?? emptyClientFallback;
   const factFindType = resolvedDraft.factFindType ?? "all";
   const isIncomeProtectionDocumentFlow =
     quoteDocumentType === "Quote" && statementDocumentType === "Statement of Suitability";
   const isPensionsQuoteWorkflow = workflowKind === "pensions" || quoteDocumentType === "Pensions Quote";
+  const effectiveIncomeProtectionDraft = useMemo(
+    () =>
+      isPensionsQuoteWorkflow
+        ? resolvedDraft
+        : mergeIncomeProtectionQuoteFields(resolvedDraft, {
+            recommendedCover: quoteAnnualCoverAmount,
+            coverAge: quoteCoverToAge,
+            phiOccupationalClass: quoteOccupationClass,
+            deferredPeriod: quoteDeferredPeriod,
+            smokerStatus: quoteSmoker,
+            phiIndexation: quotePhiIndexation,
+          }),
+    [
+      isPensionsQuoteWorkflow,
+      quoteAnnualCoverAmount,
+      quoteCoverToAge,
+      quoteDeferredPeriod,
+      quoteOccupationClass,
+      quotePhiIndexation,
+      quoteSmoker,
+      resolvedDraft,
+    ],
+  );
   const statementQuoteRequests = isIncomeProtectionDocumentFlow
     ? getStatementQuoteRequests(resolvedDraft, quoteDocumentType, statementDocumentType)
     : [];
   const statementQuoteOptions = isIncomeProtectionDocumentFlow ? buildStatementQuoteOptions(statementQuoteRequests) : [];
+
+  useEffect(() => {
+    if (!draft || isPensionsQuoteWorkflow) {
+      return;
+    }
+
+    setQuoteAnnualCoverAmount(draft.recommendedCover || "");
+    setQuoteCoverToAge(draft.coverAge || "");
+    setQuoteOccupationClass(draft.phiOccupationalClass || "");
+    setQuoteDeferredPeriod(draft.deferredPeriod || "");
+    setQuoteSmoker(draft.smokerStatus || "");
+    setQuotePhiIndexation(draft.phiIndexation || "");
+  }, [
+    draft,
+    isPensionsQuoteWorkflow,
+  ]);
 
   function syncLocalGeneratedDraft(
     documentType: SupportedDocumentType,
@@ -860,21 +894,21 @@ export function IncomeProtectionPage({
     {
       key: "smokerStatus",
       label: "Smoker status",
-      complete: hasValue(resolvedDraft.smokerStatus),
+      complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus),
       location: "Income protection",
       target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-smokerStatus" },
     },
     {
       key: "phiOccupationalClass",
       label: "PHI occupational class",
-      complete: hasValue(resolvedDraft.phiOccupationalClass),
+      complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
       location: "Income protection",
       target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiOccupationalClass" },
     },
     {
       key: "phiIndexation",
       label: "PHI indexation",
-      complete: hasValue(resolvedDraft.phiIndexation),
+      complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation),
       location: "Income protection",
       target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiIndexation" },
     },
@@ -914,11 +948,13 @@ export function IncomeProtectionPage({
     : [
         !hasValue(resolvedDraft.fullName) ? "Client name" : null,
         !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-        !hasValue(quoteAnnualCoverAmount) ? "Annual cover amount" : null,
-        !hasValue(quoteCoverToAge) ? "Cover to age" : null,
-        !hasValue(quoteOccupationClass) ? "Occupation class" : null,
-        !hasValue(quoteDeferredPeriod) ? "Deferred period" : null,
-        !hasValue(quoteSmoker) ? "Smoker" : null,
+        !hasValue(resolvedDraft.gender) ? "Gender" : null,
+        !hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "Annual cover amount" : null,
+        !hasValue(effectiveIncomeProtectionDraft.coverAge) ? "Cover to age" : null,
+        !hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "Occupation class" : null,
+        !hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "Deferred period" : null,
+        !hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "Smoker" : null,
+        !hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "PHI indexation" : null,
       ]).filter(isPresent);
 
   const quoteGenerationRequirements: WorkflowRequirement[] = isPensionsQuoteWorkflow
@@ -933,11 +969,13 @@ export function IncomeProtectionPage({
     : [
         { key: "fullName", label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
         { key: "dateOfBirth", label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
-        { key: "quote-annualCoverAmount", label: "Annual cover amount", complete: hasValue(quoteAnnualCoverAmount), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" } },
-        { key: "quote-coverToAge", label: "Cover to age", complete: hasValue(quoteCoverToAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" } },
-        { key: "quote-occupationClass", label: "Occupation class", complete: hasValue(quoteOccupationClass), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" } },
-        { key: "quote-deferredPeriod", label: "Deferred period", complete: hasValue(quoteDeferredPeriod), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-deferredPeriod" } },
-        { key: "quote-smoker", label: "Smoker", complete: hasValue(quoteSmoker), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-smoker" } },
+        { key: "gender", label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find", target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-gender" } },
+        { key: "quote-annualCoverAmount", label: "Annual cover amount", complete: hasValue(effectiveIncomeProtectionDraft.recommendedCover), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" } },
+        { key: "quote-coverToAge", label: "Cover to age", complete: hasValue(effectiveIncomeProtectionDraft.coverAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" } },
+        { key: "quote-occupationClass", label: "Occupation class", complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" } },
+        { key: "quote-deferredPeriod", label: "Deferred period", complete: hasValue(effectiveIncomeProtectionDraft.deferredPeriod), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-deferredPeriod" } },
+        { key: "quote-smoker", label: "Smoker", complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-smoker" } },
+        { key: "quote-phiIndexation", label: "PHI indexation", complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-phiIndexation" } },
       ];
 
   const quoteWorkflowSnapshot = useMemo(
@@ -961,14 +999,8 @@ export function IncomeProtectionPage({
             monthlyContribution: quotePensionMonthlyContribution,
           }
         : {
-            ...resolvedDraft,
-            recommendedCover: quoteAnnualCoverAmount,
-            coverAge: quoteCoverToAge,
-            phiOccupationalClass: quoteOccupationClass,
-            deferredPeriod: quoteDeferredPeriod,
-            smokerStatus: quoteSmoker,
-            phiIndexation: quotePhiIndexation,
-            zurichDiscountActive: resolvedDraft.zurichDiscountActive,
+            ...effectiveIncomeProtectionDraft,
+            zurichDiscountActive: effectiveIncomeProtectionDraft.zurichDiscountActive,
           },
     [
       isPensionsQuoteWorkflow,
@@ -985,13 +1017,8 @@ export function IncomeProtectionPage({
       quotePensionRetirementAge,
       quotePensionSpousesPension,
       quoteYourAge,
+      effectiveIncomeProtectionDraft,
       resolvedDraft,
-      quoteAnnualCoverAmount,
-      quoteCoverToAge,
-      quoteDeferredPeriod,
-      quoteOccupationClass,
-      quotePhiIndexation,
-      quoteSmoker,
     ],
   );
 
@@ -1016,24 +1043,26 @@ export function IncomeProtectionPage({
           : {
               fullName: resolvedDraft.fullName,
               dateOfBirth: resolvedDraft.dateOfBirth,
-              recommendedCover: quoteAnnualCoverAmount,
-              coverAge: quoteCoverToAge,
-              phiOccupationalClass: quoteOccupationClass,
-              deferredPeriod: quoteDeferredPeriod,
-              smokerStatus: quoteSmoker,
-              phiIndexation: quotePhiIndexation,
+              recommendedCover: effectiveIncomeProtectionDraft.recommendedCover,
+              coverAge: effectiveIncomeProtectionDraft.coverAge,
+              phiOccupationalClass: effectiveIncomeProtectionDraft.phiOccupationalClass,
+              deferredPeriod: effectiveIncomeProtectionDraft.deferredPeriod,
+              smokerStatus: effectiveIncomeProtectionDraft.smokerStatus,
+              phiIndexation: effectiveIncomeProtectionDraft.phiIndexation,
               zurichDiscountActive: resolvedDraft.zurichDiscountActive,
             },
       ),
     [
       isPensionsQuoteWorkflow,
+      effectiveIncomeProtectionDraft.coverAge,
+      effectiveIncomeProtectionDraft.deferredPeriod,
+      effectiveIncomeProtectionDraft.phiIndexation,
+      effectiveIncomeProtectionDraft.phiOccupationalClass,
+      effectiveIncomeProtectionDraft.recommendedCover,
+      effectiveIncomeProtectionDraft.smokerStatus,
       resolvedDraft.dateOfBirth,
       resolvedDraft.zurichDiscountActive,
       resolvedDraft.fullName,
-      quoteAnnualCoverAmount,
-      quoteCoverToAge,
-      quoteDeferredPeriod,
-      quoteOccupationClass,
       quotePensionEscalation,
       quotePensionExistingFund,
       quotePensionGender,
@@ -1044,8 +1073,6 @@ export function IncomeProtectionPage({
       quotePensionRequired,
       quotePensionRetirementAge,
       quotePensionSpousesPension,
-      quotePhiIndexation,
-      quoteSmoker,
     ],
   );
 
@@ -1076,32 +1103,33 @@ export function IncomeProtectionPage({
     "ff-phone": hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)
       ? ""
       : "Provide either a phone number or an email address.",
-    "ff-phiIndexation": hasValue(resolvedDraft.phiIndexation) ? "" : "PHI indexation is required for the statement output.",
-    "ff-phiOccupationalClass": hasValue(resolvedDraft.phiOccupationalClass)
+    "ff-phiIndexation": hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "" : "PHI indexation is required for the statement output.",
+    "ff-phiOccupationalClass": hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass)
       ? ""
       : "PHI occupational class is required for the statement output.",
-    "ff-smokerStatus": hasValue(resolvedDraft.smokerStatus) ? "" : "Smoker status is required for the statement output.",
+    "ff-smokerStatus": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required for the statement output.",
     "ff-townCity": hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim())
       ? ""
       : "Town/county is required for document generation.",
     "ffu-personalCircumstances": hasValue(resolvedDraft.factFindUpdatePersonalCircumstances)
       ? ""
       : "Add updated personal circumstances before generating the update.",
-    "quote-annualCoverAmount": hasValue(quoteAnnualCoverAmount) ? "" : "Annual cover amount is required.",
-    "quote-coverToAge": hasValue(quoteCoverToAge) ? "" : "Cover to age is required.",
-    "quote-deferredPeriod": hasValue(quoteDeferredPeriod) ? "" : "Deferred period is required.",
-    "quote-occupationClass": hasValue(quoteOccupationClass) ? "" : "Occupation class is required.",
+    "quote-annualCoverAmount": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Annual cover amount is required.",
+    "quote-coverToAge": hasValue(effectiveIncomeProtectionDraft.coverAge) ? "" : "Cover to age is required.",
+    "quote-deferredPeriod": hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "" : "Deferred period is required.",
+    "quote-occupationClass": hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "" : "Occupation class is required.",
+    "quote-phiIndexation": hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "" : "PHI indexation is required.",
     "quote-pensionGender": hasValue(quotePensionGender) ? "" : "Gender is required.",
     "quote-pensionMonthlyContribution": hasValue(quotePensionMonthlyContribution) ? "" : "Monthly contribution is required.",
     "quote-pensionRequired": hasValue(quotePensionRequired) ? "" : "Required pension income is required.",
     "quote-pensionRetirementAge": hasValue(quotePensionRetirementAge) ? "" : "Retirement age is required.",
-    "quote-smoker": hasValue(quoteSmoker) ? "" : "Smoker status is required.",
+    "quote-smoker": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required.",
     "sos-advisorName": hasValue(resolvedDraft.advisorName) ? "" : "Advisor name is required for document generation.",
-    "sos-coverAge": hasValue(resolvedDraft.coverAge) ? "" : "Cover to age is required.",
-    "sos-deferredPeriod": hasValue(resolvedDraft.deferredPeriod) ? "" : "Deferred period is required.",
+    "sos-coverAge": hasValue(effectiveIncomeProtectionDraft.coverAge) ? "" : "Cover to age is required.",
+    "sos-deferredPeriod": hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "" : "Deferred period is required.",
     "sos-letterDate": hasValue(resolvedDraft.letterDate) ? "" : "Letter date is required for the statement.",
     "sos-productType": hasValue(resolvedDraft.productType) ? "" : "Product type is required.",
-    "sos-recommendedCover": hasValue(resolvedDraft.recommendedCover) ? "" : "Recommended cover is required.",
+    "sos-recommendedCover": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Recommended cover is required.",
     "sos-statementSelectedQuoteKey": statementHasSelectedQuote ? "" : "Choose a policy before generating the statement.",
     "sos-statementType": hasValue(resolvedDraft.statementType) ? "" : "Statement type is required.",
   };
@@ -1136,9 +1164,16 @@ export function IncomeProtectionPage({
     {
       id: "income-protection",
       title: "Income protection",
-      completeCount: [hasValue(resolvedDraft.smokerStatus), hasValue(resolvedDraft.phiOccupationalClass), hasValue(resolvedDraft.phiIndexation)].filter(Boolean).length,
+      completeCount: [
+        hasValue(effectiveIncomeProtectionDraft.smokerStatus),
+        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
+        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
+      ].filter(Boolean).length,
       requiredCount: 3,
-      complete: hasValue(resolvedDraft.smokerStatus) && hasValue(resolvedDraft.phiOccupationalClass) && hasValue(resolvedDraft.phiIndexation),
+      complete:
+        hasValue(effectiveIncomeProtectionDraft.smokerStatus) &&
+        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) &&
+        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
     },
   ];
 
@@ -1911,12 +1946,13 @@ export function IncomeProtectionPage({
   }
 
   async function saveStatementDraft() {
+    const statementDraft = isIncomeProtectionDocumentFlow ? effectiveIncomeProtectionDraft : resolvedDraft;
     if (!canUseBackend) {
-      void persistDraft(resolvedDraft, { showToast: true });
+      void persistDraft(statementDraft, { showToast: true });
       setStatementSaveStatus("Saved just now");
       return;
     }
-    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
+    const { savedRemotely } = await persistDraft(statementDraft, { showToast: true });
     setStatementSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
@@ -1952,6 +1988,7 @@ export function IncomeProtectionPage({
   }
 
   async function handleStatementGenerate() {
+    const statementDraft = isIncomeProtectionDocumentFlow ? effectiveIncomeProtectionDraft : resolvedDraft;
     if (statementMissingFields.length > 0) {
       setShowStatementValidation(true);
       setStatementDocumentStatus("Document: Blocked by missing required fields");
@@ -1961,19 +1998,19 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     await saveStatementDraft();
     setStatementDocumentStatus("Document: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, { generationStatus: "generating" });
+    saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, { generationStatus: "generating" });
     try {
       const generatedDocument = await generateDocument({
-        clientReference: resolvedDraft.clientReference,
+        clientReference: statementDraft.clientReference,
         documentType: statementDocumentType,
         templateId: getDocumentDraft(statementDocumentType).selectedTemplateId,
-        workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
+        workflowSnapshot: statementDraft as unknown as Record<string, unknown>,
       });
       const integrationRequests = resolveStatementIntegrationRequests(
         getDocumentDraft(quoteDocumentType).integrationRequests,
         generatedDocument.integrationRequests,
       );
-      saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, {
+      saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
@@ -1986,7 +2023,7 @@ export function IncomeProtectionPage({
       setStatementDocumentStatus("Document: Draft generated");
       addToast(`${statementDocumentType} draft generated`, "success");
     } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, statementDocumentType, { generationStatus: "failed" });
+      saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, { generationStatus: "failed" });
       setStatementDocumentStatus("Document: Draft generation failed");
       addToast(`Failed to generate ${statementDocumentType} draft`, "error");
     }
@@ -2270,6 +2307,15 @@ export function IncomeProtectionPage({
       "generated-documents": generatedComplete ? "complete" : "incomplete",
     } as Record<(typeof moduleTabs)[number]["id"], "complete" | "partial" | "incomplete">;
   }, [resolvedDraft]);
+
+  if (!hasResolvedClient) {
+    return (
+      <section className="card">
+        <h1>Client Not Found</h1>
+        <p className="text-muted">Select a client to continue with income protection workflow.</p>
+      </section>
+    );
+  }
 
   function requiredLabel(label: string) {
     return (
@@ -3769,42 +3815,60 @@ export function IncomeProtectionPage({
                     <Input
                       id="quote-annualCoverAmount"
                       label={requiredLabel("Annual Cover Amount")}
-                      onChange={(event) => setQuoteAnnualCoverAmount(event.target.value)}
+                      onChange={(event) => {
+                        setQuoteAnnualCoverAmount(event.target.value);
+                        updateField("recommendedCover", event.target.value);
+                      }}
                       type="text"
                       value={quoteAnnualCoverAmount}
                     />
                     <Select
                       id="quote-coverToAge"
                       label={requiredLabel("Cover to Age")}
-                      onChange={(event) => setQuoteCoverToAge(event.target.value)}
+                      onChange={(event) => {
+                        setQuoteCoverToAge(event.target.value);
+                        updateField("coverAge", event.target.value);
+                      }}
                       options={coverAgeOptions}
                       value={quoteCoverToAge}
                     />
                     <Select
                       id="quote-occupationClass"
                       label={requiredLabel("Occupation Class")}
-                      onChange={(event) => setQuoteOccupationClass(event.target.value)}
+                      onChange={(event) => {
+                        setQuoteOccupationClass(event.target.value);
+                        updateField("phiOccupationalClass", event.target.value);
+                      }}
                       options={phiOccupationalClassOptions}
                       value={quoteOccupationClass}
                     />
                     <Select
                       id="quote-deferredPeriod"
                       label={requiredLabel("Deferred Period")}
-                      onChange={(event) => setQuoteDeferredPeriod(event.target.value)}
+                      onChange={(event) => {
+                        setQuoteDeferredPeriod(event.target.value);
+                        updateField("deferredPeriod", event.target.value);
+                      }}
                       options={deferredPeriodOptions}
                       value={quoteDeferredPeriod}
                     />
                     <Select
                       id="quote-smoker"
                       label={requiredLabel("Smoker")}
-                      onChange={(event) => setQuoteSmoker(event.target.value)}
+                      onChange={(event) => {
+                        setQuoteSmoker(event.target.value);
+                        updateField("smokerStatus", event.target.value);
+                      }}
                       options={smokerStatusOptions}
                       value={quoteSmoker}
                     />
                     <Select
                       id="quote-phiIndexation"
                       label="PHI Indexation"
-                      onChange={(event) => setQuotePhiIndexation(event.target.value)}
+                      onChange={(event) => {
+                        setQuotePhiIndexation(event.target.value);
+                        updateField("phiIndexation", event.target.value);
+                      }}
                       options={phiIndexationOptions}
                       value={quotePhiIndexation}
                     />
