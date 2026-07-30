@@ -13,7 +13,13 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
+    if not password_hash or "$" not in password_hash:
+        return False
+
     salt, digest = password_hash.split("$", maxsplit=1)
+    if not salt or not digest:
+        return False
+
     candidate = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 200_000)
     return hmac.compare_digest(candidate.hex(), digest)
 
