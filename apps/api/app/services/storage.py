@@ -1,14 +1,47 @@
 """Storage service for client file operations on disk.
 
-Writes files under FILE_STORAGE_PATH / {client_slug} / and provides
-deterministic safe filenames.
+Writes files under FILE_STORAGE_PATH / {client_slug} / {workflow_slug} /
+{files|documents} / and provides deterministic safe filenames.
 """
 
 from __future__ import annotations
 
 import re
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
+
+DOCUMENT_BUCKET = "documents"
+FILE_BUCKET = "files"
+GENERAL_WORKFLOW = "general"
+INCOME_PROTECTION_WORKFLOW = "income-protection"
+PENSIONS_WORKFLOW = "pensions"
+
+
+def normalize_workflow_slug(value: str | None) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
+    if not normalized:
+        return GENERAL_WORKFLOW
+    if normalized in {"fact-find", "fact-find-update", "income-protection", "files-docs"}:
+        return INCOME_PROTECTION_WORKFLOW
+    if normalized in {"pensions", "pension"}:
+        return PENSIONS_WORKFLOW
+    return normalized
+
+
+def workflow_slug_for_document_type(document_type: str | None) -> str:
+    normalized = (document_type or "").strip().lower()
+    if "pension" in normalized:
+        return PENSIONS_WORKFLOW
+    if normalized in {
+        "fact find",
+        "fact find update",
+        "terms of business",
+        "statement of suitability",
+        "quote",
+    }:
+        return INCOME_PROTECTION_WORKFLOW
+    return GENERAL_WORKFLOW
 
 
 def _safe_filename(original: str) -> str:
@@ -40,12 +73,27 @@ class ClientStorage:
         folder.mkdir(parents=True, exist_ok=True)
         return folder
 
-    def save_file(self, client_slug: str, filename: str, content: bytes) -> Path:
+    def ensure_client_workflow_folder(self, client_slug: str, year: int, workflow_slug: str, bucket: str) -> Path:
+        folder = self.ensure_client_folder(client_slug) / str(year) / normalize_workflow_slug(workflow_slug) / bucket
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
+
+    def save_file(
+        self,
+        client_slug: str,
+        filename: str,
+        content: bytes,
+        *,
+        year: int | None = None,
+        workflow_slug: str = GENERAL_WORKFLOW,
+        bucket: str = FILE_BUCKET,
+    ) -> Path:
         """Write file bytes to the client folder.
 
         Returns the full resolved path of the saved file.
         """
-        folder = self.ensure_client_folder(client_slug)
+        resolved_year = year or datetime.now(UTC).year
+        folder = self.ensure_client_workflow_folder(client_slug, resolved_year, workflow_slug, bucket)
         stored_name = _unique_filename(filename)
         filepath = folder / stored_name
         filepath.write_bytes(content)

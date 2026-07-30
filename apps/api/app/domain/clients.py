@@ -26,6 +26,14 @@ def build_client_reference(year: int, sequence: int) -> str:
 
 
 def build_client_storage_slug(client_reference: str, client: ClientRecord) -> str:
-    surname = re.sub(r"[^a-z0-9]+", "-", client.surname.lower().replace("'", "")).strip("-")
-    first_name = re.sub(r"[^a-z0-9]+", "-", client.first_name.lower().replace("'", "")).strip("-")
-    return f"{client_reference}-{surname}-{first_name}"
+    def _clean_name_part(value: str, fallback: str) -> str:
+        cleaned = re.sub(r"\s+", " ", value.replace("/", " ").replace("\\", " ").strip())
+        cleaned = cleaned.strip(" .")
+        return cleaned or fallback
+
+    match = re.search(r"(\d+)$", client_reference)
+    omega_numeric_id = match.group(1) if match else "00000"
+    omega_id = f"omega-{omega_numeric_id.zfill(5)}"
+    surname = _clean_name_part(client.surname, "Unknown")
+    first_name = _clean_name_part(client.first_name, "Unknown")
+    return f"{surname}, {first_name} - {omega_id}"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Edit,
@@ -17,7 +17,18 @@ import {
   Eye,
 } from "lucide-react";
 
+import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
+import {
+  deleteFile as deleteBackendFile,
+  downloadFile as downloadBackendFile,
+  listFiles,
+  uploadFile,
+} from "../data/file-api";
+import {
+  downloadDocument as downloadBackendDocument,
+  listDocuments,
+} from "../documents/generated-document-api";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
 import { Badge, Button, Input, Modal, Textarea, useToast } from "../components/ui";
 
@@ -76,10 +87,51 @@ function getStatusVariant(status: string): Parameters<typeof Badge>[0]["variant"
   return "default";
 }
 
+function mapBackendDocumentToSeeded(document: {
+  id: string;
+  document_type: string;
+  document_name: string;
+  version: string | null;
+  status: string;
+  generated_at: string | null;
+  preview_html: string | null;
+  preview_title: string | null;
+}): SeededGeneratedDocument {
+  return {
+    id: document.id,
+    documentType: document.document_type,
+    documentName: document.document_name,
+    version: document.version ?? "1",
+    status: document.status,
+    generatedAt: document.generated_at ?? "",
+    previewHtml: document.preview_html ?? undefined,
+    previewTitle: document.preview_title ?? undefined,
+  };
+}
+
+function mapBackendFileToSeeded(file: {
+  id: string;
+  category: string;
+  original_filename: string;
+  status: string;
+  uploaded_by: string | null;
+  uploaded_at: string | null;
+}): SeededClientFile {
+  return {
+    id: file.id,
+    category: file.category,
+    originalFilename: file.original_filename,
+    status: file.status,
+    uploadedBy: file.uploaded_by ?? "System",
+    uploadedAt: file.uploaded_at ?? "",
+  };
+}
+
 export function ClientProfilePage() {
   const { clientReference = "" } = useParams();
   const navigate = useNavigate();
-  const { getClient, saveClient } = useClientData();
+  const { user } = useAuth();
+  const { getClient } = useClientData();
   const { addToast } = useToast();
   const client = getClient(clientReference);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
@@ -90,15 +142,45 @@ export function ClientProfilePage() {
   const [dependantName, setDependantName] = useState("");
   const [dependantDob, setDependantDob] = useState("");
   const [dependantRelationship, setDependantRelationship] = useState("");
+  const [backendDocuments, setBackendDocuments] = useState<SeededGeneratedDocument[]>([]);
+  const [backendFiles, setBackendFiles] = useState<SeededClientFile[]>([]);
+  const [artifactsLoaded, setArtifactsLoaded] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const canUseBackend = Boolean(user);
 
   useEffect(() => {
     setDraft(client ?? null);
   }, [client]);
 
+  async function refreshArtifacts() {
+    if (!canUseBackend || !clientReference) {
+      return;
+    }
+
+    const [documents, files] = await Promise.all([
+      listDocuments(clientReference),
+      listFiles(clientReference),
+    ]);
+
+    setBackendDocuments(documents.map(mapBackendDocumentToSeeded));
+    setBackendFiles(files.map(mapBackendFileToSeeded));
+    setArtifactsLoaded(true);
+  }
+
+  useEffect(() => {
+    void refreshArtifacts().catch(() => {
+      addToast("Failed to load client files and documents", "error");
+    });
+  }, [addToast, canUseBackend, clientReference]);
+
   const documents = useMemo(
     () =>
-      draft?.generatedDocuments.length
-        ? draft.generatedDocuments
+      canUseBackend && artifactsLoaded
+        ? backendDocuments
+        : backendDocuments.length > 0
+        ? backendDocuments
+        : draft?.generatedDocuments.length
+          ? draft.generatedDocuments
         : [
             {
               id: "placeholder-fact-find",
@@ -125,7 +207,7 @@ export function ClientProfilePage() {
               generatedAt: "",
             },
           ],
-    [draft?.generatedDocuments],
+    [artifactsLoaded, backendDocuments, canUseBackend, draft?.generatedDocuments],
   );
 
   if (!client || !draft) {
@@ -142,44 +224,63 @@ export function ClientProfilePage() {
 
   const resolvedDraft = draft;
 
-  function handleDownloadDocument(document: SeededGeneratedDocument) {
+  async function handleDownloadDocument(document: SeededGeneratedDocument) {
+    if (canUseBackend) {
+      await downloadBackendDocument(clientReference, document.id, document.documentName);
+    }
     addToast(`Downloaded ${document.documentName}`, "success");
   }
 
   function handleRegenerateDocument(document: SeededGeneratedDocument) {
-    addToast(`Regenerating ${document.documentName}...`, "info");
+    addToast(`Open the workflow to regenerate ${document.documentName}`, "info");
+    navigate(`/clients/${clientReference}/income-protection`);
   }
 
-  function handleDownloadFile(file: SeededClientFile) {
+  async function handleDownloadFile(file: SeededClientFile) {
+    if (canUseBackend) {
+      await downloadBackendFile(clientReference, file.id, file.originalFilename);
+    }
     addToast(`Downloaded ${file.originalFilename}`, "success");
   }
 
-  function handleDeleteFile(file: SeededClientFile) {
-    setDraft((currentDraft) => {
-      if (!currentDraft) {
-        return currentDraft;
-      }
-      return { ...currentDraft, files: currentDraft.files.filter((entry) => entry.id !== file.id) };
-    });
+  async function handleDeleteFile(file: SeededClientFile) {
+    if (canUseBackend) {
+      await deleteBackendFile(clientReference, file.id);
+      setBackendFiles((currentFiles) => currentFiles.filter((entry) => entry.id !== file.id));
+    } else {
+      setDraft((currentDraft) => {
+        if (!currentDraft) {
+          return currentDraft;
+        }
+        return { ...currentDraft, files: currentDraft.files.filter((entry) => entry.id !== file.id) };
+      });
+    }
     addToast(`Deleted ${file.originalFilename}`, "success");
   }
 
   function handleUploadFile() {
-    const nextFile: SeededClientFile = {
-      id: `FILE-${Date.now()}`,
-      category: "Uploads",
-      originalFilename: `${resolvedDraft.surname || "Client"}_uploaded_note.txt`,
-      status: "Pending review",
-      uploadedBy: resolvedDraft.updatedBy,
-      uploadedAt: new Date().toISOString().slice(0, 10),
-    };
-    setDraft((currentDraft) => {
-      if (!currentDraft) {
-        return currentDraft;
+    fileInputRef.current?.click();
+  }
+
+  async function handleUploadFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      if (canUseBackend) {
+        const uploaded = await uploadFile(clientReference, file, "Client Upload", "general");
+        setBackendFiles((currentFiles) => [mapBackendFileToSeeded(uploaded), ...currentFiles]);
       }
-      return { ...currentDraft, files: [nextFile, ...currentDraft.files] };
-    });
-    addToast("File uploaded successfully", "success");
+      addToast("File uploaded successfully", "success");
+    } catch {
+      addToast("File upload failed", "error");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   }
 
   function handleAddDependant() {
@@ -221,11 +322,9 @@ export function ClientProfilePage() {
 
   async function handleSaveDocuments() {
     setSaveStatus("saving");
-    // Simulate a brief save for UX feedback.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    saveClient(resolvedDraft);
+    await refreshArtifacts();
     setSaveStatus("saved");
-    addToast("Documents saved", "success");
+    addToast("Files and documents refreshed", "success");
     setTimeout(() => setSaveStatus("notSaved"), 2000);
   }
 
@@ -354,7 +453,14 @@ export function ClientProfilePage() {
             Upload File
           </Button>
         </div>
-        {resolvedDraft.files.length === 0 ? (
+        <input
+          accept="*/*"
+          onChange={(event) => void handleUploadFileSelection(event)}
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          type="file"
+        />
+        {((canUseBackend && artifactsLoaded) ? backendFiles : resolvedDraft.files).length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <FolderOpen size={28} />
@@ -368,7 +474,7 @@ export function ClientProfilePage() {
           </div>
         ) : (
           <div className="file-list">
-            {resolvedDraft.files.map((file) => (
+            {((canUseBackend && artifactsLoaded) ? backendFiles : resolvedDraft.files).map((file) => (
               <div key={file.id} className="file-item">
                 <div className="file-icon">
                   <FileIcon filename={file.originalFilename} />
@@ -384,11 +490,11 @@ export function ClientProfilePage() {
                   </div>
                 </div>
                 <div className="file-actions">
-                  <Button className="btn-sm" onClick={() => handleDownloadFile(file)} variant="secondary">
+                  <Button className="btn-sm" onClick={() => void handleDownloadFile(file)} variant="secondary">
                     <Download size={14} />
                     Download
                   </Button>
-                  <Button className="btn-sm" onClick={() => handleDeleteFile(file)} variant="danger">
+                  <Button className="btn-sm" onClick={() => void handleDeleteFile(file)} variant="danger">
                     <Trash2 size={14} />
                     Delete
                   </Button>

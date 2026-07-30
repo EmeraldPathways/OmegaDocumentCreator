@@ -24,6 +24,7 @@ export type CreateDocumentPayload = {
   status?: string;
   preview_title?: string;
   preview_html?: string;
+  workflow?: string;
 };
 
 export type CreateDocumentArtifact = {
@@ -62,6 +63,7 @@ export async function createDocument(
     if (payload.status) form.append("status", payload.status);
     if (payload.preview_title) form.append("preview_title", payload.preview_title);
     if (payload.preview_html) form.append("preview_html", payload.preview_html);
+    if (payload.workflow) form.append("workflow", payload.workflow);
     form.append("artifact", new File([artifact.blob], artifact.filename, { type: artifact.contentType }));
     body = form;
     headers = undefined;

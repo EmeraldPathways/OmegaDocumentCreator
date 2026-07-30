@@ -19,11 +19,15 @@ export async function uploadFile(
   clientReference: string,
   file: File,
   category?: string,
+  workflow?: string,
 ): Promise<BackendFile> {
   const form = new FormData();
   form.append("file", file);
   if (category) {
     form.append("category", category);
+  }
+  if (workflow) {
+    form.append("workflow", workflow);
   }
 
   const response = await fetch(

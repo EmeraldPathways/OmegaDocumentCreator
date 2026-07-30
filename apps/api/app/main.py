@@ -36,9 +36,36 @@ from app.repositories.workflows import WorkflowRepository
 from app.security import hash_password, is_session_expired, verify_password
 from app.services.backups import create_backup_manifest
 from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, validate_restore
-from app.services.storage import ClientStorage
+from app.services.storage import (
+    DOCUMENT_BUCKET,
+    FILE_BUCKET,
+    ClientStorage,
+    normalize_workflow_slug,
+    workflow_slug_for_document_type,
+)
 
 settings = get_settings()
+
+SYSTEM_ACCESS_EMAILS = {
+    "andrew@omegafinancial.ie",
+}
+
+FULL_RECORD_ACCESS_EMAILS = {
+    "info@omegafinancial.ie",
+    "john@omegafinancial.ie",
+    "aideen@omegafinancial.ie",
+    "aimee@omegafinancial.ie",
+}
+
+OWN_RECORD_ACCESS_EMAILS = {
+    "sophie@omegafinancial.ie",
+    "declan@omegafinancial.ie",
+    "tadhg@omegafinancial.ie",
+}
+
+DELEGATED_OWNER_ACCESS: dict[str, set[str]] = {
+    "alison@omegafinancial.ie": {"john@omegafinancial.ie"},
+}
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
 app.db = app_db
@@ -304,9 +331,73 @@ def _current_user(request: Request) -> dict[str, str]:
 
 def _require_admin(request: Request) -> dict[str, str]:
     user = _current_user(request)
-    if user["role"] != UserRole.ADMIN.value:
+    if not _is_admin_user(user):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+def _normalized_email(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _is_admin_user(user: dict[str, str]) -> bool:
+    email = _normalized_email(user.get("email"))
+    return user.get("role") == UserRole.ADMIN.value or email in SYSTEM_ACCESS_EMAILS
+
+
+def _has_global_record_access(user: dict[str, str]) -> bool:
+    email = _normalized_email(user.get("email"))
+    return email in SYSTEM_ACCESS_EMAILS or email in FULL_RECORD_ACCESS_EMAILS
+
+
+def _can_create_client(user: dict[str, str]) -> bool:
+    email = _normalized_email(user.get("email"))
+    return _has_global_record_access(user) or email in OWN_RECORD_ACCESS_EMAILS
+
+
+def _resolve_user_email_by_id(db: object, user_id: uuid.UUID | None) -> str:
+    if user_id is None:
+        return ""
+    user_repo = UserRepository(db)
+    user_model = user_repo.get_by_id(user_id)
+    return _normalized_email(user_model.email if user_model else "")
+
+
+def _can_access_owner_email(user: dict[str, str], owner_email: str) -> bool:
+    user_email = _normalized_email(user.get("email"))
+    record_owner = _normalized_email(owner_email)
+    if _has_global_record_access(user):
+        return True
+    if user_email in OWN_RECORD_ACCESS_EMAILS:
+        return bool(record_owner) and record_owner == user_email
+    delegated_owners = DELEGATED_OWNER_ACCESS.get(user_email, set())
+    return bool(record_owner) and record_owner in delegated_owners
+
+
+def _can_access_client_record(user: dict[str, str], db: object, client: ClientRecord | object) -> bool:
+    owner_id = getattr(client, "created_by", None)
+    owner_email = _resolve_user_email_by_id(db, owner_id)
+    return _can_access_owner_email(user, owner_email)
+
+
+def _require_client_access(
+    user: dict[str, str],
+    db: object,
+    client_reference: str,
+) -> object:
+    client_repo = ClientRepository(db)
+    client = client_repo.get_by_reference(client_reference)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if not _can_access_client_record(user, db, client):
+        raise HTTPException(status_code=403, detail="Access denied for this client")
+    return client
+
+
+def _resolve_storage_workflow_slug(*, workflow_hint: str | None = None, document_type: str | None = None) -> str:
+    if workflow_hint and workflow_hint.strip():
+        return normalize_workflow_slug(workflow_hint)
+    return workflow_slug_for_document_type(document_type)
 
 
 # ---------------------------------------------------------------------------
@@ -539,12 +630,12 @@ def me(request: Request) -> dict[str, dict[str, str]]:
 
 @app.get("/clients")
 def clients(request: Request) -> dict[str, list[dict[str, object]]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
         repo = ClientRepository(db)
         all_clients = repo.list_all()
-        items = [repo._to_list_item(c) for c in all_clients]
+        items = [repo._to_list_item(c) for c in all_clients if _can_access_client_record(user, db, c)]
         db.commit()
         return {"items": items}
     finally:
@@ -554,6 +645,8 @@ def clients(request: Request) -> dict[str, list[dict[str, object]]]:
 @app.post("/clients", status_code=201)
 def create_client_record(payload: ClientCreateRequest, request: Request) -> dict[str, dict[str, object]]:
     user = _current_user(request)
+    if not _can_create_client(user):
+        raise HTTPException(status_code=403, detail="Access denied for creating clients")
     db = get_session()
     try:
         repo = ClientRepository(db)
@@ -586,13 +679,11 @@ def create_client_record(payload: ClientCreateRequest, request: Request) -> dict
 
 @app.get("/clients/{client_reference}")
 def client_detail(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
         repo = ClientRepository(db)
-        client = repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
         item = repo._to_detail_response(client)
         db.commit()
         return {"item": item}
@@ -608,6 +699,7 @@ def update_client_record(
     db = get_session()
     try:
         repo = ClientRepository(db)
+        _require_client_access(user, db, client_reference)
         updates = {key: value for key, value in payload.model_dump().items() if value is not None}
         item = repo.update(client_reference, updates, updated_by_email=user["email"])
         if not item:
@@ -653,13 +745,10 @@ def archive_client_record(client_reference: str, request: Request) -> dict[str, 
 
 @app.get("/clients/{client_reference}/workflow")
 def get_workflow(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
         workflow_repo = WorkflowRepository(db)
         fields = workflow_repo.get(client.id)
         db.commit()
@@ -670,13 +759,10 @@ def get_workflow(client_reference: str, request: Request) -> dict[str, dict[str,
 
 @app.put("/clients/{client_reference}/workflow")
 def save_workflow(client_reference: str, payload: dict[str, object], request: Request) -> dict[str, dict[str, str]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
         workflow_repo = WorkflowRepository(db)
         try:
             workflow_repo.save(client.id, payload)
@@ -725,8 +811,7 @@ def generate_document_record(
     current_user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(payload.client_reference)
+        client = _require_client_access(current_user, db, payload.client_reference)
         item = generate_document(
             settings=settings,
             client_reference=payload.client_reference,
@@ -755,8 +840,7 @@ def generate_statement_quote(
     current_user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(payload.client_reference)
+        client = _require_client_access(current_user, db, payload.client_reference)
         integration_requests = build_statement_quote_requests(
             settings=settings,
             workflow_snapshot=payload.workflow_snapshot,
@@ -777,14 +861,10 @@ def generate_statement_quote(
 
 @app.get("/clients/{client_reference}/documents")
 def list_documents(client_reference: str, request: Request) -> dict[str, list[dict[str, object]]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-
+        client = _require_client_access(user, db, client_reference)
         doc_repo = DocumentRepository(db)
         docs = doc_repo.list_by_client(client.id)
         items = [_document_to_response(d) for d in docs]
@@ -799,11 +879,7 @@ async def create_document_record(client_reference: str, request: Request) -> dic
     current_user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-
+        client = _require_client_access(current_user, db, client_reference)
         doc_repo = DocumentRepository(db)
         user_repo = UserRepository(db)
         user_model = user_repo.get_by_email(current_user["email"])
@@ -819,6 +895,7 @@ async def create_document_record(client_reference: str, request: Request) -> dic
                 "status": form.get("status"),
                 "preview_title": form.get("preview_title"),
                 "preview_html": form.get("preview_html"),
+                "workflow": form.get("workflow"),
             }
             uploaded = form.get("artifact")
         else:
@@ -852,7 +929,17 @@ async def create_document_record(client_reference: str, request: Request) -> dic
 
             storage = ClientStorage(settings.file_storage_path)
             slug = _build_client_slug_from_model(client)
-            filepath = storage.save_file(slug, artifact_name, artifact_content)
+            workflow_slug = _resolve_storage_workflow_slug(
+                workflow_hint=str(payload.get("workflow") or ""),
+                document_type=doc_type,
+            )
+            filepath = storage.save_file(
+                slug,
+                artifact_name,
+                artifact_content,
+                workflow_slug=workflow_slug,
+                bucket=DOCUMENT_BUCKET,
+            )
             relative_path = str(filepath.relative_to(settings.file_storage_path))
             suffix = filepath.suffix.lower()
             doc_repo.update_artifact_paths(
@@ -877,14 +964,10 @@ async def create_document_record(client_reference: str, request: Request) -> dic
 
 @app.get("/clients/{client_reference}/documents/{document_id}/download")
 def download_document(client_reference: str, document_id: str, request: Request) -> object:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-
+        client = _require_client_access(user, db, client_reference)
         doc_repo = DocumentRepository(db)
         doc = doc_repo.get_by_id(document_id)
         if not doc or doc.client_id != client.id:
@@ -935,14 +1018,10 @@ def download_document(client_reference: str, document_id: str, request: Request)
 @app.get("/clients/{client_reference}/documents/pack")
 def download_document_pack(client_reference: str, request: Request) -> object:
     """Return a ZIP containing all generated document artifacts for a client."""
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-
+        client = _require_client_access(user, db, client_reference)
         doc_repo = DocumentRepository(db)
         docs = doc_repo.list_by_client(client.id)
 
@@ -1004,13 +1083,10 @@ def download_document_pack(client_reference: str, request: Request) -> object:
 @app.delete("/clients/{client_reference}/documents/{document_id}")
 def delete_document(client_reference: str, document_id: str, request: Request) -> dict[str, object]:
     """Delete a generated document — DB row and all disk artifacts."""
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
 
         doc_repo = DocumentRepository(db)
         doc = doc_repo.get_by_id(document_id)
@@ -1528,10 +1604,7 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
     user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
 
         # Read the multipart upload
         form = await request.form()
@@ -1549,6 +1622,7 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
             )
 
         category = str(form.get("category", "General"))
+        workflow_slug = _resolve_storage_workflow_slug(workflow_hint=str(form.get("workflow") or ""))
 
         # Determine file type from extension
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -1557,7 +1631,13 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
         # Write to disk
         storage = ClientStorage(settings.file_storage_path)
         slug = _build_client_slug_from_model(client)
-        filepath = storage.save_file(slug, filename, content)
+        filepath = storage.save_file(
+            slug,
+            filename,
+            content,
+            workflow_slug=workflow_slug,
+            bucket=FILE_BUCKET,
+        )
 
         # Persist metadata
         file_repo = FileRepository(db)
@@ -1591,13 +1671,10 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
 
 @app.get("/clients/{client_reference}/files")
 def list_files(client_reference: str, request: Request) -> dict[str, list[dict[str, object]]]:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
 
         file_repo = FileRepository(db)
         file_models = file_repo.list_by_client(client.id)
@@ -1610,13 +1687,10 @@ def list_files(client_reference: str, request: Request) -> dict[str, list[dict[s
 
 @app.get("/clients/{client_reference}/files/{file_id}/download")
 def download_file(client_reference: str, file_id: str, request: Request) -> object:
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
 
         file_repo = FileRepository(db)
         file_model = file_repo.get_by_id(uuid.UUID(file_id))
@@ -1651,13 +1725,10 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
 @app.delete("/clients/{client_reference}/files/{file_id}")
 def delete_file(client_reference: str, file_id: str, request: Request) -> dict[str, object]:
     """Delete a client file — DB row and disk artifact."""
-    _current_user(request)
+    user = _current_user(request)
     db = get_session()
     try:
-        client_repo = ClientRepository(db)
-        client = client_repo.get_by_reference(client_reference)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
+        client = _require_client_access(user, db, client_reference)
 
         file_repo = FileRepository(db)
         file_model = file_repo.get_by_id(uuid.UUID(file_id))

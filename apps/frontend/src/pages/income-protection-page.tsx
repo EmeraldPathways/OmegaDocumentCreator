@@ -1836,6 +1836,7 @@ export function IncomeProtectionPage({
           status: nextDocument.status,
           preview_title: nextDocument.previewTitle,
           preview_html: nextDocument.previewHtml,
+          workflow: workflowKind,
         },
         {
           blob: artifactBlob,
@@ -2102,7 +2103,7 @@ export function IncomeProtectionPage({
         return;
       }
 
-      const uploaded = await uploadFile(selectedClientReference, file);
+      const uploaded = await uploadFile(selectedClientReference, file, "Client Upload", workflowKind);
       setUploadProgress(100);
       setFileUploadStatus("Upload: File saved");
       setBackendFiles((current) => [uploaded, ...current]);
