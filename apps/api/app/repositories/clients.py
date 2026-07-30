@@ -108,6 +108,7 @@ class ClientRepository:
             "title": client.title or "",
             "status": client.status,
             "created_by": self._user_email_by_id(client.created_by),
+            "assigned_to": self._user_email_by_id(client.assigned_to),
             "updated_by": self._user_email_by_id(client.updated_by),
             "created_at": client.created_at.isoformat() if client.created_at else "",
             "updated_at": client.updated_at.isoformat() if client.updated_at else "",
@@ -137,6 +138,7 @@ class ClientRepository:
             "full_name": client.full_name,
             "status": client.status,
             "created_by": self._user_email_by_id(client.created_by),
+            "assigned_to": self._user_email_by_id(client.assigned_to),
             "updated_by": self._user_email_by_id(client.updated_by),
         }
 
@@ -156,8 +158,15 @@ class ClientRepository:
         title: str,
         town_city: str,
         county: str,
+        home_address_line_1: str = "",
+        home_address_line_2: str = "",
+        work_phone: str = "",
+        eircode: str = "",
+        partner_name: str = "",
+        partner_address: str = "",
         dependants: list[dict[str, str]],
         created_by_email: str,
+        assigned_to_email: str | None = None,
     ) -> dict[str, object]:
         from app.domain.clients import build_client_reference
 
@@ -167,6 +176,7 @@ class ClientRepository:
         client_reference = build_client_reference(current_year, seq)
 
         created_by_id = self._user_id_by_email(created_by_email)
+        assigned_to_id = self._user_id_by_email(assigned_to_email or created_by_email)
 
         client = Client(
             client_reference=client_reference,
@@ -178,10 +188,17 @@ class ClientRepository:
             date_of_birth=self._parse_date(date_of_birth),
             mobile_number=mobile_number or None,
             email=email or None,
+            work_phone=work_phone or None,
+            home_address_line_1=home_address_line_1 or None,
+            home_address_line_2=home_address_line_2 or None,
             town_city=town_city or None,
             county=county or None,
+            eircode=eircode or None,
+            partner_name=partner_name or None,
+            partner_address=partner_address or None,
             status=ClientStatus.DRAFT.value,
             created_by=created_by_id,
+            assigned_to=assigned_to_id,
             updated_by=created_by_id,
         )
         self._db.add(client)
@@ -230,6 +247,10 @@ class ClientRepository:
 
         if "first_name" in updates or "surname" in updates:
             client.full_name = f"{client.first_name} {client.surname}".strip()
+
+        if "assigned_to" in updates:
+            assigned_email = str(updates["assigned_to"] or "").strip().lower()
+            client.assigned_to = self._user_id_by_email(assigned_email) if assigned_email else None
 
         client.updated_by = updated_by_id
 

@@ -50,3 +50,10 @@ class SessionRepository:
             SessionModel.expires_at <= datetime.now(UTC),
         ).delete()
         return result
+
+    def count_active(self) -> int:
+        return (
+            self._db.query(SessionModel)
+            .filter(SessionModel.expires_at > datetime.now(UTC))
+            .count()
+        )

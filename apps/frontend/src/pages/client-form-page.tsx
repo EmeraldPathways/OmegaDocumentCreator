@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Save, X, ArrowLeft } from "lucide-react";
 
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
+import { listAssignableUsers, type AdminUser } from "../data/admin-api";
 import { createSeededClientProfiles, type SeededClientProfile } from "../data/seeded-clients";
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
 import { Button, Input, Select, Textarea, useToast } from "../components/ui";
@@ -114,18 +115,20 @@ function buildFullName(firstName: string, surname: string) {
 }
 
 function resolveActorLabel(role: string | null | undefined) {
-  return role === "admin" ? "Omega Admin" : "Office Staff";
+  return role === "admin" ? "admin" : "staff";
 }
 
 export function ClientFormPage() {
   const { clientReference } = useParams();
   const navigate = useNavigate();
-  const { getClient, listClients, saveClient } = useClientData();
+  const { getClient, listClients, saveClient, refreshClients } = useClientData();
   const { user } = useAuth();
   const { addToast } = useToast();
   const isEdit = Boolean(clientReference);
-  const actorLabel = resolveActorLabel(user?.role);
+  const actorLabel = user?.email ?? resolveActorLabel(user?.role);
   const existingClient = clientReference ? getClient(clientReference) : undefined;
+  const [assignableUsers, setAssignableUsers] = useState<AdminUser[]>([]);
+  const [isClientLoading, setIsClientLoading] = useState(Boolean(isEdit && !existingClient));
 
   const [formState, setFormState] = useState<SeededClientProfile>(() => {
     if (existingClient) {
@@ -146,8 +149,24 @@ export function ClientFormPage() {
   useEffect(() => {
     if (existingClient) {
       setFormState(existingClient);
+      setIsClientLoading(false);
     }
   }, [existingClient]);
+
+  useEffect(() => {
+    void listAssignableUsers()
+      .then(setAssignableUsers)
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isEdit || existingClient) {
+      return;
+    }
+    void refreshClients()
+      .catch(() => undefined)
+      .finally(() => setIsClientLoading(false));
+  }, [existingClient, isEdit, refreshClients]);
 
   useEffect(() => {
     // Auto-save draft after 1 second of inactivity, but only if valid and not pristine on create.
@@ -166,6 +185,15 @@ export function ClientFormPage() {
   }, [debouncedFormState]);
 
   if (isEdit && !existingClient) {
+    if (isClientLoading) {
+      return (
+        <section className="card">
+          <h1>Loading Client</h1>
+          <p className="text-muted">Fetching the latest client record.</p>
+        </section>
+      );
+    }
+
     return (
       <section className="card">
         <h1>Client Not Found</h1>
@@ -229,20 +257,21 @@ export function ClientFormPage() {
 
   async function performSave(state: SeededClientProfile, showToastOnSuccess = true) {
     setSaveStatus("saving");
-    const nextClient = {
+    const nextClientDraft = {
       ...state,
       fullName: buildFullName(state.firstName, state.surname),
       updatedBy: actorLabel,
       advisorName: state.advisorName || actorLabel,
     };
 
-    saveClient(nextClient);
+    const nextClient = await saveClient(nextClientDraft);
     setFormState(nextClient);
     setSaveStatus("saved");
     if (showToastOnSuccess) {
       addToast("Client saved", "success");
     }
     setTimeout(() => setSaveStatus("idle"), 2000);
+    return nextClient;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -257,9 +286,9 @@ export function ClientFormPage() {
     }
 
     setIsSubmitting(true);
-    await performSave(formState, true);
+    const savedClient = await performSave(formState, true);
     setIsSubmitting(false);
-    navigate(`/clients/${formState.clientReference}`);
+    navigate(`/clients/${savedClient.clientReference}`);
   }
 
   function handleCancel() {
@@ -426,6 +455,19 @@ export function ClientFormPage() {
               onChange={(event) => updateField("partnerAddress", event.target.value)}
               type="text"
               value={formState.partnerAddress}
+            />
+            <Select
+              id="assignedTo"
+              label="Assigned to"
+              onChange={(event) => updateField("assignedTo" as keyof SeededClientProfile, event.target.value)}
+              options={[
+                { value: "", label: "Select assignee" },
+                ...assignableUsers.map((assignableUser) => ({
+                  value: assignableUser.email,
+                  label: `${assignableUser.first_name} ${assignableUser.last_name} (${assignableUser.email})`,
+                })),
+              ]}
+              value={formState.assignedTo ?? ""}
             />
             <Textarea
               className="form-grid-full"

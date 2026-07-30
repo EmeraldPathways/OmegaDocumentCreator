@@ -131,10 +131,11 @@ export function ClientProfilePage() {
   const { clientReference = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getClient } = useClientData();
+  const { getClient, refreshClients } = useClientData();
   const { addToast } = useToast();
   const client = getClient(clientReference);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
+  const [isClientLoading, setIsClientLoading] = useState(Boolean(!client));
   const [saveStatus, setSaveStatus] = useState<"notSaved" | "saving" | "saved">("notSaved");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<SeededGeneratedDocument | null>(null);
@@ -150,7 +151,19 @@ export function ClientProfilePage() {
 
   useEffect(() => {
     setDraft(client ?? null);
+    if (client) {
+      setIsClientLoading(false);
+    }
   }, [client]);
+
+  useEffect(() => {
+    if (client) {
+      return;
+    }
+    void refreshClients()
+      .catch(() => undefined)
+      .finally(() => setIsClientLoading(false));
+  }, [client, refreshClients]);
 
   async function refreshArtifacts() {
     if (!canUseBackend || !clientReference) {
@@ -211,6 +224,15 @@ export function ClientProfilePage() {
   );
 
   if (!client || !draft) {
+    if (isClientLoading) {
+      return (
+        <section className="card">
+          <h1>Loading Client</h1>
+          <p className="text-muted">Fetching the latest client record.</p>
+        </section>
+      );
+    }
+
     return (
       <section className="card">
         <h1>Client Not Found</h1>

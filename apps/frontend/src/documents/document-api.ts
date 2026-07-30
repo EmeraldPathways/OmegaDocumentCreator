@@ -25,9 +25,6 @@ type StatementQuoteRequest = {
   workflowSnapshot: Record<string, unknown>;
 };
 
-const DEMO_STAFF_EMAIL = "staff@omega.local";
-const DEMO_STAFF_PASSWORD = "ChangeMe123!";
-
 type RawGeneratedSection = {
   id?: string;
   title?: string;
@@ -220,35 +217,14 @@ function normalizeIntegrationRequests(
 }
 
 async function sendAuthenticatedJsonRequest(path: string, body: Record<string, unknown>) {
-  const requestInit: RequestInit = {
+  return fetch(path, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "same-origin",
     body: JSON.stringify(body),
-  };
-
-  const sendRequest = () => fetch(path, requestInit);
-  let response = await sendRequest();
-
-  if (response.status === 401) {
-    const bootstrapResponse = await fetch("/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: DEMO_STAFF_EMAIL,
-        password: DEMO_STAFF_PASSWORD,
-      }),
-    });
-
-    if (bootstrapResponse.ok) {
-      response = await sendRequest();
-    }
-  }
-
-  return response;
+  });
 }
 
 export async function generateDocument({

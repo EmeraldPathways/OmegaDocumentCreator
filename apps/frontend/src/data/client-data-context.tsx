@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+
+import { useAuth } from "../auth/auth-context";
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
 import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
 import { isLegacyStatementDraft, resolveStatementDraft } from "../documents/statement-draft";
 
+import { createClient, getClient as getBackendClient, listClients as listBackendClients, updateClient } from "./client-api";
 import {
   createSeededClientProfiles,
   type SeededClientFile,
@@ -12,13 +15,13 @@ import {
 
 const STORAGE_KEY = "omega-client-records";
 const STORAGE_VERSION_KEY = "omega-client-records-version";
-const STORAGE_VERSION = "3";
+const STORAGE_VERSION = "4";
 
 type ClientDataContextValue = {
   clients: Record<string, SeededClientProfile>;
   getClient: (clientReference: string) => SeededClientProfile | undefined;
   listClients: () => SeededClientProfile[];
-  saveClient: (client: SeededClientProfile) => void;
+  saveClient: (client: SeededClientProfile) => Promise<SeededClientProfile>;
   upsertFile: (clientReference: string, file: SeededClientFile) => void;
   upsertGeneratedDocument: (clientReference: string, document: SeededGeneratedDocument) => void;
   updateSelectedTemplate: (clientReference: string, documentType: SupportedDocumentType, templateId: string) => void;
@@ -27,6 +30,7 @@ type ClientDataContextValue = {
     documentType: SupportedDocumentType,
     draft: Partial<Omit<GeneratedDocumentDraft, "selectedTemplateId">>,
   ) => void;
+  refreshClients: () => Promise<void>;
 };
 
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
@@ -89,21 +93,21 @@ function normalizeDocumentDrafts(
       defaultDrafts["Statement of Suitability"],
       documentDrafts?.["Statement of Suitability"],
     ),
-    "Quote": normalizeDraft(defaultDrafts["Quote"], documentDrafts?.["Quote"]),
+    Quote: normalizeDraft(defaultDrafts.Quote, documentDrafts?.Quote),
     "Pensions Statement": normalizeDraft(defaultDrafts["Pensions Statement"], documentDrafts?.["Pensions Statement"]),
     "Pensions Quote": normalizeDraft(defaultDrafts["Pensions Quote"], documentDrafts?.["Pensions Quote"]),
   };
 }
 
 function normalizeClient(client: SeededClientProfile): SeededClientProfile {
-  const seededClient = createSeededClientProfiles()[client.clientReference];
+  const seededClient = createSeededClientProfiles()["CLI-2026-0001"];
   const normalizedDocumentDrafts = normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts);
   const normalizedClient: SeededClientProfile = {
     ...seededClient,
     ...client,
     status: client.status ?? "Draft",
-    files: client.files ?? seededClient?.files ?? [],
-    generatedDocuments: client.generatedDocuments ?? seededClient?.generatedDocuments ?? [],
+    files: client.files ?? [],
+    generatedDocuments: client.generatedDocuments ?? [],
     documentDrafts: normalizedDocumentDrafts,
   };
 
@@ -141,12 +145,6 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   };
 }
 
-function normalizeClients(clients: Record<string, SeededClientProfile>) {
-  return Object.fromEntries(
-    Object.entries(clients).map(([clientReference, client]) => [clientReference, normalizeClient(client)]),
-  ) as Record<string, SeededClientProfile>;
-}
-
 function readStoredClients() {
   if (typeof window === "undefined") {
     return createSeededClientProfiles();
@@ -160,25 +158,143 @@ function readStoredClients() {
   }
 
   try {
-    const parsed = JSON.parse(storedValue) as Record<string, SeededClientProfile>;
-    return normalizeClients(parsed);
+    return JSON.parse(storedValue) as Record<string, SeededClientProfile>;
   } catch {
     return createSeededClientProfiles();
   }
 }
 
+function mapBackendClientToSeeded(
+  backendClient: Record<string, unknown>,
+  existingClient?: SeededClientProfile,
+): SeededClientProfile {
+  const base = {
+    ...createSeededClientProfiles()["CLI-2026-0001"],
+    ...(existingClient ?? {}),
+  };
+
+  return normalizeClient({
+    ...base,
+    clientReference: String(backendClient.client_reference ?? base.clientReference),
+    fullName: String(backendClient.full_name ?? base.fullName),
+    firstName: String(backendClient.first_name ?? base.firstName),
+    surname: String(backendClient.surname ?? base.surname),
+    status: String(backendClient.status ?? base.status),
+    title: String(backendClient.title ?? base.title ?? ""),
+    email: String(backendClient.email ?? base.email ?? ""),
+    mobileNumber: String(backendClient.mobile_number ?? base.mobileNumber ?? ""),
+    workPhone: String(backendClient.work_phone ?? base.workPhone ?? ""),
+    dateOfBirth: String(backendClient.date_of_birth ?? base.dateOfBirth ?? ""),
+    maritalStatus: String(backendClient.marital_status ?? base.maritalStatus ?? ""),
+    createdBy: String(backendClient.created_by ?? base.createdBy ?? ""),
+    assignedTo: String(backendClient.assigned_to ?? base.assignedTo ?? ""),
+    updatedBy: String(backendClient.updated_by ?? base.updatedBy ?? ""),
+    townCity: String(backendClient.town_city ?? base.townCity ?? ""),
+    county: String(backendClient.county ?? base.county ?? ""),
+    homeAddressLine1: String(backendClient.home_address_line_1 ?? base.homeAddressLine1 ?? ""),
+    homeAddressLine2: String(backendClient.home_address_line_2 ?? base.homeAddressLine2 ?? ""),
+    eircode: String(backendClient.eircode ?? base.eircode ?? ""),
+    partnerName: String(backendClient.partner_name ?? base.partnerName ?? ""),
+    partnerAddress: String(backendClient.partner_address ?? base.partnerAddress ?? ""),
+    generalNotes: String(backendClient.general_notes ?? base.generalNotes ?? ""),
+    dependants: Array.isArray(backendClient.dependants)
+      ? backendClient.dependants.map((dependant) => ({
+          name: String((dependant as Record<string, unknown>).name ?? ""),
+          dateOfBirth: String((dependant as Record<string, unknown>).date_of_birth ?? ""),
+          notes: String((dependant as Record<string, unknown>).notes ?? ""),
+        }))
+      : (base.dependants ?? []),
+  });
+}
+
+function buildClientPayload(client: SeededClientProfile) {
+  return {
+    first_name: client.firstName,
+    surname: client.surname,
+    email: client.email,
+    mobile_number: client.mobileNumber,
+    marital_status: client.maritalStatus,
+    date_of_birth: client.dateOfBirth,
+    title: client.title,
+    town_city: client.townCity,
+    county: client.county,
+    dependants: client.dependants.map((dependant) => ({
+      name: dependant.name,
+      date_of_birth: dependant.dateOfBirth,
+      notes: dependant.notes,
+    })),
+    home_address_line_1: client.homeAddressLine1,
+    home_address_line_2: client.homeAddressLine2,
+    work_phone: client.workPhone,
+    eircode: client.eircode,
+    partner_name: client.partnerName,
+    partner_address: client.partnerAddress,
+    assigned_to: client.assignedTo || undefined,
+  };
+}
+
 export function ClientDataProvider({ children }: PropsWithChildren) {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() => readStoredClients());
 
-  function saveClient(client: SeededClientProfile) {
+  async function refreshClients() {
+    if (import.meta.env.MODE === "test") {
+      return;
+    }
+    if (!user) {
+      setClients({});
+      return;
+    }
+
+    const summaries = await listBackendClients();
+    const details = await Promise.all(summaries.map((client) => getBackendClient(client.client_reference)));
+    setClients((currentClients) => {
+      const nextClients = Object.fromEntries(
+        details.map((client) => {
+          const existingClient = currentClients[client.client_reference];
+          return [client.client_reference, mapBackendClientToSeeded(client as unknown as Record<string, unknown>, existingClient)];
+        }),
+      ) as Record<string, SeededClientProfile>;
+      writeClientsToStorage(nextClients);
+      return nextClients;
+    });
+  }
+
+  useEffect(() => {
+    void refreshClients().catch(() => {
+      if (import.meta.env.MODE === "test") {
+        setClients(createSeededClientProfiles());
+      }
+    });
+  }, [user?.email]);
+
+  async function saveClient(client: SeededClientProfile) {
+    if (import.meta.env.MODE === "test" || !user) {
+      const normalized = normalizeClient(client);
+      setClients((currentClients) => {
+        const nextClients = {
+          ...currentClients,
+          [client.clientReference]: normalized,
+        };
+        writeClientsToStorage(nextClients);
+        return nextClients;
+      });
+      return normalized;
+    }
+
+    const payload = buildClientPayload(client);
+    const isExistingClient = Boolean(client.clientReference && clients[client.clientReference]);
+    const persisted = isExistingClient ? await updateClient(client.clientReference, payload) : await createClient(payload);
+    const nextClient = mapBackendClientToSeeded(persisted as unknown as Record<string, unknown>, client);
     setClients((currentClients) => {
       const nextClients = {
         ...currentClients,
-        [client.clientReference]: normalizeClient(client),
+        [nextClient.clientReference]: nextClient,
       };
       writeClientsToStorage(nextClients);
       return nextClients;
     });
+    return nextClient;
   }
 
   function upsertGeneratedDocument(clientReference: string, document: SeededGeneratedDocument) {
@@ -283,6 +399,7 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
       upsertGeneratedDocument,
       updateSelectedTemplate,
       saveGeneratedDraft,
+      refreshClients,
     }),
     [clients],
   );

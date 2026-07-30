@@ -10,8 +10,13 @@ import {
 type SessionRole = "admin" | "staff" | null;
 
 type SessionUser = {
+  first_name?: string;
+  last_name?: string;
   email: string;
   role: SessionRole;
+  status?: string;
+  force_password_change?: boolean;
+  last_login_at?: string | null;
 };
 
 type AuthContextValue = {
@@ -28,20 +33,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function resolveRole(email: string): SessionRole {
-  const normalizedEmail = normalizeEmail(email);
-
-  if (normalizedEmail === "admin@omega.local" || normalizedEmail === "andrew@omegafinancial.ie") {
-    return "admin";
-  }
-
-  if (normalizedEmail.length > 0) {
-    return "staff";
-  }
-
-  return null;
 }
 
 function readStoredUser(): SessionUser | null {
@@ -65,12 +56,15 @@ function readStoredUser(): SessionUser | null {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
 
-  async function signIn(email: string, password: string) {
-    const role = resolveRole(email);
-    if (!role) {
-      return false;
-    }
+  function coerceSessionUser(rawUser: SessionUser | null | undefined, fallbackEmail?: string): SessionUser {
+    return {
+      ...rawUser,
+      email: normalizeEmail(rawUser?.email ?? fallbackEmail ?? ""),
+      role: rawUser?.role === "admin" ? "admin" : "staff",
+    };
+  }
 
+  async function signIn(email: string, password: string) {
     const response = await fetch("/auth/login", {
       method: "POST",
       headers: {
@@ -86,7 +80,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return false;
     }
 
-    const nextUser = { email: normalizeEmail(email), role };
+    const payload = (await response.json()) as { user?: SessionUser };
+    const nextUser = coerceSessionUser(payload.user, email);
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
     return true;
@@ -105,16 +100,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    void fetch("/auth/me").then((response) => {
-      if (response.ok) {
-        return;
-      }
+    void fetch("/auth/me")
+      .then(async (response) => {
+        if (response.ok) {
+          const payload = (await response.json()) as { user?: SessionUser };
+          if (payload.user) {
+            const nextUser = coerceSessionUser(payload.user);
+            window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+            setUser(nextUser);
+          }
+          return;
+        }
 
-      if (response.status === 401) {
-        window.sessionStorage.removeItem(STORAGE_KEY);
-        setUser(null);
-      }
-    }).catch(() => undefined);
+        if (response.status === 401 || response.status === 403) {
+          window.sessionStorage.removeItem(STORAGE_KEY);
+          setUser(null);
+        }
+      })
+      .catch(() => undefined);
   }, [user]);
 
   const value = useMemo<AuthContextValue>(

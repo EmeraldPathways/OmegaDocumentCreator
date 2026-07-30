@@ -27,6 +27,16 @@ function RequireAdmin({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const { isSignedIn } = useAuth();
+
+  if (!isSignedIn) {
+    return <Navigate replace to="/login" />;
+  }
+
+  return children;
+}
+
 function RedirectDocumentFolder() {
   const { clientReference = "" } = useParams();
   return <Navigate replace to={`/clients/${clientReference}`} />;
@@ -65,18 +75,18 @@ function AppRoutes() {
         <Routes>
         <Route path="/" element={<Navigate replace to="/fact-find" />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/fact-find" element={<RedirectFactFindHome />} />
-        <Route path="/income-protection" element={<RedirectIncomeProtectionHome />} />
-        <Route path="/pensions" element={<RedirectPensionsHome />} />
-        <Route path="/files-docs" element={<RedirectFilesDocsHome />} />
-        <Route path="/documents" element={<Navigate replace to="/clients" />} />
-        <Route path="/documents/:clientReference" element={<RedirectDocumentFolder />} />
-        <Route path="/files" element={<Navigate replace to="/files-docs" />} />
-        <Route path="/clients/new" element={<ClientFormPage />} />
-        <Route path="/clients/:clientReference" element={<ClientProfilePage />} />
-        <Route path="/clients/:clientReference/income-protection" element={<RedirectIncomeProtectionClient />} />
-        <Route path="/clients/:clientReference/edit" element={<ClientFormPage />} />
+        <Route path="/clients" element={<RequireAuth><ClientsPage /></RequireAuth>} />
+        <Route path="/fact-find" element={<RequireAuth><RedirectFactFindHome /></RequireAuth>} />
+        <Route path="/income-protection" element={<RequireAuth><RedirectIncomeProtectionHome /></RequireAuth>} />
+        <Route path="/pensions" element={<RequireAuth><RedirectPensionsHome /></RequireAuth>} />
+        <Route path="/files-docs" element={<RequireAuth><RedirectFilesDocsHome /></RequireAuth>} />
+        <Route path="/documents" element={<RequireAuth><Navigate replace to="/clients" /></RequireAuth>} />
+        <Route path="/documents/:clientReference" element={<RequireAuth><RedirectDocumentFolder /></RequireAuth>} />
+        <Route path="/files" element={<RequireAuth><Navigate replace to="/files-docs" /></RequireAuth>} />
+        <Route path="/clients/new" element={<RequireAuth><ClientFormPage /></RequireAuth>} />
+        <Route path="/clients/:clientReference" element={<RequireAuth><ClientProfilePage /></RequireAuth>} />
+        <Route path="/clients/:clientReference/income-protection" element={<RequireAuth><RedirectIncomeProtectionClient /></RequireAuth>} />
+        <Route path="/clients/:clientReference/edit" element={<RequireAuth><ClientFormPage /></RequireAuth>} />
         <Route
           path="/admin"
           element={

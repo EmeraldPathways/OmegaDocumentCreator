@@ -48,6 +48,7 @@ export type SeededClientProfile = {
   dateOfBirth: string;
   maritalStatus: string;
   createdBy: string;
+  assignedTo: string;
   updatedBy: string;
   townCity: string;
   county: string;
@@ -274,6 +275,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     dateOfBirth: "1985-04-12",
     maritalStatus: "Married",
     createdBy: "Omega Admin",
+    assignedTo: "",
     updatedBy: "Omega Admin",
     townCity: "Dublin",
     county: "Dublin",
@@ -524,6 +526,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     dateOfBirth: "1990-11-08",
     maritalStatus: "Single",
     createdBy: "Office Staff",
+    assignedTo: "",
     updatedBy: "Office Staff",
     townCity: "Galway",
     county: "Galway",

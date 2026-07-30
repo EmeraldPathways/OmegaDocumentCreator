@@ -120,7 +120,7 @@ async def _csrf_middleware(request: Request, call_next: object) -> object:
 
 
 def _startup_db_check() -> None:
-    """Verify database connectivity, seed default users, and start scheduler if enabled."""
+    """Verify database connectivity and start scheduler if enabled."""
     import logging
 
     logger = logging.getLogger("omega.startup")
@@ -166,26 +166,8 @@ def _startup_db_check() -> None:
                 logger.info("Cleaned up %d expired session(s) on startup.", removed)
 
             repo = UserRepository(db)
-
-            if not repo.get_by_email(settings.admin_email):
-                repo.create(
-                    first_name="Omega",
-                    last_name="Admin",
-                    email=settings.admin_email,
-                    password_hash=hash_password(settings.admin_password),
-                    role=UserRole.ADMIN,
-                )
-                logger.info("Bootstrap admin user created: %s", settings.admin_email)
-
-            if not repo.get_by_email(settings.staff_email):
-                repo.create(
-                    first_name="Office",
-                    last_name="Staff",
-                    email=settings.staff_email,
-                    password_hash=hash_password(settings.staff_password),
-                    role=UserRole.STAFF,
-                )
-                logger.info("Bootstrap staff user created: %s", settings.staff_email)
+            if repo.count() == 0:
+                logger.warning("No users found in database. Create users through the admin flow or direct DB bootstrap.")
 
             db.commit()
         finally:
@@ -246,6 +228,13 @@ class AdminUserUpdateRequest(BaseModel):
     first_name: str
     last_name: str
     role: UserRole
+    status: UserStatus | None = None
+    force_password_change: bool | None = None
+
+
+class AdminUserResetPasswordRequest(BaseModel):
+    password: str
+    force_password_change: bool = True
 
 
 class ClientCreateRequest(BaseModel):
@@ -258,7 +247,14 @@ class ClientCreateRequest(BaseModel):
     title: str = ""
     town_city: str = ""
     county: str = ""
+    home_address_line_1: str = ""
+    home_address_line_2: str = ""
+    work_phone: str = ""
+    eircode: str = ""
+    partner_name: str = ""
+    partner_address: str = ""
     dependants: list[dict[str, str]] = []
+    assigned_to: str | None = None
 
 
 class ClientUpdateRequest(BaseModel):
@@ -271,7 +267,14 @@ class ClientUpdateRequest(BaseModel):
     title: str | None = None
     town_city: str | None = None
     county: str | None = None
+    home_address_line_1: str | None = None
+    home_address_line_2: str | None = None
+    work_phone: str | None = None
+    eircode: str | None = None
+    partner_name: str | None = None
+    partner_address: str | None = None
     dependants: list[dict[str, str]] | None = None
+    assigned_to: str | None = None
 
 
 class DocumentGenerationRequest(BaseModel):
@@ -295,7 +298,7 @@ class RestoreConfirmRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _current_user(request: Request) -> dict[str, str]:
+def _current_user(request: Request) -> dict[str, object]:
     session_id = request.session.get("session_id")
     if not session_id:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -374,10 +377,17 @@ def _can_access_owner_email(user: dict[str, str], owner_email: str) -> bool:
     return bool(record_owner) and record_owner in delegated_owners
 
 
+def _can_access_client_emails(user: dict[str, str], *emails: str) -> bool:
+    for email in emails:
+        if _can_access_owner_email(user, email):
+            return True
+    return False
+
+
 def _can_access_client_record(user: dict[str, str], db: object, client: ClientRecord | object) -> bool:
-    owner_id = getattr(client, "created_by", None)
-    owner_email = _resolve_user_email_by_id(db, owner_id)
-    return _can_access_owner_email(user, owner_email)
+    owner_email = _resolve_user_email_by_id(db, getattr(client, "created_by", None))
+    assigned_email = _resolve_user_email_by_id(db, getattr(client, "assigned_to", None))
+    return _can_access_client_emails(user, owner_email, assigned_email)
 
 
 def _require_client_access(
@@ -550,7 +560,7 @@ def _check_login_rate(client_ip: str) -> None:
 
 
 @app.post("/auth/login")
-def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
+def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, object]]:
     client_ip = request.client.host if request.client else "unknown"
     _check_login_rate(client_ip)
     db = get_session()
@@ -575,6 +585,18 @@ def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, str]]:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         if user_model.status != UserStatus.ACTIVE.value:
+            try:
+                _log_audit(
+                    request, db=db,
+                    action="login_disabled_user",
+                    entity_type="auth",
+                    entity_id=payload.email,
+                    details={"reason": "user_disabled", "ip": client_ip},
+                    user_email=payload.email,
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
             raise HTTPException(status_code=403, detail="User account disabled")
 
         user_repo.record_login(user_model)
@@ -619,8 +641,25 @@ def logout(request: Request) -> dict[str, str]:
 
 
 @app.get("/auth/me")
-def me(request: Request) -> dict[str, dict[str, str]]:
+def me(request: Request) -> dict[str, dict[str, object]]:
     return {"user": _current_user(request)}
+
+
+@app.get("/users/assignable")
+def assignable_users(request: Request) -> dict[str, list[dict[str, object]]]:
+    _current_user(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        items = [
+            repo.to_response(user_model)
+            for user_model in repo.list_all()
+            if user_model.status == UserStatus.ACTIVE.value
+        ]
+        db.commit()
+        return {"items": items}
+    finally:
+        db.close()
 
 
 # ---------------------------------------------------------------------------
@@ -660,8 +699,15 @@ def create_client_record(payload: ClientCreateRequest, request: Request) -> dict
             title=payload.title,
             town_city=payload.town_city,
             county=payload.county,
+            home_address_line_1=payload.home_address_line_1,
+            home_address_line_2=payload.home_address_line_2,
+            work_phone=payload.work_phone,
+            eircode=payload.eircode,
+            partner_name=payload.partner_name,
+            partner_address=payload.partner_address,
             dependants=payload.dependants,
             created_by_email=user["email"],
+            assigned_to_email=payload.assigned_to,
         )
         client_ref = item.get("client_reference", "")
         _log_audit(
@@ -1124,7 +1170,7 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
 
 
 @app.get("/admin/users")
-def admin_users(request: Request) -> dict[str, list[dict[str, str]]]:
+def admin_users(request: Request) -> dict[str, list[dict[str, object]]]:
     _require_admin(request)
     db = get_session()
     try:
@@ -1137,7 +1183,7 @@ def admin_users(request: Request) -> dict[str, list[dict[str, str]]]:
 
 
 @app.post("/admin/users", status_code=201)
-def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict[str, dict[str, str]]:
+def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict[str, dict[str, object]]:
     _require_admin(request)
     db = get_session()
     try:
@@ -1169,7 +1215,7 @@ def admin_create_user(payload: AdminUserCreateRequest, request: Request) -> dict
 @app.patch("/admin/users/{user_id}")
 def admin_update_user(
     user_id: str, payload: AdminUserUpdateRequest, request: Request
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, object]]:
     _require_admin(request)
     db = get_session()
     try:
@@ -1179,20 +1225,66 @@ def admin_update_user(
             raise HTTPException(status_code=404, detail="User not found")
 
         old_role = user_model.role.value if hasattr(user_model.role, "value") else str(user_model.role)
+        old_status = user_model.status.value if hasattr(user_model.status, "value") else str(user_model.status)
         old_name = f"{user_model.first_name} {user_model.last_name}"
-        user_model.first_name = payload.first_name
-        user_model.last_name = payload.last_name
-        user_model.role = payload.role
+        result = repo.update(
+            user_id,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            role=payload.role,
+            status=payload.status,
+            force_password_change=payload.force_password_change,
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
 
         _log_audit(
             request, db=db,
             action="user_updated",
             entity_type="user",
             entity_id=user_id,
-            details={"old_role": old_role, "new_role": payload.role.value, "old_name": old_name, "new_name": f"{payload.first_name} {payload.last_name}"},
+            details={
+                "old_role": old_role,
+                "new_role": payload.role.value,
+                "old_status": old_status,
+                "new_status": payload.status.value if payload.status else old_status,
+                "old_name": old_name,
+                "new_name": f"{payload.first_name} {payload.last_name}",
+                "force_password_change": payload.force_password_change,
+            },
         )
         db.commit()
-        return {"item": repo.to_response(user_model)}
+        return {"item": result}
+    finally:
+        db.close()
+
+
+@app.post("/admin/users/{user_id}/reset-password")
+def admin_reset_user_password(
+    user_id: str,
+    payload: AdminUserResetPasswordRequest,
+    request: Request,
+) -> dict[str, dict[str, object]]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        result = repo.reset_password(
+            user_id,
+            password_hash=hash_password(payload.password),
+            force_password_change=payload.force_password_change,
+        )
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+        _log_audit(
+            request, db=db,
+            action="user_password_reset",
+            entity_type="user",
+            entity_id=user_id,
+            details={"force_password_change": payload.force_password_change},
+        )
+        db.commit()
+        return {"item": result}
     finally:
         db.close()
 
@@ -1485,7 +1577,7 @@ def admin_schedule_status(request: Request) -> dict[str, object]:
 
 
 @app.patch("/admin/users/{user_id}/disable")
-def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, str]]:
+def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, object]]:
     """Disable a user account. Admin-only."""
     _require_admin(request)
     db = get_session()
@@ -1500,6 +1592,28 @@ def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, st
             entity_type="user",
             entity_id=user_id,
             details={"new_status": "disabled"},
+        )
+        db.commit()
+        return {"item": result}
+    finally:
+        db.close()
+
+
+@app.patch("/admin/users/{user_id}/enable")
+def admin_enable_user(user_id: str, request: Request) -> dict[str, dict[str, object]]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        repo = UserRepository(db)
+        result = repo.enable(user_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+        _log_audit(
+            request, db=db,
+            action="user_enabled",
+            entity_type="user",
+            entity_id=user_id,
+            details={"new_status": "active"},
         )
         db.commit()
         return {"item": result}
@@ -1555,16 +1669,69 @@ def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
 
 
 @app.get("/admin/audit-logs")
-def admin_audit_logs(request: Request) -> dict[str, list[dict[str, object]]]:
+def admin_audit_logs(
+    request: Request,
+    user_email: str | None = None,
+    action: str | None = None,
+    entity_type: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+) -> dict[str, list[dict[str, object]]]:
     """List recent audit log entries. Admin-only."""
     _require_admin(request)
     db = get_session()
     try:
         repo = AuditLogRepository(db)
         entries = repo.list_recent()
-        items = [AuditLogRepository.to_response(e) for e in entries]
+        user_lookup = UserRepository(db)
+        items = []
+        for entry in entries:
+            item = AuditLogRepository.to_response(entry)
+            user_model = user_lookup.get_by_id(entry.user_id) if entry.user_id else None
+            item["user_email"] = user_model.email if user_model else None
+            if user_email and _normalized_email(str(item.get("user_email"))) != _normalized_email(user_email):
+                continue
+            if action and str(item.get("action")) != action:
+                continue
+            if entity_type and str(item.get("entity_type")) != entity_type:
+                continue
+            created_at = str(item.get("created_at") or "")
+            if from_date and created_at and created_at[:10] < from_date:
+                continue
+            if to_date and created_at and created_at[:10] > to_date:
+                continue
+            items.append(item)
         db.commit()
         return {"items": items}
+    finally:
+        db.close()
+
+
+@app.get("/admin/security")
+def admin_security_status(request: Request) -> dict[str, object]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        session_repo = SessionRepository(db)
+        user_repo = UserRepository(db)
+        users = user_repo.list_all()
+        active_sessions = session_repo.count_active() if hasattr(session_repo, "count_active") else None
+        db.commit()
+        return {
+            "app_url": settings.app_url,
+            "environment": settings.environment,
+            "remote_access_mode": settings.remote_access_mode,
+            "session_timeout_minutes": settings.session_timeout_minutes,
+            "cookie_secure": settings.cookie_secure,
+            "cookie_samesite": settings.cookie_samesite,
+            "password_hashing": "PBKDF2-HMAC-SHA256",
+            "user_count": len(users),
+            "disabled_user_count": len([user for user in users if user.status == UserStatus.DISABLED.value]),
+            "force_password_change_count": len([user for user in users if user.force_password_change]),
+            "active_session_count": active_sessions,
+            "file_storage_path": str(settings.file_storage_path),
+            "backup_path": str(settings.backup_path),
+        }
     finally:
         db.close()
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -33,18 +34,19 @@ class UserRepository:
         self._db.add(user)
 
     def record_login(self, user: User) -> None:
-        """Update the user's last-login timestamp (no-op for now)."""
-        # In a fuller implementation this would update a last_login_at column.
-        # For now, just flush to keep the pattern open without requiring schema change.
+        """Update the user's last-login timestamp."""
+        user.last_login_at = datetime.now(UTC)
         self._db.flush()
 
-    def to_response(self, user: User) -> dict[str, str]:
+    def to_response(self, user: User) -> dict[str, str | bool | None]:
         return {
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
             "role": user.role,
             "status": user.status,
+            "force_password_change": user.force_password_change,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
         }
 
     def create(
@@ -68,6 +70,7 @@ class UserRepository:
             password_hash=password_hash,
             role=role.value,
             status=status.value,
+            force_password_change=False,
         )
         self._db.add(user)
         self._db.flush()
@@ -81,6 +84,29 @@ class UserRepository:
         self._db.flush()
         return self.to_response(user)
 
+    def enable(self, email: str) -> dict[str, str | bool | None] | None:
+        user = self.get_by_email(email)
+        if user is None:
+            return None
+        user.status = UserStatus.ACTIVE.value
+        self._db.flush()
+        return self.to_response(user)
+
+    def reset_password(
+        self,
+        email: str,
+        *,
+        password_hash: str,
+        force_password_change: bool = True,
+    ) -> dict[str, str | bool | None] | None:
+        user = self.get_by_email(email)
+        if user is None:
+            return None
+        user.password_hash = password_hash
+        user.force_password_change = force_password_change
+        self._db.flush()
+        return self.to_response(user)
+
     def update(
         self,
         email: str,
@@ -88,12 +114,18 @@ class UserRepository:
         first_name: str,
         last_name: str,
         role: UserRole,
-    ) -> dict[str, str] | None:
+        status: UserStatus | None = None,
+        force_password_change: bool | None = None,
+    ) -> dict[str, str | bool | None] | None:
         user = self.get_by_email(email)
         if user is None:
             return None
         user.first_name = first_name
         user.last_name = last_name
         user.role = role.value
+        if status is not None:
+            user.status = status.value
+        if force_password_change is not None:
+            user.force_password_change = force_password_change
         self._db.flush()
         return self.to_response(user)
