@@ -197,6 +197,25 @@ def _normalize_saved_quote_results(value: object) -> list[dict[str, str]]:
     return results
 
 
+def _normalize_saved_quote_sections(value: object) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    sections: list[dict[str, str]] = []
+    for raw_section in value:
+        if not isinstance(raw_section, dict):
+            continue
+        sections.append(
+            {
+                "id": _as_clean_string(raw_section.get("id")),
+                "title": _as_clean_string(raw_section.get("title")),
+                "bodyHtml": _as_clean_string(raw_section.get("bodyHtml")),
+                "summary": _as_clean_string(raw_section.get("summary")),
+            }
+        )
+    return sections
+
+
 def _normalize_saved_quote_requests(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
         return []
@@ -235,10 +254,23 @@ def _normalize_saved_quotes(value: object) -> list[dict[str, object]]:
                 "id": _as_clean_string(raw_snapshot.get("id")),
                 "name": _as_clean_string(raw_snapshot.get("name")),
                 "documentType": "Pensions Quote" if document_type == "Pensions Quote" else "Quote",
+                "selectedTemplateId": _as_clean_string(raw_snapshot.get("selectedTemplateId")),
                 "createdAt": _as_clean_string(raw_snapshot.get("createdAt")),
                 "updatedAt": _as_clean_string(raw_snapshot.get("updatedAt")),
                 "provider": _as_clean_string(raw_snapshot.get("provider")),
                 "integrationRequests": _normalize_saved_quote_requests(raw_snapshot.get("integrationRequests")),
+                "generationStatus": (
+                    "failed"
+                    if _as_clean_string(raw_snapshot.get("generationStatus")).lower() == "failed"
+                    else "generating"
+                    if _as_clean_string(raw_snapshot.get("generationStatus")).lower() == "generating"
+                    else "completed"
+                    if _as_clean_string(raw_snapshot.get("generationStatus")).lower() == "completed"
+                    else "idle"
+                ),
+                "lastGeneratedHtml": _as_clean_string(raw_snapshot.get("lastGeneratedHtml")),
+                "lastGeneratedSections": _normalize_saved_quote_sections(raw_snapshot.get("lastGeneratedSections")),
+                "editedHtml": _as_clean_string(raw_snapshot.get("editedHtml")),
                 "quoteAnnualCoverAmount": _as_clean_string(raw_snapshot.get("quoteAnnualCoverAmount")),
                 "quoteCoverToAge": _as_clean_string(raw_snapshot.get("quoteCoverToAge")),
                 "quoteDeferredPeriod": _as_clean_string(raw_snapshot.get("quoteDeferredPeriod")),

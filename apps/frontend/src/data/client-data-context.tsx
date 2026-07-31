@@ -87,7 +87,8 @@ function normalizeDocumentDrafts(
 }
 
 function normalizeClient(client: SeededClientProfile): SeededClientProfile {
-  const seededClient = createSeededClientProfiles()["CLI-2026-0001"];
+  const seededClients = createSeededClientProfiles();
+  const seededClient = seededClients[client.clientReference] ?? seededClients["CLI-2026-0001"];
   const normalizedDocumentDrafts = normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts);
   const normalizedClient: SeededClientProfile = {
     ...seededClient,
@@ -137,14 +138,16 @@ function mapBackendClientToSeeded(
   backendClient: Record<string, unknown>,
   existingClient?: SeededClientProfile,
 ): SeededClientProfile {
+  const clientReference = String(backendClient.client_reference ?? existingClient?.clientReference ?? "");
+  const seededClients = createSeededClientProfiles();
   const base = {
-    ...createSeededClientProfiles()["CLI-2026-0001"],
+    ...(seededClients[clientReference] ?? seededClients["CLI-2026-0001"]),
     ...(existingClient ?? {}),
   };
 
   return normalizeClient({
     ...base,
-    clientReference: String(backendClient.client_reference ?? base.clientReference),
+    clientReference: clientReference || base.clientReference,
     fullName: String(backendClient.full_name ?? base.fullName),
     firstName: String(backendClient.first_name ?? base.firstName),
     surname: String(backendClient.surname ?? base.surname),

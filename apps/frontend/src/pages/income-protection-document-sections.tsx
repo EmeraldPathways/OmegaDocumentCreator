@@ -77,6 +77,7 @@ type QuoteWorkflowSectionProps = {
   quoteDocumentType: "Quote" | "Pensions Quote";
   quoteGenerationRequirements: WorkflowRequirement[];
   quoteMissingFields: string[];
+  quoteNameInput: string;
   quoteOccupationClass: string;
   quoteSaveStatus: string;
   quotePensionEscalation: string;
@@ -116,6 +117,7 @@ type QuoteWorkflowSectionProps = {
   onQuotePensionRetirementAgeChange: (value: string) => void;
   onQuotePensionSpousesPensionChange: (value: string) => void;
   onQuotePhiIndexationChange: (value: string) => void;
+  onQuoteNameInputChange: (value: string) => void;
   onSaveQuote: () => void;
   onQuoteSmokerChange: (value: string) => void;
   onTemplateChange: (templateId: string) => void;
@@ -327,6 +329,7 @@ export function QuoteWorkflowSection({
   quoteDocumentType,
   quoteGenerationRequirements,
   quoteMissingFields,
+  quoteNameInput,
   quoteOccupationClass,
   quoteSaveStatus,
   quotePensionEscalation,
@@ -366,6 +369,7 @@ export function QuoteWorkflowSection({
   onQuotePensionRetirementAgeChange,
   onQuotePensionSpousesPensionChange,
   onQuotePhiIndexationChange,
+  onQuoteNameInputChange,
   onSaveQuote,
   onQuoteSmokerChange,
   onTemplateChange,
@@ -416,6 +420,16 @@ export function QuoteWorkflowSection({
               explainSharedFields: false,
               emphasiseMissing: showQuoteValidation,
             })}
+          </div>
+          <div className="form-grid" style={{ marginTop: "var(--space-4)" }}>
+            <Input
+              id="quote-save-name"
+              label="Saved quote name"
+              onChange={(event) => onQuoteNameInputChange(event.target.value)}
+              placeholder="Enter an easy to recognise name"
+              type="text"
+              value={quoteNameInput}
+            />
           </div>
           <div className="form-action-row">
             <span className="form-action-row-status">{quoteSaveStatus}</span>

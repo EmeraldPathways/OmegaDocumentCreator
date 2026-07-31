@@ -1,5 +1,11 @@
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
-import type { GeneratedDocumentDraft, IntegrationRequestArtifact, SupportedDocumentType } from "../documents/document-types";
+import type {
+  GeneratedDocumentDraft,
+  GeneratedDocumentDraftStatus,
+  GeneratedDocumentSection,
+  IntegrationRequestArtifact,
+  SupportedDocumentType,
+} from "../documents/document-types";
 
 export type SeededDependant = {
   name: string;
@@ -38,10 +44,15 @@ export type SavedQuoteSnapshot = {
   id: string;
   name: string;
   documentType: "Quote" | "Pensions Quote";
+  selectedTemplateId: string;
   createdAt: string;
   updatedAt: string;
   provider: string;
   integrationRequests: IntegrationRequestArtifact[];
+  generationStatus: GeneratedDocumentDraftStatus;
+  lastGeneratedHtml: string;
+  lastGeneratedSections: GeneratedDocumentSection[];
+  editedHtml: string;
   quoteAnnualCoverAmount: string;
   quoteCoverToAge: string;
   quoteDeferredPeriod: string;

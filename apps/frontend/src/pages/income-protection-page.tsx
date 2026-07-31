@@ -332,7 +332,7 @@ function mergeWorkflowFieldsIntoDraft(
 }
 
 function buildWorkflowPersistencePayload(draft: SeededClientProfile): Partial<SeededClientProfile> {
-  const { documentDrafts: _documentDrafts, files: _files, generatedDocuments: _generatedDocuments, ...workflowFields } = draft;
+  const { files: _files, generatedDocuments: _generatedDocuments, ...workflowFields } = draft;
   return workflowFields;
 }
 
@@ -415,6 +415,7 @@ export function IncomeProtectionPage({
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
   const [quoteSaveStatus, setQuoteSaveStatus] = useState("No saved quotes yet");
+  const [quoteNameInput, setQuoteNameInput] = useState("");
   const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
   const [showQuoteValidation, setShowQuoteValidation] = useState(false);
   const [lastSubmittedQuoteRequestKey, setLastSubmittedQuoteRequestKey] = useState<string | null>(null);
@@ -450,6 +451,7 @@ export function IncomeProtectionPage({
   const quoteGenerateRef = useRef<(() => Promise<void>) | null>(null);
   const lastPersistedSnapshotRef = useRef("");
   const latestDraftRef = useRef<SeededClientProfile | null>(null);
+  const pendingWorkflowFieldsRef = useRef<Partial<SeededClientProfile> | null>(null);
   const workflowSaveStateRef = useRef<WorkflowSaveState>("saved");
   const canUseBackendRef = useRef(canUseBackend);
   const actorLabelRef = useRef(actorLabel);
@@ -490,11 +492,13 @@ export function IncomeProtectionPage({
     let cancelled = false;
     fetchWorkflow(selectedClientReference).then((fields) => {
       if (cancelled) return;
+      pendingWorkflowFieldsRef.current = fields;
       setDraft((current) => {
         if (!current) {
           return current;
         }
         const mergedDraft = mergeWorkflowFieldsIntoDraft(current, fields);
+        pendingWorkflowFieldsRef.current = null;
         lastPersistedSnapshotRef.current = buildWorkflowSnapshot(mergedDraft, actorLabel);
         setWorkflowSaveState("saved");
         return mergedDraft;
@@ -510,12 +514,20 @@ export function IncomeProtectionPage({
       }
 
       if (!currentDraft || currentDraft.clientReference !== client.clientReference) {
-        return client;
+        const mergedClient = pendingWorkflowFieldsRef.current
+          ? mergeWorkflowFieldsIntoDraft(client, pendingWorkflowFieldsRef.current)
+          : client;
+        if (pendingWorkflowFieldsRef.current) {
+          pendingWorkflowFieldsRef.current = null;
+          lastPersistedSnapshotRef.current = buildWorkflowSnapshot(mergedClient, actorLabel);
+          setWorkflowSaveState("saved");
+        }
+        return mergedClient;
       }
 
       return currentDraft;
     });
-  }, [client]);
+  }, [actorLabel, client]);
 
   useEffect(() => {
     if (!client) {
@@ -1824,7 +1836,10 @@ export function IncomeProtectionPage({
 
   function buildSavedQuoteName(integrationRequests: GeneratedDocumentDraft["integrationRequests"]) {
     const providerName = findSavedQuoteProviderName(integrationRequests, resolvedDraft.provider || quoteDocumentType);
-    const dateLabel = new Date().toISOString().slice(0, 10);
+    const date = new Date();
+    const dateLabel = date.toISOString().slice(0, 10);
+    const timeLabel = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }).replace(":", "");
+    const timestampLabel = `${dateLabel} ${timeLabel}`;
 
     if (isPensionsQuoteWorkflow) {
       const scenarioLabel = [
@@ -1834,7 +1849,7 @@ export function IncomeProtectionPage({
         .filter(Boolean)
         .join(" - ");
 
-      return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, dateLabel]
+      return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, timestampLabel]
         .filter(Boolean)
         .join(" - ");
     }
@@ -1847,7 +1862,7 @@ export function IncomeProtectionPage({
       .filter(Boolean)
       .join(" - ");
 
-    return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, dateLabel]
+    return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, timestampLabel]
       .filter(Boolean)
       .join(" - ");
   }
@@ -1860,16 +1875,31 @@ export function IncomeProtectionPage({
     }
 
     const now = new Date().toISOString();
-    const snapshotName = buildSavedQuoteName(quoteDraft.integrationRequests);
+    const fallbackSnapshotName = buildSavedQuoteName(quoteDraft.integrationRequests);
+    const snapshotName = quoteNameInput.trim() || fallbackSnapshotName;
     const existingSnapshot = savedQuotesForCurrentDocument.find((savedQuote) => savedQuote.name === snapshotName);
+    const rebuiltEditedHtml = buildGeneratedEditorHtml(quoteDocumentType, {
+      generatedHtml: quoteDraft.lastGeneratedHtml,
+      sections: quoteDraft.lastGeneratedSections,
+      integrationRequests: quoteDraft.integrationRequests,
+    });
+    const savedEditedHtml =
+      quoteDraft.editedHtml.trim() && !quoteDraft.editedHtml.includes("No Quote Data")
+        ? quoteDraft.editedHtml
+        : rebuiltEditedHtml;
     const nextSnapshot: SavedQuoteSnapshot = {
       id: existingSnapshot?.id ?? `saved-quote-${Date.now()}`,
       name: snapshotName,
       documentType: quoteDocumentType,
+      selectedTemplateId: quoteDraft.selectedTemplateId,
       createdAt: existingSnapshot?.createdAt ?? now,
       updatedAt: now,
       provider: findSavedQuoteProviderName(quoteDraft.integrationRequests, resolvedDraft.provider || quoteDocumentType),
       integrationRequests: quoteDraft.integrationRequests,
+      generationStatus: quoteDraft.generationStatus,
+      lastGeneratedHtml: quoteDraft.lastGeneratedHtml,
+      lastGeneratedSections: quoteDraft.lastGeneratedSections,
+      editedHtml: savedEditedHtml,
       quoteAnnualCoverAmount,
       quoteCoverToAge,
       quoteDeferredPeriod,
@@ -1895,6 +1925,7 @@ export function IncomeProtectionPage({
     ];
     const { savedRemotely } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
     setQuoteSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    setQuoteNameInput(snapshotName);
     addToast(`Saved quote as ${snapshotName}`, "success");
   }
 
@@ -1912,21 +1943,24 @@ export function IncomeProtectionPage({
     };
 
     const generatedDocument = {
-      generatedHtml: "",
-      sections: [],
+      generatedHtml: savedQuote.lastGeneratedHtml,
+      sections: savedQuote.lastGeneratedSections,
       integrationRequests: savedQuote.integrationRequests,
     };
+    const nextEditedHtml =
+      savedQuote.editedHtml || buildGeneratedEditorHtmlForProfile(nextDraft, quoteDocumentType, generatedDocument);
     const editorProfile: SeededClientProfile = {
       ...nextDraft,
       documentDrafts: {
         ...nextDraft.documentDrafts,
         [quoteDocumentType]: {
           ...nextDraft.documentDrafts[quoteDocumentType],
-          generationStatus: "completed",
-          lastGeneratedHtml: "",
-          lastGeneratedSections: [],
+          selectedTemplateId: savedQuote.selectedTemplateId || nextDraft.documentDrafts[quoteDocumentType].selectedTemplateId,
+          generationStatus: savedQuote.generationStatus || "completed",
+          lastGeneratedHtml: savedQuote.lastGeneratedHtml,
+          lastGeneratedSections: savedQuote.lastGeneratedSections,
           integrationRequests: savedQuote.integrationRequests,
-          editedHtml: "",
+          editedHtml: nextEditedHtml,
         },
       },
     };
@@ -1953,14 +1987,15 @@ export function IncomeProtectionPage({
 
     const { savedRemotely } = await persistDraft(nextDraft, { showToast: false });
     syncLocalGeneratedDraft(quoteDocumentType, {
-      generationStatus: "completed",
+      generationStatus: savedQuote.generationStatus || "completed",
       lastGeneratedHtml: generatedDocument.generatedHtml,
       lastGeneratedSections: generatedDocument.sections,
       integrationRequests: generatedDocument.integrationRequests,
-      editedHtml: buildGeneratedEditorHtmlForProfile(editorProfile, quoteDocumentType, generatedDocument),
+      editedHtml: nextEditedHtml || buildGeneratedEditorHtmlForProfile(editorProfile, quoteDocumentType, generatedDocument),
     });
     setQuoteDocumentStatus("Document: Draft loaded");
     setQuoteSaveStatus(savedRemotely ? "Loaded saved quote" : "Loaded saved quote locally");
+    setQuoteNameInput(savedQuote.name);
     addToast(`Loaded ${savedQuote.name}`, "success");
   }
 
@@ -2310,11 +2345,14 @@ export function IncomeProtectionPage({
       "fact-find-update": factFindUpdateComplete
         ? "complete"
         : (factFindUpdateFields.some(hasValue) ? "partial" : "incomplete"),
+      quote: quoteMissingFields.length === 0
+        ? "complete"
+        : (quoteGenerationRequirements.some((item) => item.complete) ? "partial" : "incomplete"),
       "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 15 ? "partial" : "incomplete"),
       "files": filesComplete ? "complete" : "incomplete",
       "generated-documents": generatedComplete ? "complete" : "incomplete",
     } as Record<(typeof moduleTabs)[number]["id"], "complete" | "partial" | "incomplete">;
-  }, [resolvedDraft]);
+  }, [quoteGenerationRequirements, quoteMissingFields.length, resolvedDraft, statementMissingFields.length, displayDocuments.length]);
 
   if (!hasResolvedClient) {
     return (
@@ -3598,6 +3636,7 @@ export function IncomeProtectionPage({
             setQuotePhiIndexation(value);
             updateField("phiIndexation", value);
           }}
+          onQuoteNameInputChange={setQuoteNameInput}
           onSaveQuote={() => void saveQuoteSnapshot()}
           onQuoteSmokerChange={(value) => {
             setQuoteSmoker(value);
@@ -3615,6 +3654,7 @@ export function IncomeProtectionPage({
           quoteDocumentType={quoteDocumentType}
           quoteGenerationRequirements={quoteGenerationRequirements}
           quoteMissingFields={quoteMissingFields}
+          quoteNameInput={quoteNameInput}
           quoteOccupationClass={quoteOccupationClass}
           quoteSaveStatus={quoteSaveStatus}
           quotePensionEscalation={quotePensionEscalation}
@@ -3635,9 +3675,9 @@ export function IncomeProtectionPage({
           savedQuotes={savedQuotesForCurrentDocument}
           showQuoteValidation={showQuoteValidation}
           tabProgressIndicator={getSectionProgress(
-            isPensionsQuoteWorkflow
-              ? [quotePensionGender, quotePensionRetirementAge, quotePensionRequired, quotePensionMonthlyContribution]
-              : [quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker],
+            quoteGenerationRequirements
+              .filter((item) => item.location === "Quote form")
+              .map((item) => (item.complete ? item.label : "")),
           )}
           workspaceAccordion={quoteWorkspaceAccordion}
         />
