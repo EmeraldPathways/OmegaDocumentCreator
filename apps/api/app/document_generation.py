@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from app.ai import build_document_prompt, generate_document_content
 from app.config import AppSettings
 from app.db import get_session
+from app.html_sanitizer import sanitize_preview_html
 from app.models import Document as DocumentModel
 from app.repositories.clients import ClientRepository
 from app.repositories.documents import DocumentRepository
@@ -341,6 +342,7 @@ def generate_document(
     document_type: str,
     template_id: str,
     workflow_snapshot: dict[str, Any],
+    generated_by_email: str | None = None,
 ) -> dict[str, Any]:
     db = get_session()
     try:
@@ -384,19 +386,22 @@ def generate_document(
 
         # Persist generated document metadata + frozen HTML snapshot
         doc_repo = DocumentRepository(db)
+        user_repo = UserRepository(db)
         preview_title = str(generated_document.get("title") or document_type)
-        preview_html = str(generated_document.get("generated_html") or "")
+        preview_html = sanitize_preview_html(str(generated_document.get("generated_html") or ""))
         doc_name = f"{client_name}_{replace_spaces(document_type, '_')}"
+        generated_by_user = user_repo.get_by_email(generated_by_email) if generated_by_email else None
+        next_version = doc_repo.next_version_for(str(client_model.id), document_type)
 
         doc_model = DocumentModel(
             client_id=client_model.id,
             document_type=document_type,
             document_name=doc_name,
             status="draft",
-            version="1",
+            version=next_version,
             preview_title=preview_title,
             preview_html=preview_html,
-            generated_by=None,
+            generated_by=generated_by_user.id if generated_by_user else None,
         )
         doc_repo.add(doc_model)
         db.commit()

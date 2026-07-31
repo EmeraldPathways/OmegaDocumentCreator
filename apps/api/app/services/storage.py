@@ -10,6 +10,7 @@ import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import BinaryIO
 
 DOCUMENT_BUCKET = "documents"
 FILE_BUCKET = "files"
@@ -61,6 +62,17 @@ def _unique_filename(original: str) -> str:
     return f"{stem}-{unique}.{ext}" if ext else f"{stem}-{unique}"
 
 
+def safe_download_name(original: str, fallback_stem: str = "download") -> str:
+    """Return a readable attachment filename without unsafe characters."""
+    candidate = (original or "").strip()
+    if not candidate:
+        candidate = fallback_stem
+    candidate = candidate.replace("\\", " ").replace("/", " ")
+    candidate = re.sub(r"[\r\n\t]+", " ", candidate)
+    candidate = re.sub(r"\s+", " ", candidate).strip()
+    return candidate or fallback_stem
+
+
 class ClientStorage:
     """Manages per-client file storage on disk."""
 
@@ -99,12 +111,59 @@ class ClientStorage:
         filepath.write_bytes(content)
         return filepath
 
-    def read_relative_file(self, relative_path: str) -> bytes | None:
-        """Read a stored file using its persisted relative path."""
-        filepath = self._root / relative_path
-        if not filepath.resolve().is_relative_to(self._root.resolve()):
+    def save_upload(
+        self,
+        client_slug: str,
+        filename: str,
+        upload_file: BinaryIO,
+        *,
+        max_size_bytes: int,
+        year: int | None = None,
+        workflow_slug: str = GENERAL_WORKFLOW,
+        bucket: str = FILE_BUCKET,
+        chunk_size: int = 1024 * 1024,
+    ) -> Path:
+        """Stream an uploaded file to disk and enforce a maximum size."""
+        resolved_year = year or datetime.now(UTC).year
+        folder = self.ensure_client_workflow_folder(client_slug, resolved_year, workflow_slug, bucket)
+        stored_name = _unique_filename(filename)
+        filepath = folder / stored_name
+
+        total_bytes = 0
+        try:
+            with filepath.open("wb") as handle:
+                while True:
+                    chunk = upload_file.read(chunk_size)
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                    if total_bytes > max_size_bytes:
+                        raise ValueError(f"File exceeds maximum upload size of {max_size_bytes} bytes")
+                    handle.write(chunk)
+        except Exception:
+            filepath.unlink(missing_ok=True)
+            raise
+
+        if total_bytes == 0:
+            filepath.unlink(missing_ok=True)
+            raise ValueError("Empty upload")
+
+        return filepath
+
+    def resolve_relative_file(self, relative_path: str) -> Path | None:
+        """Resolve a persisted relative path inside the storage root."""
+        filepath = (self._root / relative_path).resolve()
+        root = self._root.resolve()
+        if not filepath.is_relative_to(root):
             return None
         if not filepath.is_file():
+            return None
+        return filepath
+
+    def read_relative_file(self, relative_path: str) -> bytes | None:
+        """Read a stored file using its persisted relative path."""
+        filepath = self.resolve_relative_file(relative_path)
+        if filepath is None:
             return None
         return filepath.read_bytes()
 

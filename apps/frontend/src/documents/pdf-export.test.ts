@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildPdfStyledHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
+import { buildPdfStyledHtml, buildStandaloneDocumentPreviewHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
 
 const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
@@ -104,5 +104,17 @@ describe("quote table layout", () => {
 
     expect(styles).toContain("grid-template-columns: 1.4fr 1fr 1fr 1fr;");
     expect(styledHtml).toContain("grid-template-columns:1.4fr 1fr 1fr 1fr");
+  });
+});
+
+describe("buildStandaloneDocumentPreviewHtml", () => {
+  it("strips executable markup from preview html", () => {
+    const previewHtml = buildStandaloneDocumentPreviewHtml(
+      '<section><h1>Preview</h1><script>alert(1)</script><img src="x" onerror="alert(2)" /></section>',
+    );
+
+    expect(previewHtml).toContain("Preview");
+    expect(previewHtml).not.toContain("<script>");
+    expect(previewHtml).not.toContain("onerror=");
   });
 });

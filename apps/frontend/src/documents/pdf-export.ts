@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { sanitizeGeneratedHtml } from "./document-api";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
 export const A4_WIDTH_PX = 794;
@@ -841,7 +842,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 }
 
 export function buildStandaloneDocumentPreviewHtml(html: string) {
-  const styledContent = buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true });
+  const styledContent = buildPdfStyledHtml(sanitizeGeneratedHtml(html), true, { stripFactFindLogosForPreview: true });
   const isStatement = styledContent.includes("workflow-document-statement-of-suitability");
 
   const statementPreviewCss = `

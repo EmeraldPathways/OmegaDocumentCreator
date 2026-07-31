@@ -1,4 +1,5 @@
 export type AdminUser = {
+  id: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -25,9 +26,14 @@ export type AdminBackupRun = {
   id: string;
   status: string;
   triggered_by: string | null;
+  manifest_path?: string | null;
+  manifest_present?: boolean;
   database_backup: string | null;
+  database_backup_present?: boolean;
   files_backup: string | null;
+  files_backup_present?: boolean;
   documents_backup: string | null;
+  documents_backup_present?: boolean;
   error_message: string | null;
   created_at: string | null;
 };
@@ -57,6 +63,18 @@ export type SecurityStatus = {
   active_session_count: number | null;
   file_storage_path: string;
   backup_path: string;
+};
+
+export type AdminSettings = {
+  admin_email: string;
+  app_url: string;
+  backup_path: string;
+  file_storage_path: string;
+  remote_access_mode: string;
+  session_timeout_minutes: number;
+  ai_enabled: boolean;
+  ai_model: string;
+  ai_api_key: string;
 };
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -89,7 +107,7 @@ export async function createAdminUser(payload: {
 }
 
 export async function updateAdminUser(
-  email: string,
+  userId: string,
   payload: {
     first_name: string;
     last_name: string;
@@ -98,7 +116,7 @@ export async function updateAdminUser(
     force_password_change?: boolean;
   },
 ): Promise<AdminUser> {
-  const response = await fetch(`/admin/users/${encodeURIComponent(email)}`, {
+  const response = await fetch(`/admin/users/${encodeURIComponent(userId)}`, {
     method: "PATCH",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -108,11 +126,11 @@ export async function updateAdminUser(
 }
 
 export async function resetAdminUserPassword(
-  email: string,
+  userId: string,
   password: string,
   forcePasswordChange = true,
 ): Promise<AdminUser> {
-  const response = await fetch(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
+  const response = await fetch(`/admin/users/${encodeURIComponent(userId)}/reset-password`, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
@@ -121,16 +139,16 @@ export async function resetAdminUserPassword(
   return (await parseJson<{ item: AdminUser }>(response)).item;
 }
 
-export async function disableAdminUser(email: string): Promise<AdminUser> {
-  const response = await fetch(`/admin/users/${encodeURIComponent(email)}/disable`, {
+export async function disableAdminUser(userId: string): Promise<AdminUser> {
+  const response = await fetch(`/admin/users/${encodeURIComponent(userId)}/disable`, {
     method: "PATCH",
     credentials: "same-origin",
   });
   return (await parseJson<{ item: AdminUser }>(response)).item;
 }
 
-export async function enableAdminUser(email: string): Promise<AdminUser> {
-  const response = await fetch(`/admin/users/${encodeURIComponent(email)}/enable`, {
+export async function enableAdminUser(userId: string): Promise<AdminUser> {
+  const response = await fetch(`/admin/users/${encodeURIComponent(userId)}/enable`, {
     method: "PATCH",
     credentials: "same-origin",
   });
@@ -196,6 +214,31 @@ export async function getScheduleStatus(): Promise<Record<string, unknown>> {
 export async function getSecurityStatus(): Promise<SecurityStatus> {
   const response = await fetch("/admin/security", { credentials: "same-origin" });
   return parseJson<SecurityStatus>(response);
+}
+
+export async function getAdminSettings(): Promise<AdminSettings> {
+  const response = await fetch("/admin/settings", { credentials: "same-origin" });
+  return parseJson<AdminSettings>(response);
+}
+
+export async function saveAdminSettings(payload: AdminSettings): Promise<AdminSettings> {
+  const response = await fetch("/admin/settings", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseJson<AdminSettings>(response);
+}
+
+export async function testAdminSettingsPath(path: string): Promise<{ passed: boolean; message: string }> {
+  const response = await fetch("/admin/settings/test-path", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+  return parseJson<{ passed: boolean; message: string }>(response);
 }
 
 export async function listAssignableUsers(): Promise<AdminUser[]> {

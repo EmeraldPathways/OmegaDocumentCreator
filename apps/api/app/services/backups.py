@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import subprocess
 import uuid
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -35,18 +36,27 @@ def run_pg_dump(
     """Run pg_dump against the target database.
 
     Returns (dump_relative_path, error_message).  When successful the dump
-    file is written to output_dir as ``pgdump-{timestamp}.sql`` and the
+    file is written to output_dir as ``pgdump-{timestamp}.dump`` and the
     relative path (from the backup root) is returned.  On failure the dump
     path is None and error_message describes what went wrong.
     """
-    dump_filename = f"pgdump-{timestamp}.sql"
+    dump_filename = f"pgdump-{timestamp}.dump"
     dump_path = output_dir / dump_filename
 
     conn_str = _pg_connection_string(database_url)
 
     try:
         result = subprocess.run(
-            [pg_dump_bin, "--dbname", conn_str, "--file", str(dump_path), "--no-owner", "--no-acl"],
+            [
+                pg_dump_bin,
+                "--dbname",
+                conn_str,
+                "--file",
+                str(dump_path),
+                "--format=custom",
+                "--no-owner",
+                "--no-acl",
+            ],
             capture_output=True,
             text=True,
             timeout=120,
@@ -86,6 +96,41 @@ def _scan_directory_stats(root: Path) -> dict[str, int]:
     return {"file_count": file_count, "total_bytes": total_bytes}
 
 
+def _create_bucket_archive(
+    *,
+    backup_path: Path,
+    file_storage_path: Path,
+    bucket: str,
+    archive_prefix: str,
+    timestamp: str,
+    manifest_id: str,
+) -> tuple[str | None, dict[str, int], str | None]:
+    archives_dir = backup_path / "archives"
+    archives_dir.mkdir(parents=True, exist_ok=True)
+
+    archive_filename = f"{archive_prefix}-{timestamp}-{manifest_id}.zip"
+    archive_path = archives_dir / archive_filename
+    stats = {"file_count": 0, "total_bytes": 0}
+
+    try:
+        candidates = [
+            entry
+            for entry in file_storage_path.rglob("*")
+            if entry.is_file() and bucket in entry.parts
+        ]
+        with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for entry in candidates:
+                relative_path = entry.relative_to(file_storage_path)
+                archive.write(entry, arcname=relative_path.as_posix())
+                stats["file_count"] += 1
+                stats["total_bytes"] += entry.stat().st_size
+    except OSError as exc:
+        archive_path.unlink(missing_ok=True)
+        return None, stats, f"Failed to archive {bucket}: {exc}"
+
+    return f"archives/{archive_filename}", stats, None
+
+
 def create_backup_manifest(
     *,
     backup_path: Path,
@@ -116,6 +161,22 @@ def create_backup_manifest(
     dumps_dir.mkdir(parents=True, exist_ok=True)
 
     storage_stats = _scan_directory_stats(file_storage_path)
+    files_archive_path, files_archive_stats, files_archive_error = _create_bucket_archive(
+        backup_path=backup_path,
+        file_storage_path=file_storage_path,
+        bucket="files",
+        archive_prefix="files",
+        timestamp=timestamp,
+        manifest_id=manifest_id,
+    )
+    documents_archive_path, documents_archive_stats, documents_archive_error = _create_bucket_archive(
+        backup_path=backup_path,
+        file_storage_path=file_storage_path,
+        bucket="documents",
+        archive_prefix="documents",
+        timestamp=timestamp,
+        manifest_id=manifest_id,
+    )
 
     # ---- Real pg_dump (best-effort) ----
     dump_path: str | None = None
@@ -134,7 +195,7 @@ def create_backup_manifest(
     }
     if dump_path is not None:
         database_section["dump_file"] = dump_path
-        database_section["dump_format"] = "sql"
+        database_section["dump_format"] = "custom"
     elif dump_error is not None:
         database_section["dump_attempted"] = True
         database_section["dump_error"] = dump_error
@@ -151,23 +212,39 @@ def create_backup_manifest(
             "file_storage_root": str(file_storage_path),
             "file_count": storage_stats["file_count"],
             "total_bytes": storage_stats["total_bytes"],
+            "files_archive": {
+                "path": files_archive_path,
+                "file_count": files_archive_stats["file_count"],
+                "total_bytes": files_archive_stats["total_bytes"],
+                "error": files_archive_error,
+            },
+            "documents_archive": {
+                "path": documents_archive_path,
+                "file_count": documents_archive_stats["file_count"],
+                "total_bytes": documents_archive_stats["total_bytes"],
+                "error": documents_archive_error,
+            },
         },
         "artifact": {
             "manifest_filename": manifest_filename,
             "backup_root": str(backup_path),
+            "files_backup": files_archive_path,
+            "documents_backup": documents_archive_path,
         },
     }
 
     manifest_path = manifests_dir / manifest_filename
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    status = "success" if dump_error is None else "partial"
+    error_messages = [error for error in (dump_error, files_archive_error, documents_archive_error) if error]
+    status = "success" if not error_messages else "partial"
 
     return {
         "status": status,
         "database_backup": dump_path,
-        "files_backup": f"manifests/{manifest_filename}",
-        "documents_backup": f"manifests/{manifest_filename}",
-        "error_message": dump_error,
+        "files_backup": files_archive_path,
+        "documents_backup": documents_archive_path,
+        "manifest_path": f"manifests/{manifest_filename}",
+        "error_message": "; ".join(error_messages) if error_messages else None,
         "manifest": manifest,
     }

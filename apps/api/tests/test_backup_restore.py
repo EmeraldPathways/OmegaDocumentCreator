@@ -32,6 +32,10 @@ class BackupServiceTests(unittest.TestCase):
         self.file_root = Path(self._tmpdir.name) / "files"
         self.backup_root.mkdir(parents=True, exist_ok=True)
         self.file_root.mkdir(parents=True, exist_ok=True)
+        (self.file_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "files").mkdir(parents=True, exist_ok=True)
+        (self.file_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "documents").mkdir(parents=True, exist_ok=True)
+        (self.file_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "files" / "payslip.pdf").write_bytes(b"pay")
+        (self.file_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "documents" / "fact-find.docx").write_bytes(b"doc")
 
     def tearDown(self) -> None:
         self._tmpdir.cleanup()
@@ -42,7 +46,7 @@ class BackupServiceTests(unittest.TestCase):
 
     def test_pg_dump_success_sets_database_backup(self) -> None:
         """Mock pg_dump success: status='success', database_backup path set."""
-        with patch("app.services.backups.run_pg_dump", return_value=("dumps/pgdump-test.sql", None)):
+        with patch("app.services.backups.run_pg_dump", return_value=("dumps/pgdump-test.dump", None)):
             result = create_backup_manifest(
                 backup_path=self.backup_root,
                 file_storage_path=self.file_root,
@@ -51,7 +55,7 @@ class BackupServiceTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["database_backup"], "dumps/pgdump-test.sql")
+        self.assertEqual(result["database_backup"], "dumps/pgdump-test.dump")
         self.assertIsNone(result["error_message"])
 
     def test_pg_dump_failure_sets_partial_status(self) -> None:
@@ -121,7 +125,7 @@ class BackupServiceTests(unittest.TestCase):
             triggered_by_email="admin@test.local",
         )
 
-        manifest_path = self.backup_root / result["files_backup"]  # e.g. backups/manifests/file.json
+        manifest_path = self.backup_root / result["manifest_path"]
         self.assertTrue(manifest_path.is_file(), f"Manifest not found at {manifest_path}")
 
         raw = manifest_path.read_text(encoding="utf-8")
@@ -130,10 +134,12 @@ class BackupServiceTests(unittest.TestCase):
         self.assertEqual(data["backup_type"], "full")
         self.assertIn("database", data)
         self.assertIn("storage", data)
+        self.assertEqual(data["artifact"]["files_backup"], result["files_backup"])
+        self.assertEqual(data["artifact"]["documents_backup"], result["documents_backup"])
 
     def test_manifest_includes_database_section_with_dump_file_on_success(self) -> None:
         """When pg_dump succeeds, manifest includes database.dump_file."""
-        with patch("app.services.backups.run_pg_dump", return_value=("dumps/pgdump-real.sql", None)):
+        with patch("app.services.backups.run_pg_dump", return_value=("dumps/pgdump-real.dump", None)):
             result = create_backup_manifest(
                 backup_path=self.backup_root,
                 file_storage_path=self.file_root,
@@ -143,8 +149,8 @@ class BackupServiceTests(unittest.TestCase):
 
         manifest = result["manifest"]
         self.assertIn("database", manifest)
-        self.assertEqual(manifest["database"]["dump_file"], "dumps/pgdump-real.sql")
-        self.assertEqual(manifest["database"]["dump_format"], "sql")
+        self.assertEqual(manifest["database"]["dump_file"], "dumps/pgdump-real.dump")
+        self.assertEqual(manifest["database"]["dump_format"], "custom")
 
     def test_manifest_includes_dump_error_in_database_section_on_failure(self) -> None:
         """When pg_dump fails, manifest includes database.dump_error."""
@@ -159,6 +165,18 @@ class BackupServiceTests(unittest.TestCase):
         manifest = result["manifest"]
         self.assertEqual(manifest["database"]["dump_attempted"], True)
         self.assertEqual(manifest["database"]["dump_error"], "connection refused")
+
+    def test_backup_copies_file_and_document_artifacts(self) -> None:
+        result = create_backup_manifest(
+            backup_path=self.backup_root,
+            file_storage_path=self.file_root,
+            triggered_by_email="admin@test.local",
+            database_url=None,
+        )
+
+        self.assertNotEqual(result["files_backup"], result["documents_backup"])
+        self.assertTrue((self.backup_root / result["files_backup"]).is_file())
+        self.assertTrue((self.backup_root / result["documents_backup"]).is_file())
 
 
 class RestoreServiceTests(unittest.TestCase):
@@ -219,7 +237,7 @@ class RestoreServiceTests(unittest.TestCase):
 
     def test_validate_manifest_artifacts_detects_missing_dump(self) -> None:
         manifest = {
-            "artifact": {"manifest_filename": "test.json"},
+            "artifact": {"manifest_filename": "test.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/missing.sql"},
         }
         warnings = validate_manifest_artifacts(manifest, backup_root=self.backup_root)
@@ -229,7 +247,7 @@ class RestoreServiceTests(unittest.TestCase):
     def test_validate_manifest_artifacts_detects_empty_dump(self) -> None:
         dump = self._write_dump("dumps/empty.sql", b"")
         manifest = {
-            "artifact": {"manifest_filename": "test.json"},
+            "artifact": {"manifest_filename": "test.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/empty.sql"},
         }
         warnings = validate_manifest_artifacts(manifest, backup_root=self.backup_root)
@@ -238,8 +256,10 @@ class RestoreServiceTests(unittest.TestCase):
 
     def test_validate_manifest_artifacts_no_warnings_for_valid_dump(self) -> None:
         dump = self._write_dump("dumps/valid.sql", b"-- valid dump")
+        self._write_dump("archives/files.zip", b"zip")
+        self._write_dump("archives/documents.zip", b"zip")
         manifest = {
-            "artifact": {"manifest_filename": "test.json"},
+            "artifact": {"manifest_filename": "test.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/valid.sql"},
         }
         warnings = validate_manifest_artifacts(manifest, backup_root=self.backup_root)
@@ -251,6 +271,13 @@ class RestoreServiceTests(unittest.TestCase):
         }
         warnings = validate_manifest_artifacts(manifest, backup_root=self.backup_root)
         self.assertEqual(len(warnings), 0)
+
+    def test_validate_manifest_artifacts_detects_missing_file_archive(self) -> None:
+        manifest = {
+            "artifact": {"manifest_filename": "test.json", "files_backup": "archives/files.zip"},
+        }
+        warnings = validate_manifest_artifacts(manifest, backup_root=self.backup_root)
+        self.assertTrue(any("Files archive not found" in warning for warning in warnings))
 
     def test_validate_manifest_artifacts_raises_for_missing_artifact_section(self) -> None:
         manifest = {"backup_type": "full"}  # no "artifact" key
@@ -270,7 +297,7 @@ class RestoreServiceTests(unittest.TestCase):
 
     def test_validate_restore_returns_valid_false_on_warnings(self) -> None:
         path = self._write_manifest("partial.json", {
-            "artifact": {"manifest_filename": "partial.json"},
+            "artifact": {"manifest_filename": "partial.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/missing.sql"},
         })
         result = validate_restore(backup_root=self.backup_root, manifest_path=path)
@@ -278,19 +305,25 @@ class RestoreServiceTests(unittest.TestCase):
         self.assertGreaterEqual(len(result["warnings"]), 1)
 
     def test_validate_restore_returns_valid_true_when_all_artifacts_exist(self) -> None:
+        self._write_dump("archives/files.zip", b"zip")
+        self._write_dump("archives/documents.zip", b"zip")
         self._write_dump("dumps/ok.sql", b"-- ok")
         path = self._write_manifest("ok.json", {
-            "artifact": {"manifest_filename": "ok.json"},
+            "artifact": {"manifest_filename": "ok.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/ok.sql"},
         })
         result = validate_restore(backup_root=self.backup_root, manifest_path=path)
         self.assertTrue(result["valid"])
         self.assertEqual(len(result["warnings"]), 0)
+        self.assertEqual(result["files_backup"], "archives/files.zip")
+        self.assertEqual(result["documents_backup"], "archives/documents.zip")
 
     def test_validate_restore_returns_dump_file(self) -> None:
+        self._write_dump("archives/files.zip", b"zip")
+        self._write_dump("archives/documents.zip", b"zip")
         self._write_dump("dumps/ok.sql", b"-- ok")
         path = self._write_manifest("ok.json", {
-            "artifact": {"manifest_filename": "ok.json"},
+            "artifact": {"manifest_filename": "ok.json", "files_backup": "archives/files.zip", "documents_backup": "archives/documents.zip"},
             "database": {"dump_file": "dumps/ok.sql"},
         })
         result = validate_restore(backup_root=self.backup_root, manifest_path=path)
@@ -455,31 +488,36 @@ class SchedulerServiceTests(unittest.TestCase):
         status = get_scheduler_status()
         self.assertFalse(status["enabled"])
 
-    @patch("app.db.get_session")
-    def test_scheduled_trigger_calls_backup_service(self, mock_get_session: object) -> None:
+    def test_scheduled_trigger_calls_backup_service(self) -> None:
         """run_single_scheduled_backup calls create_backup_manifest and returns completed/failed."""
+        try:
+            import app.db  # noqa: F401
+        except ModuleNotFoundError as exc:
+            self.skipTest(f"Scheduler backup test requires backend dependencies: {exc}")
+
         import tempfile
         from pathlib import Path
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         # Mock the DB session to avoid needing real PostgreSQL
         mock_db = MagicMock()
-        mock_get_session.return_value = mock_db
 
         from app.services.scheduler import run_single_scheduled_backup
 
-        with tempfile.TemporaryDirectory() as tmp:
-            bp = Path(tmp) / "backups"
-            fp = Path(tmp) / "files"
-            bp.mkdir(parents=True, exist_ok=True)
-            fp.mkdir(parents=True, exist_ok=True)
+        import app.db
+        with patch.object(app.db, "get_session", return_value=mock_db):
+            with tempfile.TemporaryDirectory() as tmp:
+                bp = Path(tmp) / "backups"
+                fp = Path(tmp) / "files"
+                bp.mkdir(parents=True, exist_ok=True)
+                fp.mkdir(parents=True, exist_ok=True)
 
-            result = run_single_scheduled_backup(
-                backup_path=bp,
-                file_storage_path=fp,
-                database_url="postgresql://placeholder",
-                pg_dump_bin="pg_dump",
-            )
+                result = run_single_scheduled_backup(
+                    backup_path=bp,
+                    file_storage_path=fp,
+                    database_url="postgresql://placeholder",
+                    pg_dump_bin="pg_dump",
+                )
 
         self.assertIn(result["status"], ("completed", "failed"))
 

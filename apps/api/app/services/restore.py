@@ -59,6 +59,15 @@ def validate_manifest_artifacts(
     if not isinstance(manifest_filename, str):
         raise RestoreValidationError("Manifest is missing 'artifact.manifest_filename'")
 
+    for archive_key, label in (("files_backup", "Files archive"), ("documents_backup", "Documents archive")):
+        archive_relative_path = artifact_section.get(archive_key)
+        if isinstance(archive_relative_path, str):
+            archive_path = backup_root / archive_relative_path
+            if not archive_path.is_file():
+                warnings.append(f"{label} not found: {archive_relative_path}")
+            elif archive_path.stat().st_size == 0:
+                warnings.append(f"{label} is empty: {archive_relative_path}")
+
     # Check database dump artifact
     database_section = manifest.get("database")
     if isinstance(database_section, dict):
@@ -89,6 +98,7 @@ def validate_restore(
     Raises RestoreValidationError only for truly fatal issues.
     """
     manifest = load_manifest(manifest_path)
+    artifact_section = manifest.get("artifact")
 
     warnings = validate_manifest_artifacts(manifest, backup_root=backup_root)
 
@@ -104,6 +114,8 @@ def validate_restore(
         "manifest": manifest,
         "warnings": warnings,
         "dump_file": dump_file,
+        "files_backup": artifact_section.get("files_backup") if isinstance(artifact_section, dict) else None,
+        "documents_backup": artifact_section.get("documents_backup") if isinstance(artifact_section, dict) else None,
     }
 
 

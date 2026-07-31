@@ -564,11 +564,11 @@ class ApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(create_resp.status_code, 201)
-        user_email = create_resp.json()["item"]["email"]
+        user_id = create_resp.json()["item"]["id"]
 
         # Edit the user — change role from staff to admin and rename
         patch_resp = self.client.patch(
-            f"/admin/users/{user_email}",
+            f"/admin/users/{user_id}",
             json={
                 "first_name": "Audited",
                 "last_name": "User",
@@ -580,7 +580,7 @@ class ApiTests(unittest.TestCase):
         # Check audit log for the user_updated entry
         audit_resp = self.client.get("/admin/audit-logs")
         entries = audit_resp.json()["items"]
-        update_entries = [e for e in entries if e["action"] == "user_updated" and e["entity_id"] == user_email]
+        update_entries = [e for e in entries if e["action"] == "user_updated" and e["entity_id"] == user_id]
         self.assertGreaterEqual(len(update_entries), 1, "Expected at least 1 user_updated audit entry")
         details = update_entries[0]["details"]
         self.assertEqual(details["old_role"], "staff")
@@ -606,15 +606,15 @@ class ApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(create_resp.status_code, 201)
-        user_email = create_resp.json()["item"]["email"]
+        user_id = create_resp.json()["item"]["id"]
 
         # Disable the user
-        self.client.patch(f"/admin/users/{user_email}/disable")
+        self.client.patch(f"/admin/users/{user_id}/disable")
 
         # Check audit log for user_disabled entry
         audit_resp = self.client.get("/admin/audit-logs")
         entries = audit_resp.json()["items"]
-        disable_entries = [e for e in entries if e["action"] == "user_disabled" and e["entity_id"] == user_email]
+        disable_entries = [e for e in entries if e["action"] == "user_disabled" and e["entity_id"] == user_id]
         self.assertGreaterEqual(len(disable_entries), 1, "Expected at least 1 user_disabled audit entry")
         details = disable_entries[0]["details"]
         self.assertEqual(details["new_status"], "disabled")
@@ -634,7 +634,10 @@ class ApiTests(unittest.TestCase):
                 "role": "staff",
             },
         )
-        disable_response = self.client.patch("/admin/users/nora.kelly@omega.local/disable")
+        list_response = self.client.get("/admin/users")
+        target_user = next((item for item in list_response.json()["items"] if item["email"] == "nora.kelly@omega.local"), None)
+        self.assertIsNotNone(target_user)
+        disable_response = self.client.patch(f"/admin/users/{target_user['id']}/disable")
         login_response = self.client.post(
             "/auth/login",
             json={"email": "nora.kelly@omega.local", "password": "StrongPass123!"},
@@ -659,7 +662,7 @@ class ApiTests(unittest.TestCase):
             },
         )
         response = self.client.patch(
-            "/admin/users/nora.kelly@omega.local",
+            f"/admin/users/{next(item for item in self.client.get('/admin/users').json()['items'] if item['email'] == 'nora.kelly@omega.local')['id']}",
             json={"first_name": "Norah", "last_name": "Kelly", "role": "staff"},
         )
         self.assertEqual(response.status_code, 200)
@@ -983,6 +986,7 @@ class ApiTests(unittest.TestCase):
         self.assertIsNotNone(payload["created_at"])
         self.assertIsNotNone(payload["files_backup"])
         self.assertIsNotNone(payload["documents_backup"])
+        self.assertIsNotNone(payload["manifest_path"])
         # error_message may be None (placeholder URL) or a string (pg_dump unavailable)
         if payload["status"] == "partial":
             self.assertIsNotNone(payload["error_message"])
@@ -997,7 +1001,7 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(any(r["id"] == payload["id"] for r in items))
 
         # Verify artifact file exists on disk
-        manifest_path = payload["files_backup"]
+        manifest_path = payload["manifest_path"]
         from app.main import settings as app_settings
         from pathlib import Path
         full_path = app_settings.backup_path / manifest_path
@@ -1224,7 +1228,7 @@ class ApiTests(unittest.TestCase):
         from pathlib import Path
         import json
 
-        manifest_path = app_settings.backup_path / payload["files_backup"]
+        manifest_path = app_settings.backup_path / payload["manifest_path"]
         self.assertTrue(manifest_path.is_file())
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

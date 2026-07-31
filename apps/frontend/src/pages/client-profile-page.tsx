@@ -19,6 +19,7 @@ import {
 
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
+import { archiveClient as archiveBackendClient } from "../data/client-api";
 import {
   deleteFile as deleteBackendFile,
   downloadFile as downloadBackendFile,
@@ -29,6 +30,7 @@ import {
   downloadDocument as downloadBackendDocument,
   listDocuments,
 } from "../documents/generated-document-api";
+import { buildStandaloneDocumentPreviewHtml } from "../documents/pdf-export";
 import type { SeededClientFile, SeededClientProfile, SeededGeneratedDocument } from "../data/seeded-clients";
 import { Badge, Button, Input, Modal, Textarea, useToast } from "../components/ui";
 
@@ -145,7 +147,6 @@ export function ClientProfilePage() {
   const [dependantRelationship, setDependantRelationship] = useState("");
   const [backendDocuments, setBackendDocuments] = useState<SeededGeneratedDocument[]>([]);
   const [backendFiles, setBackendFiles] = useState<SeededClientFile[]>([]);
-  const [artifactsLoaded, setArtifactsLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canUseBackend = Boolean(user);
 
@@ -177,7 +178,6 @@ export function ClientProfilePage() {
 
     setBackendDocuments(documents.map(mapBackendDocumentToSeeded));
     setBackendFiles(files.map(mapBackendFileToSeeded));
-    setArtifactsLoaded(true);
   }
 
   useEffect(() => {
@@ -188,13 +188,11 @@ export function ClientProfilePage() {
 
   const documents = useMemo(
     () =>
-      canUseBackend && artifactsLoaded
-        ? backendDocuments
-        : backendDocuments.length > 0
+      canUseBackend
         ? backendDocuments
         : draft?.generatedDocuments.length
           ? draft.generatedDocuments
-        : [
+          : [
             {
               id: "placeholder-fact-find",
               documentType: "Fact Find",
@@ -220,7 +218,12 @@ export function ClientProfilePage() {
               generatedAt: "",
             },
           ],
-    [artifactsLoaded, backendDocuments, canUseBackend, draft?.generatedDocuments],
+    [backendDocuments, canUseBackend, draft?.generatedDocuments],
+  );
+
+  const files = useMemo(
+    () => (canUseBackend ? backendFiles : (draft?.files ?? [])),
+    [backendFiles, canUseBackend, draft?.files],
   );
 
   if (!client || !draft) {
@@ -334,12 +337,18 @@ export function ClientProfilePage() {
     addToast("Dependant added", "success");
   }
 
-  function handleDeleteClient() {
-    // Remove client from persisted state by saving an archived copy or simply filtering out.
-    // For this local-storage-backed app we navigate away and toast.
-    setIsDeleteModalOpen(false);
-    addToast("Client deleted", "success");
-    navigate("/clients");
+  async function handleDeleteClient() {
+    try {
+      if (canUseBackend) {
+        await archiveBackendClient(clientReference);
+        await refreshClients();
+      }
+      setIsDeleteModalOpen(false);
+      addToast("Client archived", "success");
+      navigate("/clients");
+    } catch {
+      addToast("Failed to archive client", "error");
+    }
   }
 
   async function handleSaveDocuments() {
@@ -384,7 +393,7 @@ export function ClientProfilePage() {
           </Link>
           <Button onClick={() => setIsDeleteModalOpen(true)} variant="danger">
             <Trash2 size={18} />
-            Delete Client
+            Archive Client
           </Button>
           <Button isLoading={saveStatus === "saving"} onClick={handleSaveDocuments} variant="secondary">
             {saveStatus === "saved" ? <Check size={18} /> : <Save size={18} />}
@@ -482,7 +491,7 @@ export function ClientProfilePage() {
           style={{ display: "none" }}
           type="file"
         />
-        {((canUseBackend && artifactsLoaded) ? backendFiles : resolvedDraft.files).length === 0 ? (
+        {files.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">
               <FolderOpen size={28} />
@@ -496,7 +505,7 @@ export function ClientProfilePage() {
           </div>
         ) : (
           <div className="file-list">
-            {((canUseBackend && artifactsLoaded) ? backendFiles : resolvedDraft.files).map((file) => (
+            {files.map((file) => (
               <div key={file.id} className="file-item">
                 <div className="file-icon">
                   <FileIcon filename={file.originalFilename} />
@@ -611,18 +620,18 @@ export function ClientProfilePage() {
             <Button onClick={() => setIsDeleteModalOpen(false)} variant="secondary">
               Cancel
             </Button>
-            <Button onClick={handleDeleteClient} variant="danger">
-              Delete Client
+            <Button onClick={() => void handleDeleteClient()} variant="danger">
+              Archive Client
             </Button>
           </>
         }
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Client"
+        title="Archive Client"
       >
-        <p>Are you sure you want to delete {resolvedDraft.fullName}?</p>
+        <p>Are you sure you want to archive {resolvedDraft.fullName}?</p>
         <p className="text-muted" style={{ marginTop: "var(--space-3)" }}>
-          This action cannot be undone. All associated documents and files will be removed.
+          This removes the client from active work while preserving the record and associated documents and files.
         </p>
       </Modal>
 
@@ -635,7 +644,8 @@ export function ClientProfilePage() {
         {previewDocument?.previewHtml ? (
           <iframe
             className="document-preview-iframe"
-            srcDoc={previewDocument.previewHtml}
+            sandbox=""
+            srcDoc={buildStandaloneDocumentPreviewHtml(previewDocument.previewHtml)}
             title={previewDocument.documentName}
           />
         ) : (

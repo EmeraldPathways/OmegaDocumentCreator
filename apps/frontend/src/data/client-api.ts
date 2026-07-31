@@ -19,6 +19,7 @@ export type BackendClientDetail = BackendClientSummary & {
   title: string;
   created_at: string;
   updated_at: string;
+  archived_at?: string;
   email: string;
   mobile_number: string;
   work_phone: string;
@@ -88,6 +89,14 @@ export async function updateClient(clientReference: string, payload: Partial<Cli
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  return (await parseJson<{ item: BackendClientDetail }>(response)).item;
+}
+
+export async function archiveClient(clientReference: string): Promise<BackendClientDetail> {
+  const response = await fetch(`/clients/${encodeURIComponent(clientReference)}/archive`, {
+    method: "PATCH",
+    credentials: "same-origin",
   });
   return (await parseJson<{ item: BackendClientDetail }>(response)).item;
 }

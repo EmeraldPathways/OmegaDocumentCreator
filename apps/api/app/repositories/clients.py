@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+import re
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -30,6 +31,24 @@ class ClientRepository:
 
     def count(self) -> int:
         return self._db.query(Client).count()
+
+    def next_reference_sequence(self, year: int) -> int:
+        prefix = f"CLI-{year}-"
+        matching_references = (
+            self._db.query(Client.client_reference)
+            .filter(Client.client_reference.like(f"{prefix}%"))
+            .all()
+        )
+
+        highest = 0
+        for row in matching_references:
+            reference = str(row[0] or "")
+            match = re.fullmatch(rf"CLI-{year}-(\d+)", reference)
+            if not match:
+                continue
+            highest = max(highest, int(match.group(1)))
+
+        return highest + 1
 
     # ------------------------------------------------------------------
     # Helpers
@@ -112,6 +131,7 @@ class ClientRepository:
             "updated_by": self._user_email_by_id(client.updated_by),
             "created_at": client.created_at.isoformat() if client.created_at else "",
             "updated_at": client.updated_at.isoformat() if client.updated_at else "",
+            "archived_at": client.archived_at.isoformat() if client.archived_at else "",
             "email": client.email or "",
             "mobile_number": client.mobile_number or "",
             "work_phone": client.work_phone or "",
@@ -172,7 +192,7 @@ class ClientRepository:
 
         full_name = f"{first_name} {surname}".strip()
         current_year = datetime.now(UTC).year
-        seq = self._db.query(Client).count() + 1
+        seq = self.next_reference_sequence(current_year)
         client_reference = build_client_reference(current_year, seq)
 
         created_by_id = self._user_id_by_email(created_by_email)
@@ -243,7 +263,10 @@ class ClientRepository:
 
         for request_key, attr_name in field_map.items():
             if request_key in updates:
-                setattr(client, attr_name, updates[request_key] or None)
+                if request_key == "date_of_birth":
+                    setattr(client, attr_name, self._parse_date(updates[request_key]))
+                else:
+                    setattr(client, attr_name, updates[request_key] or None)
 
         if "first_name" in updates or "surname" in updates:
             client.full_name = f"{client.first_name} {client.surname}".strip()
@@ -279,6 +302,7 @@ class ClientRepository:
         if client is None:
             return None
         client.status = ClientStatus.ARCHIVED.value
+        client.archived_at = datetime.now(UTC)
         client.updated_by = self._user_id_by_email(updated_by_email)
         self._db.flush()
         return self._to_detail_response(client)

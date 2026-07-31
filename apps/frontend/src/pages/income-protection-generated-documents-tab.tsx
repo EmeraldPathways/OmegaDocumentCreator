@@ -197,6 +197,7 @@ export function IncomeProtectionGeneratedDocumentsTab({
         {previewDocument?.previewHtml ? (
           <iframe
             className="document-preview-iframe"
+            sandbox=""
             srcDoc={buildStandaloneDocumentPreviewHtml(previewDocument.previewHtml)}
             title={previewDocument.documentName}
           />

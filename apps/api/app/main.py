@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import io
+import json
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
+from urllib.parse import quote
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
@@ -19,6 +24,7 @@ from app.db import get_engine, get_session
 from app.document_generation import build_statement_quote_requests, generate_document
 from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_slug
 from app.domain.users import UserRole, UserStatus
+from app.html_sanitizer import sanitize_preview_html
 from app.models import AuditLog
 from app.models import BackupRun as BackupRunModel
 from app.models import RestoreAttempt as RestoreAttemptModel
@@ -35,12 +41,13 @@ from app.repositories.users import UserRepository
 from app.repositories.workflows import WorkflowRepository
 from app.security import hash_password, is_session_expired, verify_password
 from app.services.backups import create_backup_manifest
-from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, validate_restore
+from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, load_manifest, validate_restore
 from app.services.storage import (
     DOCUMENT_BUCKET,
     FILE_BUCKET,
     ClientStorage,
     normalize_workflow_slug,
+    safe_download_name,
     workflow_slug_for_document_type,
 )
 
@@ -66,6 +73,8 @@ OWN_RECORD_ACCESS_EMAILS = {
 DELEGATED_OWNER_ACCESS: dict[str, set[str]] = {
     "alison@omegafinancial.ie": {"john@omegafinancial.ie"},
 }
+
+GLOBAL_RECORD_ACCESS_EMAILS = SYSTEM_ACCESS_EMAILS | FULL_RECORD_ACCESS_EMAILS
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
 app.db = app_db
@@ -293,6 +302,22 @@ class RestoreConfirmRequest(BaseModel):
     confirm: str  # must be "yes-do-restore-now" to proceed
 
 
+class AdminSettingsRequest(BaseModel):
+    admin_email: str
+    app_url: str
+    backup_path: str
+    file_storage_path: str
+    remote_access_mode: str
+    session_timeout_minutes: int
+    ai_enabled: bool = False
+    ai_model: str = "gpt-4o-mini"
+    ai_api_key: str = ""
+
+
+class AdminPathTestRequest(BaseModel):
+    path: str
+
+
 # ---------------------------------------------------------------------------
 # Auth helpers (DB-backed)
 # ---------------------------------------------------------------------------
@@ -348,14 +373,25 @@ def _is_admin_user(user: dict[str, str]) -> bool:
     return user.get("role") == UserRole.ADMIN.value or email in SYSTEM_ACCESS_EMAILS
 
 
-def _has_global_record_access(user: dict[str, str]) -> bool:
+def _resolve_record_access_policy(user: dict[str, str]) -> str:
     email = _normalized_email(user.get("email"))
-    return email in SYSTEM_ACCESS_EMAILS or email in FULL_RECORD_ACCESS_EMAILS
+    if _is_admin_user(user):
+        return "admin"
+    if email in GLOBAL_RECORD_ACCESS_EMAILS:
+        return "global"
+    if email in OWN_RECORD_ACCESS_EMAILS:
+        return "own"
+    if email in DELEGATED_OWNER_ACCESS:
+        return "delegated"
+    return "none"
+
+
+def _has_global_record_access(user: dict[str, str]) -> bool:
+    return _resolve_record_access_policy(user) in {"admin", "global"}
 
 
 def _can_create_client(user: dict[str, str]) -> bool:
-    email = _normalized_email(user.get("email"))
-    return _has_global_record_access(user) or email in OWN_RECORD_ACCESS_EMAILS
+    return _resolve_record_access_policy(user) != "none"
 
 
 def _resolve_user_email_by_id(db: object, user_id: uuid.UUID | None) -> str:
@@ -369,11 +405,12 @@ def _resolve_user_email_by_id(db: object, user_id: uuid.UUID | None) -> str:
 def _can_access_owner_email(user: dict[str, str], owner_email: str) -> bool:
     user_email = _normalized_email(user.get("email"))
     record_owner = _normalized_email(owner_email)
-    if _has_global_record_access(user):
+    policy = _resolve_record_access_policy(user)
+    if policy in {"admin", "global"}:
         return True
-    if user_email in OWN_RECORD_ACCESS_EMAILS:
+    if policy == "own":
         return bool(record_owner) and record_owner == user_email
-    delegated_owners = DELEGATED_OWNER_ACCESS.get(user_email, set())
+    delegated_owners = DELEGATED_OWNER_ACCESS.get(user_email, set()) if policy == "delegated" else set()
     return bool(record_owner) and record_owner in delegated_owners
 
 
@@ -408,6 +445,12 @@ def _resolve_storage_workflow_slug(*, workflow_hint: str | None = None, document
     if workflow_hint and workflow_hint.strip():
         return normalize_workflow_slug(workflow_hint)
     return workflow_slug_for_document_type(document_type)
+
+
+def _attachment_headers(filename: str) -> dict[str, str]:
+    safe_name = safe_download_name(filename)
+    encoded_name = quote(safe_name, safe="")
+    return {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}"}
 
 
 # ---------------------------------------------------------------------------
@@ -494,18 +537,17 @@ def _check_db_connectivity() -> dict[str, object]:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {"database": "available"}
-    except Exception as exc:
-        return {"database": "unavailable", "database_error": str(exc)}
+    except Exception:
+        return {"database": "unavailable"}
 
 
 def _check_storage_availability() -> dict[str, object]:
     """Return storage availability status for readiness checks."""
-    from pathlib import Path
     result: dict[str, object] = {}
     storage_root = Path(settings.file_storage_path)
     backup_root = Path(settings.backup_path)
-    result["file_storage"] = str(storage_root) if storage_root.is_dir() else "unavailable"
-    result["backup_storage"] = str(backup_root) if backup_root.is_dir() else "unavailable"
+    result["file_storage"] = "available" if storage_root.is_dir() else "unavailable"
+    result["backup_storage"] = "available" if backup_root.is_dir() else "unavailable"
     return result
 
 
@@ -520,7 +562,7 @@ def healthcheck() -> dict[str, object]:
 
 
 @app.get("/ready")
-def readiness() -> dict[str, object]:
+def readiness() -> JSONResponse:
     db_status = _check_db_connectivity()
     storage_status = _check_storage_availability()
     db_available = db_status.get("database") == "available"
@@ -529,13 +571,16 @@ def readiness() -> dict[str, object]:
         and storage_status.get("backup_storage") != "unavailable"
     )
     ready = db_available and storage_available
-    return {
-        "ready": ready,
-        "checks": {
-            **db_status,
-            **storage_status,
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={
+            "ready": ready,
+            "checks": {
+                **db_status,
+                **storage_status,
+            },
         },
-    }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -864,6 +909,7 @@ def generate_document_record(
             document_type=payload.document_type,
             template_id=payload.template_id,
             workflow_snapshot=payload.workflow_snapshot,
+            generated_by_email=str(current_user.get("email") or ""),
         )
         _log_audit(
             request, db=db,
@@ -953,7 +999,7 @@ async def create_document_record(client_reference: str, request: Request) -> dic
             raise HTTPException(status_code=400, detail="document_type is required")
         doc_name = str(payload.get("document_name", f"{doc_type} - {client_reference}"))
         preview_title = str(payload.get("preview_title", ""))
-        preview_html = str(payload.get("preview_html", ""))
+        preview_html = sanitize_preview_html(str(payload.get("preview_html", "")))
         document_model = DocumentModel(
             client_id=client.id,
             document_type=doc_type,
@@ -969,23 +1015,28 @@ async def create_document_record(client_reference: str, request: Request) -> dic
 
         if uploaded is not None and hasattr(uploaded, "filename") and getattr(uploaded, "filename", ""):
             artifact_name = str(uploaded.filename)
-            artifact_content = await uploaded.read()
-            if not artifact_content:
-                raise HTTPException(status_code=400, detail="Empty artifact upload")
-
             storage = ClientStorage(settings.file_storage_path)
             slug = _build_client_slug_from_model(client)
             workflow_slug = _resolve_storage_workflow_slug(
                 workflow_hint=str(payload.get("workflow") or ""),
                 document_type=doc_type,
             )
-            filepath = storage.save_file(
-                slug,
-                artifact_name,
-                artifact_content,
-                workflow_slug=workflow_slug,
-                bucket=DOCUMENT_BUCKET,
-            )
+            upload_source = getattr(uploaded, "file", None)
+            if upload_source is None:
+                raise HTTPException(status_code=400, detail="Invalid artifact upload")
+            try:
+                filepath = storage.save_upload(
+                    slug,
+                    artifact_name,
+                    upload_source,
+                    max_size_bytes=settings.max_upload_size_bytes,
+                    workflow_slug=workflow_slug,
+                    bucket=DOCUMENT_BUCKET,
+                )
+            except ValueError as exc:
+                detail = str(exc)
+                status_code = 413 if "maximum upload size" in detail else 400
+                raise HTTPException(status_code=status_code, detail=detail) from exc
             relative_path = str(filepath.relative_to(settings.file_storage_path))
             suffix = filepath.suffix.lower()
             doc_repo.update_artifact_paths(
@@ -1019,8 +1070,6 @@ def download_document(client_reference: str, document_id: str, request: Request)
         if not doc or doc.client_id != client.id:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        from fastapi.responses import Response
-
         storage = ClientStorage(settings.file_storage_path)
 
         # Try PDF first, then DOCX
@@ -1028,8 +1077,8 @@ def download_document(client_reference: str, document_id: str, request: Request)
         if not artifact_path:
             raise HTTPException(status_code=404, detail="No artifact available for this document")
 
-        content = storage.read_relative_file(artifact_path)
-        if content is None:
+        resolved_path = storage.resolve_relative_file(artifact_path)
+        if resolved_path is None:
             raise HTTPException(status_code=404, detail="Document artifact not found on disk")
 
         # Determine filename and MIME type
@@ -1052,10 +1101,11 @@ def download_document(client_reference: str, document_id: str, request: Request)
             details={"document_name": doc.document_name},
         )
         db.commit()
-        return Response(
-            content=content,
+        return FileResponse(
+            path=resolved_path,
             media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            filename=None,
+            headers=_attachment_headers(filename),
         )
     finally:
         db.close()
@@ -1081,8 +1131,8 @@ def download_document_pack(client_reference: str, request: Request) -> object:
                 for artifact_path in (doc.pdf_file_path, doc.docx_file_path):
                     if not artifact_path:
                         continue
-                    content = storage.read_relative_file(artifact_path)
-                    if content is None:
+                    resolved_path = storage.resolve_relative_file(artifact_path)
+                    if resolved_path is None:
                         continue
                     # Determine filename inside ZIP, avoiding collisions
                     if artifact_path.endswith(".pdf"):
@@ -1098,13 +1148,11 @@ def download_document_pack(client_reference: str, request: Request) -> object:
                         zip_name = f"{stem}_{counter}.{ext}" if ext else f"{base}_{counter}"
                         counter += 1
                     seen.add(zip_name)
-                    zf.writestr(zip_name, content)
+                    zf.write(resolved_path, arcname=safe_download_name(zip_name, "document"))
                     packed += 1
 
         if packed == 0:
             raise HTTPException(status_code=404, detail="No packable document artifacts found")
-
-        from fastapi.responses import Response
 
         _log_audit(
             request, db=db,
@@ -1120,7 +1168,7 @@ def download_document_pack(client_reference: str, request: Request) -> object:
         return Response(
             content=zip_buffer.getvalue(),
             media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
+            headers=_attachment_headers(zip_filename),
         )
     finally:
         db.close()
@@ -1220,15 +1268,19 @@ def admin_update_user(
     db = get_session()
     try:
         repo = UserRepository(db)
-        user_model = repo.get_by_email(user_id)
+        try:
+            resolved_user_id = UUID(user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="User not found") from exc
+        user_model = repo.get_by_id(resolved_user_id)
         if not user_model:
             raise HTTPException(status_code=404, detail="User not found")
 
         old_role = user_model.role.value if hasattr(user_model.role, "value") else str(user_model.role)
         old_status = user_model.status.value if hasattr(user_model.status, "value") else str(user_model.status)
         old_name = f"{user_model.first_name} {user_model.last_name}"
-        result = repo.update(
-            user_id,
+        result = repo.update_by_id(
+            resolved_user_id,
             first_name=payload.first_name,
             last_name=payload.last_name,
             role=payload.role,
@@ -1269,8 +1321,12 @@ def admin_reset_user_password(
     db = get_session()
     try:
         repo = UserRepository(db)
-        result = repo.reset_password(
-            user_id,
+        try:
+            resolved_user_id = UUID(user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="User not found") from exc
+        result = repo.reset_password_by_id(
+            resolved_user_id,
             password_hash=hash_password(payload.password),
             force_password_change=payload.force_password_change,
         )
@@ -1301,7 +1357,7 @@ def admin_list_backups(request: Request) -> dict[str, list[dict[str, object]]]:
     try:
         repo = BackupRepository(db)
         runs = repo.list_recent(limit=100)
-        items = [repo.to_response(r) for r in runs]
+        items = [_backup_run_response(r) for r in runs]
         db.commit()
         return {"items": items}
     finally:
@@ -1344,7 +1400,7 @@ def admin_create_backup(request: Request) -> dict[str, dict[str, object]]:
             details={"status": manifest["status"]},
         )
         db.commit()
-        return {"item": repo.to_response(run)}
+        return {"item": _backup_run_response(run)}
     finally:
         db.close()
 
@@ -1427,8 +1483,6 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
     user = _require_admin(request)
     db = get_session()
     try:
-        from pathlib import Path as _Path
-
         backup_repo = BackupRepository(db)
         run = backup_repo.get_by_id(backup_id)
         if not run:
@@ -1445,7 +1499,8 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
             raise HTTPException(status_code=400, detail="Restore not confirmed — explicit confirmation required")
 
         # Pre-validate manifest
-        if not run.files_backup:
+        manifest_path = _resolve_backup_manifest_path(run)
+        if manifest_path is None:
             _persist_restore_attempt(
                 backup_repo, run.id, user, "failed",
                 mode="execute", dump_file=run.database_backup,
@@ -1453,8 +1508,6 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
             )
             db.commit()
             raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
-
-        manifest_path = _Path(settings.backup_path) / run.files_backup
         try:
             validation = validate_restore(
                 backup_root=settings.backup_path,
@@ -1583,7 +1636,11 @@ def admin_disable_user(user_id: str, request: Request) -> dict[str, dict[str, ob
     db = get_session()
     try:
         repo = UserRepository(db)
-        result = repo.disable(user_id)
+        try:
+            resolved_user_id = UUID(user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="User not found") from exc
+        result = repo.disable_by_id(resolved_user_id)
         if not result:
             raise HTTPException(status_code=404, detail="User not found")
         _log_audit(
@@ -1605,7 +1662,11 @@ def admin_enable_user(user_id: str, request: Request) -> dict[str, dict[str, obj
     db = get_session()
     try:
         repo = UserRepository(db)
-        result = repo.enable(user_id)
+        try:
+            resolved_user_id = UUID(user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="User not found") from exc
+        result = repo.enable_by_id(resolved_user_id)
         if not result:
             raise HTTPException(status_code=404, detail="User not found")
         _log_audit(
@@ -1627,14 +1688,13 @@ def admin_validate_restore(backup_id: str, request: Request) -> dict[str, object
     _require_admin(request)
     db = get_session()
     try:
-        from pathlib import Path as _Path
         backup_repo = BackupRepository(db)
         run = backup_repo.get_by_id(backup_id)
         if not run:
             raise HTTPException(status_code=404, detail="Backup run not found")
-        if not run.files_backup:
+        manifest_path = _resolve_backup_manifest_path(run)
+        if manifest_path is None:
             raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
-        manifest_path = _Path(settings.backup_path) / run.files_backup
         validation = validate_restore(
             backup_root=settings.backup_path,
             manifest_path=manifest_path,
@@ -1666,6 +1726,114 @@ def admin_security_summary(request: Request) -> dict[str, dict[str, str]]:
             "file_storage_visibility": "private_server_storage",
         }
     }
+
+
+def _resolve_backup_manifest_path(run: BackupRunModel) -> Path | None:
+    backup_root = Path(settings.backup_path)
+
+    if run.files_backup and run.files_backup.endswith(".json"):
+        candidate = backup_root / run.files_backup
+        return candidate if candidate.is_file() else None
+
+    manifests_dir = backup_root / "manifests"
+    if not manifests_dir.is_dir():
+        return None
+
+    for manifest_path in manifests_dir.glob("*.json"):
+        try:
+            manifest = load_manifest(manifest_path)
+        except RestoreValidationError:
+            continue
+
+        artifact_section = manifest.get("artifact")
+        database_section = manifest.get("database")
+        if not isinstance(artifact_section, dict):
+            continue
+
+        manifest_files_backup = artifact_section.get("files_backup")
+        manifest_documents_backup = artifact_section.get("documents_backup")
+        manifest_database_backup = database_section.get("dump_file") if isinstance(database_section, dict) else None
+
+        if (
+            manifest_files_backup == run.files_backup
+            and manifest_documents_backup == run.documents_backup
+            and manifest_database_backup == run.database_backup
+        ):
+            return manifest_path
+
+    return None
+
+
+def _backup_run_response(run: BackupRunModel) -> dict[str, object]:
+    payload = BackupRepository.to_response(run)
+    backup_root = Path(settings.backup_path)
+    manifest_path = _resolve_backup_manifest_path(run)
+
+    payload["manifest_path"] = str(manifest_path.relative_to(backup_root).as_posix()) if manifest_path else None
+    payload["manifest_present"] = manifest_path is not None
+    payload["database_backup_present"] = bool(run.database_backup and (backup_root / run.database_backup).is_file())
+    payload["files_backup_present"] = bool(run.files_backup and (backup_root / run.files_backup).is_file())
+    payload["documents_backup_present"] = bool(run.documents_backup and (backup_root / run.documents_backup).is_file())
+    return payload
+
+
+def _admin_settings_file_path() -> Path:
+    return Path(settings.backup_path).parent / "admin-settings.json"
+
+
+def _default_admin_settings_payload() -> dict[str, object]:
+    return {
+        "admin_email": "",
+        "app_url": settings.app_url,
+        "backup_path": str(settings.backup_path),
+        "file_storage_path": str(settings.file_storage_path),
+        "remote_access_mode": settings.remote_access_mode,
+        "session_timeout_minutes": settings.session_timeout_minutes,
+        "ai_enabled": False,
+        "ai_model": "gpt-4o-mini",
+        "ai_api_key": "",
+    }
+
+
+def _load_admin_settings_payload() -> dict[str, object]:
+    defaults = _default_admin_settings_payload()
+    settings_file = _admin_settings_file_path()
+    if not settings_file.is_file():
+        return defaults
+
+    try:
+        stored = json.loads(settings_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return defaults
+
+    if not isinstance(stored, dict):
+        return defaults
+
+    return {**defaults, **stored}
+
+
+def _save_admin_settings_payload(payload: dict[str, object]) -> dict[str, object]:
+    settings_file = _admin_settings_file_path()
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+    settings_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return payload
+
+
+def _test_operator_path(path_value: str) -> tuple[bool, str]:
+    candidate = Path(path_value).expanduser()
+    if not candidate.exists():
+        return False, "Path does not exist"
+    if not candidate.is_dir():
+        return False, "Path is not a directory"
+
+    probe = candidate / f".omega-path-test-{uuid.uuid4().hex}.tmp"
+    try:
+        probe.write_text("omega-path-test", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True, "Path is valid and writable"
+    except OSError as exc:
+        probe.unlink(missing_ok=True)
+        return False, f"Path is not writable: {exc}"
 
 
 @app.get("/admin/audit-logs")
@@ -1736,6 +1904,39 @@ def admin_security_status(request: Request) -> dict[str, object]:
         db.close()
 
 
+@app.get("/admin/settings")
+def admin_settings(request: Request) -> dict[str, object]:
+    _require_admin(request)
+    return _load_admin_settings_payload()
+
+
+@app.put("/admin/settings")
+def admin_update_settings(payload: AdminSettingsRequest, request: Request) -> dict[str, object]:
+    _require_admin(request)
+    normalized_payload = {
+        "admin_email": payload.admin_email.strip().lower(),
+        "app_url": payload.app_url.strip(),
+        "backup_path": payload.backup_path.strip(),
+        "file_storage_path": payload.file_storage_path.strip(),
+        "remote_access_mode": payload.remote_access_mode.strip(),
+        "session_timeout_minutes": payload.session_timeout_minutes,
+        "ai_enabled": payload.ai_enabled,
+        "ai_model": payload.ai_model.strip(),
+        "ai_api_key": payload.ai_api_key,
+    }
+    return _save_admin_settings_payload(normalized_payload)
+
+
+@app.post("/admin/settings/test-path")
+def admin_test_settings_path(payload: AdminPathTestRequest, request: Request) -> dict[str, object]:
+    _require_admin(request)
+    passed, message = _test_operator_path(payload.path)
+    return {
+        "passed": passed,
+        "message": message,
+    }
+
+
 # ---------------------------------------------------------------------------
 # File routes (Phase 4 DB-backed)
 # ---------------------------------------------------------------------------
@@ -1780,14 +1981,6 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
             raise HTTPException(status_code=400, detail="No file uploaded")
 
         filename = uploaded.filename
-        content = await uploaded.read()
-
-        if len(content) > settings.max_upload_size_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File exceeds maximum upload size of {settings.max_upload_size_bytes} bytes",
-            )
-
         category = str(form.get("category", "General"))
         workflow_slug = _resolve_storage_workflow_slug(workflow_hint=str(form.get("workflow") or ""))
 
@@ -1798,13 +1991,22 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
         # Write to disk
         storage = ClientStorage(settings.file_storage_path)
         slug = _build_client_slug_from_model(client)
-        filepath = storage.save_file(
-            slug,
-            filename,
-            content,
-            workflow_slug=workflow_slug,
-            bucket=FILE_BUCKET,
-        )
+        upload_source = getattr(uploaded, "file", None)
+        if upload_source is None:
+            raise HTTPException(status_code=400, detail="Invalid file upload")
+        try:
+            filepath = storage.save_upload(
+                slug,
+                filename,
+                upload_source,
+                max_size_bytes=settings.max_upload_size_bytes,
+                workflow_slug=workflow_slug,
+                bucket=FILE_BUCKET,
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            status_code = 413 if "maximum upload size" in detail else 400
+            raise HTTPException(status_code=status_code, detail=detail) from exc
 
         # Persist metadata
         file_repo = FileRepository(db)
@@ -1864,11 +2066,9 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
         if not file_model or file_model.client_id != client.id:
             raise HTTPException(status_code=404, detail="File not found")
 
-        from fastapi.responses import Response
-
         storage = ClientStorage(settings.file_storage_path)
-        content = storage.read_relative_file(file_model.file_path)
-        if content is None:
+        resolved_path = storage.resolve_relative_file(file_model.file_path)
+        if resolved_path is None:
             raise HTTPException(status_code=404, detail="File content not found on disk")
 
         _log_audit(
@@ -1880,10 +2080,11 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
             details={"filename": file_model.original_filename},
         )
         db.commit()
-        return Response(
-            content=content,
+        return FileResponse(
+            path=resolved_path,
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{file_model.original_filename}"'},
+            filename=None,
+            headers=_attachment_headers(file_model.original_filename),
         )
     finally:
         db.close()

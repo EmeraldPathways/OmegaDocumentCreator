@@ -13,10 +13,6 @@ import {
   type SeededGeneratedDocument,
 } from "./seeded-clients";
 
-const STORAGE_KEY = "omega-client-records";
-const STORAGE_VERSION_KEY = "omega-client-records-version";
-const STORAGE_VERSION = "4";
-
 type ClientDataContextValue = {
   clients: Record<string, SeededClientProfile>;
   getClient: (clientReference: string) => SeededClientProfile | undefined;
@@ -34,15 +30,6 @@ type ClientDataContextValue = {
 };
 
 const ClientDataContext = createContext<ClientDataContextValue | null>(null);
-
-function writeClientsToStorage(clients: Record<string, SeededClientProfile>) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-}
 
 function isPristineDraft(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
@@ -145,25 +132,6 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   };
 }
 
-function readStoredClients() {
-  if (typeof window === "undefined") {
-    return createSeededClientProfiles();
-  }
-
-  const storedVersion = window.localStorage.getItem(STORAGE_VERSION_KEY);
-  const storedValue = window.localStorage.getItem(STORAGE_KEY);
-
-  if (!storedValue || storedVersion !== STORAGE_VERSION) {
-    return createSeededClientProfiles();
-  }
-
-  try {
-    return JSON.parse(storedValue) as Record<string, SeededClientProfile>;
-  } catch {
-    return createSeededClientProfiles();
-  }
-}
-
 function mapBackendClientToSeeded(
   backendClient: Record<string, unknown>,
   existingClient?: SeededClientProfile,
@@ -235,7 +203,9 @@ function buildClientPayload(client: SeededClientProfile) {
 
 export function ClientDataProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
-  const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() => readStoredClients());
+  const [clients, setClients] = useState<Record<string, SeededClientProfile>>(() =>
+    import.meta.env.MODE === "test" ? createSeededClientProfiles() : {},
+  );
 
   async function refreshClients() {
     if (import.meta.env.MODE === "test") {
@@ -249,14 +219,12 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
     const summaries = await listBackendClients();
     const details = await Promise.all(summaries.map((client) => getBackendClient(client.client_reference)));
     setClients((currentClients) => {
-      const nextClients = Object.fromEntries(
+      return Object.fromEntries(
         details.map((client) => {
           const existingClient = currentClients[client.client_reference];
           return [client.client_reference, mapBackendClientToSeeded(client as unknown as Record<string, unknown>, existingClient)];
         }),
       ) as Record<string, SeededClientProfile>;
-      writeClientsToStorage(nextClients);
-      return nextClients;
     });
   }
 
@@ -271,14 +239,10 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
   async function saveClient(client: SeededClientProfile) {
     if (import.meta.env.MODE === "test" || !user) {
       const normalized = normalizeClient(client);
-      setClients((currentClients) => {
-        const nextClients = {
-          ...currentClients,
-          [client.clientReference]: normalized,
-        };
-        writeClientsToStorage(nextClients);
-        return nextClients;
-      });
+      setClients((currentClients) => ({
+        ...currentClients,
+        [client.clientReference]: normalized,
+      }));
       return normalized;
     }
 
@@ -286,14 +250,10 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
     const isExistingClient = Boolean(client.clientReference && clients[client.clientReference]);
     const persisted = isExistingClient ? await updateClient(client.clientReference, payload) : await createClient(payload);
     const nextClient = mapBackendClientToSeeded(persisted as unknown as Record<string, unknown>, client);
-    setClients((currentClients) => {
-      const nextClients = {
-        ...currentClients,
-        [nextClient.clientReference]: nextClient,
-      };
-      writeClientsToStorage(nextClients);
-      return nextClients;
-    });
+    setClients((currentClients) => ({
+      ...currentClients,
+      [nextClient.clientReference]: nextClient,
+    }));
     return nextClient;
   }
 
@@ -304,15 +264,13 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
         return currentClients;
       }
 
-      const nextClients = {
+      return {
         ...currentClients,
         [clientReference]: {
           ...client,
           generatedDocuments: [document, ...client.generatedDocuments.filter((entry) => entry.id !== document.id)],
         },
       };
-      writeClientsToStorage(nextClients);
-      return nextClients;
     });
   }
 
@@ -323,15 +281,13 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
         return currentClients;
       }
 
-      const nextClients = {
+      return {
         ...currentClients,
         [clientReference]: {
           ...client,
           files: [file, ...client.files.filter((entry) => entry.id !== file.id)],
         },
       };
-      writeClientsToStorage(nextClients);
-      return nextClients;
     });
   }
 
@@ -342,7 +298,7 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
         return currentClients;
       }
 
-      const nextClients = {
+      return {
         ...currentClients,
         [clientReference]: {
           ...normalizeClient(client),
@@ -355,8 +311,6 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
           },
         },
       };
-      writeClientsToStorage(nextClients);
-      return nextClients;
     });
   }
 
@@ -371,7 +325,7 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
         return currentClients;
       }
 
-      const nextClients = {
+      return {
         ...currentClients,
         [clientReference]: {
           ...normalizeClient(client),
@@ -384,8 +338,6 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
           },
         },
       };
-      writeClientsToStorage(nextClients);
-      return nextClients;
     });
   }
 
@@ -403,10 +355,6 @@ export function ClientDataProvider({ children }: PropsWithChildren) {
     }),
     [clients],
   );
-
-  useEffect(() => {
-    writeClientsToStorage(clients);
-  }, [clients]);
 
   return <ClientDataContext.Provider value={value}>{children}</ClientDataContext.Provider>;
 }

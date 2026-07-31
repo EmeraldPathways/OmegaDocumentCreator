@@ -30,6 +30,25 @@ class DocumentRepository:
     def add(self, document: Document) -> None:
         self._db.add(document)
 
+    def next_version_for(self, client_id: str, document_type: str) -> str:
+        existing_versions = (
+            self._db.query(Document.version)
+            .filter(Document.client_id == client_id, Document.document_type == document_type)
+            .all()
+        )
+
+        highest = 0
+        for row in existing_versions:
+            raw_value = row[0]
+            if raw_value is None:
+                continue
+            try:
+                highest = max(highest, int(str(raw_value).strip()))
+            except ValueError:
+                continue
+
+        return str(highest + 1)
+
     def update_artifact_paths(self, document_id: str, *, docx_path: str | None = None, pdf_path: str | None = None) -> Document | None:
         doc = self.get_by_id(document_id)
         if doc is None:

@@ -1,16 +1,20 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:8007";
+
 export default defineConfig({
   plugins: [react()],
   server: {
     host: "0.0.0.0",
     port: 3007,
     proxy: {
-      "/auth": "http://127.0.0.1:8007",
-      "/clients": "http://127.0.0.1:8007",
-      "/documents": "http://127.0.0.1:8007",
-      "/health": "http://127.0.0.1:8007",
+      "/auth": apiProxyTarget,
+      "/clients": apiProxyTarget,
+      "/documents": apiProxyTarget,
+      "/health": apiProxyTarget,
+      "/admin": apiProxyTarget,
+      "/users": apiProxyTarget,
     },
   },
   test: {

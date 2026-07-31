@@ -40,6 +40,7 @@ class UserRepository:
 
     def to_response(self, user: User) -> dict[str, str | bool | None]:
         return {
+            "id": str(user.id),
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
@@ -75,6 +76,60 @@ class UserRepository:
         self._db.add(user)
         self._db.flush()
         return user
+
+    def disable_by_id(self, user_id: UUID) -> dict[str, str | bool | None] | None:
+        user = self.get_by_id(user_id)
+        if user is None:
+            return None
+        user.status = UserStatus.DISABLED.value
+        self._db.flush()
+        return self.to_response(user)
+
+    def enable_by_id(self, user_id: UUID) -> dict[str, str | bool | None] | None:
+        user = self.get_by_id(user_id)
+        if user is None:
+            return None
+        user.status = UserStatus.ACTIVE.value
+        self._db.flush()
+        return self.to_response(user)
+
+    def reset_password_by_id(
+        self,
+        user_id: UUID,
+        *,
+        password_hash: str,
+        force_password_change: bool = True,
+    ) -> dict[str, str | bool | None] | None:
+        user = self.get_by_id(user_id)
+        if user is None:
+            return None
+        user.password_hash = password_hash
+        user.force_password_change = force_password_change
+        self._db.flush()
+        return self.to_response(user)
+
+    def update_by_id(
+        self,
+        user_id: UUID,
+        *,
+        first_name: str,
+        last_name: str,
+        role: UserRole,
+        status: UserStatus | None = None,
+        force_password_change: bool | None = None,
+    ) -> dict[str, str | bool | None] | None:
+        user = self.get_by_id(user_id)
+        if user is None:
+            return None
+        user.first_name = first_name
+        user.last_name = last_name
+        user.role = role.value
+        if status is not None:
+            user.status = status.value
+        if force_password_change is not None:
+            user.force_password_change = force_password_change
+        self._db.flush()
+        return self.to_response(user)
 
     def disable(self, email: str) -> dict[str, str] | None:
         user = self.get_by_email(email)

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Save, Cpu, Check, X, RefreshCw } from "lucide-react";
 
+import { getAdminSettings, saveAdminSettings, testAdminSettingsPath } from "../data/admin-api";
 import { Badge, Button, Input, Select, Toggle, useToast } from "../components/ui";
 
 type AppSettings = {
@@ -19,9 +20,6 @@ type AiSettings = {
 };
 
 type PathTestResult = { status: "idle" | "loading" | "success" | "error"; message: string };
-
-const STORAGE_KEY = "omega-app-settings";
-const AI_STORAGE_KEY = "omega-ai-settings";
 
 const defaultSettings: AppSettings = {
   adminEmail: "",
@@ -50,44 +48,6 @@ const modelOptions = [
   { value: "claude-3-haiku", label: "Anthropic Claude 3 Haiku" },
   { value: "ollama-llama3", label: "Ollama Llama 3 (local)" },
 ];
-
-function readStoredSettings() {
-  if (typeof window === "undefined") {
-    return defaultSettings;
-  }
-
-  const storedValue = window.localStorage.getItem(STORAGE_KEY);
-  if (!storedValue) {
-    return defaultSettings;
-  }
-
-  try {
-    const parsed = { ...defaultSettings, ...(JSON.parse(storedValue) as Partial<AppSettings>) };
-    if (parsed.adminEmail.trim().toLowerCase() === "admin@omega.local") {
-      parsed.adminEmail = "";
-    }
-    return parsed;
-  } catch {
-    return defaultSettings;
-  }
-}
-
-function readStoredAiSettings(): AiSettings {
-  if (typeof window === "undefined") {
-    return defaultAiSettings;
-  }
-
-  const storedValue = window.localStorage.getItem(AI_STORAGE_KEY);
-  if (!storedValue) {
-    return defaultAiSettings;
-  }
-
-  try {
-    return { ...defaultAiSettings, ...(JSON.parse(storedValue) as Partial<AiSettings>) };
-  } catch {
-    return defaultAiSettings;
-  }
-}
 
 function validateSettings(settings: AppSettings) {
   const errors: Record<string, string> = {};
@@ -118,10 +78,11 @@ function validateSettings(settings: AppSettings) {
 
 export function SettingsPage() {
   const { addToast } = useToast();
-  const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
-  const [aiSettings, setAiSettings] = useState<AiSettings>(() => readStoredAiSettings());
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [aiSettings, setAiSettings] = useState<AiSettings>(defaultAiSettings);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [isLoading, setIsLoading] = useState(true);
   const [pathTests, setPathTests] = useState<{
     fileStoragePath: PathTestResult;
     backupPath: PathTestResult;
@@ -131,6 +92,29 @@ export function SettingsPage() {
   });
 
   const isSaved = saveStatus === "saved";
+
+  useEffect(() => {
+    void getAdminSettings()
+      .then((payload) => {
+        setSettings({
+          adminEmail: payload.admin_email ?? "",
+          appUrl: payload.app_url ?? defaultSettings.appUrl,
+          backupPath: payload.backup_path ?? defaultSettings.backupPath,
+          fileStoragePath: payload.file_storage_path ?? defaultSettings.fileStoragePath,
+          remoteAccessMode: payload.remote_access_mode ?? defaultSettings.remoteAccessMode,
+          sessionTimeoutMinutes: String(payload.session_timeout_minutes ?? defaultSettings.sessionTimeoutMinutes),
+        });
+        setAiSettings({
+          enabled: payload.ai_enabled ?? false,
+          model: payload.ai_model ?? defaultAiSettings.model,
+          apiKey: payload.ai_api_key ?? "",
+        });
+      })
+      .catch(() => {
+        addToast("Failed to load settings", "error");
+      })
+      .finally(() => setIsLoading(false));
+  }, [addToast]);
 
   function updateField(field: keyof AppSettings, value: string) {
     setSettings((currentSettings) => ({
@@ -158,24 +142,21 @@ export function SettingsPage() {
       ...current,
       [field]: { status: "loading", message: "" },
     }));
-
-    // Simulate a path read/write test.
-    await new Promise((resolve) => setTimeout(resolve, 800));
     const path = settings[field];
-    const isValid = path.length > 3 && path.includes(":\\");
+    const result = await testAdminSettingsPath(path);
 
     setPathTests((current) => ({
       ...current,
       [field]: {
-        status: isValid ? "success" : "error",
-        message: isValid ? "Path is valid and writable" : "Path does not exist or is not writable",
+        status: result.passed ? "success" : "error",
+        message: result.message,
       },
     }));
 
-    addToast(isValid ? "Path test passed" : "Path test failed", isValid ? "success" : "error");
+    addToast(result.passed ? "Path test passed" : "Path test failed", result.passed ? "success" : "error");
   }
 
-  function saveSettings() {
+  async function saveSettings() {
     const validationErrors = validateSettings(settings);
     setErrors(validationErrors);
 
@@ -187,17 +168,24 @@ export function SettingsPage() {
 
     setSaveStatus("saving");
 
-    setTimeout(() => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        window.localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(aiSettings));
-        setSaveStatus("saved");
-        addToast("Settings saved", "success");
-      } catch {
-        setSaveStatus("error");
-        addToast("Failed to save settings", "error");
-      }
-    }, 600);
+    try {
+      await saveAdminSettings({
+        admin_email: settings.adminEmail,
+        app_url: settings.appUrl,
+        backup_path: settings.backupPath,
+        file_storage_path: settings.fileStoragePath,
+        remote_access_mode: settings.remoteAccessMode,
+        session_timeout_minutes: Number.parseInt(settings.sessionTimeoutMinutes, 10),
+        ai_enabled: aiSettings.enabled,
+        ai_model: aiSettings.model,
+        ai_api_key: aiSettings.apiKey,
+      });
+      setSaveStatus("saved");
+      addToast("Settings saved", "success");
+    } catch {
+      setSaveStatus("error");
+      addToast("Failed to save settings", "error");
+    }
   }
 
   const aiStatus = aiSettings.enabled ? "Enabled" : "Disabled";
@@ -210,6 +198,12 @@ export function SettingsPage() {
           <p className="page-subtitle">Configure the Omega Document Creator application.</p>
         </div>
       </div>
+
+      {isLoading ? (
+        <section className="section-divided">
+          <p className="text-muted">Loading settings…</p>
+        </section>
+      ) : null}
 
       <section className="section-divided">
         <h2 className="section-title">Core App Settings</h2>
@@ -352,12 +346,12 @@ export function SettingsPage() {
 
       <div className="sticky-action-bar">
         {saveStatus === "error" ? (
-          <Button onClick={saveSettings} variant="secondary">
+          <Button onClick={() => void saveSettings()} variant="secondary">
             <RefreshCw size={18} />
             Retry
           </Button>
         ) : null}
-        <Button isLoading={saveStatus === "saving"} onClick={saveSettings} variant="primary">
+        <Button isLoading={saveStatus === "saving"} onClick={() => void saveSettings()} variant="primary">
           {saveStatus === "saved" ? <Check size={18} /> : <Save size={18} />}
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save Settings"}
         </Button>

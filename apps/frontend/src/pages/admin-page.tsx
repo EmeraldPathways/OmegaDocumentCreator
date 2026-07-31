@@ -55,6 +55,31 @@ function getStatusVariant(status: string): Parameters<typeof Badge>[0]["variant"
   return status === "active" ? "active" : "pending";
 }
 
+function getBackupVariant(status: string): Parameters<typeof Badge>[0]["variant"] {
+  if (status === "success") {
+    return "approved";
+  }
+  if (status === "partial") {
+    return "pending";
+  }
+  return "draft";
+}
+
+function renderArtifactStatus(path: string | null | undefined, present: boolean | undefined, emptyLabel = "—") {
+  if (!path) {
+    return emptyLabel;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <span>{path}</span>
+      <span style={{ fontSize: "var(--font-size-small)", color: present ? "var(--color-success-700)" : "var(--color-danger-700)" }}>
+        {present ? "Present" : "Missing"}
+      </span>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { addToast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -127,12 +152,12 @@ export function AdminPage() {
   }
 
   async function handleToggleUserStatus(user: AdminUser) {
-    setBusy(`status-${user.email}`);
+    setBusy(`status-${user.id}`);
     try {
       if (user.status === "active") {
-        await disableAdminUser(user.email);
+        await disableAdminUser(user.id);
       } else {
-        await enableAdminUser(user.email);
+        await enableAdminUser(user.id);
       }
       await loadAdminData();
       addToast("User updated", "success");
@@ -144,9 +169,9 @@ export function AdminPage() {
   }
 
   async function handleResetPassword(user: AdminUser) {
-    setBusy(`reset-${user.email}`);
+    setBusy(`reset-${user.id}`);
     try {
-      await resetAdminUserPassword(user.email, "Omega123", true);
+      await resetAdminUserPassword(user.id, "Omega123", true);
       await loadAdminData();
       addToast(`Password reset for ${user.email}`, "success");
     } catch {
@@ -264,7 +289,7 @@ export function AdminPage() {
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.email}>
+                <tr key={user.id}>
                   <td>{user.first_name} {user.last_name}</td>
                   <td>{user.email}</td>
                   <td><Badge variant={getRoleVariant(user.role)}>{user.role}</Badge></td>
@@ -277,10 +302,10 @@ export function AdminPage() {
                   <td>{formatDateTime(user.last_login_at)}</td>
                   <td>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <Button className="btn-sm" isLoading={busy === `reset-${user.email}`} leftIcon={<KeyRound size={14} />} onClick={() => void handleResetPassword(user)} variant="secondary">
+                      <Button className="btn-sm" isLoading={busy === `reset-${user.id}`} leftIcon={<KeyRound size={14} />} onClick={() => void handleResetPassword(user)} variant="secondary">
                         Reset Password
                       </Button>
-                      <Button className="btn-sm" isLoading={busy === `status-${user.email}`} onClick={() => void handleToggleUserStatus(user)} variant={user.status === "active" ? "danger" : "secondary"}>
+                      <Button className="btn-sm" isLoading={busy === `status-${user.id}`} onClick={() => void handleToggleUserStatus(user)} variant={user.status === "active" ? "danger" : "secondary"}>
                         {user.status === "active" ? "Disable" : "Enable"}
                       </Button>
                     </div>
@@ -347,10 +372,10 @@ export function AdminPage() {
               {backups.map((backup) => (
                 <tr key={backup.id}>
                   <td>{formatDateTime(backup.created_at)}</td>
-                  <td><Badge variant={backup.status === "success" ? "approved" : "pending"}>{backup.status}</Badge></td>
-                  <td>{backup.database_backup ?? "—"}</td>
-                  <td>{backup.files_backup ?? "—"}</td>
-                  <td>{backup.documents_backup ?? "—"}</td>
+                  <td><Badge variant={getBackupVariant(backup.status)}>{backup.status}</Badge></td>
+                  <td>{renderArtifactStatus(backup.database_backup, backup.database_backup_present)}</td>
+                  <td>{renderArtifactStatus(backup.files_backup, backup.files_backup_present)}</td>
+                  <td>{renderArtifactStatus(backup.documents_backup, backup.documents_backup_present)}</td>
                   <td>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <Button className="btn-sm" isLoading={busy === `validate-${backup.id}`} onClick={() => void handleValidateRestore(backup.id)} variant="secondary">
@@ -363,6 +388,14 @@ export function AdminPage() {
                     {(restoreAttemptsByBackup[backup.id] ?? []).length > 0 ? (
                       <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-text-muted)" }}>
                         Last restore attempt: {restoreAttemptsByBackup[backup.id][0]?.status} on {formatDateTime(restoreAttemptsByBackup[backup.id][0]?.created_at)}
+                      </div>
+                    ) : null}
+                    <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-text-muted)" }}>
+                      Manifest: {renderArtifactStatus(backup.manifest_path, backup.manifest_present, "Not recorded")}
+                    </div>
+                    {backup.error_message ? (
+                      <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-danger-700)" }}>
+                        {backup.error_message}
                       </div>
                     ) : null}
                   </td>
