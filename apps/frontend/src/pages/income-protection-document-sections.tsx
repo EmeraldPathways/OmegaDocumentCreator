@@ -118,6 +118,7 @@ type QuoteWorkflowSectionProps = {
   onQuotePensionSpousesPensionChange: (value: string) => void;
   onQuotePhiIndexationChange: (value: string) => void;
   onQuoteNameInputChange: (value: string) => void;
+  onDeleteSavedQuote: (savedQuote: SavedQuoteSnapshot) => void;
   onSaveQuote: () => void;
   onQuoteSmokerChange: (value: string) => void;
   onTemplateChange: (templateId: string) => void;
@@ -370,6 +371,7 @@ export function QuoteWorkflowSection({
   onQuotePensionSpousesPensionChange,
   onQuotePhiIndexationChange,
   onQuoteNameInputChange,
+  onDeleteSavedQuote,
   onSaveQuote,
   onQuoteSmokerChange,
   onTemplateChange,
@@ -460,9 +462,14 @@ export function QuoteWorkflowSection({
                       {savedQuote.provider || "Saved quote"}{savedQuote.updatedAt ? ` · ${savedQuote.updatedAt.slice(0, 10)}` : ""}
                     </div>
                   </div>
-                  <Button onClick={() => onLoadSavedQuote(savedQuote)} variant="secondary">
-                    Load Quote
-                  </Button>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Button onClick={() => onLoadSavedQuote(savedQuote)} variant="secondary">
+                      Load Quote
+                    </Button>
+                    <Button onClick={() => onDeleteSavedQuote(savedQuote)} variant="ghost">
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

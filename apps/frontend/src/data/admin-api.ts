@@ -3,7 +3,7 @@ export type AdminUser = {
   first_name: string;
   last_name: string;
   email: string;
-  role: "admin" | "staff";
+  role: "admin" | "manager" | "staff";
   status: "active" | "disabled";
   force_password_change?: boolean;
   last_login_at?: string | null;
@@ -153,7 +153,7 @@ export async function createAdminUser(payload: {
   last_name: string;
   email: string;
   password: string;
-  role: "admin" | "staff";
+  role: "admin" | "manager" | "staff";
 }): Promise<AdminUser> {
   const response = await fetch("/admin/users", {
     method: "POST",
@@ -169,7 +169,7 @@ export async function updateAdminUser(
   payload: {
     first_name: string;
     last_name: string;
-    role: "admin" | "staff";
+    role: "admin" | "manager" | "staff";
     status?: "active" | "disabled";
     force_password_change?: boolean;
   },

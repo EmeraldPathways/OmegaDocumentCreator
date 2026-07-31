@@ -18,7 +18,7 @@
 ### Users / Assignments
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `GET` | `/users/assignable` | session | returns staff list used by client assignment UI |
+| `GET` | `/users/assignable` | session | returns active assignable users used by client assignment UI |
 
 ### Clients
 | Method | Path | Auth | Notes |
@@ -58,7 +58,7 @@
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | `GET` | `/admin/users` | admin | list DB users |
-| `POST` | `/admin/users` | admin | create user |
+| `POST` | `/admin/users` | admin | create user with `admin`, `manager`, or `staff` role |
 | `PATCH` | `/admin/users/{user_id}` | admin | update name, role, status, force-password-change |
 | `POST` | `/admin/users/{user_id}/reset-password` | admin | set temporary password and optional force-password-change |
 | `PATCH` | `/admin/users/{user_id}/disable` | admin | disable user account |
@@ -74,7 +74,7 @@
 | `GET` | `/admin/security-summary` | admin | current security summary payload |
 | `GET` | `/admin/security` | admin | live security health counts |
 | `GET` | `/admin/settings` | admin | current live settings payload |
-| `PATCH` | `/admin/settings` | admin | update settings |
+| `PUT` | `/admin/settings` | admin | update settings |
 | `POST` | `/admin/settings/test-path` | admin | validate configured filesystem path |
 
 ## Backend session keys

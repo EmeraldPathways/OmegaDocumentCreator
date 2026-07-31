@@ -18,6 +18,7 @@
 | Users | PostgreSQL via `UserRepository` |
 | Sessions | PostgreSQL via `SessionRepository` plus cookie session middleware |
 | Clients | PostgreSQL via `ClientRepository` |
+| Access policy | Persisted role plus backend policy allowlists/delegation in `main.py` |
 | Client assignment | PostgreSQL `assigned_to` on clients |
 | Workflow drafts | PostgreSQL via `WorkflowRepository` |
 | Uploaded files | Disk plus PostgreSQL via `FileRepository` |
@@ -59,8 +60,9 @@ Artifact storage
 2. Backend records are authoritative for clients, workflows, files, and generated documents.
 3. Client access is enforced from one model across workflow/file/document routes.
 4. `created_by` remains creator metadata; `assigned_to` is the working owner.
-5. Restore execution requires a short-lived approval token plus explicit confirmation text.
-6. All live client artifacts belong inside the client/year/workflow storage tree.
+5. `manager` is a first-class persisted role for global non-admin record visibility.
+6. Restore execution requires a short-lived approval token plus explicit confirmation text.
+7. All live client artifacts belong inside the client/year/workflow storage tree.
 
 ## Remote-access and operations wiring
 
@@ -80,6 +82,7 @@ Artifact storage
 - `/admin` and `/settings` are wrapped in `RequireAdmin`
 - Pensions remains a real route even if top-nav visibility is conditional
 - document pack ZIP output is built in-memory from stored PDF/DOCX artifacts
+- startup can promote the known global-access Omega users from `staff` to `manager`
 
 ## Current follow-up areas
 

@@ -17,6 +17,11 @@ Architectural choices reflected in the current codebase.
 - Decision: access is derived from the client record and inherited by workflows, files, and generated documents.
 - Why: avoids separate permission models drifting apart.
 
+## Manager is a real role
+
+- Decision: users with global non-admin visibility are represented as `manager`, not hidden behind a plain `staff` label.
+- Why: the admin UI and the backend access policy must describe the same privilege model.
+
 ## Restore execution is guarded
 
 - Decision: restore requires validation or dry-run first, then a short-lived approval token, then confirmation text.
@@ -41,3 +46,8 @@ Architectural choices reflected in the current codebase.
 
 - Decision: local scripts use `127.0.0.1:3007` for frontend and `127.0.0.1:8007` for backend.
 - Why: these are the live script/config values in the repo.
+
+## Saved quote snapshots stay operator-editable
+
+- Decision: Income Protection saved quote snapshots can be deleted from the quote workflow UI.
+- Why: office users need to remove stale or mistaken quote variants without clearing the whole draft.

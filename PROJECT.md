@@ -39,11 +39,12 @@ The live product is a PostgreSQL-backed React + FastAPI system for:
 ### Access model
 
 - `andrew@omegafinancial.ie` has full system and admin access.
-- `info@omegafinancial.ie`, `john@omegafinancial.ie`, `aideen@omegafinancial.ie`, and `aimee@omegafinancial.ie` can access all client, workflow, file, and document records.
+- `info@omegafinancial.ie`, `john@omegafinancial.ie`, `aideen@omegafinancial.ie`, and `aimee@omegafinancial.ie` are `manager` users and can access all client, workflow, file, and document records.
 - `sophie@omegafinancial.ie`, `declan@omegafinancial.ie`, and `tadhg@omegafinancial.ie` can access records they created or are assigned to.
 - `alison@omegafinancial.ie` can access records owned or assigned to John.
 - `created_by` remains creator metadata.
 - `assigned_to` is the primary working-owner field used across clients, workflows, files, and documents.
+- `manager` is now a real persisted user role, not just a hidden backend allowlist effect.
 
 ## Technical Direction
 
@@ -87,6 +88,7 @@ Live in the current codebase:
 - SQLAlchemy models and repositories
 - persisted sessions in PostgreSQL
 - authenticated client CRUD with assignment
+- explicit `admin` / `manager` / `staff` user-role model in auth and admin UI
 - backend workflow persistence
 - backend-backed file upload/list/download/delete
 - backend-backed generated document history, artifact upload, download, pack download, and deletion
@@ -111,6 +113,7 @@ Live in the current codebase:
 
 - `Fact Find` and `Fact Find Update` generate from the shared workflow draft
 - Income Protection quote generation uses quote-specific workflow snapshot data
+- Income Protection saved quote snapshots can now be loaded and deleted from the Quote workflow
 - Income Protection statement generation uses selected quote data plus shared workflow fields
 - Pensions routes use pensions-specific quote and statement document types
 - generated documents can be listed, downloaded, packed, and deleted from backend history
@@ -233,6 +236,7 @@ Current hardening in the codebase includes:
 
 - authentication required for client, workflow, file, and document routes
 - server-side client access filtering and assignment enforcement
+- role-driven global client visibility for `manager` users
 - CSRF Origin/Referer validation for state-changing endpoints
 - persisted session invalidation and startup cleanup
 - failed-login, disabled-login, password-reset, and enable/disable auditing
@@ -245,9 +249,8 @@ Current hardening in the codebase includes:
 
 Verified in the current branch before this documentation refresh:
 
-- backend API tests passed
-- frontend Vitest suite passed
 - frontend production build passed
+- backend syntax parse passed for the changed auth files
 
 The remaining non-blocking issue is a frontend bundle-size warning during build.
 

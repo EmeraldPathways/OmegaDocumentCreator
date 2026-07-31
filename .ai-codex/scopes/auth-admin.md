@@ -18,6 +18,9 @@ Use this scope when editing login/session behavior, admin users, audit logs, bac
 - `_current_user()` validates the persisted session row and extends session expiry
 - Admin enforcement comes from `_require_admin()` after resolving the current user
 - Frontend mirrors the current user in `sessionStorage`, but the backend cookie/session row remain authoritative
+- Live roles are `admin`, `manager`, and `staff`
+- `manager` grants global client/workflow/file/document visibility without admin-panel access
+- startup currently promotes the known full-record Omega users to `manager`
 
 ## Password scheme
 
@@ -50,4 +53,5 @@ Use this scope when editing login/session behavior, admin users, audit logs, bac
 - do not reintroduce seeded fallback users into live startup
 - login failures must surface as `401` or `403`, not `500`
 - disabled users must not authenticate
+- do not let session-role coercion collapse `manager` back to `staff`
 - restore execute must continue requiring approval token plus confirmation text

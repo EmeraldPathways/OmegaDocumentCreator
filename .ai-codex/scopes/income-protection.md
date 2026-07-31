@@ -22,6 +22,7 @@ Use this scope when editing the shared workflow shell, fact-find sections, quote
 - files use `file-api.ts`
 - generated documents use `generated-document-api.ts`
 - quote and statement gates depend on shared workflow data plus page-local quote state
+- saved quote snapshots are persisted inside the workflow draft and now support delete as well as load/save
 
 ## Current validation behavior
 
@@ -43,3 +44,4 @@ Use this scope when editing the shared workflow shell, fact-find sections, quote
 - Terms of Business is not a live top-level route in the split workflow
 - generated document history on these pages is backend-backed
 - files/documents permissions are broader or narrower than client access; they inherit client access
+- saved quotes are not append-only anymore; the Quote UI can remove them from the persisted draft

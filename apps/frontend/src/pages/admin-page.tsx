@@ -30,6 +30,7 @@ import { Badge, Button, Input, Modal, Select, useToast } from "../components/ui"
 
 const roleOptions = [
   { value: "staff", label: "Staff" },
+  { value: "manager", label: "Manager" },
   { value: "admin", label: "Admin" },
 ];
 
@@ -53,7 +54,13 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function getRoleVariant(role: string): Parameters<typeof Badge>[0]["variant"] {
-  return role === "admin" ? "approved" : "active";
+  if (role === "admin") {
+    return "approved";
+  }
+  if (role === "manager") {
+    return "pending";
+  }
+  return "active";
 }
 
 function getStatusVariant(status: string): Parameters<typeof Badge>[0]["variant"] {
@@ -129,7 +136,7 @@ export function AdminPage() {
     last_name: "",
     email: "",
     password: "Omega123",
-    role: "staff" as "admin" | "staff",
+    role: "staff" as "admin" | "manager" | "staff",
   });
   const [auditFilters, setAuditFilters] = useState({
     user_email: "",
@@ -376,7 +383,7 @@ export function AdminPage() {
           <Input id="user-last-name" label="Last name" onChange={(event) => setNewUser((current) => ({ ...current, last_name: event.target.value }))} value={newUser.last_name} />
           <Input id="user-email" label="Email" onChange={(event) => setNewUser((current) => ({ ...current, email: event.target.value }))} value={newUser.email} />
           <Input id="user-password" label="Temporary password" onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))} value={newUser.password} />
-          <Select id="user-role" label="Role" onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value as "admin" | "staff" }))} options={roleOptions} value={newUser.role} />
+          <Select id="user-role" label="Role" onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value as "admin" | "manager" | "staff" }))} options={roleOptions} value={newUser.role} />
           <div style={{ display: "flex", alignItems: "end" }}>
             <Button isLoading={busy === "create-user"} leftIcon={<UserPlus size={18} />} type="submit" variant="primary">
               Add User

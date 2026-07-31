@@ -1999,6 +1999,22 @@ export function IncomeProtectionPage({
     addToast(`Loaded ${savedQuote.name}`, "success");
   }
 
+  async function deleteSavedQuoteSnapshot(savedQuote: SavedQuoteSnapshot) {
+    const nextSavedQuotes = resolvedDraft.savedQuotes.filter((entry) => entry.id !== savedQuote.id);
+    const { savedRemotely } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
+    if (quoteNameInput.trim() === savedQuote.name) {
+      setQuoteNameInput("");
+    }
+    setQuoteSaveStatus(
+      nextSavedQuotes.filter((entry) => entry.documentType === quoteDocumentType).length === 0
+        ? "No saved quotes yet"
+        : savedRemotely
+        ? "Saved just now"
+        : "Saved locally - server unavailable",
+    );
+    addToast(`Deleted ${savedQuote.name}`, "success");
+  }
+
   async function handleFactFindUpdateGenerate() {
     if (factFindUpdateGenerationRequirements.some((item) => !item.complete)) {
       surfaceRequirementErrors(factFindUpdateGenerationRequirements);
@@ -3637,6 +3653,7 @@ export function IncomeProtectionPage({
             updateField("phiIndexation", value);
           }}
           onQuoteNameInputChange={setQuoteNameInput}
+          onDeleteSavedQuote={(savedQuote) => void deleteSavedQuoteSnapshot(savedQuote)}
           onSaveQuote={() => void saveQuoteSnapshot()}
           onQuoteSmokerChange={(value) => {
             setQuoteSmoker(value);

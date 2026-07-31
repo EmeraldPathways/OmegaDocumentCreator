@@ -15,9 +15,11 @@ await fetch("/auth/me");
 ## Client access pattern
 
 - Client access is enforced server-side and reused by workflow, file, and document routes.
+- `admin` and `manager` users have global client visibility through backend policy resolution.
 - `created_by` is creator metadata.
 - `assigned_to` is the working owner used for restricted-user access.
 - Alison access is delegated from John's ownership/assignment rules in backend policy checks.
+- the admin screen now needs to reflect elevated access explicitly; do not label global-access users as plain staff
 
 ## Client identifiers and storage
 
@@ -86,6 +88,13 @@ Repositories accept a `Session`, return models or dicts, and do not own session 
 - Backend is authoritative for clients, workflow data, files, and generated documents.
 - `localStorage` is limited to lightweight rehydration and UX hints such as the selected client.
 - `sessionStorage` mirrors the current user for UX only and must not grant access by itself.
+- session role coercion must preserve `manager`; collapsing it back to `staff` is a bug.
+
+## Income Protection quote snapshot pattern
+
+- quote snapshots are part of the persisted workflow draft
+- users can save, load, and now delete saved quote snapshots from the Quote workflow
+- deleting a saved quote updates the persisted draft and refreshes quote-save status messaging
 
 ## Local run paths
 
@@ -97,6 +106,7 @@ Repositories accept a `Session`, return models or dicts, and do not own session 
 
 - Do not describe admin data as seeded or in-memory.
 - Do not describe client/file/document access as creator-only.
+- Do not describe global-access users as plain `staff`.
 - Do not describe restore execution as a one-step action.
 - Do not describe generated document history as browser-only.
 - Do not describe `apps/api/app/store.py` as part of the live runtime path.

@@ -211,6 +211,24 @@ def _startup_db_check() -> None:
             repo = UserRepository(db)
             if repo.count() == 0:
                 logger.warning("No users found in database. Create users through the admin flow or direct DB bootstrap.")
+            else:
+                promoted_manager_emails: list[str] = []
+                for user_model in repo.list_all():
+                    email = _normalized_email(user_model.email)
+                    if email not in FULL_RECORD_ACCESS_EMAILS:
+                        continue
+                    if user_model.role == UserRole.MANAGER.value:
+                        continue
+                    if user_model.role == UserRole.ADMIN.value:
+                        continue
+                    user_model.role = UserRole.MANAGER.value
+                    promoted_manager_emails.append(email)
+                if promoted_manager_emails:
+                    logger.info(
+                        "Promoted %d user(s) to manager based on record-access policy: %s",
+                        len(promoted_manager_emails),
+                        ", ".join(promoted_manager_emails),
+                    )
 
             db.commit()
         finally:
@@ -415,10 +433,9 @@ def _is_admin_user(user: dict[str, str]) -> bool:
 
 def _resolve_record_access_policy(user: dict[str, str]) -> str:
     email = _normalized_email(user.get("email"))
-    global_record_access_emails = SYSTEM_ACCESS_EMAILS | FULL_RECORD_ACCESS_EMAILS
     if _is_admin_user(user):
         return "admin"
-    if email in global_record_access_emails:
+    if user.get("role") == UserRole.MANAGER.value:
         return "global"
     if email in OWN_RECORD_ACCESS_EMAILS:
         return "own"

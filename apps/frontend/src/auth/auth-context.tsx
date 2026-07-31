@@ -7,7 +7,7 @@ import {
   type PropsWithChildren,
 } from "react";
 
-type SessionRole = "admin" | "staff" | null;
+type SessionRole = "admin" | "manager" | "staff" | null;
 
 type SessionUser = {
   first_name?: string;
@@ -57,10 +57,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
 
   function coerceSessionUser(rawUser: SessionUser | null | undefined, fallbackEmail?: string): SessionUser {
+    const role = rawUser?.role;
     return {
       ...rawUser,
       email: normalizeEmail(rawUser?.email ?? fallbackEmail ?? ""),
-      role: rawUser?.role === "admin" ? "admin" : "staff",
+      role: role === "admin" || role === "manager" ? role : "staff",
     };
   }
 
