@@ -79,6 +79,50 @@ export type SecurityStatus = {
   backup_path: string;
 };
 
+export type StorageReconciliationItem = {
+  id?: string;
+  record_type?: string;
+  artifact_type?: string;
+  client_id?: string;
+  client_reference?: string | null;
+  client_name?: string | null;
+  relative_path: string;
+  original_filename?: string;
+  stored_filename?: string;
+  document_type?: string;
+  document_name?: string;
+  category?: string;
+  size_bytes?: number;
+};
+
+export type StorageReconciliationReport = {
+  generated_at: string;
+  storage_root: string;
+  summary: {
+    file_record_count: number;
+    document_record_count: number;
+    missing_file_record_count: number;
+    invalid_file_record_count: number;
+    missing_document_artifact_count: number;
+    invalid_document_artifact_count: number;
+    orphaned_disk_file_count: number;
+  };
+  items: {
+    missing_file_records: StorageReconciliationItem[];
+    invalid_file_records: StorageReconciliationItem[];
+    missing_document_artifacts: StorageReconciliationItem[];
+    invalid_document_artifacts: StorageReconciliationItem[];
+    orphaned_disk_files: StorageReconciliationItem[];
+  };
+  truncated: Record<string, boolean>;
+};
+
+export type StorageRepairResponse = {
+  executed: boolean;
+  actions: Record<string, number>;
+  report: StorageReconciliationReport;
+};
+
 export type AdminSettings = {
   admin_email: string;
   app_url: string;
@@ -243,6 +287,21 @@ export async function getScheduleStatus(): Promise<Record<string, unknown>> {
 export async function getSecurityStatus(): Promise<SecurityStatus> {
   const response = await fetch("/admin/security", { credentials: "same-origin" });
   return parseJson<SecurityStatus>(response);
+}
+
+export async function getStorageReconciliationReport(): Promise<StorageReconciliationReport> {
+  const response = await fetch("/admin/storage/reconciliation", { credentials: "same-origin" });
+  return parseJson<StorageReconciliationReport>(response);
+}
+
+export async function repairStorageReconciliation(execute = false): Promise<StorageRepairResponse> {
+  const response = await fetch("/admin/storage/reconciliation/repair", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ execute }),
+  });
+  return parseJson<StorageRepairResponse>(response);
 }
 
 export async function getAdminSettings(): Promise<AdminSettings> {

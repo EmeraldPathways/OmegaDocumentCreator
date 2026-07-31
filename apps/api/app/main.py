@@ -43,6 +43,7 @@ from app.repositories.workflows import WorkflowRepository
 from app.security import hash_password, is_session_expired, verify_password
 from app.services.backups import create_backup_manifest
 from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, load_manifest, validate_restore
+from app.services.storage_reconciliation import build_storage_reconciliation_report, repair_storage_reconciliation_report
 from app.services.storage import (
     DOCUMENT_BUCKET,
     FILE_BUCKET,
@@ -75,7 +76,6 @@ DELEGATED_OWNER_ACCESS: dict[str, set[str]] = {
     "alison@omegafinancial.ie": {"john@omegafinancial.ie"},
 }
 
-GLOBAL_RECORD_ACCESS_EMAILS = SYSTEM_ACCESS_EMAILS | FULL_RECORD_ACCESS_EMAILS
 RESTORE_APPROVAL_WINDOW_MINUTES = 10
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
@@ -353,6 +353,10 @@ class AdminPathTestRequest(BaseModel):
     path: str
 
 
+class StorageRepairRequest(BaseModel):
+    execute: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Auth helpers (DB-backed)
 # ---------------------------------------------------------------------------
@@ -411,9 +415,10 @@ def _is_admin_user(user: dict[str, str]) -> bool:
 
 def _resolve_record_access_policy(user: dict[str, str]) -> str:
     email = _normalized_email(user.get("email"))
+    global_record_access_emails = SYSTEM_ACCESS_EMAILS | FULL_RECORD_ACCESS_EMAILS
     if _is_admin_user(user):
         return "admin"
-    if email in GLOBAL_RECORD_ACCESS_EMAILS:
+    if email in global_record_access_emails:
         return "global"
     if email in OWN_RECORD_ACCESS_EMAILS:
         return "own"
@@ -458,6 +463,8 @@ def _can_access_client_emails(user: dict[str, str], *emails: str) -> bool:
 
 
 def _can_access_client_record(user: dict[str, str], db: object, client: ClientRecord | object) -> bool:
+    if _has_global_record_access(user):
+        return True
     owner_email = _resolve_user_email_by_id(db, getattr(client, "created_by", None))
     assigned_email = _resolve_user_email_by_id(db, getattr(client, "assigned_to", None))
     return _can_access_client_emails(user, owner_email, assigned_email)
@@ -663,20 +670,31 @@ def readiness() -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 
-# Lightweight in-memory login rate limiter (per IP, 5 attempts / minute)
+# Lightweight in-memory failed-login rate limiter (per IP, 5 failures / minute)
 _LOGIN_RATE_WINDOW: dict[str, tuple[float, int]] = {}
 
 
 def _check_login_rate(client_ip: str) -> None:
-    """Return if within rate limit. Raise 429 if exceeded."""
+    """Raise 429 if the failed-login rate limit has been exceeded."""
     now = datetime.now(UTC).timestamp()
     window_start, count = _LOGIN_RATE_WINDOW.get(client_ip, (0.0, 0))
     if now - window_start > 60:
-        count = 0
-        window_start = now
+        _LOGIN_RATE_WINDOW.pop(client_ip, None)
+        return
     if count >= 5:
         raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
+
+
+def _record_login_failure(client_ip: str) -> None:
+    now = datetime.now(UTC).timestamp()
+    window_start, count = _LOGIN_RATE_WINDOW.get(client_ip, (now, 0))
+    if now - window_start > 60:
+        window_start, count = now, 0
     _LOGIN_RATE_WINDOW[client_ip] = (window_start, count + 1)
+
+
+def _clear_login_failures(client_ip: str) -> None:
+    _LOGIN_RATE_WINDOW.pop(client_ip, None)
 
 
 @app.post("/auth/login")
@@ -689,6 +707,7 @@ def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, object
         user_model = user_repo.get_by_email(payload.email)
 
         if not user_model or not verify_password(payload.password, user_model.password_hash):
+            _record_login_failure(client_ip)
             # Log failed attempt
             try:
                 _log_audit(
@@ -705,6 +724,7 @@ def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, object
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         if user_model.status != UserStatus.ACTIVE.value:
+            _record_login_failure(client_ip)
             try:
                 _log_audit(
                     request, db=db,
@@ -719,6 +739,7 @@ def login(payload: LoginRequest, request: Request) -> dict[str, dict[str, object
                 db.rollback()
             raise HTTPException(status_code=403, detail="User account disabled")
 
+        _clear_login_failures(client_ip)
         user_repo.record_login(user_model)
 
         # Persist a server-side session row and store its ID in the cookie
@@ -830,11 +851,13 @@ def create_client_record(payload: ClientCreateRequest, request: Request) -> dict
             assigned_to_email=payload.assigned_to,
         )
         client_ref = item.get("client_reference", "")
+        client_model = repo.get_by_reference(client_ref) if client_ref else None
         _log_audit(
             request, db=db,
             action="client_created",
             entity_type="client",
             entity_id=client_ref,
+            client_id=client_model.id if client_model else None,
             details={"full_name": f"{payload.first_name} {payload.surname}"},
         )
         db.commit()
@@ -1593,18 +1616,10 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
 
         # Pre-validate manifest
         manifest_path = _resolve_backup_manifest_path(run)
-        if manifest_path is None:
-            _persist_restore_attempt(
-                backup_repo, run.id, user, "failed",
-                mode="execute", dump_file=run.database_backup,
-                error_message="Backup has no manifest file reference",
-            )
-            db.commit()
-            raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
         try:
             validation = validate_restore(
                 backup_root=settings.backup_path,
-                manifest_path=manifest_path,
+                manifest_path=manifest_path or (Path(settings.backup_path) / "manifests" / f"{backup_id}.json"),
             )
         except RestoreValidationError as exc:
             _persist_restore_attempt(
@@ -1786,11 +1801,9 @@ def admin_validate_restore(backup_id: str, request: Request) -> dict[str, object
         if not run:
             raise HTTPException(status_code=404, detail="Backup run not found")
         manifest_path = _resolve_backup_manifest_path(run)
-        if manifest_path is None:
-            raise HTTPException(status_code=400, detail="Backup has no manifest file reference")
         validation = validate_restore(
             backup_root=settings.backup_path,
-            manifest_path=manifest_path,
+            manifest_path=manifest_path or (Path(settings.backup_path) / "manifests" / f"{backup_id}.json"),
         )
         _log_audit(
             request, db=db,
@@ -2002,6 +2015,45 @@ def admin_security_status(request: Request) -> dict[str, object]:
             "file_storage_path": str(settings.file_storage_path),
             "backup_path": str(settings.backup_path),
         }
+    finally:
+        db.close()
+
+
+@app.get("/admin/storage/reconciliation")
+def admin_storage_reconciliation(request: Request) -> dict[str, object]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        report = build_storage_reconciliation_report(db, settings.file_storage_path)
+        db.commit()
+        return report
+    finally:
+        db.close()
+
+
+@app.post("/admin/storage/reconciliation/repair")
+def admin_storage_reconciliation_repair(payload: StorageRepairRequest, request: Request) -> dict[str, object]:
+    _require_admin(request)
+    db = get_session()
+    try:
+        result = repair_storage_reconciliation_report(
+            db,
+            settings.file_storage_path,
+            execute=payload.execute,
+        )
+        _log_audit(
+            request,
+            db=db,
+            action="storage_reconciliation_repair" if payload.execute else "storage_reconciliation_preview",
+            entity_type="storage",
+            entity_id="reconciliation",
+            details={
+                "executed": payload.execute,
+                "actions": result.get("actions", {}),
+            },
+        )
+        db.commit()
+        return result
     finally:
         db.close()
 

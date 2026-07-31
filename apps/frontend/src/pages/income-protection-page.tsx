@@ -88,8 +88,22 @@ import {
   workflowSectionByTabId,
   type WorkflowSectionId,
 } from "./income-protection-helpers";
+import {
+  buildFactFindGenerationRequirements,
+  buildFactFindSectionProgressItems,
+  buildFactFindUpdateGenerationRequirements,
+  buildFactFindUpdateSectionProgressItems,
+  buildQuoteGenerationRequirements,
+  buildQuoteMissingFields,
+  buildStatementGenerationRequirements,
+  buildValidationMessages,
+  type SectionProgressItem,
+  type WorkflowRequirement,
+  type RequirementTarget,
+} from "./income-protection-requirements";
 import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
 import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
+import { QuoteWorkflowSection, StatementWorkflowSection } from "./income-protection-document-sections";
 import { WorkflowDocumentSections } from "./workflow-document-sections";
 import { WorkflowPageLayout } from "./workflow-page-layout";
 
@@ -102,29 +116,6 @@ type IncomeProtectionPageProps = {
 };
 
 type WorkflowSaveState = "saved" | "saving" | "dirty" | "local";
-
-type RequirementTarget = {
-  tabId: string;
-  sectionId?: string;
-  fieldId: string;
-};
-
-type WorkflowRequirement = {
-  key: string;
-  label: string;
-  complete: boolean;
-  location: string;
-  target: RequirementTarget;
-  helperText?: string;
-};
-
-type SectionProgressItem = {
-  id: string;
-  title: string;
-  completeCount: number;
-  requiredCount: number;
-  complete: boolean;
-};
 
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
@@ -781,145 +772,17 @@ export function IncomeProtectionPage({
     townCity: "ff-townCity",
   };
 
-  const factFindGenerationRequirements: WorkflowRequirement[] = [
-    {
-      key: "fullName",
-      label: "Client name",
-      complete: hasValue(resolvedDraft.fullName),
-      location: "Identity",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-fullName" },
-    },
-    {
-      key: "address",
-      label: "Address (town/county)",
-      complete: hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()),
-      location: "Home address",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-townCity" },
-      helperText: "Required for document",
-    },
-    {
-      key: "dateOfBirth",
-      label: "Date of birth",
-      complete: hasValue(resolvedDraft.dateOfBirth),
-      location: "Identity",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-dob" },
-    },
-    {
-      key: "occupation",
-      label: "Occupation",
-      complete: hasValue(resolvedDraft.occupation),
-      location: "Employment details",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-occupation" },
-    },
-    {
-      key: "income",
-      label: "Income / salary",
-      complete: hasValue(resolvedDraft.income),
-      location: "Employment details",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-income" },
-    },
-    {
-      key: "email-or-phone",
-      label: "Email or phone",
-      complete: hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber),
-      location: "Contact",
-      target: {
-        tabId: "fact-find",
-        sectionId: "client-profile",
-        fieldId: hasValue(resolvedDraft.email) ? "ff-phone" : "ff-email",
-      },
-      helperText: "Provide either email or phone",
-    },
-    {
-      key: "advisorName",
-      label: "Advisor name",
-      complete: hasValue(resolvedDraft.advisorName),
-      location: "Employment details",
-      target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-advisorName" },
-    },
-  ];
+  const factFindGenerationRequirements = buildFactFindGenerationRequirements({ draft: resolvedDraft });
 
   const factFindMissingFields = factFindGenerationRequirements.filter((item) => !item.complete).map((item) => item.label);
 
-  const statementGenerationRequirements: WorkflowRequirement[] = [
-    ...factFindGenerationRequirements.map((item) => ({
-      ...item,
-      target: item.key === "advisorName"
-        ? { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-advisorName" }
-        : item.target,
-    })),
-    {
-      key: isIncomeProtectionDocumentFlow ? "policy-picker" : "statementType",
-      label: isIncomeProtectionDocumentFlow ? "Policy picker" : "Statement type",
-      complete: isIncomeProtectionDocumentFlow ? statementHasSelectedQuote : hasValue(resolvedDraft.statementType),
-      location: "Statement basics",
-      target: {
-        tabId: "statement-of-suitability",
-        sectionId: "statement-form",
-        fieldId: isIncomeProtectionDocumentFlow ? "sos-statementSelectedQuoteKey" : "sos-statementType",
-      },
-    },
-    ...(isIncomeProtectionDocumentFlow
-      ? []
-      : [
-          {
-            key: "productType",
-            label: "Product recommended",
-            complete: hasValue(resolvedDraft.productType),
-            location: "Recommendation basics",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-productType" },
-          },
-          {
-            key: "recommendedCover",
-            label: "Recommended cover",
-            complete: hasValue(resolvedDraft.recommendedCover),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-recommendedCover" },
-          },
-          {
-            key: "deferredPeriod",
-            label: "Deferred period",
-            complete: hasValue(resolvedDraft.deferredPeriod),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-deferredPeriod" },
-          },
-          {
-            key: "coverAge",
-            label: "Cover to age",
-            complete: hasValue(resolvedDraft.coverAge),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-coverAge" },
-          },
-        ]),
-    {
-      key: "smokerStatus",
-      label: "Smoker status",
-      complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-smokerStatus" },
-    },
-    {
-      key: "phiOccupationalClass",
-      label: "PHI occupational class",
-      complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiOccupationalClass" },
-    },
-    {
-      key: "phiIndexation",
-      label: "PHI indexation",
-      complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiIndexation" },
-    },
-    {
-      key: "letterDate",
-      label: "Letter date",
-      complete: hasValue(resolvedDraft.letterDate),
-      location: "Statement basics",
-      target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-letterDate" },
-    },
-  ];
+  const statementGenerationRequirements = buildStatementGenerationRequirements({
+    draft: resolvedDraft,
+    factFindGenerationRequirements,
+    effectiveIncomeProtectionDraft,
+    isIncomeProtectionDocumentFlow,
+    statementHasSelectedQuote,
+  });
 
   const statementMissingFields = statementGenerationRequirements.filter((item) => !item.complete).map((item) => item.label);
 
@@ -936,47 +799,25 @@ export function IncomeProtectionPage({
     return String(age);
   }, [resolvedDraft.dateOfBirth]);
 
-  const quoteMissingFields = (isPensionsQuoteWorkflow
-    ? [
-        !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-        !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-        !hasValue(quotePensionGender) ? "Gender" : null,
-        !hasValue(quotePensionRetirementAge) ? "Retirement age" : null,
-        !hasValue(quotePensionRequired) ? "Required pension income" : null,
-        !hasValue(quotePensionMonthlyContribution) ? "Monthly contribution" : null,
-      ]
-    : [
-        !hasValue(resolvedDraft.fullName) ? "Client name" : null,
-        !hasValue(resolvedDraft.dateOfBirth) ? "Date of birth" : null,
-        !hasValue(resolvedDraft.gender) ? "Gender" : null,
-        !hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "Annual cover amount" : null,
-        !hasValue(effectiveIncomeProtectionDraft.coverAge) ? "Cover to age" : null,
-        !hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "Occupation class" : null,
-        !hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "Deferred period" : null,
-        !hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "Smoker" : null,
-        !hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "PHI indexation" : null,
-      ]).filter(isPresent);
+  const quoteMissingFields = buildQuoteMissingFields({
+    draft: resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    isPensionsQuoteWorkflow,
+    quotePensionGender,
+    quotePensionMonthlyContribution,
+    quotePensionRequired,
+    quotePensionRetirementAge,
+  });
 
-  const quoteGenerationRequirements: WorkflowRequirement[] = isPensionsQuoteWorkflow
-    ? [
-        { key: "fullName", label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
-        { key: "dateOfBirth", label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
-        { key: "quote-pensionGender", label: "Gender", complete: hasValue(quotePensionGender), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionGender" } },
-        { key: "quote-pensionRetirementAge", label: "Retirement age", complete: hasValue(quotePensionRetirementAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionRetirementAge" } },
-        { key: "quote-pensionRequired", label: "Required pension income", complete: hasValue(quotePensionRequired), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionRequired" } },
-        { key: "quote-pensionMonthlyContribution", label: "Monthly contribution", complete: hasValue(quotePensionMonthlyContribution), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-pensionMonthlyContribution" } },
-      ]
-    : [
-        { key: "fullName", label: "Client name", complete: hasValue(resolvedDraft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
-        { key: "dateOfBirth", label: "Date of birth", complete: hasValue(resolvedDraft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
-        { key: "gender", label: "Gender", complete: hasValue(resolvedDraft.gender), location: "Fact Find", target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-gender" } },
-        { key: "quote-annualCoverAmount", label: "Annual cover amount", complete: hasValue(effectiveIncomeProtectionDraft.recommendedCover), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" } },
-        { key: "quote-coverToAge", label: "Cover to age", complete: hasValue(effectiveIncomeProtectionDraft.coverAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" } },
-        { key: "quote-occupationClass", label: "Occupation class", complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" } },
-        { key: "quote-deferredPeriod", label: "Deferred period", complete: hasValue(effectiveIncomeProtectionDraft.deferredPeriod), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-deferredPeriod" } },
-        { key: "quote-smoker", label: "Smoker", complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-smoker" } },
-        { key: "quote-phiIndexation", label: "PHI indexation", complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-phiIndexation" } },
-      ];
+  const quoteGenerationRequirements = buildQuoteGenerationRequirements({
+    draft: resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    isPensionsQuoteWorkflow,
+    quotePensionGender,
+    quotePensionMonthlyContribution,
+    quotePensionRequired,
+    quotePensionRetirementAge,
+  });
 
   const quoteWorkflowSnapshot = useMemo(
     () =>
@@ -1076,63 +917,20 @@ export function IncomeProtectionPage({
     ],
   );
 
-  const factFindUpdateGenerationRequirements: WorkflowRequirement[] = [
-    ...factFindGenerationRequirements,
-    {
-      key: "factFindUpdatePersonalCircumstances",
-      label: "Updated personal circumstances",
-      complete: hasValue(resolvedDraft.factFindUpdatePersonalCircumstances),
-      location: "Additional relevant information",
-      target: { tabId: "fact-find-update", sectionId: "additional-relevant-information", fieldId: "ffu-personalCircumstances" },
-    },
-  ];
+  const factFindUpdateGenerationRequirements = buildFactFindUpdateGenerationRequirements({
+    draft: resolvedDraft,
+    factFindGenerationRequirements,
+  });
 
-  const validationMessages: Record<string, string> = {
-    "ff-advisorName": hasValue(resolvedDraft.advisorName) ? "" : "Advisor name is required for document generation.",
-    "ff-county": hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim())
-      ? ""
-      : "Town/county is required for document generation.",
-    "ff-dob": hasValue(resolvedDraft.dateOfBirth) ? "" : "Date of birth is required for document generation.",
-    "ff-email": hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)
-      ? ""
-      : "Provide either an email or a phone number.",
-    "ff-fullName": hasValue(resolvedDraft.fullName) ? "" : "Client name is required for document generation.",
-    "ff-gender": hasValue(resolvedDraft.gender) ? "" : "Gender is required for the downstream documents.",
-    "ff-income": hasValue(resolvedDraft.income) ? "" : "Income / salary is required for document generation.",
-    "ff-occupation": hasValue(resolvedDraft.occupation) ? "" : "Occupation is required for document generation.",
-    "ff-phone": hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber)
-      ? ""
-      : "Provide either a phone number or an email address.",
-    "ff-phiIndexation": hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "" : "PHI indexation is required for the statement output.",
-    "ff-phiOccupationalClass": hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass)
-      ? ""
-      : "PHI occupational class is required for the statement output.",
-    "ff-smokerStatus": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required for the statement output.",
-    "ff-townCity": hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim())
-      ? ""
-      : "Town/county is required for document generation.",
-    "ffu-personalCircumstances": hasValue(resolvedDraft.factFindUpdatePersonalCircumstances)
-      ? ""
-      : "Add updated personal circumstances before generating the update.",
-    "quote-annualCoverAmount": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Annual cover amount is required.",
-    "quote-coverToAge": hasValue(effectiveIncomeProtectionDraft.coverAge) ? "" : "Cover to age is required.",
-    "quote-deferredPeriod": hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "" : "Deferred period is required.",
-    "quote-occupationClass": hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "" : "Occupation class is required.",
-    "quote-phiIndexation": hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "" : "PHI indexation is required.",
-    "quote-pensionGender": hasValue(quotePensionGender) ? "" : "Gender is required.",
-    "quote-pensionMonthlyContribution": hasValue(quotePensionMonthlyContribution) ? "" : "Monthly contribution is required.",
-    "quote-pensionRequired": hasValue(quotePensionRequired) ? "" : "Required pension income is required.",
-    "quote-pensionRetirementAge": hasValue(quotePensionRetirementAge) ? "" : "Retirement age is required.",
-    "quote-smoker": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required.",
-    "sos-advisorName": hasValue(resolvedDraft.advisorName) ? "" : "Advisor name is required for document generation.",
-    "sos-coverAge": hasValue(effectiveIncomeProtectionDraft.coverAge) ? "" : "Cover to age is required.",
-    "sos-deferredPeriod": hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "" : "Deferred period is required.",
-    "sos-letterDate": hasValue(resolvedDraft.letterDate) ? "" : "Letter date is required for the statement.",
-    "sos-productType": hasValue(resolvedDraft.productType) ? "" : "Product type is required.",
-    "sos-recommendedCover": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Recommended cover is required.",
-    "sos-statementSelectedQuoteKey": statementHasSelectedQuote ? "" : "Choose a policy before generating the statement.",
-    "sos-statementType": hasValue(resolvedDraft.statementType) ? "" : "Statement type is required.",
-  };
+  const validationMessages = buildValidationMessages({
+    draft: resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    quotePensionGender,
+    quotePensionMonthlyContribution,
+    quotePensionRequired,
+    quotePensionRetirementAge,
+    statementHasSelectedQuote,
+  });
 
   const fieldHints: Record<string, string> = {
     "ff-email": "Required for document if the other contact field is blank",
@@ -1144,75 +942,13 @@ export function IncomeProtectionPage({
     "ffu-personalCircumstances": "Required for this update document",
   };
 
-  const factFindSectionProgressItems: SectionProgressItem[] = [
-    {
-      id: "client-profile",
-      title: "Client profile",
-      completeCount: [
-        hasValue(resolvedDraft.fullName),
-        hasValue(resolvedDraft.dateOfBirth),
-        hasValue(resolvedDraft.gender),
-        hasValue(`${resolvedDraft.townCity ?? ""} ${resolvedDraft.county ?? ""}`.trim()),
-        hasValue(resolvedDraft.email) || hasValue(resolvedDraft.mobileNumber),
-        hasValue(resolvedDraft.occupation),
-        hasValue(resolvedDraft.income),
-        hasValue(resolvedDraft.advisorName),
-      ].filter(Boolean).length,
-      requiredCount: 8,
-      complete: factFindGenerationRequirements.every((item) => item.complete),
-    },
-    {
-      id: "income-protection",
-      title: "Income protection",
-      completeCount: [
-        hasValue(effectiveIncomeProtectionDraft.smokerStatus),
-        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
-        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
-      ].filter(Boolean).length,
-      requiredCount: 3,
-      complete:
-        hasValue(effectiveIncomeProtectionDraft.smokerStatus) &&
-        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) &&
-        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
-    },
-  ];
+  const factFindSectionProgressItems = buildFactFindSectionProgressItems(
+    resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    factFindGenerationRequirements,
+  );
 
-  const factFindUpdateSectionProgressItems: SectionProgressItem[] = [
-    {
-      id: "additional-relevant-information",
-      title: "Additional relevant information",
-      completeCount: [hasValue(resolvedDraft.factFindUpdatePersonalCircumstances)].filter(Boolean).length,
-      requiredCount: 1,
-      complete: hasValue(resolvedDraft.factFindUpdatePersonalCircumstances),
-    },
-    {
-      id: "client-declarations",
-      title: "Client declarations, data protection & PEP confirmation",
-      completeCount: [
-        hasValue(resolvedDraft.factFindUpdateExecutionOnlyBasis),
-        hasValue(resolvedDraft.factFindUpdateTermsReviewedReceived),
-        hasValue(resolvedDraft.doNotContact),
-        hasValue(resolvedDraft.agreeToMarketing),
-        hasValue(resolvedDraft.contactByPhone),
-        hasValue(resolvedDraft.contactBySms),
-        hasValue(resolvedDraft.contactByEmail),
-        hasValue(resolvedDraft.contactByPost),
-        hasValue(resolvedDraft.pepDeclarationConfirmed),
-      ].filter(Boolean).length,
-      requiredCount: 9,
-      complete: [
-        resolvedDraft.factFindUpdateExecutionOnlyBasis,
-        resolvedDraft.factFindUpdateTermsReviewedReceived,
-        resolvedDraft.doNotContact,
-        resolvedDraft.agreeToMarketing,
-        resolvedDraft.contactByPhone,
-        resolvedDraft.contactBySms,
-        resolvedDraft.contactByEmail,
-        resolvedDraft.contactByPost,
-        resolvedDraft.pepDeclarationConfirmed,
-      ].every(hasValue),
-    },
-  ];
+  const factFindUpdateSectionProgressItems = buildFactFindUpdateSectionProgressItems(resolvedDraft);
 
   const statementSectionProgressItems: SectionProgressItem[] = [
     {
@@ -3519,179 +3255,32 @@ export function IncomeProtectionPage({
         : (statementQuoteOptions[0]?.key ?? "");
 
       return (
-        <div className="page-stack">
-
-          <Accordion flush className="workflow-form-accordion">
-            <AccordionItem
-              indicator={tabProgress["statement-of-suitability"]}
-              isOpen={statementWorkspaceAccordion.isOpen("statement-form")}
-              onToggle={() => statementWorkspaceAccordion.toggle("statement-form")}
-              title="Statement Form"
-            >
-              {isIncomeProtectionDocumentFlow ? (
-                <section className="form-section">
-                  <h3 className="form-section-title">Statement basics</h3>
-                  <div className="form-grid form-grid-desktop-3">
-                    <Input
-                      id="sos-letterDate"
-                      label={requiredLabel("Statement date")}
-                      onChange={(event) => updateField("letterDate", event.target.value)}
-                      type="date"
-                      value={resolvedDraft.letterDate}
-                    />
-                    <Select
-                      id="sos-statementSelectedQuoteKey"
-                      label={requiredLabel("Policy picker")}
-                      onChange={(event) => updateField("statementSelectedQuoteKey", event.target.value)}
-                      options={
-                        statementQuoteOptions.length > 0
-                          ? statementQuoteOptions.map((option) => ({ label: option.label, value: option.key }))
-                          : [{ label: "Generate a quote first", value: "" }]
-                      }
-                      value={selectedPolicyPickerValue}
-                    />
-                  </div>
-                </section>
-              ) : (
-                <>
-                  <section className="form-section">
-                    <h3 className="form-section-title">Recommendation basics</h3>
-                    <div className="form-grid">
-                      <Input
-                        id="sos-letterDate"
-                        label={requiredLabel("Letter date")}
-                        onChange={(event) => updateField("letterDate", event.target.value)}
-                        type="date"
-                        value={resolvedDraft.letterDate}
-                      />
-                      <Select
-                        id="sos-statementType"
-                        label={requiredLabel("Statement type")}
-                        onChange={(event) => updateField("statementType", event.target.value)}
-                        options={statementTypeOptions}
-                        value={resolvedDraft.statementType}
-                      />
-                      <Input
-                        id="sos-productType"
-                        label={requiredLabel("Product type")}
-                        onChange={(event) => updateField("productType", event.target.value)}
-                        type="text"
-                        value={resolvedDraft.productType}
-                      />
-                      <Input
-                        id="sos-advisorName"
-                        label={requiredLabel("Advisor name")}
-                        onChange={(event) => updateField("advisorName", event.target.value)}
-                        type="text"
-                        value={resolvedDraft.advisorName}
-                      />
-                    </div>
-                  </section>
-
-                  <section className="form-section">
-                    <h3 className="form-section-title">Cover summary</h3>
-                    <div className="form-grid">
-                      <Input
-                        id="sos-recommendedCover"
-                        label={requiredLabel("Annual Cover Amount (€)")}
-                        onBlur={(event) => updateField("recommendedCover", formatCurrency(event.target.value))}
-                        onChange={(event) => updateField("recommendedCover", event.target.value)}
-                        prefix="EUR"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="text"
-                        value={resolvedDraft.recommendedCover}
-                      />
-                      <Select
-                        id="sos-deferredPeriod"
-                        label={requiredLabel("Deferred period")}
-                        onChange={(event) => updateField("deferredPeriod", event.target.value)}
-                        options={deferredPeriodOptions}
-                        value={resolvedDraft.deferredPeriod}
-                      />
-                      <Select
-                        id="sos-coverAge"
-                        label={requiredLabel("Cover to age")}
-                        onChange={(event) => updateField("coverAge", event.target.value)}
-                        options={coverAgeOptions}
-                        value={resolvedDraft.coverAge}
-                      />
-                      {false ? <Input
-                        id="sos-premium"
-                        label={requiredLabel("Gross monthly premium")}
-                        onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
-                        onChange={(event) => updateField("premium", event.target.value)}
-                        prefix="€"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="text"
-                        value={resolvedDraft.premium}
-                      /> : null}
-                      <Input
-                        hint="Gross premium minus tax relief at your marginal rate"
-                        id="sos-netMonthlyCost"
-                        label={requiredLabel("Net monthly cost")}
-                        onBlur={(event) => updateField("netMonthlyCost", formatCurrency(event.target.value))}
-                        onChange={(event) => updateField("netMonthlyCost", event.target.value)}
-                        prefix="€"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="text"
-                        value={resolvedDraft.netMonthlyCost}
-                      />
-                      <Textarea
-                        className="form-grid-full"
-                        hint="Summarise the recommended cover and rationale"
-                        id="sos-coverSummary"
-                        label="Cover summary"
-                        onChange={(event) => updateField("coverSummary", event.target.value)}
-                        placeholder="Brief overview of the recommended cover and why it suits the client..."
-                        rows={4}
-                        value={resolvedDraft.coverSummary}
-                      />
-                    </div>
-                  </section>
-                </>
-              )}
-              {renderGenerationRequirements(`${statementDocumentType} generation requirements`, statementGenerationRequirements, statementMissingFields, {
-                explainSharedFields: true,
-                emphasiseMissing: showStatementValidation,
-              })}
-              <div className="form-action-row">
-                <span className="form-action-row-status">{workflowSaveLabel}</span>
-                <Button onClick={() => void saveStatementDraft()} variant="primary">
-                  <Save size={18} />
-                  Save Statement
-                </Button>
-              </div>
-            </AccordionItem>
-            <AccordionItem
-              indicator={getGeneratedDraftStatusLabel(statementDraft.generationStatus)}
-              isOpen={statementWorkspaceAccordion.isOpen("statement-output")}
-              onToggle={() => statementWorkspaceAccordion.toggle("statement-output")}
-              title="Generated Output"
-            >
-              <GeneratedOutputWorkspace
-                draft={statementDraft}
-                generateDisabled={statementMissingFields.length > 0}
-                onContentChange={(html) => updateGeneratedOutput(statementDocumentType, html)}
-                onExportDocx={() => void handleGeneratedOutputExport(statementDocumentType, "docx")}
-                onExportPdf={() => void handleGeneratedOutputExport(statementDocumentType, "pdf")}
-                onGenerate={() => void handleStatementGenerate()}
-                statusLabel={statementDocumentStatus.replace("Document: ", "")}
-                templatePicker={
-                  <TemplatePicker
-                    documentType={statementDocumentType}
-                    onChange={(templateId) =>
-                      updateSelectedTemplate(resolvedDraft.clientReference, statementDocumentType, templateId)
-                    }
-                    selectedTemplateId={statementDraft.selectedTemplateId}
-                  />
-                }
-              />
-            </AccordionItem>
-          </Accordion>
-        </div>
+        <StatementWorkflowSection
+          documentDraft={statementDraft}
+          draft={resolvedDraft}
+          isIncomeProtectionDocumentFlow={isIncomeProtectionDocumentFlow}
+          onExportDocx={() => void handleGeneratedOutputExport(statementDocumentType, "docx")}
+          onExportPdf={() => void handleGeneratedOutputExport(statementDocumentType, "pdf")}
+          onGenerate={() => void handleStatementGenerate()}
+          onSave={() => void saveStatementDraft()}
+          onTemplateChange={(templateId) =>
+            updateSelectedTemplate(resolvedDraft.clientReference, statementDocumentType, templateId)
+          }
+          onUpdateField={(field, value) => updateField(field, value)}
+          onUpdateGeneratedOutput={(html) => updateGeneratedOutput(statementDocumentType, html)}
+          renderGenerationRequirements={renderGenerationRequirements}
+          requiredLabel={requiredLabel}
+          saveLabel={workflowSaveLabel}
+          selectedPolicyPickerValue={selectedPolicyPickerValue}
+          showStatementValidation={showStatementValidation}
+          statementDocumentStatus={statementDocumentStatus}
+          statementDocumentType={statementDocumentType}
+          statementGenerationRequirements={statementGenerationRequirements}
+          statementMissingFields={statementMissingFields}
+          statementQuoteOptions={statementQuoteOptions}
+          tabProgressIndicator={tabProgress["statement-of-suitability"]}
+          workspaceAccordion={statementWorkspaceAccordion}
+        />
       );
     }
 
@@ -3699,221 +3288,83 @@ export function IncomeProtectionPage({
       const quoteDraft = getWorkspaceDocumentDraft(quoteDocumentType);
 
       return (
-        <div className="page-stack">
-
-          <Accordion flush className="workflow-form-accordion">
-            <AccordionItem
-              indicator={getSectionProgress(
-                isPensionsQuoteWorkflow
-                  ? [quotePensionGender, quotePensionRetirementAge, quotePensionRequired, quotePensionMonthlyContribution]
-                  : [quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker],
-              )}
-              isOpen={quoteWorkspaceAccordion.isOpen("quote-output")}
-              onToggle={() => quoteWorkspaceAccordion.toggle("quote-output")}
-              title="Quote Form"
-            >
-              <div className="form-grid form-grid-desktop-3">
-                <Input
-                  id="quote-name"
-                  label="Name"
-                  type="text"
-                  value={resolvedDraft.fullName}
-                  disabled
-                />
-                <Input
-                  id="quote-dob"
-                  label="Date of Birth"
-                  type="date"
-                  value={resolvedDraft.dateOfBirth}
-                  disabled
-                />
-                <Input
-                  id="quote-age"
-                  label="Your Age"
-                  type="text"
-                  value={quoteYourAge}
-                  disabled
-                />
-                {isPensionsQuoteWorkflow ? (
-                  <>
-                    <Select
-                      id="quote-pensionGender"
-                      label={requiredLabel("Gender")}
-                      onChange={(event) => setQuotePensionGender(event.target.value)}
-                      options={genderOptions}
-                      value={quotePensionGender}
-                    />
-                    <Input
-                      id="quote-pensionRetirementAge"
-                      label={requiredLabel("Retirement Age")}
-                      onChange={(event) => setQuotePensionRetirementAge(event.target.value)}
-                      type="text"
-                      value={quotePensionRetirementAge}
-                    />
-                    <Select
-                      id="quote-pensionSpousesPension"
-                      label="Spouse's Pension"
-                      onChange={(event) => setQuotePensionSpousesPension(event.target.value)}
-                      options={[
-                        { label: "No", value: "No" },
-                        { label: "Yes", value: "Yes" },
-                      ]}
-                      value={quotePensionSpousesPension}
-                    />
-                    <Input
-                      id="quote-pensionEscalation"
-                      label="Pension Escalation"
-                      onChange={(event) => setQuotePensionEscalation(event.target.value)}
-                      type="text"
-                      value={quotePensionEscalation}
-                    />
-                    <Input
-                      id="quote-pensionNetGrowth"
-                      label="Net Growth"
-                      onChange={(event) => setQuotePensionNetGrowth(event.target.value)}
-                      type="text"
-                      value={quotePensionNetGrowth}
-                    />
-                    <Input
-                      id="quote-pensionPremiumEscalation"
-                      label="Premium Escalation"
-                      onChange={(event) => setQuotePensionPremiumEscalation(event.target.value)}
-                      type="text"
-                      value={quotePensionPremiumEscalation}
-                    />
-                    <Input
-                      id="quote-pensionInflation"
-                      label="Inflation"
-                      onChange={(event) => setQuotePensionInflation(event.target.value)}
-                      type="text"
-                      value={quotePensionInflation}
-                    />
-                    <Input
-                      id="quote-pensionExistingFund"
-                      label="Existing Fund"
-                      onChange={(event) => setQuotePensionExistingFund(event.target.value)}
-                      type="text"
-                      value={quotePensionExistingFund}
-                    />
-                    <Input
-                      id="quote-pensionRequired"
-                      label={requiredLabel("Required Pension Income")}
-                      onChange={(event) => setQuotePensionRequired(event.target.value)}
-                      type="text"
-                      value={quotePensionRequired}
-                    />
-                    <Input
-                      id="quote-pensionMonthlyContribution"
-                      label={requiredLabel("Monthly Contribution")}
-                      onChange={(event) => setQuotePensionMonthlyContribution(event.target.value)}
-                      type="text"
-                      value={quotePensionMonthlyContribution}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Input
-                      id="quote-annualCoverAmount"
-                      label={requiredLabel("Annual Cover Amount")}
-                      onChange={(event) => {
-                        setQuoteAnnualCoverAmount(event.target.value);
-                        updateField("recommendedCover", event.target.value);
-                      }}
-                      type="text"
-                      value={quoteAnnualCoverAmount}
-                    />
-                    <Select
-                      id="quote-coverToAge"
-                      label={requiredLabel("Cover to Age")}
-                      onChange={(event) => {
-                        setQuoteCoverToAge(event.target.value);
-                        updateField("coverAge", event.target.value);
-                      }}
-                      options={coverAgeOptions}
-                      value={quoteCoverToAge}
-                    />
-                    <Select
-                      id="quote-occupationClass"
-                      label={requiredLabel("Occupation Class")}
-                      onChange={(event) => {
-                        setQuoteOccupationClass(event.target.value);
-                        updateField("phiOccupationalClass", event.target.value);
-                      }}
-                      options={phiOccupationalClassOptions}
-                      value={quoteOccupationClass}
-                    />
-                    <Select
-                      id="quote-deferredPeriod"
-                      label={requiredLabel("Deferred Period")}
-                      onChange={(event) => {
-                        setQuoteDeferredPeriod(event.target.value);
-                        updateField("deferredPeriod", event.target.value);
-                      }}
-                      options={deferredPeriodOptions}
-                      value={quoteDeferredPeriod}
-                    />
-                    <Select
-                      id="quote-smoker"
-                      label={requiredLabel("Smoker")}
-                      onChange={(event) => {
-                        setQuoteSmoker(event.target.value);
-                        updateField("smokerStatus", event.target.value);
-                      }}
-                      options={smokerStatusOptions}
-                      value={quoteSmoker}
-                    />
-                    <Select
-                      id="quote-phiIndexation"
-                      label="PHI Indexation"
-                      onChange={(event) => {
-                        setQuotePhiIndexation(event.target.value);
-                        updateField("phiIndexation", event.target.value);
-                      }}
-                      options={phiIndexationOptions}
-                      value={quotePhiIndexation}
-                    />
-                    <Toggle
-                      checked={isAffirmative(resolvedDraft.zurichDiscountActive)}
-                      id="quote-zurichDiscount"
-                      label="Apply Zurich 17.5% discount"
-                      onChange={(event) => updateField("zurichDiscountActive", event.target.checked ? "Yes" : "")}
-                    />
-                  </>
-                )}
-              </div>
-              <div style={{ marginTop: "var(--space-4)" }}>
-                {renderGenerationRequirements("Quote generation requirements", quoteGenerationRequirements, quoteMissingFields, {
-                  explainSharedFields: false,
-                  emphasiseMissing: showQuoteValidation,
-                })}
-              </div>
-            </AccordionItem>
-            <AccordionItem
-              indicator={getGeneratedDraftStatusLabel(quoteDraft.generationStatus)}
-              isOpen={quoteWorkspaceAccordion.isOpen("generated-output")}
-              onToggle={() => quoteWorkspaceAccordion.toggle("generated-output")}
-              title="Generated Output"
-            >
-              <GeneratedOutputWorkspace
-                draft={quoteDraft}
-                emptyMessage="Generate the quote comparison to open the quote workspace."
-                generateDisabled={quoteMissingFields.length > 0}
-                onContentChange={(html) => updateGeneratedOutput(quoteDocumentType, html)}
-                onExportDocx={() => void handleGeneratedOutputExport(quoteDocumentType, "docx")}
-                onExportPdf={() => void handleGeneratedOutputExport(quoteDocumentType, "pdf")}
-                onGenerate={() => void handleQuoteGenerate()}
-                statusLabel={quoteDocumentStatus.replace("Document: ", "")}
-                templatePicker={
-                  <TemplatePicker
-                    documentType={quoteDocumentType}
-                    onChange={(templateId) => updateSelectedTemplate(resolvedDraft.clientReference, quoteDocumentType, templateId)}
-                    selectedTemplateId={quoteDraft.selectedTemplateId}
-                  />
-                }
-              />
-            </AccordionItem>
-          </Accordion>
-        </div>
+        <QuoteWorkflowSection
+          documentDraft={quoteDraft}
+          draft={resolvedDraft}
+          isPensionsQuoteWorkflow={isPensionsQuoteWorkflow}
+          onExportDocx={() => void handleGeneratedOutputExport(quoteDocumentType, "docx")}
+          onExportPdf={() => void handleGeneratedOutputExport(quoteDocumentType, "pdf")}
+          onGenerate={() => void handleQuoteGenerate()}
+          onQuoteAnnualCoverAmountChange={(value) => {
+            setQuoteAnnualCoverAmount(value);
+            updateField("recommendedCover", value);
+          }}
+          onQuoteCoverToAgeChange={(value) => {
+            setQuoteCoverToAge(value);
+            updateField("coverAge", value);
+          }}
+          onQuoteDeferredPeriodChange={(value) => {
+            setQuoteDeferredPeriod(value);
+            updateField("deferredPeriod", value);
+          }}
+          onQuoteOccupationClassChange={(value) => {
+            setQuoteOccupationClass(value);
+            updateField("phiOccupationalClass", value);
+          }}
+          onQuotePensionEscalationChange={setQuotePensionEscalation}
+          onQuotePensionExistingFundChange={setQuotePensionExistingFund}
+          onQuotePensionGenderChange={setQuotePensionGender}
+          onQuotePensionInflationChange={setQuotePensionInflation}
+          onQuotePensionMonthlyContributionChange={setQuotePensionMonthlyContribution}
+          onQuotePensionNetGrowthChange={setQuotePensionNetGrowth}
+          onQuotePensionPremiumEscalationChange={setQuotePensionPremiumEscalation}
+          onQuotePensionRequiredChange={setQuotePensionRequired}
+          onQuotePensionRetirementAgeChange={setQuotePensionRetirementAge}
+          onQuotePensionSpousesPensionChange={setQuotePensionSpousesPension}
+          onQuotePhiIndexationChange={(value) => {
+            setQuotePhiIndexation(value);
+            updateField("phiIndexation", value);
+          }}
+          onQuoteSmokerChange={(value) => {
+            setQuoteSmoker(value);
+            updateField("smokerStatus", value);
+          }}
+          onTemplateChange={(templateId) =>
+            updateSelectedTemplate(resolvedDraft.clientReference, quoteDocumentType, templateId)
+          }
+          onToggleZurichDiscount={(checked) => updateField("zurichDiscountActive", checked ? "Yes" : "")}
+          onUpdateGeneratedOutput={(html) => updateGeneratedOutput(quoteDocumentType, html)}
+          quoteAnnualCoverAmount={quoteAnnualCoverAmount}
+          quoteCoverToAge={quoteCoverToAge}
+          quoteDeferredPeriod={quoteDeferredPeriod}
+          quoteDocumentStatus={quoteDocumentStatus}
+          quoteDocumentType={quoteDocumentType}
+          quoteGenerationRequirements={quoteGenerationRequirements}
+          quoteMissingFields={quoteMissingFields}
+          quoteOccupationClass={quoteOccupationClass}
+          quotePensionEscalation={quotePensionEscalation}
+          quotePensionExistingFund={quotePensionExistingFund}
+          quotePensionGender={quotePensionGender}
+          quotePensionInflation={quotePensionInflation}
+          quotePensionMonthlyContribution={quotePensionMonthlyContribution}
+          quotePensionNetGrowth={quotePensionNetGrowth}
+          quotePensionPremiumEscalation={quotePensionPremiumEscalation}
+          quotePensionRequired={quotePensionRequired}
+          quotePensionRetirementAge={quotePensionRetirementAge}
+          quotePensionSpousesPension={quotePensionSpousesPension}
+          quotePhiIndexation={quotePhiIndexation}
+          quoteSmoker={quoteSmoker}
+          quoteYourAge={quoteYourAge}
+          renderGenerationRequirements={renderGenerationRequirements}
+          requiredLabel={requiredLabel}
+          showQuoteValidation={showQuoteValidation}
+          tabProgressIndicator={getSectionProgress(
+            isPensionsQuoteWorkflow
+              ? [quotePensionGender, quotePensionRetirementAge, quotePensionRequired, quotePensionMonthlyContribution]
+              : [quoteAnnualCoverAmount, quoteCoverToAge, quoteOccupationClass, quoteDeferredPeriod, quoteSmoker],
+          )}
+          workspaceAccordion={quoteWorkspaceAccordion}
+        />
       );
     }
 

@@ -1,5 +1,3 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { sanitizeGeneratedHtml } from "./document-api";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 
@@ -16,6 +14,17 @@ const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const PAGE_TOP_PADDING_WITHOUT_HEADER = 28;
+type JsPdfCtor = typeof import("jspdf").jsPDF;
+type JsPdfInstance = InstanceType<JsPdfCtor>;
+
+async function loadPdfDependencies() {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+
+  return { html2canvas, jsPDF };
+}
 
 function stripMarkdownFences(html: string) {
   return html.replace(/^\s*```html\s*/i, "").replace(/```\s*$/i, "").trim();
@@ -660,7 +669,7 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
   `;
 }
 
-function drawPdfPageChrome(pdf: jsPDF, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
+function drawPdfPageChrome(pdf: JsPdfInstance, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
   if (options?.showShellHeader) {
     pdf.addImage(OMEGA_LOGO_DATA_URI, "PNG", 71, 9, 68, 18, undefined, "FAST");
     pdf.setFont("helvetica", "normal");
@@ -707,6 +716,8 @@ function canRenderCanvas() {
 }
 
 export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
+  const { html2canvas, jsPDF } = await loadPdfDependencies();
+
   if (!canRenderCanvas()) {
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const text = stripHtml(html);

@@ -10,10 +10,12 @@ import {
   enableAdminUser,
   getScheduleStatus,
   getSecurityStatus,
+  getStorageReconciliationReport,
   listAdminUsers,
   listAuditLogs,
   listBackups,
   listRestoreAttempts,
+  repairStorageReconciliation,
   resetAdminUserPassword,
   type AdminAuditLog,
   type AdminBackupRun,
@@ -21,6 +23,7 @@ import {
   type RestoreActionResponse,
   type RestoreAttempt,
   type SecurityStatus,
+  type StorageReconciliationReport,
   validateRestore,
 } from "../data/admin-api";
 import { Badge, Button, Input, Modal, Select, useToast } from "../components/ui";
@@ -91,12 +94,32 @@ function summarizeAuditDetails(details: Record<string, unknown>) {
   return entries.length > 0 ? entries.join(" | ") : "â€”";
 }
 
+function renderStorageIssueList(
+  items: Array<{ relative_path: string; client_reference?: string | null; document_name?: string; original_filename?: string }>,
+) {
+  if (items.length === 0) {
+    return <span className="font-medium">None</span>;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {items.slice(0, 3).map((item) => (
+        <span key={`${item.relative_path}-${item.client_reference ?? ""}`}>
+          {item.client_reference ? `${item.client_reference}: ` : ""}
+          {item.original_filename ?? item.document_name ?? item.relative_path}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { addToast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [backups, setBackups] = useState<AdminBackupRun[]>([]);
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
+  const [storageReport, setStorageReport] = useState<StorageReconciliationReport | null>(null);
   const [scheduleStatus, setScheduleStatus] = useState<Record<string, unknown> | null>(null);
   const [restoreAttemptsByBackup, setRestoreAttemptsByBackup] = useState<Record<string, RestoreAttempt[]>>({});
   const [restoreApprovals, setRestoreApprovals] = useState<Record<string, { token: string; expiresAt: string }>>({});
@@ -132,17 +155,19 @@ export function AdminPage() {
   }
 
   async function loadAdminData() {
-    const [nextUsers, nextAuditLogs, nextBackups, nextSecurityStatus, nextScheduleStatus] = await Promise.all([
+    const [nextUsers, nextAuditLogs, nextBackups, nextSecurityStatus, nextStorageReport, nextScheduleStatus] = await Promise.all([
       listAdminUsers(),
       listAuditLogs(),
       listBackups(),
       getSecurityStatus(),
+      getStorageReconciliationReport(),
       getScheduleStatus(),
     ]);
     setUsers(nextUsers);
     setAuditLogs(nextAuditLogs);
     setBackups(nextBackups);
     setSecurityStatus(nextSecurityStatus);
+    setStorageReport(nextStorageReport);
     setScheduleStatus(nextScheduleStatus);
   }
 
@@ -216,6 +241,32 @@ export function AdminPage() {
       addToast("Backup run created", "success");
     } catch {
       addToast("Backup failed", "error");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handlePreviewStorageCleanup() {
+    setBusy("storage-preview");
+    try {
+      const result = await repairStorageReconciliation(false);
+      setStorageReport(result.report);
+      addToast("Storage cleanup preview refreshed", "success");
+    } catch {
+      addToast("Failed to preview storage cleanup", "error");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleExecuteStorageCleanup() {
+    setBusy("storage-execute");
+    try {
+      const result = await repairStorageReconciliation(true);
+      setStorageReport(result.report);
+      addToast("Storage cleanup completed", "success");
+    } catch {
+      addToast("Failed to execute storage cleanup", "error");
     } finally {
       setBusy("");
     }
@@ -399,6 +450,42 @@ export function AdminPage() {
               <tr><td>Force password change</td><td className="font-medium">{securityStatus?.force_password_change_count ?? "—"}</td></tr>
               <tr><td>Cookie secure</td><td className="font-medium">{String(securityStatus?.cookie_secure ?? false)}</td></tr>
               <tr><td>Scheduler status</td><td className="font-medium">{String(scheduleStatus?.running ?? false)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-header">
+          <div>
+            <h2 className="card-title">
+              <Database size={20} />
+              Storage Reconciliation
+            </h2>
+            <p className="card-subtitle">Compare database records with local client storage and run safe cleanup.</p>
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Button isLoading={busy === "storage-preview"} onClick={() => void handlePreviewStorageCleanup()} variant="secondary">
+              Preview Cleanup
+            </Button>
+            <Button isLoading={busy === "storage-execute"} onClick={() => void handleExecuteStorageCleanup()} variant="danger">
+              Execute Cleanup
+            </Button>
+          </div>
+        </div>
+        <div className="table-wrap-flush">
+          <table className="data-table">
+            <tbody>
+              <tr><td>Storage root</td><td className="font-medium">{storageReport?.storage_root ?? "â€”"}</td></tr>
+              <tr><td>Last scan</td><td className="font-medium">{formatDateTime(storageReport?.generated_at)}</td></tr>
+              <tr><td>Missing file records</td><td>{storageReport?.summary.missing_file_record_count ?? 0}</td></tr>
+              <tr><td>Invalid file records</td><td>{storageReport?.summary.invalid_file_record_count ?? 0}</td></tr>
+              <tr><td>Missing document artifacts</td><td>{storageReport?.summary.missing_document_artifact_count ?? 0}</td></tr>
+              <tr><td>Invalid document artifacts</td><td>{storageReport?.summary.invalid_document_artifact_count ?? 0}</td></tr>
+              <tr><td>Orphaned disk files</td><td>{storageReport?.summary.orphaned_disk_file_count ?? 0}</td></tr>
+              <tr><td>Missing file examples</td><td>{renderStorageIssueList(storageReport?.items.missing_file_records ?? [])}</td></tr>
+              <tr><td>Missing document examples</td><td>{renderStorageIssueList(storageReport?.items.missing_document_artifacts ?? [])}</td></tr>
+              <tr><td>Orphaned file examples</td><td>{renderStorageIssueList(storageReport?.items.orphaned_disk_files ?? [])}</td></tr>
             </tbody>
           </table>
         </div>

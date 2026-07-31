@@ -15,6 +15,12 @@ set -euo pipefail
 #   3. Follow prompts for hostnames
 #   4. Copy the generated config.yaml and credentials file
 
+if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "cloudflared is not installed. Install it first:"
+    echo "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+    exit 1
+fi
+
 CLOUDFLARED_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_FILE="$CLOUDFLARED_DIR/config.yaml"
 CREDENTIALS_DIR="$CLOUDFLARED_DIR"
@@ -95,8 +101,9 @@ echo "  1. Ensure $CREDENTIALS_DIR/${TUNNEL_ID}.json is NOT committed to git (al
 echo "  2. Set these in .env:"
 echo "       ENVIRONMENT=production"
 echo "       REMOTE_ACCESS_MODE=remote"
-echo "       CORS_ORIGINS=https://${FRONTEND_HOSTNAME}"
-echo "       APP_URL=https://${API_HOSTNAME}"
+echo "       CORS_ORIGINS=https://${FRONTEND_HOSTNAME},https://${API_HOSTNAME}"
+echo "       CSRF_TRUSTED_ORIGINS=https://${FRONTEND_HOSTNAME},https://${API_HOSTNAME}"
+echo "       APP_URL=https://${FRONTEND_HOSTNAME}"
 echo "       TRUSTED_PROXY_COUNT=1"
 echo "       COOKIE_SECURE=true"
 echo "       SESSION_SECRET=<generate-a-strong-random-secret>"

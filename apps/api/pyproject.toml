@@ -29,7 +29,7 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-cache_dir = "C:/tmp/omega-pytest-cache"
+addopts = "-p no:cacheprovider"
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead\\.",
 ]
