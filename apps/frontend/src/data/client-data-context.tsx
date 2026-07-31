@@ -93,6 +93,7 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
     ...seededClient,
     ...client,
     status: client.status ?? "Draft",
+    savedQuotes: Array.isArray(client.savedQuotes) ? client.savedQuotes : [],
     files: client.files ?? [],
     generatedDocuments: client.generatedDocuments ?? [],
     documentDrafts: normalizedDocumentDrafts,

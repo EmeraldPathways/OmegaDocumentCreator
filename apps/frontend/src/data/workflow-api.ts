@@ -6,6 +6,10 @@
 
 import type { SeededClientProfile } from "./seeded-clients";
 
+type SaveWorkflowOptions = {
+  keepalive?: boolean;
+};
+
 export async function fetchWorkflow(clientReference: string): Promise<Partial<SeededClientProfile>> {
   const response = await fetch(`/clients/${encodeURIComponent(clientReference)}/workflow`);
 
@@ -20,11 +24,16 @@ export async function fetchWorkflow(clientReference: string): Promise<Partial<Se
   return payload.item as Partial<SeededClientProfile>;
 }
 
-export async function saveWorkflow(clientReference: string, data: Partial<SeededClientProfile>): Promise<void> {
+export async function saveWorkflow(
+  clientReference: string,
+  data: Partial<SeededClientProfile>,
+  options?: SaveWorkflowOptions,
+): Promise<void> {
   const response = await fetch(`/clients/${encodeURIComponent(clientReference)}/workflow`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
+    keepalive: options?.keepalive ?? false,
   });
 
   if (!response.ok) {

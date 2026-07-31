@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { Save } from "lucide-react";
 
-import type { SeededClientProfile } from "../data/seeded-clients";
+import type { SavedQuoteSnapshot, SeededClientProfile } from "../data/seeded-clients";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft } from "../documents/document-types";
@@ -78,6 +78,7 @@ type QuoteWorkflowSectionProps = {
   quoteGenerationRequirements: WorkflowRequirement[];
   quoteMissingFields: string[];
   quoteOccupationClass: string;
+  quoteSaveStatus: string;
   quotePensionEscalation: string;
   quotePensionExistingFund: string;
   quotePensionGender: string;
@@ -93,11 +94,13 @@ type QuoteWorkflowSectionProps = {
   quoteYourAge: string;
   renderGenerationRequirements: RenderGenerationRequirements;
   requiredLabel: RequiredLabel;
+  savedQuotes: SavedQuoteSnapshot[];
   showQuoteValidation: boolean;
   workspaceAccordion: AccordionState;
   onExportDocx: () => void;
   onExportPdf: () => void;
   onGenerate: () => void;
+  onLoadSavedQuote: (savedQuote: SavedQuoteSnapshot) => void;
   onQuoteAnnualCoverAmountChange: (value: string) => void;
   onQuoteCoverToAgeChange: (value: string) => void;
   onQuoteDeferredPeriodChange: (value: string) => void;
@@ -113,6 +116,7 @@ type QuoteWorkflowSectionProps = {
   onQuotePensionRetirementAgeChange: (value: string) => void;
   onQuotePensionSpousesPensionChange: (value: string) => void;
   onQuotePhiIndexationChange: (value: string) => void;
+  onSaveQuote: () => void;
   onQuoteSmokerChange: (value: string) => void;
   onTemplateChange: (templateId: string) => void;
   onToggleZurichDiscount: (checked: boolean) => void;
@@ -324,6 +328,7 @@ export function QuoteWorkflowSection({
   quoteGenerationRequirements,
   quoteMissingFields,
   quoteOccupationClass,
+  quoteSaveStatus,
   quotePensionEscalation,
   quotePensionExistingFund,
   quotePensionGender,
@@ -339,11 +344,13 @@ export function QuoteWorkflowSection({
   quoteYourAge,
   renderGenerationRequirements,
   requiredLabel,
+  savedQuotes,
   showQuoteValidation,
   workspaceAccordion,
   onExportDocx,
   onExportPdf,
   onGenerate,
+  onLoadSavedQuote,
   onQuoteAnnualCoverAmountChange,
   onQuoteCoverToAgeChange,
   onQuoteDeferredPeriodChange,
@@ -359,6 +366,7 @@ export function QuoteWorkflowSection({
   onQuotePensionRetirementAgeChange,
   onQuotePensionSpousesPensionChange,
   onQuotePhiIndexationChange,
+  onSaveQuote,
   onQuoteSmokerChange,
   onTemplateChange,
   onToggleZurichDiscount,
@@ -409,6 +417,42 @@ export function QuoteWorkflowSection({
               emphasiseMissing: showQuoteValidation,
             })}
           </div>
+          <div className="form-action-row">
+            <span className="form-action-row-status">{quoteSaveStatus}</span>
+            <Button onClick={onSaveQuote} variant="primary">
+              <Save size={18} />
+              Save Quote
+            </Button>
+          </div>
+          {savedQuotes.length > 0 ? (
+            <div style={{ display: "grid", gap: "12px", marginTop: "var(--space-4)" }}>
+              {savedQuotes.map((savedQuote) => (
+                <div
+                  key={savedQuote.id}
+                  style={{
+                    border: "1px solid var(--color-border, #dbe3ee)",
+                    borderRadius: "12px",
+                    padding: "12px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    background: "#fff",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{savedQuote.name}</div>
+                    <div style={{ color: "var(--color-text-muted, #64748b)", fontSize: "0.95rem" }}>
+                      {savedQuote.provider || "Saved quote"}{savedQuote.updatedAt ? ` · ${savedQuote.updatedAt.slice(0, 10)}` : ""}
+                    </div>
+                  </div>
+                  <Button onClick={() => onLoadSavedQuote(savedQuote)} variant="secondary">
+                    Load Quote
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </AccordionItem>
         <AccordionItem
           indicator={getGeneratedDraftStatusLabel(documentDraft.generationStatus)}

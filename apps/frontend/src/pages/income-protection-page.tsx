@@ -27,6 +27,7 @@ import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import { createSeededClientProfiles } from "../data/seeded-clients";
 import type {
+  SavedQuoteSnapshot,
   SeededClientFile,
   SeededClientProfile,
   SeededGeneratedDocument,
@@ -356,6 +357,23 @@ function formatSavedTime(value: string | null) {
   return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
+function findSavedQuoteProviderName(
+  integrationRequests: GeneratedDocumentDraft["integrationRequests"],
+  fallbackProvider: string,
+) {
+  const quoteProvider = integrationRequests.flatMap((request) => request.quoteResults)[0]?.providerName?.trim();
+  if (quoteProvider) {
+    return quoteProvider;
+  }
+
+  const requestProvider = integrationRequests[0]?.provider?.trim();
+  if (requestProvider) {
+    return requestProvider;
+  }
+
+  return fallbackProvider.trim();
+}
+
 export function IncomeProtectionPage({
   pageTitle = "Income Protection",
   quoteDocumentType = "Quote",
@@ -396,6 +414,7 @@ export function IncomeProtectionPage({
   const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
+  const [quoteSaveStatus, setQuoteSaveStatus] = useState("No saved quotes yet");
   const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
   const [showQuoteValidation, setShowQuoteValidation] = useState(false);
   const [lastSubmittedQuoteRequestKey, setLastSubmittedQuoteRequestKey] = useState<string | null>(null);
@@ -430,6 +449,10 @@ export function IncomeProtectionPage({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const quoteGenerateRef = useRef<(() => Promise<void>) | null>(null);
   const lastPersistedSnapshotRef = useRef("");
+  const latestDraftRef = useRef<SeededClientProfile | null>(null);
+  const workflowSaveStateRef = useRef<WorkflowSaveState>("saved");
+  const canUseBackendRef = useRef(canUseBackend);
+  const actorLabelRef = useRef(actorLabel);
   const activeValidationFieldRef = useRef<string | null>(null);
   const factFindWorkspaceAccordion = useAccordionState(["fact-find-form"]);
   const factFindAccordion = useAccordionState(["client-profile"]);
@@ -445,6 +468,22 @@ export function IncomeProtectionPage({
     const allowedTabIds = new Set(visibleTabIds);
     return moduleTabs.filter((tab) => allowedTabIds.has(tab.id));
   }, [visibleTabIds]);
+
+  useEffect(() => {
+    latestDraftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    workflowSaveStateRef.current = workflowSaveState;
+  }, [workflowSaveState]);
+
+  useEffect(() => {
+    canUseBackendRef.current = canUseBackend;
+  }, [canUseBackend]);
+
+  useEffect(() => {
+    actorLabelRef.current = actorLabel;
+  }, [actorLabel]);
 
   useEffect(() => {
     if (!canUseBackend || !selectedClientReference) return;
@@ -819,6 +858,21 @@ export function IncomeProtectionPage({
     quotePensionRetirementAge,
   });
 
+  const savedQuotesForCurrentDocument = useMemo(
+    () => (resolvedDraft.savedQuotes ?? []).filter((savedQuote) => savedQuote.documentType === quoteDocumentType),
+    [quoteDocumentType, resolvedDraft.savedQuotes],
+  );
+
+  useEffect(() => {
+    if (savedQuotesForCurrentDocument.length === 0) {
+      setQuoteSaveStatus("No saved quotes yet");
+      return;
+    }
+
+    const quoteCount = savedQuotesForCurrentDocument.length;
+    setQuoteSaveStatus(`${quoteCount} saved quote${quoteCount === 1 ? "" : "s"}`);
+  }, [savedQuotesForCurrentDocument]);
+
   const quoteWorkflowSnapshot = useMemo(
     () =>
       isPensionsQuoteWorkflow
@@ -964,9 +1018,11 @@ export function IncomeProtectionPage({
     {
       id: "quote-output",
       title: "Quote readiness",
-      completeCount: quoteGenerationRequirements.filter((item) => item.complete).length,
-      requiredCount: quoteGenerationRequirements.length,
-      complete: quoteMissingFields.length === 0,
+      completeCount: quoteGenerationRequirements.filter((item) => item.location === "Quote form" && item.complete).length,
+      requiredCount: quoteGenerationRequirements.filter((item) => item.location === "Quote form").length,
+      complete: quoteGenerationRequirements
+        .filter((item) => item.location === "Quote form")
+        .every((item) => item.complete),
     },
   ];
 
@@ -1139,6 +1195,68 @@ export function IncomeProtectionPage({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [workflowSaveState]);
+
+  async function flushDraftForPersistence(options?: { keepalive?: boolean }) {
+    const pendingDraft = latestDraftRef.current;
+    if (!pendingDraft) {
+      return;
+    }
+
+    const currentSaveState = workflowSaveStateRef.current;
+    if (currentSaveState !== "dirty" && currentSaveState !== "saving") {
+      return;
+    }
+
+    const normalizedDraft = {
+      ...pendingDraft,
+      fullName: buildFullName(pendingDraft.firstName, pendingDraft.surname),
+      updatedBy: actorLabelRef.current,
+    };
+    const nextSnapshot = buildWorkflowSnapshot(normalizedDraft, actorLabelRef.current);
+
+    setDraft(normalizedDraft);
+    saveClient(normalizedDraft);
+    lastPersistedSnapshotRef.current = nextSnapshot;
+
+    if (!canUseBackendRef.current) {
+      setWorkflowSaveState("saved");
+      setWorkflowSavedAt(new Date().toISOString());
+      return;
+    }
+
+    try {
+      await saveWorkflow(
+        normalizedDraft.clientReference,
+        buildWorkflowPersistencePayload(normalizedDraft),
+        { keepalive: options?.keepalive ?? false },
+      );
+      setWorkflowSaveState("saved");
+      setWorkflowSavedAt(new Date().toISOString());
+    } catch {
+      setWorkflowSaveState("local");
+      setWorkflowSavedAt(new Date().toISOString());
+    }
+  }
+
+  useEffect(() => {
+    const flushOnPageHide = () => {
+      void flushDraftForPersistence({ keepalive: true });
+    };
+
+    const flushOnVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushDraftForPersistence({ keepalive: true });
+      }
+    };
+
+    window.addEventListener("pagehide", flushOnPageHide);
+    document.addEventListener("visibilitychange", flushOnVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", flushOnPageHide);
+      document.removeEventListener("visibilitychange", flushOnVisibilityChange);
+      void flushDraftForPersistence({ keepalive: true });
+    };
+  }, []);
 
   function getDocumentDraft(documentType: SupportedDocumentType) {
     return resolvedDraft.documentDrafts[documentType];
@@ -1547,6 +1665,32 @@ export function IncomeProtectionPage({
     syncLocalGeneratedDraft(documentType, { editedHtml: nextHtml });
   }
 
+  function buildGeneratedEditorHtmlForProfile(
+    profile: SeededClientProfile,
+    documentType: SupportedDocumentType,
+    generatedDocument: {
+      generatedHtml: string;
+      sections: Array<{ id: string; title: string; bodyHtml: string }>;
+      integrationRequests?: GeneratedDocumentDraft["integrationRequests"];
+    },
+  ) {
+    const nextProfile = {
+      ...profile,
+      documentDrafts: {
+        ...profile.documentDrafts,
+        [documentType]: {
+          ...profile.documentDrafts[documentType],
+          lastGeneratedHtml: generatedDocument.generatedHtml,
+          lastGeneratedSections: generatedDocument.sections,
+          integrationRequests: generatedDocument.integrationRequests ?? profile.documentDrafts[documentType].integrationRequests,
+          editedHtml: "",
+        },
+      },
+    };
+
+    return buildWorkflowEditorDocument(nextProfile, documentType).html;
+  }
+
   function buildGeneratedEditorHtml(
     documentType: SupportedDocumentType,
     generatedDocument: {
@@ -1556,21 +1700,7 @@ export function IncomeProtectionPage({
     },
   ) {
     const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
-    const nextProfile = {
-      ...sourceProfile,
-      documentDrafts: {
-        ...sourceProfile.documentDrafts,
-        [documentType]: {
-          ...sourceProfile.documentDrafts[documentType],
-          lastGeneratedHtml: generatedDocument.generatedHtml,
-          lastGeneratedSections: generatedDocument.sections,
-          integrationRequests: generatedDocument.integrationRequests ?? sourceProfile.documentDrafts[documentType].integrationRequests,
-          editedHtml: "",
-        },
-      },
-    };
-
-    return buildWorkflowEditorDocument(nextProfile, documentType).html;
+    return buildGeneratedEditorHtmlForProfile(sourceProfile, documentType, generatedDocument);
   }
 
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
@@ -1692,6 +1822,148 @@ export function IncomeProtectionPage({
     setStatementSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
   }
 
+  function buildSavedQuoteName(integrationRequests: GeneratedDocumentDraft["integrationRequests"]) {
+    const providerName = findSavedQuoteProviderName(integrationRequests, resolvedDraft.provider || quoteDocumentType);
+    const dateLabel = new Date().toISOString().slice(0, 10);
+
+    if (isPensionsQuoteWorkflow) {
+      const scenarioLabel = [
+        quotePensionRequired ? `${quotePensionRequired} target` : "",
+        quotePensionRetirementAge ? `age ${quotePensionRetirementAge}` : "",
+      ]
+        .filter(Boolean)
+        .join(" - ");
+
+      return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, dateLabel]
+        .filter(Boolean)
+        .join(" - ");
+    }
+
+    const scenarioLabel = [
+      quoteAnnualCoverAmount ? `${quoteAnnualCoverAmount}/yr` : "",
+      quoteDeferredPeriod,
+      quoteCoverToAge ? `to age ${quoteCoverToAge}` : "",
+    ]
+      .filter(Boolean)
+      .join(" - ");
+
+    return [resolvedDraft.fullName || resolvedDraft.clientReference, providerName, scenarioLabel, dateLabel]
+      .filter(Boolean)
+      .join(" - ");
+  }
+
+  async function saveQuoteSnapshot() {
+    const quoteDraft = getWorkspaceDocumentDraft(quoteDocumentType);
+    if (!hasStatementQuoteResults(quoteDraft.integrationRequests)) {
+      addToast("Generate the quote before saving it", "error");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const snapshotName = buildSavedQuoteName(quoteDraft.integrationRequests);
+    const existingSnapshot = savedQuotesForCurrentDocument.find((savedQuote) => savedQuote.name === snapshotName);
+    const nextSnapshot: SavedQuoteSnapshot = {
+      id: existingSnapshot?.id ?? `saved-quote-${Date.now()}`,
+      name: snapshotName,
+      documentType: quoteDocumentType,
+      createdAt: existingSnapshot?.createdAt ?? now,
+      updatedAt: now,
+      provider: findSavedQuoteProviderName(quoteDraft.integrationRequests, resolvedDraft.provider || quoteDocumentType),
+      integrationRequests: quoteDraft.integrationRequests,
+      quoteAnnualCoverAmount,
+      quoteCoverToAge,
+      quoteDeferredPeriod,
+      quoteOccupationClass,
+      quotePhiIndexation,
+      quoteSmoker,
+      quotePensionGender,
+      quotePensionRetirementAge,
+      quotePensionSpousesPension,
+      quotePensionEscalation,
+      quotePensionNetGrowth,
+      quotePensionPremiumEscalation,
+      quotePensionInflation,
+      quotePensionExistingFund,
+      quotePensionRequired,
+      quotePensionMonthlyContribution,
+      zurichDiscountActive: resolvedDraft.zurichDiscountActive,
+    };
+
+    const nextSavedQuotes = [
+      nextSnapshot,
+      ...resolvedDraft.savedQuotes.filter((savedQuote) => savedQuote.id !== nextSnapshot.id),
+    ];
+    const { savedRemotely } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
+    setQuoteSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    addToast(`Saved quote as ${snapshotName}`, "success");
+  }
+
+  async function loadSavedQuoteSnapshot(savedQuote: SavedQuoteSnapshot) {
+    const nextDraft: SeededClientProfile = {
+      ...resolvedDraft,
+      recommendedCover: savedQuote.quoteAnnualCoverAmount,
+      coverAge: savedQuote.quoteCoverToAge,
+      deferredPeriod: savedQuote.quoteDeferredPeriod,
+      phiOccupationalClass: savedQuote.quoteOccupationClass,
+      phiIndexation: savedQuote.quotePhiIndexation,
+      smokerStatus: savedQuote.quoteSmoker,
+      zurichDiscountActive: savedQuote.zurichDiscountActive,
+      savedQuotes: resolvedDraft.savedQuotes,
+    };
+
+    const generatedDocument = {
+      generatedHtml: "",
+      sections: [],
+      integrationRequests: savedQuote.integrationRequests,
+    };
+    const editorProfile: SeededClientProfile = {
+      ...nextDraft,
+      documentDrafts: {
+        ...nextDraft.documentDrafts,
+        [quoteDocumentType]: {
+          ...nextDraft.documentDrafts[quoteDocumentType],
+          generationStatus: "completed",
+          lastGeneratedHtml: "",
+          lastGeneratedSections: [],
+          integrationRequests: savedQuote.integrationRequests,
+          editedHtml: "",
+        },
+      },
+    };
+
+    if (isPensionsQuoteWorkflow) {
+      setQuotePensionGender(savedQuote.quotePensionGender);
+      setQuotePensionRetirementAge(savedQuote.quotePensionRetirementAge);
+      setQuotePensionSpousesPension(savedQuote.quotePensionSpousesPension || "No");
+      setQuotePensionEscalation(savedQuote.quotePensionEscalation || "0");
+      setQuotePensionNetGrowth(savedQuote.quotePensionNetGrowth || "6");
+      setQuotePensionPremiumEscalation(savedQuote.quotePensionPremiumEscalation || "5");
+      setQuotePensionInflation(savedQuote.quotePensionInflation || "3");
+      setQuotePensionExistingFund(savedQuote.quotePensionExistingFund);
+      setQuotePensionRequired(savedQuote.quotePensionRequired);
+      setQuotePensionMonthlyContribution(savedQuote.quotePensionMonthlyContribution);
+    } else {
+      setQuoteAnnualCoverAmount(savedQuote.quoteAnnualCoverAmount);
+      setQuoteCoverToAge(savedQuote.quoteCoverToAge);
+      setQuoteDeferredPeriod(savedQuote.quoteDeferredPeriod);
+      setQuoteOccupationClass(savedQuote.quoteOccupationClass);
+      setQuotePhiIndexation(savedQuote.quotePhiIndexation);
+      setQuoteSmoker(savedQuote.quoteSmoker);
+    }
+
+    const { savedRemotely } = await persistDraft(nextDraft, { showToast: false });
+    syncLocalGeneratedDraft(quoteDocumentType, {
+      generationStatus: "completed",
+      lastGeneratedHtml: generatedDocument.generatedHtml,
+      lastGeneratedSections: generatedDocument.sections,
+      integrationRequests: generatedDocument.integrationRequests,
+      editedHtml: buildGeneratedEditorHtmlForProfile(editorProfile, quoteDocumentType, generatedDocument),
+    });
+    setQuoteDocumentStatus("Document: Draft loaded");
+    setQuoteSaveStatus(savedRemotely ? "Loaded saved quote" : "Loaded saved quote locally");
+    addToast(`Loaded ${savedQuote.name}`, "success");
+  }
+
   async function handleFactFindUpdateGenerate() {
     if (factFindUpdateGenerationRequirements.some((item) => !item.complete)) {
       surfaceRequirementErrors(factFindUpdateGenerationRequirements);
@@ -1734,7 +2006,7 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     await saveStatementDraft();
     setStatementDocumentStatus("Document: Generating");
-    saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, { generationStatus: "generating" });
+    syncLocalGeneratedDraft(statementDocumentType, { generationStatus: "generating" });
     try {
       const generatedDocument = await generateDocument({
         clientReference: statementDraft.clientReference,
@@ -1746,7 +2018,7 @@ export function IncomeProtectionPage({
         getDocumentDraft(quoteDocumentType).integrationRequests,
         generatedDocument.integrationRequests,
       );
-      saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, {
+      syncLocalGeneratedDraft(statementDocumentType, {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
@@ -1759,7 +2031,7 @@ export function IncomeProtectionPage({
       setStatementDocumentStatus("Document: Draft generated");
       addToast(`${statementDocumentType} draft generated`, "success");
     } catch {
-      saveGeneratedDraft(statementDraft.clientReference, statementDocumentType, { generationStatus: "failed" });
+      syncLocalGeneratedDraft(statementDocumentType, { generationStatus: "failed" });
       setStatementDocumentStatus("Document: Draft generation failed");
       addToast(`Failed to generate ${statementDocumentType} draft`, "error");
     }
@@ -3295,6 +3567,7 @@ export function IncomeProtectionPage({
           onExportDocx={() => void handleGeneratedOutputExport(quoteDocumentType, "docx")}
           onExportPdf={() => void handleGeneratedOutputExport(quoteDocumentType, "pdf")}
           onGenerate={() => void handleQuoteGenerate()}
+          onLoadSavedQuote={(savedQuote) => void loadSavedQuoteSnapshot(savedQuote)}
           onQuoteAnnualCoverAmountChange={(value) => {
             setQuoteAnnualCoverAmount(value);
             updateField("recommendedCover", value);
@@ -3325,6 +3598,7 @@ export function IncomeProtectionPage({
             setQuotePhiIndexation(value);
             updateField("phiIndexation", value);
           }}
+          onSaveQuote={() => void saveQuoteSnapshot()}
           onQuoteSmokerChange={(value) => {
             setQuoteSmoker(value);
             updateField("smokerStatus", value);
@@ -3342,6 +3616,7 @@ export function IncomeProtectionPage({
           quoteGenerationRequirements={quoteGenerationRequirements}
           quoteMissingFields={quoteMissingFields}
           quoteOccupationClass={quoteOccupationClass}
+          quoteSaveStatus={quoteSaveStatus}
           quotePensionEscalation={quotePensionEscalation}
           quotePensionExistingFund={quotePensionExistingFund}
           quotePensionGender={quotePensionGender}
@@ -3357,6 +3632,7 @@ export function IncomeProtectionPage({
           quoteYourAge={quoteYourAge}
           renderGenerationRequirements={renderGenerationRequirements}
           requiredLabel={requiredLabel}
+          savedQuotes={savedQuotesForCurrentDocument}
           showQuoteValidation={showQuoteValidation}
           tabProgressIndicator={getSectionProgress(
             isPensionsQuoteWorkflow

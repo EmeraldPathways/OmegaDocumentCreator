@@ -1,5 +1,5 @@
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
-import type { GeneratedDocumentDraft, SupportedDocumentType } from "../documents/document-types";
+import type { GeneratedDocumentDraft, IntegrationRequestArtifact, SupportedDocumentType } from "../documents/document-types";
 
 export type SeededDependant = {
   name: string;
@@ -32,6 +32,33 @@ export type SeededGeneratedDocument = {
   generatedAt: string;
   previewHtml?: string;
   previewTitle?: string;
+};
+
+export type SavedQuoteSnapshot = {
+  id: string;
+  name: string;
+  documentType: "Quote" | "Pensions Quote";
+  createdAt: string;
+  updatedAt: string;
+  provider: string;
+  integrationRequests: IntegrationRequestArtifact[];
+  quoteAnnualCoverAmount: string;
+  quoteCoverToAge: string;
+  quoteDeferredPeriod: string;
+  quoteOccupationClass: string;
+  quotePhiIndexation: string;
+  quoteSmoker: string;
+  quotePensionGender: string;
+  quotePensionRetirementAge: string;
+  quotePensionSpousesPension: string;
+  quotePensionEscalation: string;
+  quotePensionNetGrowth: string;
+  quotePensionPremiumEscalation: string;
+  quotePensionInflation: string;
+  quotePensionExistingFund: string;
+  quotePensionRequired: string;
+  quotePensionMonthlyContribution: string;
+  zurichDiscountActive: string;
 };
 
 export type SeededClientProfile = {
@@ -246,6 +273,7 @@ export type SeededClientProfile = {
   requestCompanyName: string;
   requestPolicies: string;
   requestLetterDate: string;
+  savedQuotes: SavedQuoteSnapshot[];
   documentDrafts: Record<SupportedDocumentType, GeneratedDocumentDraft>;
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
@@ -473,6 +501,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-01-15",
+    savedQuotes: [],
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Fact Find": {
@@ -724,6 +753,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestCompanyName: "Zurich Life",
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-06-06",
+    savedQuotes: [],
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Terms of Business": {
