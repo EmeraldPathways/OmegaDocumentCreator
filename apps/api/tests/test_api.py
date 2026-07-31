@@ -74,6 +74,94 @@ class PhiParsingTests(unittest.TestCase):
         self.assertIn("<Indexation>Y</Indexation>", payload["xml"])
         self.assertNotIn("<Age>", payload["xml"])
 
+
+class AiPromptTests(unittest.TestCase):
+    def test_build_document_prompt_only_includes_allowlisted_fields(self) -> None:
+        from app.ai import build_document_prompt
+
+        prompt = build_document_prompt(
+            client_name="Jamie Murphy",
+            client_reference="CLI-2026-0002",
+            document_type="Statement of Suitability",
+            template_id="statement-template",
+            workflow_snapshot={
+                "fullName": "Jamie Murphy",
+                "needsObjectives": "Protect monthly income",
+                "recommendedCover": "30000",
+                "secretInternalNote": "do not leak",
+                "rawHtmlDraft": "<script>alert(1)</script>",
+                "apiToken": "super-secret-token",
+            },
+        )
+
+        self.assertIn("fullName: Jamie Murphy", prompt)
+        self.assertIn("needsObjectives: Protect monthly income", prompt)
+        self.assertIn("recommendedCover: 30000", prompt)
+        self.assertNotIn("secretInternalNote", prompt)
+        self.assertNotIn("rawHtmlDraft", prompt)
+        self.assertNotIn("apiToken", prompt)
+
+
+class StartupConfigurationTests(unittest.TestCase):
+    def test_startup_configuration_errors_empty_in_development(self) -> None:
+        from app.config import get_settings
+
+        with patch.object(
+            app_main,
+            "settings",
+            get_settings(
+                ENVIRONMENT="development",
+                SESSION_SECRET="development-only",
+                APP_URL="http://office-server.local",
+            ),
+        ):
+            self.assertEqual(app_main._startup_configuration_errors(), [])
+
+    def test_startup_configuration_errors_fail_closed_for_remote_production_defaults(self) -> None:
+        from app.config import get_settings
+
+        with patch.object(
+            app_main,
+            "settings",
+            get_settings(
+                ENVIRONMENT="production",
+                REMOTE_ACCESS_MODE="remote",
+                SESSION_SECRET="development-only",
+                APP_URL="http://office-server.local",
+                COOKIE_SECURE="false",
+                CORS_ORIGINS="",
+                CSRF_TRUSTED_ORIGINS="",
+            ),
+        ):
+            errors = app_main._startup_configuration_errors()
+
+        self.assertIn("SESSION_SECRET must be changed from the default for non-development environments.", errors)
+        self.assertIn("APP_URL must be set to the deployed base URL for non-development environments.", errors)
+        self.assertIn("APP_URL must use https:// when REMOTE_ACCESS_MODE is not local_only.", errors)
+        self.assertIn("COOKIE_SECURE must be true when REMOTE_ACCESS_MODE is not local_only.", errors)
+        self.assertIn("CORS_ORIGINS must be configured when REMOTE_ACCESS_MODE is not local_only.", errors)
+        self.assertIn("CSRF_TRUSTED_ORIGINS must be configured when REMOTE_ACCESS_MODE is not local_only.", errors)
+
+    def test_startup_configuration_warnings_include_proxy_hint_in_non_dev(self) -> None:
+        from app.config import get_settings
+
+        with patch.object(
+            app_main,
+            "settings",
+            get_settings(
+                ENVIRONMENT="production",
+                SESSION_SECRET="custom-secret",
+                APP_URL="https://omega.example.com",
+                TRUSTED_PROXY_COUNT="0",
+            ),
+        ):
+            warnings = app_main._startup_configuration_warnings()
+
+        self.assertIn(
+            "TRUSTED_PROXY_COUNT is 0 - assuming no reverse proxy. Set it to match production proxy configuration.",
+            warnings,
+        )
+
     def test_submit_phi_request_parses_live_output_quote_path(self) -> None:
         from app.config import get_settings
         from app.document_generation import submit_phi_request
@@ -337,6 +425,47 @@ class ApiTests(unittest.TestCase):
 
         response = self.client.get("/auth/me")
         self.assertEqual(response.status_code, 401)
+
+    def test_auth_me_extends_persisted_session_expiry(self) -> None:
+        """A valid authenticated request refreshes the DB-backed session expiry."""
+        from app.db import get_session
+        from app.models import Session as SessionModel
+
+        self.client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+
+        db = get_session()
+        try:
+            session_row = (
+                db.query(SessionModel)
+                .filter(SessionModel.user_email == "staff@omega.local")
+                .order_by(SessionModel.created_at.desc())
+                .first()
+            )
+            self.assertIsNotNone(session_row)
+            original_expiry = session_row.expires_at
+            db.commit()
+        finally:
+            db.close()
+
+        response = self.client.get("/auth/me")
+        self.assertEqual(response.status_code, 200)
+
+        db2 = get_session()
+        try:
+            refreshed_row = (
+                db2.query(SessionModel)
+                .filter(SessionModel.user_email == "staff@omega.local")
+                .order_by(SessionModel.created_at.desc())
+                .first()
+            )
+            self.assertIsNotNone(refreshed_row)
+            self.assertGreater(refreshed_row.expires_at, original_expiry)
+            db2.commit()
+        finally:
+            db2.close()
 
     def test_two_sessions_coexist_and_invalidating_one_does_not_invalidate_other(self) -> None:
         """Two login sessions for the same user can coexist; logout only invalidates one."""
@@ -724,6 +853,54 @@ class ApiTests(unittest.TestCase):
             json={"email": "admin@omega.local", "password": "ChangeMe123!"},
         )
 
+    def _create_staff_user(self, *, email: str, first_name: str, last_name: str, password: str = "Omega123") -> dict[str, object]:
+        self._login_as_admin()
+        response = self.client.post(
+            "/admin/users",
+            json={
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "password": password,
+                "role": "staff",
+            },
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.client.post("/auth/logout")
+        return response.json()["item"]
+
+    def _login_as(self, email: str, password: str = "Omega123") -> None:
+        response = self.client.post("/auth/login", json={"email": email, "password": password})
+        self.assertEqual(response.status_code, 200, response.text)
+
+    def _create_client_as(
+        self,
+        *,
+        creator_email: str,
+        first_name: str,
+        surname: str,
+        assigned_to: str | None = None,
+        password: str = "Omega123",
+    ) -> dict[str, object]:
+        self._login_as(creator_email, password=password)
+        response = self.client.post(
+            "/clients",
+            json={
+                "first_name": first_name,
+                "surname": surname,
+                "email": f"{first_name.lower()}.{surname.lower()}@example.com",
+                "mobile_number": "0871234567",
+                "marital_status": "Single",
+                "date_of_birth": "1990-01-01",
+                "title": "Mr",
+                "town_city": "Dublin",
+                "county": "Dublin",
+                "assigned_to": assigned_to,
+            },
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()["item"]
+
     def test_workflow_fetch_for_existing_client_returns_fields(self) -> None:
         self._login_as_admin()
         response = self.client.get("/clients/CLI-2026-0002/workflow")
@@ -735,6 +912,86 @@ class ApiTests(unittest.TestCase):
     def test_workflow_fetch_requires_login(self) -> None:
         response = self.client.get("/clients/CLI-2026-0002/workflow")
         self.assertEqual(response.status_code, 401)
+
+    def test_full_access_user_can_see_all_seeded_clients(self) -> None:
+        self._create_staff_user(email="info@omegafinancial.ie", first_name="Info", last_name="Omega")
+        self._login_as("info@omegafinancial.ie")
+        response = self.client.get("/clients")
+        self.assertEqual(response.status_code, 200)
+        refs = {item["client_reference"] for item in response.json()["items"]}
+        self.assertIn("CLI-2026-0001", refs)
+        self.assertIn("CLI-2026-0002", refs)
+
+    def test_own_only_user_can_access_assigned_client_and_not_unassigned_client(self) -> None:
+        self._create_staff_user(email="sophie@omegafinancial.ie", first_name="Sophie", last_name="Omega")
+        self._create_staff_user(email="john@omegafinancial.ie", first_name="John", last_name="Omega")
+        client = self._create_client_as(
+            creator_email="john@omegafinancial.ie",
+            first_name="Assigned",
+            surname="Client",
+            assigned_to="sophie@omegafinancial.ie",
+        )
+        client_ref = client["client_reference"]
+        self.client.post("/auth/logout")
+
+        self._login_as("sophie@omegafinancial.ie")
+        allowed_detail = self.client.get(f"/clients/{client_ref}")
+        self.assertEqual(allowed_detail.status_code, 200)
+
+        workflow_resp = self.client.get(f"/clients/{client_ref}/workflow")
+        self.assertEqual(workflow_resp.status_code, 200)
+
+        blocked_detail = self.client.get("/clients/CLI-2026-0001")
+        self.assertEqual(blocked_detail.status_code, 403)
+
+    def test_delegated_user_can_access_john_records_only(self) -> None:
+        self._create_staff_user(email="john@omegafinancial.ie", first_name="John", last_name="Omega")
+        self._create_staff_user(email="alison@omegafinancial.ie", first_name="Alison", last_name="Omega")
+        self._create_staff_user(email="sophie@omegafinancial.ie", first_name="Sophie", last_name="Omega")
+
+        john_client = self._create_client_as(
+            creator_email="john@omegafinancial.ie",
+            first_name="JohnClient",
+            surname="Access",
+        )
+        john_ref = john_client["client_reference"]
+        self.client.put(
+            f"/clients/{john_ref}/workflow",
+            json={"personalCircumstances": "Delegated workflow access"},
+        )
+        self.client.post(
+            f"/clients/{john_ref}/files",
+            files={"file": ("delegated.pdf", b"delegated", "application/pdf")},
+        )
+        self.client.post(
+            f"/clients/{john_ref}/documents",
+            data={"document_type": "Fact Find", "document_name": "Delegated Doc"},
+            files={"artifact": ("delegated.pdf", b"pdf", "application/pdf")},
+        )
+        self.client.post("/auth/logout")
+
+        sophie_client = self._create_client_as(
+            creator_email="sophie@omegafinancial.ie",
+            first_name="SophieClient",
+            surname="Blocked",
+        )
+        sophie_ref = sophie_client["client_reference"]
+        self.client.post("/auth/logout")
+
+        self._login_as("alison@omegafinancial.ie")
+        detail_resp = self.client.get(f"/clients/{john_ref}")
+        self.assertEqual(detail_resp.status_code, 200)
+        workflow_resp = self.client.get(f"/clients/{john_ref}/workflow")
+        self.assertEqual(workflow_resp.status_code, 200)
+        files_resp = self.client.get(f"/clients/{john_ref}/files")
+        self.assertEqual(files_resp.status_code, 200)
+        self.assertGreaterEqual(len(files_resp.json()["items"]), 1)
+        docs_resp = self.client.get(f"/clients/{john_ref}/documents")
+        self.assertEqual(docs_resp.status_code, 200)
+        self.assertGreaterEqual(len(docs_resp.json()["items"]), 1)
+
+        blocked_resp = self.client.get(f"/clients/{sophie_ref}")
+        self.assertEqual(blocked_resp.status_code, 403)
 
     def test_workflow_save_and_reload_roundtrip(self) -> None:
         self._login_as_admin()
@@ -956,6 +1213,27 @@ class ApiTests(unittest.TestCase):
         payload = response.json()["items"]
         self.assertIsInstance(payload, list)
 
+    def test_admin_can_filter_audit_logs_by_client_reference(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post(
+            "/clients",
+            json={
+                "first_name": "Audit",
+                "surname": "Filter",
+                "email": "audit.filter@example.com",
+                "mobile_number": "0871000001",
+                "marital_status": "Married",
+                "date_of_birth": "1982-05-14",
+            },
+        )
+        client_reference = create_resp.json()["item"]["client_reference"]
+
+        response = self.client.get(f"/admin/audit-logs?client_reference={client_reference}")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        self.assertGreaterEqual(len(items), 1)
+        self.assertTrue(all(item.get("client_reference") == client_reference for item in items))
+
     def test_admin_backup_requires_admin_session(self) -> None:
         self.client.post(
             "/auth/login",
@@ -1052,6 +1330,19 @@ class ApiTests(unittest.TestCase):
         self.assertIn("manifest", payload)
         self.assertIsInstance(payload["warnings"], list)
 
+    def test_restore_validate_returns_confirmation_token_when_backup_is_restore_eligible(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        with patch("app.main.validate_restore", return_value={"valid": True, "manifest": {}, "warnings": [], "dump_file": "dumps/test.dump"}):
+            response = self.client.post(f"/admin/backups/{backup_id}/validate-restore")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("confirmation_token", payload)
+        self.assertIn("confirmation_expires_at", payload)
+
     def test_restore_validate_requires_admin(self) -> None:
         self._login_as_admin()
         create_resp = self.client.post("/admin/backups")
@@ -1131,6 +1422,18 @@ class ApiTests(unittest.TestCase):
             json={"confirm": "nope"},
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_restore_execute_rejects_missing_confirmation_token(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        response = self.client.post(
+            f"/admin/backups/{backup_id}/restore",
+            json={"confirm": "yes-do-restore-now"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("approval token", response.json()["detail"].lower())
 
     def test_restore_attempts_requires_admin(self) -> None:
         self._login_as_staff()
@@ -1258,7 +1561,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["status"], "failed")
         self.assertEqual(items[0]["mode"], "execute")
-        self.assertEqual(items[0]["error_message"], "Restore not confirmed")
+        self.assertIn(items[0]["error_message"], {"Restore not confirmed", "Restore approval token missing or expired"})
 
     def test_restore_execute_persists_failed_attempt_on_missing_dump(self) -> None:
         """Restore with no dump artifact persists a failed RestoreAttempt."""
@@ -1282,6 +1585,39 @@ class ApiTests(unittest.TestCase):
         # At least one attempt should exist from this flow
         self.assertGreater(len(items), 0)
         self.assertEqual(items[0]["status"], "failed")
+
+    def test_restore_execute_succeeds_with_confirmation_token(self) -> None:
+        from app.db import get_session
+        from app.models import BackupRun as BackupRunModel
+
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        db = get_session()
+        try:
+            run = db.query(BackupRunModel).filter(BackupRunModel.id == backup_id).first()
+            self.assertIsNotNone(run)
+            run.database_backup = "dumps/test.dump"
+            db.commit()
+        finally:
+            db.close()
+
+        with patch("app.main.validate_restore", return_value={"valid": True, "manifest": {}, "warnings": [], "dump_file": "dumps/test.dump"}):
+            validate_resp = self.client.post(f"/admin/backups/{backup_id}/validate-restore")
+        self.assertEqual(validate_resp.status_code, 200)
+        token = validate_resp.json()["confirmation_token"]
+
+        with patch("app.main.validate_restore", return_value={"valid": True, "manifest": {}, "warnings": [], "dump_file": "dumps/test.dump"}):
+            with patch("app.main.execute_restore", return_value=None) as execute_restore_mock:
+                response = self.client.post(
+                    f"/admin/backups/{backup_id}/restore",
+                    json={"confirm": "yes-do-restore-now", "confirmation_token": token},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["restored"])
+        execute_restore_mock.assert_called_once()
 
     def test_scheduler_status_shows_last_run_after_manual_backup(self) -> None:
         """After manually creating a backup, scheduler status endpoint still works."""
@@ -1602,6 +1938,11 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/clients/CLI-2026-0002/documents/00000000-0000-0000-0000-000000000000/download")
         self.assertEqual(response.status_code, 404)
 
+    def test_download_document_returns_404_for_invalid_document_id(self) -> None:
+        self._login_as_staff()
+        response = self.client.get("/clients/CLI-2026-0002/documents/not-a-uuid/download")
+        self.assertEqual(response.status_code, 404)
+
     # ------------------------------------------------------------------
     # Document pack ZIP download tests
     # ------------------------------------------------------------------
@@ -1778,6 +2119,11 @@ class ApiTests(unittest.TestCase):
         response = self.client.delete("/clients/CLI-2026-0002/documents/00000000-0000-0000-0000-000000000000")
         self.assertEqual(response.status_code, 404)
 
+    def test_delete_document_returns_404_for_invalid_document_id(self) -> None:
+        self._login_as_staff()
+        response = self.client.delete("/clients/CLI-2026-0002/documents/not-a-uuid")
+        self.assertEqual(response.status_code, 404)
+
     def test_delete_document_removes_db_row_and_disk_artifacts(self) -> None:
         """Deleting a document removes the DB row and disk file."""
         from pathlib import Path
@@ -1938,6 +2284,11 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000/download")
         self.assertEqual(response.status_code, 404)
 
+    def test_download_returns_404_for_invalid_file_id(self) -> None:
+        self._login_as_admin()
+        response = self.client.get("/clients/CLI-2026-0002/files/not-a-uuid/download")
+        self.assertEqual(response.status_code, 404)
+
     # ------------------------------------------------------------------
     # File deletion tests
     # ------------------------------------------------------------------
@@ -1949,6 +2300,11 @@ class ApiTests(unittest.TestCase):
     def test_delete_file_returns_404_for_unknown_file(self) -> None:
         self._login_as_admin()
         response = self.client.delete("/clients/CLI-2026-0002/files/00000000-0000-0000-0000-000000000000")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_file_returns_404_for_invalid_file_id(self) -> None:
+        self._login_as_admin()
+        response = self.client.delete("/clients/CLI-2026-0002/files/not-a-uuid")
         self.assertEqual(response.status_code, 404)
 
     def test_delete_file_removes_db_row_and_disk_artifact(self) -> None:
@@ -2068,6 +2424,54 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(len(deletions), 1, f"Expected 1 file_deleted audit row, got {len(deletions)}")
         self.assertEqual(deletions[0]["entity_type"], "file")
         self.assertIn("audit_file.pdf", str(deletions[0].get("details", {})))
+
+    def test_upload_file_cleans_up_saved_artifact_when_request_fails(self) -> None:
+        from app.main import settings as app_settings
+        from fastapi.testclient import TestClient
+
+        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:8007"}, raise_server_exceptions=False)
+        login_resp = failing_client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangeMe123!"},
+        )
+        self.assertEqual(login_resp.status_code, 200)
+
+        with patch("app.main._log_audit", side_effect=RuntimeError("forced failure")):
+            response = failing_client.post(
+                "/clients/CLI-2026-0002/files",
+                files={"file": ("cleanup-check.pdf", b"cleanup", "application/pdf")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        leftovers = list(app_settings.file_storage_path.rglob("cleanup-check-*.pdf"))
+        self.assertEqual(leftovers, [])
+
+    def test_upload_document_cleans_up_saved_artifact_when_request_fails(self) -> None:
+        from app.main import settings as app_settings
+        from fastapi.testclient import TestClient
+
+        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:8007"}, raise_server_exceptions=False)
+        login_resp = failing_client.post(
+            "/auth/login",
+            json={"email": "staff@omega.local", "password": "ChangeMe123!"},
+        )
+        self.assertEqual(login_resp.status_code, 200)
+
+        with patch("app.main._log_audit", side_effect=RuntimeError("forced failure")):
+            response = failing_client.post(
+                "/clients/CLI-2026-0002/documents",
+                data={
+                    "document_type": "Fact Find",
+                    "document_name": "Cleanup_Doc",
+                    "version": "1",
+                    "status": "PDF ready",
+                },
+                files={"artifact": ("cleanup-doc.pdf", b"cleanup", "application/pdf")},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        leftovers = list(app_settings.file_storage_path.rglob("cleanup-doc-*.pdf"))
+        self.assertEqual(leftovers, [])
 
     # ------------------------------------------------------------------
     # Document generation tests (store.py-backed)

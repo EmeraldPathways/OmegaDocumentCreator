@@ -4,16 +4,16 @@
 
 Omega Document Creator is an internal office application for Omega Financial Management.
 
-The current product is a PostgreSQL-backed React + FastAPI system for:
+This document reflects the current implementation state on Friday, July 31, 2026.
+
+The live product is a PostgreSQL-backed React + FastAPI system for:
 
 - authenticated client management
 - shared fact-find capture
 - separate Income Protection quote and statement generation
 - separate Pensions quote and statement generation
-- client file storage and generated document history
-- admin user, audit, backup, and restore operations
-
-This document reflects the current implementation state on Friday, July 17, 2026.
+- backend-backed file storage and generated document history
+- admin user, audit, backup, restore, and settings operations
 
 ## Product Scope
 
@@ -24,39 +24,26 @@ This document reflects the current implementation state on Friday, July 17, 2026
 - `Income Protection`
 - `Pensions`
 - `Files/Docs`
+- `Admin`
+- `Settings`
 
 ### Workflow rules
 
-- `Clients` stays functionally unchanged.
-- `Fact Find` is the shared information source for both downstream workflows.
-- `Fact Find` contains only `Fact Find` and `Fact Find Update`.
-- `Income Protection` contains only `Quote` and `Statement of Suitability`.
-- `Pensions` contains only `Pensions Quote` and `Pensions Statement`.
-- `Files/Docs` contains the current `Files` and `Generated Documents` workspaces.
-- The current design, layout, preview flow, editor behavior, and export behavior are preserved through the split.
+- `Fact Find` contains `Fact Find` and `Fact Find Update`.
+- `Income Protection` contains `Quote` and `Statement of Suitability`.
+- `Pensions` contains `Pensions Quote` and `Pensions Statement`.
+- `Files/Docs` contains the shared `Files` and `Generated Documents` workspaces.
+- Shared workflow data feeds downstream gates and generation flows.
+- The current preview, editor, and export behavior is preserved across routes.
 
-### Roles
+### Access model
 
-#### Admin
-
-- create, edit, and disable staff accounts
-- view all clients
-- create, edit, and archive client records
-- review audit logs
-- create and review backup runs
-- validate, dry-run, and execute restores
-- review scheduler and security status
-- access admin-only settings
-
-#### Staff
-
-- log in securely
-- create and edit client records
-- complete shared fact-find workflow fields
-- upload, download, and delete client files
-- generate and edit document drafts
-- export PDF and DOCX artifacts
-- review generated document history
+- `andrew@omegafinancial.ie` has full system and admin access.
+- `info@omegafinancial.ie`, `john@omegafinancial.ie`, `aideen@omegafinancial.ie`, and `aimee@omegafinancial.ie` can access all client, workflow, file, and document records.
+- `sophie@omegafinancial.ie`, `declan@omegafinancial.ie`, and `tadhg@omegafinancial.ie` can access records they created or are assigned to.
+- `alison@omegafinancial.ie` can access records owned or assigned to John.
+- `created_by` remains creator metadata.
+- `assigned_to` is the primary working-owner field used across clients, workflows, files, and documents.
 
 ## Technical Direction
 
@@ -65,8 +52,8 @@ This document reflects the current implementation state on Friday, July 17, 2026
 - Frontend: React + TypeScript
 - Backend: FastAPI + Python
 - Database: PostgreSQL via SQLAlchemy
-- File storage: local server filesystem
-- Auth: cookie-session auth plus persisted PostgreSQL session rows
+- File storage: local filesystem under repo `storage/`
+- Auth: cookie session auth plus persisted PostgreSQL session rows
 - AI generation: Gemini-backed generation with seeded fallback
 - Deployment: Windows-first local scripts plus Docker Compose
 
@@ -76,21 +63,18 @@ This document reflects the current implementation state on Friday, July 17, 2026
 apps/
   api/
   frontend/
-docs/
-  superpowers/
 infra/
   cloudflared/
   docker/
 storage/
-  clients/
   backups/
+  clients/
 templates/
   docx/
 .ai-codex/
 .agent-handoff/
 AGENTS.md
 PROJECT.md
-phases.md
 ```
 
 ## Current Implementation Status
@@ -102,48 +86,70 @@ Live in the current codebase:
 - PostgreSQL runtime wiring
 - SQLAlchemy models and repositories
 - persisted sessions in PostgreSQL
-- authenticated client CRUD
-- workflow persistence
+- authenticated client CRUD with assignment
+- backend workflow persistence
 - backend-backed file upload/list/download/delete
 - backend-backed generated document history, artifact upload, download, pack download, and deletion
 - audit logging
-- backup manifests, restore validation, dry-run, execution, and restore-attempt persistence
+- backup manifests, restore validation, restore dry-run, restore execution, and restore-attempt persistence
 - backup scheduler wiring
-- Cloudflare Tunnel setup guidance and automation scripts
+- admin users, audit, backups, security, and settings pages wired to live backend routes
 
-### Current workflow split
+### Current route split
 
 Live in the current codebase:
 
-- top navigation currently shows four primary workflow links: `Clients`, `Fact Find`, `Income Protection`, and `Files/Docs`
-- the `Pensions` route and page remain implemented but are intentionally hidden from the top navigation for now
-- `/fact-find` page narrowed to `Fact Find` and `Fact Find Update`
-- `/income-protection` page narrowed to `Quote` and `Statement of Suitability`
-- `/pensions` page narrowed to `Pensions Quote` and `Pensions Statement`
-- `/files-docs` page narrowed to `Files` and `Generated Documents`
-- legacy `/files` kept as a redirect to `/files-docs`
 - root route redirects to `/fact-find`
+- `/fact-find` serves Fact Find and Fact Find Update
+- `/income-protection` serves Quote and Statement of Suitability
+- `/pensions` serves Pensions Quote and Pensions Statement
+- `/files-docs` serves Files and Generated Documents
+- legacy `/files` redirects to `/files-docs`
+- `/admin` and `/settings` require admin access
 
 ### Current document flows
 
 - `Fact Find` and `Fact Find Update` generate from the shared workflow draft
-- Income Protection quote generation uses a local quote form and sends a Quote-specific workflow snapshot
-- Income Protection statement generation uses the selected quote results and statement workflow fields
-- Pensions uses its own `Pensions Quote` and `Pensions Statement` draft keys
-- Pensions quote generation now builds a pensions-specific snapshot and routes to the pension integration path
-- Files and generated documents remain client-scoped and backend-backed
+- Income Protection quote generation uses quote-specific workflow snapshot data
+- Income Protection statement generation uses selected quote data plus shared workflow fields
+- Pensions routes use pensions-specific quote and statement document types
+- generated documents can be listed, downloaded, packed, and deleted from backend history
+
+## Storage Model
+
+### Live artifact layout
+
+```text
+storage/
+  backups/
+  clients/
+    {Last, First - omega-00000}/
+      {year}/
+        {workflow}/
+          files/
+          documents/
+```
+
+Rules reflected in the current app:
+
+- all client artifacts belong inside the client folder
+- files and generated documents are separated by workflow and bucket
+- backup artifacts stay under `storage/backups`
+- legacy flat client folders and quarantine copies are cleanup targets, not the live storage design
 
 ## Backend Details
 
 ### Current auth model
 
-Auth is cookie-session based using Starlette `SessionMiddleware` plus a persisted PostgreSQL `sessions` table.
+Auth uses Starlette `SessionMiddleware` plus a persisted PostgreSQL `sessions` table.
 
 Session keys currently used:
 
 - `session_id`
 - `user_email`
 - `last_seen_at`
+
+`/auth/me` validates the persisted session row and extends expiry. Disabled users cannot authenticate. Malformed password hashes fail closed.
 
 ### Current API surface
 
@@ -154,6 +160,7 @@ Implemented:
 - `POST /auth/login`
 - `POST /auth/logout`
 - `GET /auth/me`
+- `GET /users/assignable`
 - `GET /clients`
 - `POST /clients`
 - `GET /clients/{client_reference}`
@@ -175,6 +182,9 @@ Implemented:
 - `GET /admin/users`
 - `POST /admin/users`
 - `PATCH /admin/users/{user_id}`
+- `POST /admin/users/{user_id}/reset-password`
+- `PATCH /admin/users/{user_id}/disable`
+- `PATCH /admin/users/{user_id}/enable`
 - `GET /admin/backups`
 - `POST /admin/backups`
 - `POST /admin/backups/{backup_id}/validate-restore`
@@ -184,13 +194,10 @@ Implemented:
 - `GET /admin/backups/schedule-status`
 - `GET /admin/audit-logs`
 - `GET /admin/security-summary`
-
-### Integration behavior
-
-- PHI quote requests are supported through the BestAdvice PHI endpoint
-- pensions quote requests are supported through the BestAdvice pension calculator endpoint
-- statement quote requests are routed through `/documents/statement-quote`
-- pensions snapshots are detected and routed to the pensions request builder instead of the PHI request builder
+- `GET /admin/security`
+- `GET /admin/settings`
+- `PATCH /admin/settings`
+- `POST /admin/settings/test-path`
 
 ## Frontend Details
 
@@ -213,77 +220,43 @@ Implemented:
 - `/settings`
 - `/admin`
 
-### Current workflow behavior
+### Current persistence behavior
 
-- backend workflow persistence is authoritative
-- client record cache uses `localStorage` for quick rehydration
+- backend records are authoritative for clients, workflows, files, and generated documents
+- client assignment is persisted server-side
+- frontend uses lightweight browser storage only for session mirroring, selected client, and quick rehydration
 - generated document history is backend-backed
-- `Fact Find` and `Fact Find Update` are generated from the shared draft
-- Income Protection quote generation uses Quote-tab-local inputs rather than shared fact-find quote fields
-- Pensions quote generation uses a pensions-specific quote form with its own request shape
-- `Files/Docs` reuses the existing upload, list, preview, pack, and export surfaces under its own route
-- the shared workflow shell preserves the current layout while constraining visible tabs per page
-
-### Current document types
-
-- `Fact Find`
-- `Fact Find Update`
-- `Terms of Business`
-- `Statement of Suitability`
-- `Quote`
-- `Pensions Statement`
-- `Pensions Quote`
 
 ## Security And Operations
 
 Current hardening in the codebase includes:
 
-- authentication required for client routes
+- authentication required for client, workflow, file, and document routes
+- server-side client access filtering and assignment enforcement
 - CSRF Origin/Referer validation for state-changing endpoints
 - persisted session invalidation and startup cleanup
-- failed-login auditing and rate limiting
+- failed-login, disabled-login, password-reset, and enable/disable auditing
 - upload size limit via `MAX_UPLOAD_SIZE_BYTES`
-- localhost-bound PostgreSQL in Docker Compose
-- health checks and restart policies in Docker Compose
+- restore approval tokens for destructive restore execution
+- startup configuration validation for non-development environments
 - migration runner via `python -m app.migrate`
 
-## Testing
+## Verification Snapshot
 
-### Focused commands in active use
+Verified in the current branch before this documentation refresh:
 
-Backend:
+- backend API tests passed
+- frontend Vitest suite passed
+- frontend production build passed
 
-```powershell
-cd apps/api
-.venv\Scripts\python.exe -m unittest tests.test_pension_quote_unit
-```
+The remaining non-blocking issue is a frontend bundle-size warning during build.
 
-Frontend:
+## Current Follow-up Areas
 
-```powershell
-cd apps/frontend
-npm.cmd test -- --no-cache src/app.test.tsx
-npx.cmd tsc --noEmit --project tsconfig.app.json
-```
-
-### Current verification snapshot
-
-Confirmed during the current workflow split work:
-
-- focused pensions backend quote-routing test passes
-- focused frontend route/workflow split test file passes
-- frontend TypeScript check passes
-
-This file does not claim a fresh full-suite verification beyond those focused checks.
-
-## Open Gaps
-
-The main remaining work is follow-up and hardening rather than foundational platform build-out:
-
-- broader regression coverage beyond the focused route and pensions quote checks
-- possible additional seeded-profile defaults or preview assertions for the split flows
-- further decomposition of the large shared workflow page if the current inline complexity becomes a maintenance burden
-- operational deployment remains operator-driven even though Docker and Cloudflare Tunnel support are in place
+- further split `income-protection-page.tsx` into smaller bounded components
+- keep cross-page gate mappings aligned as workflow fields move between sections
+- add more operator tooling for missing-file reconciliation and cleanup reporting
+- remote access remains an operator rollout task rather than a finished product feature
 
 ## Environment
 
@@ -327,43 +300,3 @@ Important variables:
 - `PENSION_ENDPOINT_URL`
 - `PENSION_REQUEST_FROM`
 - `PENSION_REQUEST_FROM_CODE`
-
-## Important Files
-
-Backend:
-
-- `apps/api/app/main.py`
-- `apps/api/app/config.py`
-- `apps/api/app/models.py`
-- `apps/api/app/db.py`
-- `apps/api/app/document_generation.py`
-- `apps/api/app/repositories/`
-- `apps/api/app/services/`
-- `apps/api/migrations/`
-- `apps/api/tests/test_api.py`
-- `apps/api/tests/test_pension_quote_unit.py`
-
-Frontend:
-
-- `apps/frontend/src/App.tsx`
-- `apps/frontend/src/components/app-shell.tsx`
-- `apps/frontend/src/auth/auth-context.tsx`
-- `apps/frontend/src/data/client-data-context.tsx`
-- `apps/frontend/src/data/file-api.ts`
-- `apps/frontend/src/data/workflow-api.ts`
-- `apps/frontend/src/documents/generated-document-api.ts`
-- `apps/frontend/src/pages/fact-find-page.tsx`
-- `apps/frontend/src/pages/income-protection-documents-page.tsx`
-- `apps/frontend/src/pages/pensions-page.tsx`
-- `apps/frontend/src/pages/files-docs-page.tsx`
-- `apps/frontend/src/pages/income-protection-page.tsx`
-- `apps/frontend/src/pages/admin-page.tsx`
-
-Infrastructure:
-
-- `run-omega.cmd`
-- `apps/frontend/run-frontend.cmd`
-- `apps/api/run-api.cmd`
-- `infra/docker/compose.yaml`
-- `infra/cloudflared/config.yaml.example`
-- `infra/cloudflared/setup-tunnel.sh`

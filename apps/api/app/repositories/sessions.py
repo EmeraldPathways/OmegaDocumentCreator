@@ -38,6 +38,12 @@ class SessionRepository:
             .first()
         )
 
+    def extend_expiry(self, session: SessionModel, timeout_minutes: int) -> SessionModel:
+        """Refresh a persisted session expiry for sliding-session behavior."""
+        session.expires_at = datetime.now(UTC) + timedelta(minutes=timeout_minutes)
+        self._db.flush()
+        return session
+
     def delete_by_id(self, session_id: str) -> None:
         """Delete a single session row by ID (logout invalidation)."""
         self._db.query(SessionModel).filter(

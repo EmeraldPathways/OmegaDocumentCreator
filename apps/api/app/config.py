@@ -83,8 +83,15 @@ def _parse_origin_list(raw: str) -> list[str] | None:
 def get_settings(**overrides: str) -> AppSettings:
     # Env vars always take priority over defaults.
     # Explicit overrides (kwargs) take priority over env vars for isolated callers (tests).
-    cors_origins_raw = _env_or("CORS_ORIGINS", "")
-    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()] if cors_origins_raw else None
+    cors_origins_raw = overrides.get("CORS_ORIGINS")
+    if cors_origins_raw is None:
+        cors_origins_raw = _env_or("CORS_ORIGINS", "")
+    cors_origins = _parse_origin_list(cors_origins_raw)
+
+    csrf_trusted_origins_raw = overrides.get("CSRF_TRUSTED_ORIGINS")
+    if csrf_trusted_origins_raw is None:
+        csrf_trusted_origins_raw = _env_or("CSRF_TRUSTED_ORIGINS", "")
+    csrf_trusted_origins = _parse_origin_list(csrf_trusted_origins_raw)
 
     values = {
         "database_url": overrides.get("DATABASE_URL") or _env_or("DATABASE_URL", "postgresql://placeholder"),
@@ -136,7 +143,7 @@ def get_settings(**overrides: str) -> AppSettings:
         "pension_request_from": overrides.get("PENSION_REQUEST_FROM") or _env_or("PENSION_REQUEST_FROM", _env_or("PHI_REQUEST_FROM", "")),
         "pension_request_from_code": overrides.get("PENSION_REQUEST_FROM_CODE")
         or _env_or("PENSION_REQUEST_FROM_CODE", _env_or("PHI_REQUEST_FROM_CODE", "")),
-        "csrf_trusted_origins": _parse_origin_list(_env_or("CSRF_TRUSTED_ORIGINS", "")),
+        "csrf_trusted_origins": csrf_trusted_origins,
         "max_upload_size_bytes": int(
             overrides.get("MAX_UPLOAD_SIZE_BYTES") or _env_or("MAX_UPLOAD_SIZE_BYTES", "50000000")
         ),

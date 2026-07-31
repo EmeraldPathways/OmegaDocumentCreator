@@ -6,6 +6,7 @@ import {
   createBackup,
   disableAdminUser,
   dryRunRestore,
+  executeRestore,
   enableAdminUser,
   getScheduleStatus,
   getSecurityStatus,
@@ -17,11 +18,12 @@ import {
   type AdminAuditLog,
   type AdminBackupRun,
   type AdminUser,
+  type RestoreActionResponse,
   type RestoreAttempt,
   type SecurityStatus,
   validateRestore,
 } from "../data/admin-api";
-import { Badge, Button, Input, Select, useToast } from "../components/ui";
+import { Badge, Button, Input, Modal, Select, useToast } from "../components/ui";
 
 const roleOptions = [
   { value: "staff", label: "Staff" },
@@ -80,6 +82,15 @@ function renderArtifactStatus(path: string | null | undefined, present: boolean 
   );
 }
 
+function summarizeAuditDetails(details: Record<string, unknown>) {
+  const entries = Object.entries(details ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${String(value)}`);
+
+  return entries.length > 0 ? entries.join(" | ") : "â€”";
+}
+
 export function AdminPage() {
   const { addToast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -88,6 +99,8 @@ export function AdminPage() {
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
   const [scheduleStatus, setScheduleStatus] = useState<Record<string, unknown> | null>(null);
   const [restoreAttemptsByBackup, setRestoreAttemptsByBackup] = useState<Record<string, RestoreAttempt[]>>({});
+  const [restoreApprovals, setRestoreApprovals] = useState<Record<string, { token: string; expiresAt: string }>>({});
+  const [restoreModalBackup, setRestoreModalBackup] = useState<AdminBackupRun | null>(null);
   const [newUser, setNewUser] = useState({
     first_name: "",
     last_name: "",
@@ -99,10 +112,24 @@ export function AdminPage() {
     user_email: "",
     action: "",
     entity_type: "",
+    client_reference: "",
     from_date: "",
     to_date: "",
   });
   const [busy, setBusy] = useState<string>("");
+
+  function storeRestoreApproval(backupId: string, response: RestoreActionResponse) {
+    if (!response.confirmation_token || !response.confirmation_expires_at) {
+      return;
+    }
+    setRestoreApprovals((current) => ({
+      ...current,
+      [backupId]: {
+        token: response.confirmation_token!,
+        expiresAt: response.confirmation_expires_at!,
+      },
+    }));
+  }
 
   async function loadAdminData() {
     const [nextUsers, nextAuditLogs, nextBackups, nextSecurityStatus, nextScheduleStatus] = await Promise.all([
@@ -197,7 +224,8 @@ export function AdminPage() {
   async function handleValidateRestore(backupId: string) {
     setBusy(`validate-${backupId}`);
     try {
-      await validateRestore(backupId);
+      const result = await validateRestore(backupId);
+      storeRestoreApproval(backupId, result);
       addToast("Restore validation completed", "success");
     } catch {
       addToast("Restore validation failed", "error");
@@ -209,12 +237,42 @@ export function AdminPage() {
   async function handleDryRunRestore(backupId: string) {
     setBusy(`dry-run-${backupId}`);
     try {
-      await dryRunRestore(backupId);
+      const result = await dryRunRestore(backupId);
+      storeRestoreApproval(backupId, result);
       const attempts = await listRestoreAttempts(backupId);
       setRestoreAttemptsByBackup((current) => ({ ...current, [backupId]: attempts }));
       addToast("Restore dry run completed", "success");
     } catch {
       addToast("Restore dry run failed", "error");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleExecuteRestore() {
+    if (!restoreModalBackup) {
+      return;
+    }
+    const approval = restoreApprovals[restoreModalBackup.id];
+    if (!approval?.token) {
+      addToast("Run restore validation or dry run first", "error");
+      return;
+    }
+
+    setBusy(`execute-${restoreModalBackup.id}`);
+    try {
+      await executeRestore(restoreModalBackup.id, approval.token);
+      const attempts = await listRestoreAttempts(restoreModalBackup.id);
+      setRestoreAttemptsByBackup((current) => ({ ...current, [restoreModalBackup.id]: attempts }));
+      setRestoreApprovals((current) => {
+        const next = { ...current };
+        delete next[restoreModalBackup.id];
+        return next;
+      });
+      setRestoreModalBackup(null);
+      addToast("Restore executed", "success");
+    } catch {
+      addToast("Restore execute failed", "error");
     } finally {
       setBusy("");
     }
@@ -384,7 +442,20 @@ export function AdminPage() {
                       <Button className="btn-sm" isLoading={busy === `dry-run-${backup.id}`} onClick={() => void handleDryRunRestore(backup.id)} variant="secondary">
                         Dry Run Restore
                       </Button>
+                      <Button
+                        className="btn-sm"
+                        isLoading={busy === `execute-${backup.id}`}
+                        onClick={() => setRestoreModalBackup(backup)}
+                        variant="danger"
+                      >
+                        Execute Restore
+                      </Button>
                     </div>
+                    {restoreApprovals[backup.id] ? (
+                      <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-success-700)" }}>
+                        Restore approved until {formatDateTime(restoreApprovals[backup.id]?.expiresAt)}
+                      </div>
+                    ) : null}
                     {(restoreAttemptsByBackup[backup.id] ?? []).length > 0 ? (
                       <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-text-muted)" }}>
                         Last restore attempt: {restoreAttemptsByBackup[backup.id][0]?.status} on {formatDateTime(restoreAttemptsByBackup[backup.id][0]?.created_at)}
@@ -427,6 +498,7 @@ export function AdminPage() {
             value={auditFilters.action}
           />
           <Input id="audit-entity-type" label="Entity type" onChange={(event) => setAuditFilters((current) => ({ ...current, entity_type: event.target.value }))} value={auditFilters.entity_type} />
+          <Input id="audit-client-reference" label="Client reference" onChange={(event) => setAuditFilters((current) => ({ ...current, client_reference: event.target.value }))} value={auditFilters.client_reference} />
           <Input id="audit-from-date" label="From date" onChange={(event) => setAuditFilters((current) => ({ ...current, from_date: event.target.value }))} type="date" value={auditFilters.from_date} />
           <Input id="audit-to-date" label="To date" onChange={(event) => setAuditFilters((current) => ({ ...current, to_date: event.target.value }))} type="date" value={auditFilters.to_date} />
           <div style={{ display: "flex", alignItems: "end" }}>
@@ -445,6 +517,7 @@ export function AdminPage() {
                 <th>User</th>
                 <th>Entity</th>
                 <th>Reference</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
@@ -453,14 +526,42 @@ export function AdminPage() {
                   <td>{formatDateTime(log.created_at)}</td>
                   <td>{log.action}</td>
                   <td>{log.user_email ?? "—"}</td>
-                  <td>{log.entity_type}</td>
-                  <td>{log.entity_id}</td>
+                  <td>{log.client_reference ? `${log.entity_type} (${log.client_reference})` : log.entity_type}</td>
+                  <td>{log.client_name ?? log.entity_id}</td>
+                  <td>{summarizeAuditDetails(log.details)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      <Modal
+        isOpen={Boolean(restoreModalBackup)}
+        onClose={() => setRestoreModalBackup(null)}
+        title="Execute Restore"
+        footer={(
+          <>
+            <Button onClick={() => setRestoreModalBackup(null)} variant="secondary">
+              Cancel
+            </Button>
+            <Button
+              isLoading={restoreModalBackup ? busy === `execute-${restoreModalBackup.id}` : false}
+              onClick={() => { void handleExecuteRestore(); }}
+              variant="danger"
+            >
+              Confirm Restore
+            </Button>
+          </>
+        )}
+      >
+        <p>This will run a destructive database restore. Validate or dry run the backup first to issue a short-lived approval token.</p>
+        {restoreModalBackup ? (
+          <p style={{ marginTop: "12px", color: "var(--color-text-muted)" }}>
+            Selected backup: {formatDateTime(restoreModalBackup.created_at)}
+          </p>
+        ) : null}
+      </Modal>
     </div>
   );
 }

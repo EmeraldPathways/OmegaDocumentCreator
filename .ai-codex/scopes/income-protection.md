@@ -1,42 +1,45 @@
 # Scope: Income Protection Workflow
 
-Use this scope when editing the live workflow page or its backend-backed state flow.
+Use this scope when editing the shared workflow shell, fact-find sections, quote/statement gates, or backend-backed file/document flow.
 
 ## Entry point
 
 - `apps/frontend/src/pages/income-protection-page.tsx`
 
-## Live tabs in `moduleTabs`
+## Live workflow sections
 
-| Tab | Notes |
-|-----|-------|
-| Fact Find | Live draft/generate/export flow |
-| Statement of Suitability | Live draft/generate/export flow |
-| Files | Backend upload/list/download flow |
-| Generated Documents | Backend-backed history, download, and pack download |
+| Route family | Live sections |
+|--------------|---------------|
+| `/fact-find` | `Fact Find`, `Fact Find Update` |
+| `/income-protection` | `Quote`, `Statement of Suitability` |
+| `/files-docs` | `Files`, `Generated Documents` |
 
 ## Important state flow
 
 - shared client/workflow data comes from `client-data-context.tsx`
-- selected workflow client is persisted to `localStorage` via `SELECTED_CLIENT_STORAGE_KEY`
+- selected workflow client is mirrored locally for rehydration only
 - workflow persistence uses `fetchWorkflow()` and `saveWorkflow()`
 - files use `file-api.ts`
 - generated documents use `generated-document-api.ts`
+- quote and statement gates depend on shared workflow data plus page-local quote state
 
 ## Current validation behavior
 
-- Fact Find generation blocks when required fields are missing
-- Statement of Suitability generation blocks when required fields are missing
-- draft save writes to the backend, not to browser persistence
+- Fact Find generation blocks when required shared fields are missing
+- Fact Find Update generation uses the update section data, not the main fact-find section
+- Quote generation and Statement generation each use their own gating helpers
+- shared gates can read fields that live outside the visible section, so cross-page mappings must stay in sync
+- draft save writes to the backend, not to browser-only persistence
 
 ## Route behavior
 
-- `/income-protection` - live workflow route
+- `/fact-find` - fact-find workflow route
+- `/income-protection` - quote/statement route
+- `/files-docs` - files/generated-documents route
 - `/clients/:clientReference/income-protection` - redirect helper into `/income-protection`
 
 ## Do not assume
 
-- Terms of Business is persisted through the workflow API, but it is not a live top-level workflow tab right now
-- Client Details is not a separate top-level workflow tab right now
-- there is no workflow `localStorage` fallback anymore
-- generated document history on this page is backend-backed only
+- Terms of Business is not a live top-level route in the split workflow
+- generated document history on these pages is backend-backed
+- files/documents permissions are broader or narrower than client access; they inherit client access

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import io
 import json
+import secrets
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 from uuid import UUID
@@ -75,6 +76,7 @@ DELEGATED_OWNER_ACCESS: dict[str, set[str]] = {
 }
 
 GLOBAL_RECORD_ACCESS_EMAILS = SYSTEM_ACCESS_EMAILS | FULL_RECORD_ACCESS_EMAILS
+RESTORE_APPROVAL_WINDOW_MINUTES = 10
 
 app = FastAPI(title="Omega Document Creator API", version="0.1.0")
 app.db = app_db
@@ -128,22 +130,54 @@ async def _csrf_middleware(request: Request, call_next: object) -> object:
 # ---------------------------------------------------------------------------
 
 
+def _startup_configuration_errors() -> list[str]:
+    errors: list[str] = []
+
+    if settings.environment == "development":
+        return errors
+
+    if settings.session_secret == "development-only":
+        errors.append("SESSION_SECRET must be changed from the default for non-development environments.")
+
+    if not settings.app_url or settings.app_url.startswith("http://office-server.local"):
+        errors.append("APP_URL must be set to the deployed base URL for non-development environments.")
+
+    if settings.remote_access_mode != "local_only":
+        if not settings.app_url.startswith("https://"):
+            errors.append("APP_URL must use https:// when REMOTE_ACCESS_MODE is not local_only.")
+        if not settings.cookie_secure:
+            errors.append("COOKIE_SECURE must be true when REMOTE_ACCESS_MODE is not local_only.")
+        if not settings.cors_origins:
+            errors.append("CORS_ORIGINS must be configured when REMOTE_ACCESS_MODE is not local_only.")
+        if not settings.csrf_trusted_origins:
+            errors.append("CSRF_TRUSTED_ORIGINS must be configured when REMOTE_ACCESS_MODE is not local_only.")
+
+    return errors
+
+
+def _startup_configuration_warnings() -> list[str]:
+    warnings: list[str] = []
+
+    if settings.environment != "development" and settings.trusted_proxy_count <= 0:
+        warnings.append("TRUSTED_PROXY_COUNT is 0 - assuming no reverse proxy. Set it to match production proxy configuration.")
+
+    return warnings
+
+
 def _startup_db_check() -> None:
     """Verify database connectivity and start scheduler if enabled."""
     import logging
 
     logger = logging.getLogger("omega.startup")
 
-    # Validate deploy-critical settings
-    if settings.environment != "development":
-        if settings.session_secret == "development-only":
-            logger.error("SESSION_SECRET must be changed from the default for non-development environments.")
-        if not settings.app_url or settings.app_url.startswith("http://office-server.local"):
-            logger.warning("APP_URL is set to a default/local value. Set to the public base URL for remote deployment.")
-        if not settings.cors_origins and settings.remote_access_mode != "local_only":
-            logger.warning("CORS_ORIGINS is not set but REMOTE_ACCESS_MODE is not local_only. Configure CORS for remote access.")
-        if settings.trusted_proxy_count <= 0:
-            logger.info("TRUSTED_PROXY_COUNT is 0 — assuming no reverse proxy. Set to match production proxy configuration.")
+    startup_errors = _startup_configuration_errors()
+    startup_warnings = _startup_configuration_warnings()
+    for warning in startup_warnings:
+        logger.warning(warning)
+    if startup_errors:
+        for error in startup_errors:
+            logger.error(error)
+        raise RuntimeError("Unsafe startup configuration")
 
     # Check storage availability
     from pathlib import Path
@@ -300,6 +334,7 @@ class StatementQuoteRequest(BaseModel):
 
 class RestoreConfirmRequest(BaseModel):
     confirm: str  # must be "yes-do-restore-now" to proceed
+    confirmation_token: str | None = None
 
 
 class AdminSettingsRequest(BaseModel):
@@ -350,6 +385,7 @@ def _current_user(request: Request) -> dict[str, object]:
             request.session.clear()
             raise HTTPException(status_code=403, detail="User account disabled")
 
+        session_repo.extend_expiry(session_row, settings.session_timeout_minutes)
         request.session["last_seen_at"] = datetime.now(UTC).isoformat()
         db.commit()
         return repo.to_response(user_model)
@@ -451,6 +487,45 @@ def _attachment_headers(filename: str) -> dict[str, str]:
     safe_name = safe_download_name(filename)
     encoded_name = quote(safe_name, safe="")
     return {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}"}
+
+
+def _parse_uuid_or_404(raw_value: str, *, detail: str) -> UUID:
+    try:
+        return UUID(raw_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=detail) from exc
+
+
+def _issue_restore_approval(request: Request, backup_id: str) -> dict[str, str]:
+    expires_at = datetime.now(UTC) + timedelta(minutes=RESTORE_APPROVAL_WINDOW_MINUTES)
+    token = secrets.token_urlsafe(24)
+    approvals = request.session.get("restore_approvals")
+    if not isinstance(approvals, dict):
+        approvals = {}
+    approvals[backup_id] = {"token": token, "expires_at": expires_at.isoformat()}
+    request.session["restore_approvals"] = approvals
+    return {"confirmation_token": token, "confirmation_expires_at": expires_at.isoformat()}
+
+
+def _consume_restore_approval(request: Request, backup_id: str, confirmation_token: str | None) -> bool:
+    if not confirmation_token:
+        return False
+    approvals = request.session.get("restore_approvals")
+    if not isinstance(approvals, dict):
+        return False
+    approval = approvals.get(backup_id)
+    if not isinstance(approval, dict):
+        return False
+    token = str(approval.get("token") or "")
+    expires_at = str(approval.get("expires_at") or "")
+    try:
+        expires_at_dt = datetime.fromisoformat(expires_at)
+    except ValueError:
+        expires_at_dt = None
+    valid = token == confirmation_token and expires_at_dt is not None and expires_at_dt > datetime.now(UTC)
+    approvals.pop(backup_id, None)
+    request.session["restore_approvals"] = approvals
+    return valid
 
 
 # ---------------------------------------------------------------------------
@@ -970,6 +1045,7 @@ def list_documents(client_reference: str, request: Request) -> dict[str, list[di
 async def create_document_record(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
     current_user = _current_user(request)
     db = get_session()
+    stored_artifact_relative_path: str | None = None
     try:
         client = _require_client_access(current_user, db, client_reference)
         doc_repo = DocumentRepository(db)
@@ -1037,12 +1113,12 @@ async def create_document_record(client_reference: str, request: Request) -> dic
                 detail = str(exc)
                 status_code = 413 if "maximum upload size" in detail else 400
                 raise HTTPException(status_code=status_code, detail=detail) from exc
-            relative_path = str(filepath.relative_to(settings.file_storage_path))
+            stored_artifact_relative_path = str(filepath.relative_to(settings.file_storage_path))
             suffix = filepath.suffix.lower()
             doc_repo.update_artifact_paths(
                 document_model.id,
-                docx_path=relative_path if suffix == ".docx" else None,
-                pdf_path=relative_path if suffix == ".pdf" else None,
+                docx_path=stored_artifact_relative_path if suffix == ".docx" else None,
+                pdf_path=stored_artifact_relative_path if suffix == ".pdf" else None,
             )
 
         _log_audit(
@@ -1055,6 +1131,11 @@ async def create_document_record(client_reference: str, request: Request) -> dic
         )
         db.commit()
         return {"item": _document_to_response(document_model)}
+    except Exception:
+        db.rollback()
+        if stored_artifact_relative_path:
+            ClientStorage(settings.file_storage_path).delete_relative_file(stored_artifact_relative_path)
+        raise
     finally:
         db.close()
 
@@ -1066,7 +1147,8 @@ def download_document(client_reference: str, document_id: str, request: Request)
     try:
         client = _require_client_access(user, db, client_reference)
         doc_repo = DocumentRepository(db)
-        doc = doc_repo.get_by_id(document_id)
+        resolved_document_id = _parse_uuid_or_404(document_id, detail="Document not found")
+        doc = doc_repo.get_by_id(str(resolved_document_id))
         if not doc or doc.client_id != client.id:
             raise HTTPException(status_code=404, detail="Document not found")
 
@@ -1096,7 +1178,7 @@ def download_document(client_reference: str, document_id: str, request: Request)
             request, db=db,
             action="document_downloaded",
             entity_type="document",
-            entity_id=document_id,
+            entity_id=str(resolved_document_id),
             client_id=client.id,
             details={"document_name": doc.document_name},
         )
@@ -1183,7 +1265,8 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
         client = _require_client_access(user, db, client_reference)
 
         doc_repo = DocumentRepository(db)
-        doc = doc_repo.get_by_id(document_id)
+        resolved_document_id = _parse_uuid_or_404(document_id, detail="Document not found")
+        doc = doc_repo.get_by_id(str(resolved_document_id))
         if not doc or doc.client_id != client.id:
             raise HTTPException(status_code=404, detail="Document not found")
 
@@ -1194,7 +1277,7 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
                 storage.delete_relative_file(path)
 
         document_name = doc.document_name
-        deleted = doc_repo.delete(document_id)
+        deleted = doc_repo.delete(str(resolved_document_id))
         if deleted is None:
             raise HTTPException(status_code=404, detail="Document not found")
 
@@ -1202,12 +1285,12 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
             request, db=db,
             action="document_deleted",
             entity_type="document",
-            entity_id=document_id,
+            entity_id=str(resolved_document_id),
             client_id=client.id,
             details={"document_name": document_name},
         )
         db.commit()
-        return {"deleted": True, "document_id": document_id}
+        return {"deleted": True, "document_id": str(resolved_document_id)}
     finally:
         db.close()
 
@@ -1467,7 +1550,8 @@ def admin_dry_run_restore(backup_id: str, request: Request) -> dict[str, object]
         if error is not None:
             return {"passed": False, "error": error}
 
-        return {"passed": True, "dump_file": run.database_backup}
+        approval = _issue_restore_approval(request, backup_id)
+        return {"passed": True, "dump_file": run.database_backup, **approval}
     finally:
         db.close()
 
@@ -1488,7 +1572,16 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
         if not run:
             raise HTTPException(status_code=404, detail="Backup run not found")
 
-        # Validate confirmation token first — cheapest check
+        if not _consume_restore_approval(request, backup_id, payload.confirmation_token):
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="Restore approval token missing or expired",
+            )
+            db.commit()
+            raise HTTPException(status_code=400, detail="Restore approval token missing or expired")
+
+        # Validate confirmation phrase next
         if payload.confirm != "yes-do-restore-now":
             _persist_restore_attempt(
                 backup_repo, run.id, user, "failed",
@@ -1707,6 +1800,8 @@ def admin_validate_restore(backup_id: str, request: Request) -> dict[str, object
             details={"valid": validation.get("valid", False)},
         )
         db.commit()
+        if validation.get("valid") and validation.get("dump_file"):
+            return {**validation, **_issue_restore_approval(request, backup_id)}
         return validation
     finally:
         db.close()
@@ -1842,6 +1937,7 @@ def admin_audit_logs(
     user_email: str | None = None,
     action: str | None = None,
     entity_type: str | None = None,
+    client_reference: str | None = None,
     from_date: str | None = None,
     to_date: str | None = None,
 ) -> dict[str, list[dict[str, object]]]:
@@ -1852,16 +1948,22 @@ def admin_audit_logs(
         repo = AuditLogRepository(db)
         entries = repo.list_recent()
         user_lookup = UserRepository(db)
+        client_lookup = ClientRepository(db)
         items = []
         for entry in entries:
             item = AuditLogRepository.to_response(entry)
             user_model = user_lookup.get_by_id(entry.user_id) if entry.user_id else None
             item["user_email"] = user_model.email if user_model else None
+            client_model = client_lookup.get_by_id(entry.client_id) if entry.client_id else None
+            item["client_reference"] = client_model.client_reference if client_model else None
+            item["client_name"] = client_model.full_name if client_model else None
             if user_email and _normalized_email(str(item.get("user_email"))) != _normalized_email(user_email):
                 continue
             if action and str(item.get("action")) != action:
                 continue
             if entity_type and str(item.get("entity_type")) != entity_type:
+                continue
+            if client_reference and str(item.get("client_reference") or "") != client_reference:
                 continue
             created_at = str(item.get("created_at") or "")
             if from_date and created_at and created_at[:10] < from_date:
@@ -1971,6 +2073,7 @@ def _file_to_response(file_model: FileModel) -> dict[str, object]:
 async def upload_file(client_reference: str, request: Request) -> dict[str, dict[str, object]]:
     user = _current_user(request)
     db = get_session()
+    stored_file_relative_path: str | None = None
     try:
         client = _require_client_access(user, db, client_reference)
 
@@ -2022,6 +2125,7 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
             uploaded_by=user_model.id if user_model else None,
             status="uploaded",
         )
+        stored_file_relative_path = file_record.file_path
         file_repo.add(file_record)
         _log_audit(
             request, db=db,
@@ -2034,6 +2138,11 @@ async def upload_file(client_reference: str, request: Request) -> dict[str, dict
         db.commit()
 
         return {"item": _file_to_response(file_record)}
+    except Exception:
+        db.rollback()
+        if stored_file_relative_path:
+            ClientStorage(settings.file_storage_path).delete_relative_file(stored_file_relative_path)
+        raise
     finally:
         db.close()
 
@@ -2062,7 +2171,8 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
         client = _require_client_access(user, db, client_reference)
 
         file_repo = FileRepository(db)
-        file_model = file_repo.get_by_id(uuid.UUID(file_id))
+        resolved_file_id = _parse_uuid_or_404(file_id, detail="File not found")
+        file_model = file_repo.get_by_id(resolved_file_id)
         if not file_model or file_model.client_id != client.id:
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -2075,7 +2185,7 @@ def download_file(client_reference: str, file_id: str, request: Request) -> obje
             request, db=db,
             action="file_downloaded",
             entity_type="file",
-            entity_id=file_id,
+            entity_id=str(resolved_file_id),
             client_id=client.id,
             details={"filename": file_model.original_filename},
         )
@@ -2099,7 +2209,8 @@ def delete_file(client_reference: str, file_id: str, request: Request) -> dict[s
         client = _require_client_access(user, db, client_reference)
 
         file_repo = FileRepository(db)
-        file_model = file_repo.get_by_id(uuid.UUID(file_id))
+        resolved_file_id = _parse_uuid_or_404(file_id, detail="File not found")
+        file_model = file_repo.get_by_id(resolved_file_id)
         if not file_model or file_model.client_id != client.id:
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -2108,7 +2219,7 @@ def delete_file(client_reference: str, file_id: str, request: Request) -> dict[s
         storage.delete_relative_file(file_model.file_path)
 
         original_filename = file_model.original_filename
-        deleted = file_repo.delete(uuid.UUID(file_id))
+        deleted = file_repo.delete(resolved_file_id)
         if deleted is None:
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -2116,11 +2227,11 @@ def delete_file(client_reference: str, file_id: str, request: Request) -> dict[s
             request, db=db,
             action="file_deleted",
             entity_type="file",
-            entity_id=file_id,
+            entity_id=str(resolved_file_id),
             client_id=client.id,
             details={"filename": original_filename},
         )
         db.commit()
-        return {"deleted": True, "file_id": file_id}
+        return {"deleted": True, "file_id": str(resolved_file_id)}
     finally:
         db.close()

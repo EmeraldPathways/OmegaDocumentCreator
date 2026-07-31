@@ -2,37 +2,42 @@
 
 Architectural choices reflected in the current codebase.
 
-## Workflow client stays in page state
+## Backend is the authority
 
-- Decision: `income-protection-page.tsx` owns the selected workflow client.
-- Why: the route stays stable at `/income-protection`, while client switching is local UX state.
+- Decision: live client records, workflow records, files, generated documents, audit rows, backups, and sessions are backend-backed.
+- Why: browser storage cannot be trusted for office records or access control.
 
 ## Cookie session, not JWT
 
-- Decision: auth uses Starlette `SessionMiddleware`.
-- Why: internal office app, browser-first usage, simpler server-side invalidation.
+- Decision: auth uses Starlette `SessionMiddleware` plus persisted session rows.
+- Why: internal office app, browser-first usage, simpler invalidation and audit visibility.
 
-## Browser persistence is temporary
+## Assignment is client-scoped
 
-- Decision: workflow/client state persists in `client-data-context.tsx` via `localStorage`.
-- Why: enough to support the current scaffold before backend persistence exists.
+- Decision: access is derived from the client record and inherited by workflows, files, and generated documents.
+- Why: avoids separate permission models drifting apart.
+
+## Restore execution is guarded
+
+- Decision: restore requires validation or dry-run first, then a short-lived approval token, then confirmation text.
+- Why: destructive restore actions need a deliberate operator flow.
 
 ## Document composition remains centralized
 
-- Decision: composed workflow HTML is built through `workflow-document-builders.ts` and shared document-composer helpers.
-- Why: preview/edit/export should stay aligned.
+- Decision: composed document HTML stays in shared builders/composer helpers.
+- Why: preview, edit, export, and persisted artifacts need to stay aligned.
 
 ## Seeded fallback belongs in document generation
 
 - Decision: `document_generation.py` decides fallback content, not `ai.py`.
-- Why: fallback is a document concern.
+- Why: fallback is a document concern, while `ai.py` is transport/prompt plumbing.
 
-## Client references are human-readable
+## Client storage naming is office-friendly
 
-- Decision: `build_client_reference()` uses `CLI-YYYY-NNNN`.
-- Why: stable office-friendly references and storage naming.
+- Decision: external references stay `CLI-YYYY-NNNN`, while disk folders use `Last, First - omega-00000`.
+- Why: office users need readable references and stable client folders.
 
 ## Local run ports are pinned
 
-- Decision: use `127.0.0.1:3007` for frontend and `127.0.0.1:8007` for backend when running locally.
+- Decision: local scripts use `127.0.0.1:3007` for frontend and `127.0.0.1:8007` for backend.
 - Why: these are the live script/config values in the repo.

@@ -26,6 +26,9 @@ class ClientRepository:
     def get_by_reference(self, client_reference: str) -> Client | None:
         return self._db.query(Client).filter(Client.client_reference == client_reference).first()
 
+    def get_by_id(self, client_id: UUID) -> Client | None:
+        return self._db.query(Client).filter(Client.id == client_id).first()
+
     def list_all(self) -> list[Client]:
         return self._db.query(Client).order_by(Client.created_at.desc()).all()
 

@@ -33,6 +33,28 @@ export type CreateDocumentArtifact = {
   contentType: string;
 };
 
+export function parseDownloadFilename(
+  disposition: string | null,
+  fallback: string,
+): string {
+  const rawDisposition = disposition ?? "";
+  const utf8Match = rawDisposition.match(/filename\*\s*=\s*UTF-8''([^;\n]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const plainMatch = rawDisposition.match(/filename\s*=\s*"?([^";\n]+)"?/i);
+  if (plainMatch?.[1]) {
+    return plainMatch[1];
+  }
+
+  return fallback;
+}
+
 export async function listDocuments(clientReference: string): Promise<BackendGeneratedDocument[]> {
   const response = await fetch(
     `/clients/${encodeURIComponent(clientReference)}/documents`,
@@ -145,9 +167,10 @@ export async function downloadDocumentPack(
   }
 
   const blob = await response.blob();
-  const disposition = response.headers.get("Content-Disposition") ?? "";
-  const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
-  const filename = filenameMatch?.[1] ?? `${clientReference}_documents.zip`;
+  const filename = parseDownloadFilename(
+    response.headers.get("Content-Disposition"),
+    `${clientReference}_documents.zip`,
+  );
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

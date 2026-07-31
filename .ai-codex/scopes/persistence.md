@@ -1,56 +1,63 @@
 # Scope: Persistence
 
-Use this scope when working with data storage, repositories, backups, restore, sessions, or the remaining post-cutover hardening work.
+Use this scope when working with data storage, repositories, backups, restore, sessions, or storage cleanup.
 
 ## Goal
 
-Maintain the PostgreSQL-backed implementation and avoid regressing any of the completed cutovers.
+Maintain the PostgreSQL-backed implementation and avoid regressing any completed cutovers.
 
 ## Current status
 
-The persistence roadmap is complete through Phase 16.
+| Layer | Current source of truth |
+|-------|-------------------------|
+| Users | PostgreSQL via `UserRepository` |
+| Sessions | PostgreSQL via `SessionRepository` plus cookie session |
+| Clients | PostgreSQL via `ClientRepository` |
+| Client assignment | PostgreSQL `assigned_to` on clients |
+| Workflow drafts | PostgreSQL via `WorkflowRepository` |
+| Uploaded files | Disk + PostgreSQL via `FileRepository` |
+| Generated document history | PostgreSQL via `DocumentRepository` |
+| Exported artifacts (PDF/DOCX) | Disk under `FILE_STORAGE_PATH` |
+| Audit logs | PostgreSQL via `AuditLogRepository` |
+| Backup runs | PostgreSQL + disk manifests via `BackupRepository` / `create_backup_manifest()` |
+| Restore attempts | PostgreSQL via `RestoreAttempt` |
 
-| Layer | Current source of truth | Phase |
-|-------|-------------------------|-------|
-| Users | PostgreSQL via `UserRepository` | 2 |
-| Clients | PostgreSQL via `ClientRepository` | 2 |
-| Workflow drafts | PostgreSQL via `WorkflowRepository` | 3 |
-| Uploaded files | Disk + PostgreSQL via `FileRepository` | 4 |
-| Generated document history | PostgreSQL via `DocumentRepository` | 5 |
-| Exported artifacts (PDF/DOCX) | Disk under `FILE_STORAGE_PATH` | 5 |
-| Audit logs | PostgreSQL via `AuditLogRepository` | 6 |
-| Backup runs | PostgreSQL + disk manifests via `BackupRepository` / `create_backup_manifest()` | 7 |
-| Restore attempts | PostgreSQL via `RestoreAttempt` | 9-10 follow-up |
-| Sessions | PostgreSQL via `SessionRepository` plus cookie session | 14 |
+## Storage layout
+
+```text
+storage/
+  backups/
+  clients/
+    {Last, First - omega-00000}/
+      {year}/
+        {workflow}/
+          files/
+          documents/
+```
 
 ## What is no longer true
 
-- workflow persistence is not browser-backed anymore
-- generated document history is not browser-backed anymore
-- file upload/download is not placeholder behavior anymore
-- session identity is not cookie-only anymore
+- workflow persistence is not browser-only
+- generated document history is not browser-only
+- files/documents are not placeholder behavior
+- sessions are not cookie-only
+- quarantine folders are not part of the intended steady-state storage model
 
-## Remaining partial areas
+## Active constraints
 
-- restore workflow exists, but still needs broader operator hardening
-- ~~expired session cleanup exists, but is not automatically scheduled~~ → session cleanup runs on startup
-- document pack only includes stored artifacts, not preview-only rows
-- frontend delete UI for files/documents is still missing
-
-## Post-fix updates (2026-06)
-- Session cleanup is now called on startup
-- File upload size limit enforced via max_upload_size_bytes config (default 50MB)
-- Migration runner (migrate.py) tracks applied migrations with `_migrations` table
-- CSRF origin validation added for state-changing routes
-- Remaining: document pack still excludes preview-only rows
-- Remaining: frontend delete UI for files/documents still missing
+- preserve route contracts unless payload expansion is intentional
+- keep `client_reference` as the external identifier
+- keep all artifacts inside the client/year/workflow tree
+- keep backup artifacts rooted under `BACKUP_PATH`
+- do not expose raw filesystem paths to clients
+- on write failures, clean up newly written artifacts before returning errors
 
 ## Entry points
 
-- `apps/api/app/main.py` - route imports and live call sites
-- `apps/api/app/config.py` - `DATABASE_URL`, storage paths, restore, scheduler, and remote-access settings
+- `apps/api/app/main.py` - live route call sites and access checks
+- `apps/api/app/config.py` - `DATABASE_URL`, storage paths, restore, scheduler, remote-access settings
 - `apps/api/app/models.py` - SQLAlchemy model definitions
-- `apps/api/app/repositories/` - all DB-backed repositories
+- `apps/api/app/repositories/` - DB-backed repositories
 - `apps/api/app/services/backups.py` - manifest and optional `pg_dump`
 - `apps/api/app/services/restore.py` - validate/dry-run/execute restore logic
 - `apps/api/app/services/scheduler.py` - scheduled backup lifecycle
@@ -59,11 +66,8 @@ The persistence roadmap is complete through Phase 16.
 - `apps/frontend/src/data/file-api.ts` - file API client
 - `apps/frontend/src/documents/generated-document-api.ts` - document API client
 
-## Constraints
+## Follow-up areas
 
-- preserve current route contracts unless the API is intentionally expanded
-- keep `client_reference` as the external client identifier
-- keep file storage rooted under `FILE_STORAGE_PATH`
-- keep backup artifacts rooted under `BACKUP_PATH`
-- do not expose raw filesystem paths to clients
-- client records may use `localStorage` for quick rehydration; backend workflow persistence remains authoritative
+- legacy `apps/api/storage/` and flat client folders should stay out of the live path
+- frontend still carries a client cache for UX rehydration
+- missing-file reconciliation and operator cleanup reporting can still be improved

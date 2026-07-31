@@ -14,6 +14,8 @@ export type AdminAuditLog = {
   user_id: string | null;
   user_email?: string | null;
   client_id: string | null;
+  client_reference?: string | null;
+  client_name?: string | null;
   action: string;
   entity_type: string;
   entity_id: string;
@@ -47,6 +49,18 @@ export type RestoreAttempt = {
   dump_file: string | null;
   error_message: string | null;
   created_at: string | null;
+};
+
+export type RestoreActionResponse = {
+  passed?: boolean;
+  restored?: boolean;
+  valid?: boolean;
+  error?: string;
+  detail?: string;
+  dump_file?: string | null;
+  confirmation_token?: string;
+  confirmation_expires_at?: string;
+  warnings?: string[];
 };
 
 export type SecurityStatus = {
@@ -159,6 +173,7 @@ export async function listAuditLogs(filters?: {
   user_email?: string;
   action?: string;
   entity_type?: string;
+  client_reference?: string;
   from_date?: string;
   to_date?: string;
 }): Promise<AdminAuditLog[]> {
@@ -166,6 +181,7 @@ export async function listAuditLogs(filters?: {
   if (filters?.user_email) params.set("user_email", filters.user_email);
   if (filters?.action) params.set("action", filters.action);
   if (filters?.entity_type) params.set("entity_type", filters.entity_type);
+  if (filters?.client_reference) params.set("client_reference", filters.client_reference);
   if (filters?.from_date) params.set("from_date", filters.from_date);
   if (filters?.to_date) params.set("to_date", filters.to_date);
   const query = params.toString();
@@ -183,20 +199,33 @@ export async function createBackup(): Promise<AdminBackupRun> {
   return (await parseJson<{ item: AdminBackupRun }>(response)).item;
 }
 
-export async function validateRestore(backupId: string): Promise<Record<string, unknown>> {
+export async function validateRestore(backupId: string): Promise<RestoreActionResponse> {
   const response = await fetch(`/admin/backups/${encodeURIComponent(backupId)}/validate-restore`, {
     method: "POST",
     credentials: "same-origin",
   });
-  return parseJson<Record<string, unknown>>(response);
+  return parseJson<RestoreActionResponse>(response);
 }
 
-export async function dryRunRestore(backupId: string): Promise<Record<string, unknown>> {
+export async function dryRunRestore(backupId: string): Promise<RestoreActionResponse> {
   const response = await fetch(`/admin/backups/${encodeURIComponent(backupId)}/dry-run-restore`, {
     method: "POST",
     credentials: "same-origin",
   });
-  return parseJson<Record<string, unknown>>(response);
+  return parseJson<RestoreActionResponse>(response);
+}
+
+export async function executeRestore(backupId: string, confirmationToken: string): Promise<RestoreActionResponse> {
+  const response = await fetch(`/admin/backups/${encodeURIComponent(backupId)}/restore`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      confirm: "yes-do-restore-now",
+      confirmation_token: confirmationToken,
+    }),
+  });
+  return parseJson<RestoreActionResponse>(response);
 }
 
 export async function listRestoreAttempts(backupId: string): Promise<RestoreAttempt[]> {

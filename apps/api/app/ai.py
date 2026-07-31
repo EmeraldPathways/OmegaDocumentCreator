@@ -24,6 +24,80 @@ class GeneratedDocumentOutput(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+_PROMPT_ALLOWED_FIELDS = {
+    "full_name",
+    "fullName",
+    "clientName",
+    "date_of_birth",
+    "dateOfBirth",
+    "gender",
+    "smoker_status",
+    "smokerStatus",
+    "occupation",
+    "employment_status",
+    "income_salary",
+    "incomeSalary",
+    "town_city",
+    "townCity",
+    "county",
+    "email",
+    "mobile_number",
+    "mobileNumber",
+    "work_phone",
+    "workPhone",
+    "personal_circumstances",
+    "personalCircumstances",
+    "financial_situation",
+    "financialSituation",
+    "needs_objectives",
+    "needsObjectives",
+    "recommendation_summary",
+    "recommendationSummary",
+    "product_type",
+    "productType",
+    "provider",
+    "provider_name",
+    "providerName",
+    "recommended_cover",
+    "recommendedCover",
+    "deferred_period",
+    "deferredPeriod",
+    "cover_age",
+    "coverAge",
+    "phiOccupationalClass",
+    "phiIndexation",
+    "letter_date",
+    "letterDate",
+    "advisor_name",
+    "advisorName",
+    "pensionAge",
+    "pensionGender",
+    "pensionRetirementAge",
+    "pensionRequired",
+    "monthlyContribution",
+    "spousesPension",
+    "pensionEscalation",
+    "pensionNetGrowth",
+    "pensionPremiumEscalation",
+    "pensionInflation",
+    "pensionExistingFund",
+}
+
+
+def _filtered_prompt_fields(workflow_snapshot: dict[str, Any]) -> list[tuple[str, str]]:
+    filtered: list[tuple[str, str]] = []
+    for key, value in workflow_snapshot.items():
+        if key not in _PROMPT_ALLOWED_FIELDS:
+            continue
+        if value is None:
+            continue
+        normalized = str(value).strip()
+        if not normalized:
+            continue
+        filtered.append((key, normalized))
+    return filtered
+
+
 def build_document_prompt(
     *,
     client_name: str,
@@ -32,7 +106,11 @@ def build_document_prompt(
     template_id: str,
     workflow_snapshot: dict[str, Any],
 ) -> str:
-    fields = "\n".join(f"- {key}: {value}" for key, value in workflow_snapshot.items())
+    filtered_fields = _filtered_prompt_fields(workflow_snapshot)
+    if filtered_fields:
+        fields = "\n".join(f"- {key}: {value}" for key, value in filtered_fields)
+    else:
+        fields = "- No approved workflow fields were available."
     return (
         "You are generating a professional financial advice document draft.\n"
         f"Client: {client_name} ({client_reference})\n"

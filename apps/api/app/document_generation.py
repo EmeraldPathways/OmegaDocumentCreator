@@ -432,10 +432,12 @@ def build_statement_quote_requests(
 def _build_quote_requests_for_snapshot(
     *,
     settings: AppSettings,
+    document_type: str | None = None,
     workflow_snapshot: dict[str, Any],
     warnings: list[str],
 ) -> list[dict[str, Any]]:
-    is_pensions_workflow = _is_pensions_workflow_snapshot(workflow_snapshot)
+    normalized_document_type = (document_type or "").strip().lower()
+    is_pensions_workflow = "pension" in normalized_document_type or _is_pensions_workflow_snapshot(workflow_snapshot)
 
     try:
         if is_pensions_workflow:
@@ -467,6 +469,7 @@ def _build_integration_requests(
         return []
     return _build_quote_requests_for_snapshot(
         settings=settings,
+        document_type=document_type,
         workflow_snapshot=workflow_snapshot,
         warnings=warnings,
     )
