@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -202,6 +203,14 @@ class RestoreServiceTests(unittest.TestCase):
         path = self.backup_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
+        return path
+
+    def _write_archive(self, relative: str, members: dict[str, bytes]) -> Path:
+        path = self.backup_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, content in members.items():
+                archive.writestr(name, content)
         return path
 
     # ------------------------------------------------------------------
@@ -424,13 +433,14 @@ class RestoreServiceTests(unittest.TestCase):
         mock_run.return_value = type("R", (), {"returncode": 0, "stderr": ""})()
         self._write_dump("dumps/real.sql", b"-- real dump")
 
-        # Should not raise
-        execute_restore(
+        result = execute_restore(
             backup_root=self.backup_root,
             dump_relative_path="dumps/real.sql",
             database_url="postgresql://real",
             confirm="yes-do-restore-now",
         )
+        self.assertEqual(result["dump_file"], "dumps/real.sql")
+        self.assertEqual(result["restored_archives"], {"files": 0, "documents": 0})
 
     @patch("subprocess.run")
     def test_execute_restore_raises_on_nonzero_exit(self, mock_run: object) -> None:
@@ -445,6 +455,46 @@ class RestoreServiceTests(unittest.TestCase):
                 confirm="yes-do-restore-now",
             )
         self.assertIn("exited with code 3", str(ctx.exception))
+
+    @patch("subprocess.run")
+    def test_execute_restore_restores_file_and_document_archives(self, mock_run: object) -> None:
+        mock_run.return_value = type("R", (), {"returncode": 0, "stderr": ""})()
+        self._write_dump("dumps/real.sql", b"-- real dump")
+        self._write_archive(
+            "archives/files.zip",
+            {"Murphy, Jamie - omega-00002/2026/income-protection/files/payslip.pdf": b"restored-pay"},
+        )
+        self._write_archive(
+            "archives/documents.zip",
+            {"Murphy, Jamie - omega-00002/2026/income-protection/documents/fact-find.docx": b"restored-doc"},
+        )
+
+        storage_root = self.backup_root / "restored-storage"
+        storage_root.mkdir(parents=True, exist_ok=True)
+        stale_file_dir = storage_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "files"
+        stale_file_dir.mkdir(parents=True, exist_ok=True)
+        (stale_file_dir / "stale.pdf").write_bytes(b"stale")
+
+        result = execute_restore(
+            backup_root=self.backup_root,
+            dump_relative_path="dumps/real.sql",
+            database_url="postgresql://real",
+            file_storage_root=storage_root,
+            files_relative_path="archives/files.zip",
+            documents_relative_path="archives/documents.zip",
+            confirm="yes-do-restore-now",
+        )
+
+        self.assertEqual(result["restored_archives"], {"files": 1, "documents": 1})
+        self.assertFalse((stale_file_dir / "stale.pdf").exists())
+        self.assertEqual(
+            (storage_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "files" / "payslip.pdf").read_bytes(),
+            b"restored-pay",
+        )
+        self.assertEqual(
+            (storage_root / "Murphy, Jamie - omega-00002" / "2026" / "income-protection" / "documents" / "fact-find.docx").read_bytes(),
+            b"restored-doc",
+        )
 
 
 class SchedulerServiceTests(unittest.TestCase):
@@ -547,3 +597,30 @@ class SchedulerServiceTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["reason"], "previous-run-still-running")
+
+    def test_database_lock_prevents_cross_process_overlap(self) -> None:
+        from unittest.mock import MagicMock, patch
+        import tempfile
+
+        mock_db = MagicMock()
+        mock_db.execute.return_value.scalar.return_value = False
+
+        from app.services.scheduler import run_single_scheduled_backup
+
+        import app.db
+        with patch.object(app.db, "get_session", return_value=mock_db):
+            with tempfile.TemporaryDirectory() as tmp:
+                bp = Path(tmp) / "b"
+                fp = Path(tmp) / "f"
+                bp.mkdir(parents=True, exist_ok=True)
+                fp.mkdir(parents=True, exist_ok=True)
+
+                result = run_single_scheduled_backup(
+                    backup_path=bp,
+                    file_storage_path=fp,
+                    database_url="postgresql://omega:test@localhost:5432/omega",
+                    pg_dump_bin="pg",
+                )
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "database-lock-held")

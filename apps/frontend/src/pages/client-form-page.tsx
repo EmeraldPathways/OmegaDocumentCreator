@@ -5,7 +5,7 @@ import { Save, X, ArrowLeft } from "lucide-react";
 import { useAuth } from "../auth/auth-context";
 import { useClientData } from "../data/client-data-context";
 import { listAssignableUsers, type AdminUser } from "../data/admin-api";
-import { createSeededClientProfiles, type SeededClientProfile } from "../data/seeded-clients";
+import { createEmptyClientProfile, type SeededClientProfile } from "../data/seeded-clients";
 import { createDefaultDocumentDrafts } from "../documents/document-templates";
 import { Button, Input, Select, Textarea, useToast } from "../components/ui";
 import { useDebounce } from "../hooks/use-debounce";
@@ -33,81 +33,14 @@ const maritalStatusOptions = [
 ];
 
 function createBlankClient(nextReference: string, updatedBy: string): SeededClientProfile {
-  return {
-    ...createSeededClientProfiles()["CLI-2026-0001"],
+  return createEmptyClientProfile({
     clientReference: nextReference,
-    fullName: "",
-    firstName: "",
-    surname: "",
     status: "Draft",
-    title: "",
-    email: "",
-    mobileNumber: "",
-    workPhone: "",
-    dateOfBirth: "",
-    maritalStatus: "",
     createdBy: updatedBy,
     updatedBy,
-    townCity: "",
-    county: "",
-    homeAddressLine1: "",
-    homeAddressLine2: "",
-    eircode: "",
-    generalNotes: "",
-    partnerName: "",
-    partnerAddress: "",
-    dependants: [],
-    occupation: "",
-    employmentStatus: "",
-    income: "",
-    provider: "",
-    recommendedCover: "",
-    premium: "",
-    deferredPeriod: "",
-    coverAge: "",
     advisorName: updatedBy,
-    statementType: "",
-    productType: "",
-    letterDate: "",
-    zurichDiscountActive: "",
-    netMonthlyCost: "",
-    coverSummary: "",
-    mortgageProtection: "",
-    personalInsurance: "",
-    keymanInsurance: "",
-    partnershipInsurance: "",
-    selfLifeInsuranceAmount: "",
-    partnerSeriousIllnessAmount: "",
-    personalCircumstances: "",
-    financialSituation: "",
-    needsObjectives: "",
-    executionOnlyConfirmation: "",
-    termsReviewedReceived: "",
-    termsVersion: "",
-    termsDeliveryMethod: "",
-    termsIssuedBy: "",
-    termsClientReceived: "",
-    termsClientReviewed: "",
-    termsIssuedDate: "",
-    termsNotes: "",
-    contactByPhone: "",
-    contactBySms: "",
-    contactByEmail: "",
-    contactByPost: "",
-    pepConfirmation: "",
-    pepRelatedConfirmation: "",
-    businessSource: "",
-    clientSignature1: "",
-    clientSignature1Date: "",
-    clientSignature2: "",
-    financialAdvisorSignature: "",
-    requestCompanyName: "",
-    requestPolicies: "",
-    requestLetterDate: "",
     documentDrafts: createDefaultDocumentDrafts(),
-    files: [],
-    generatedDocuments: [],
-  };
+  });
 }
 
 function buildFullName(firstName: string, surname: string) {

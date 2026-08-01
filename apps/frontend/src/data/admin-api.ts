@@ -132,7 +132,11 @@ export type AdminSettings = {
   session_timeout_minutes: number;
   ai_enabled: boolean;
   ai_model: string;
-  ai_api_key: string;
+  ai_api_key?: string;
+  ai_api_key_configured?: boolean;
+  ai_provider?: string;
+  requires_restart?: boolean;
+  clear_ai_api_key?: boolean;
 };
 
 async function parseJson<T>(response: Response): Promise<T> {

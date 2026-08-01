@@ -15,9 +15,23 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
-_RAW_TEST_DB = os.environ.get("TEST_DATABASE_URL", "").strip()
-_RAW_LIVE_DB = os.environ.get("DATABASE_URL", "").strip()
+from dotenv import dotenv_values
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_RAW_ENV_FILE = dotenv_values(_PROJECT_ROOT / ".env")
+
+
+def _env_or_dotenv(name: str) -> str:
+    raw_env = os.environ.get(name, "").strip()
+    if raw_env:
+        return raw_env
+    return str(_RAW_ENV_FILE.get(name, "") or "").strip()
+
+
+_RAW_TEST_DB = _env_or_dotenv("TEST_DATABASE_URL")
+_RAW_LIVE_DB = _env_or_dotenv("DATABASE_URL")
 
 if not _RAW_TEST_DB:
     print(
@@ -94,7 +108,7 @@ def _effective_target(db_url: str) -> tuple[str, str, str, int | None]:
 def _structured_same_db_check() -> None:
     """Structured URL comparison (post-dotenv) — rejects test==live."""
     test_normalised = _normalize_database_url(_RAW_TEST_DB)
-    live_raw = os.environ.get("DATABASE_URL", "").strip()
+    live_raw = _env_or_dotenv("DATABASE_URL")
     if not live_raw:
         return
     live_normalised = _normalize_database_url(live_raw)
@@ -169,6 +183,7 @@ def truncate_all(session: Session) -> None:
         "employment_details",
         "restore_attempts",
         "backup_runs",
+        "client_reference_counters",
         "clients",
         "users",
     ]
@@ -214,7 +229,7 @@ def seed_default_users(session: Session) -> None:
 
 def seed_default_clients(session: Session) -> None:
     """Insert two default clients matching the legacy seeded data."""
-    from app.models import Client, Dependant, User
+    from app.models import Client, ClientReferenceCounter, Dependant, User
     from app.domain.clients import ClientStatus
 
     settings = get_settings()
@@ -280,5 +295,11 @@ def seed_default_clients(session: Session) -> None:
         notes="Child",
     )
     session.add(dep)
+    session.add(
+        ClientReferenceCounter(
+            year=2026,
+            next_value=3,
+        )
+    )
     session.flush()
     session.expunge_all()

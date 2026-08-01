@@ -12,7 +12,10 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import text
+
 logger = logging.getLogger("omega.scheduler")
+_SCHEDULER_LOCK_KEY = 20260801
 
 # ---- module-level state ----
 _scheduler_task: asyncio.Task[object] | None = None
@@ -57,6 +60,9 @@ def run_single_scheduled_backup(
     _next_scheduled_run = now
     _scheduled_backup_running = True
 
+    advisory_lock_acquired = False
+    db = None
+
     try:
         from app.models import BackupRun as BackupRunModel
         from app.repositories.backups import BackupRepository
@@ -65,6 +71,12 @@ def run_single_scheduled_backup(
 
         db = get_session()
         try:
+            if "placeholder" not in database_url:
+                advisory_lock_acquired = _try_acquire_scheduler_lock(db)
+                if not advisory_lock_acquired:
+                    logger.warning("Scheduled backup skipped — database advisory lock already held")
+                    return {"status": "skipped", "reason": "database-lock-held"}
+
             result = create_backup_manifest(
                 backup_path=backup_path,
                 file_storage_path=file_storage_path,
@@ -88,11 +100,15 @@ def run_single_scheduled_backup(
             logger.info("Scheduled backup completed: status=%s id=%s", result["status"], run.id)
             return {"status": "completed", "backup_run_id": str(run.id), "backup_status": result["status"]}
         except Exception:
-            db.rollback()
+            if db is not None:
+                db.rollback()
             logger.exception("Scheduled backup failed")
             return {"status": "failed", "error": "backup-execution-error"}
         finally:
-            db.close()
+            if db is not None:
+                if advisory_lock_acquired:
+                    _release_scheduler_lock(db)
+                db.close()
     finally:
         _scheduled_backup_running = False
 
@@ -107,7 +123,8 @@ async def _run_scheduled_backup(
 ) -> None:
     """Loop forever, sleeping *interval_seconds* between backup runs."""
     while True:
-        run_single_scheduled_backup(
+        await asyncio.to_thread(
+            run_single_scheduled_backup,
             backup_path=backup_path,
             file_storage_path=file_storage_path,
             database_url=database_url,
@@ -173,3 +190,19 @@ def stop_scheduler() -> None:
         _scheduler_task = None
         _scheduler_loop = None
         logger.info("Scheduler stopped")
+
+
+def _try_acquire_scheduler_lock(db: object) -> bool:
+    try:
+        result = db.execute(text("SELECT pg_try_advisory_lock(:lock_key)"), {"lock_key": _SCHEDULER_LOCK_KEY})
+        return bool(result.scalar())
+    except Exception:
+        logger.warning("Failed to acquire scheduler advisory lock; falling back to process-local protection", exc_info=True)
+        return True
+
+
+def _release_scheduler_lock(db: object) -> None:
+    try:
+        db.execute(text("SELECT pg_advisory_unlock(:lock_key)"), {"lock_key": _SCHEDULER_LOCK_KEY})
+    except Exception:
+        logger.warning("Failed to release scheduler advisory lock", exc_info=True)

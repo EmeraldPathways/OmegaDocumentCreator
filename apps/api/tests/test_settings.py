@@ -14,7 +14,7 @@ class SettingsTests(unittest.TestCase):
             file_storage_path="storage/clients",
             backup_path="storage/backups",
             session_secret="secret",
-            app_url="http://office-server.local",
+            app_url="http://127.0.0.1:3007",
             admin_email="admin@omega.local",
         )
 
@@ -33,7 +33,7 @@ class SettingsTests(unittest.TestCase):
             file_storage_path=clients,
             backup_path=backups,
             session_secret="secret",
-            app_url="http://office-server.local",
+            app_url="http://127.0.0.1:3007",
             admin_email="admin@omega.local",
         )
 

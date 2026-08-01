@@ -54,9 +54,13 @@ export function ClientDocumentsPage() {
     });
   }
 
-  function saveFolder() {
-    saveClient(resolvedDraft);
-    setSaveStatus("Saved just now");
+  async function saveFolder() {
+    try {
+      await saveClient(resolvedDraft);
+      setSaveStatus("Saved just now");
+    } catch {
+      setSaveStatus("Save failed");
+    }
   }
 
   return (

@@ -7,6 +7,7 @@ import { isLegacyStatementDraft, resolveStatementDraft } from "../documents/stat
 
 import { createClient, getClient as getBackendClient, listClients as listBackendClients, updateClient } from "./client-api";
 import {
+  createEmptyClientProfile,
   createSeededClientProfiles,
   type SeededClientFile,
   type SeededClientProfile,
@@ -86,14 +87,17 @@ function normalizeDocumentDrafts(
   };
 }
 
-function normalizeClient(client: SeededClientProfile): SeededClientProfile {
+export function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   const seededClients = createSeededClientProfiles();
-  const seededClient = seededClients[client.clientReference] ?? seededClients["CLI-2026-0001"];
-  const normalizedDocumentDrafts = normalizeDocumentDrafts(client.documentDrafts, seededClient?.documentDrafts);
+  const seededClient = seededClients[client.clientReference];
+  const fallbackClient = seededClient ?? createEmptyClientProfile({ clientReference: client.clientReference });
+  const normalizedDocumentDrafts = normalizeDocumentDrafts(client.documentDrafts, fallbackClient.documentDrafts);
   const normalizedClient: SeededClientProfile = {
-    ...seededClient,
+    ...fallbackClient,
     ...client,
     status: client.status ?? "Draft",
+    dependants: client.dependants ?? fallbackClient.dependants,
+    savingsInvestmentRows: client.savingsInvestmentRows ?? fallbackClient.savingsInvestmentRows,
     savedQuotes: Array.isArray(client.savedQuotes) ? client.savedQuotes : [],
     files: client.files ?? [],
     generatedDocuments: client.generatedDocuments ?? [],
@@ -134,14 +138,14 @@ function normalizeClient(client: SeededClientProfile): SeededClientProfile {
   };
 }
 
-function mapBackendClientToSeeded(
+export function mapBackendClientToSeeded(
   backendClient: Record<string, unknown>,
   existingClient?: SeededClientProfile,
 ): SeededClientProfile {
   const clientReference = String(backendClient.client_reference ?? existingClient?.clientReference ?? "");
   const seededClients = createSeededClientProfiles();
   const base = {
-    ...(seededClients[clientReference] ?? seededClients["CLI-2026-0001"]),
+    ...(seededClients[clientReference] ?? createEmptyClientProfile({ clientReference })),
     ...(existingClient ?? {}),
   };
 

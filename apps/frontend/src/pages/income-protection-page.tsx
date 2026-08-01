@@ -116,7 +116,8 @@ type IncomeProtectionPageProps = {
   workflowKind?: "fact-find" | "income-protection" | "pensions" | "files-docs";
 };
 
-type WorkflowSaveState = "saved" | "saving" | "dirty" | "local";
+type WorkflowSaveState = "saved" | "saving" | "dirty" | "session" | "error";
+type DraftPersistenceOutcome = "saved" | "session" | "error";
 
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
@@ -1062,9 +1063,11 @@ export function IncomeProtectionPage({
       ? "Saving..."
       : workflowSaveState === "dirty"
         ? "Unsaved changes"
-        : workflowSaveState === "local"
-          ? `Saved locally${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`
-          : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
+        : workflowSaveState === "session"
+          ? "Saved in current session only"
+          : workflowSaveState === "error"
+            ? "Save failed"
+            : `All changes saved${formatSavedTime(workflowSavedAt) ? ` · ${formatSavedTime(workflowSavedAt)}` : ""}`;
   const useUnifiedWorkflowBar =
     workflowKind === "fact-find" || workflowKind === "income-protection" || workflowKind === "files-docs";
   const workflowReadinessLabel =
@@ -1196,7 +1199,7 @@ export function IncomeProtectionPage({
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (workflowSaveState !== "dirty" && workflowSaveState !== "saving") {
+      if (workflowSaveState !== "dirty" && workflowSaveState !== "saving" && workflowSaveState !== "error" && workflowSaveState !== "session") {
         return;
       }
 
@@ -1215,7 +1218,7 @@ export function IncomeProtectionPage({
     }
 
     const currentSaveState = workflowSaveStateRef.current;
-    if (currentSaveState !== "dirty" && currentSaveState !== "saving") {
+    if (currentSaveState !== "dirty" && currentSaveState !== "saving" && currentSaveState !== "error") {
       return;
     }
 
@@ -1227,26 +1230,27 @@ export function IncomeProtectionPage({
     const nextSnapshot = buildWorkflowSnapshot(normalizedDraft, actorLabelRef.current);
 
     setDraft(normalizedDraft);
-    saveClient(normalizedDraft);
-    lastPersistedSnapshotRef.current = nextSnapshot;
 
     if (!canUseBackendRef.current) {
-      setWorkflowSaveState("saved");
+      await saveClient(normalizedDraft);
+      lastPersistedSnapshotRef.current = nextSnapshot;
+      setWorkflowSaveState("session");
       setWorkflowSavedAt(new Date().toISOString());
       return;
     }
 
     try {
+      await saveClient(normalizedDraft);
       await saveWorkflow(
         normalizedDraft.clientReference,
         buildWorkflowPersistencePayload(normalizedDraft),
         { keepalive: options?.keepalive ?? false },
       );
+      lastPersistedSnapshotRef.current = nextSnapshot;
       setWorkflowSaveState("saved");
       setWorkflowSavedAt(new Date().toISOString());
     } catch {
-      setWorkflowSaveState("local");
-      setWorkflowSavedAt(new Date().toISOString());
+      setWorkflowSaveState("error");
     }
   }
 
@@ -1319,33 +1323,37 @@ export function IncomeProtectionPage({
     const nextSnapshot = buildWorkflowSnapshot(normalizedDraft, actorLabel);
     setWorkflowSaveState("saving");
     setDraft(normalizedDraft);
-    saveClient(normalizedDraft);
-    lastPersistedSnapshotRef.current = nextSnapshot;
 
     if (!canUseBackend) {
+      await saveClient(normalizedDraft);
+      lastPersistedSnapshotRef.current = nextSnapshot;
       if (options?.showToast) {
-        addToast("Changes saved", "success");
+        addToast("Changes saved in the current session", "success");
       }
-      setWorkflowSaveState("saved");
+      setWorkflowSaveState("session");
       setWorkflowSavedAt(new Date().toISOString());
-      return { draft: normalizedDraft, savedRemotely: true };
+      return { draft: normalizedDraft, outcome: "session" as DraftPersistenceOutcome };
     }
 
     try {
+      await saveClient(normalizedDraft);
       await saveWorkflow(normalizedDraft.clientReference, buildWorkflowPersistencePayload(normalizedDraft));
+      lastPersistedSnapshotRef.current = nextSnapshot;
       if (options?.showToast) {
         addToast("Changes saved", "success");
       }
       setWorkflowSaveState("saved");
       setWorkflowSavedAt(new Date().toISOString());
-      return { draft: normalizedDraft, savedRemotely: true };
+      return { draft: normalizedDraft, outcome: "saved" as DraftPersistenceOutcome };
     } catch {
       if (options?.showToast) {
         addToast("Save failed - server unavailable", "error");
       }
-      setWorkflowSaveState(options?.silent ? "local" : "saved");
-      setWorkflowSavedAt(new Date().toISOString());
-      return { draft: normalizedDraft, savedRemotely: false };
+      setWorkflowSaveState("error");
+      if (!options?.silent) {
+        setWorkflowSavedAt(null);
+      }
+      return { draft: normalizedDraft, outcome: "error" as DraftPersistenceOutcome };
     }
   }
 
@@ -1464,22 +1472,22 @@ export function IncomeProtectionPage({
 
   async function saveFactFindDraft() {
     if (!canUseBackend) {
-      void persistDraft(resolvedDraft, { showToast: true });
-      setFactFindDraftSavedLabel("Saved just now");
+      const { outcome } = await persistDraft(resolvedDraft, { showToast: true });
+      setFactFindDraftSavedLabel(outcome === "session" ? "Saved in current session only" : "Save failed");
       return;
     }
-    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
-    setFactFindDraftSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    const { outcome } = await persistDraft(resolvedDraft, { showToast: true });
+    setFactFindDraftSavedLabel(outcome === "saved" ? "Saved just now" : "Save failed - server unavailable");
   }
 
   async function saveFactFindUpdateDraft() {
     if (!canUseBackend) {
-      void persistDraft(resolvedDraft, { showToast: true });
-      setFactFindUpdateSavedLabel("Saved just now");
+      const { outcome } = await persistDraft(resolvedDraft, { showToast: true });
+      setFactFindUpdateSavedLabel(outcome === "session" ? "Saved in current session only" : "Save failed");
       return;
     }
-    const { savedRemotely } = await persistDraft(resolvedDraft, { showToast: true });
-    setFactFindUpdateSavedLabel(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    const { outcome } = await persistDraft(resolvedDraft, { showToast: true });
+    setFactFindUpdateSavedLabel(outcome === "saved" ? "Saved just now" : "Save failed - server unavailable");
   }
 
   function renderAssetRow(
@@ -1826,12 +1834,12 @@ export function IncomeProtectionPage({
   async function saveStatementDraft() {
     const statementDraft = isIncomeProtectionDocumentFlow ? effectiveIncomeProtectionDraft : resolvedDraft;
     if (!canUseBackend) {
-      void persistDraft(statementDraft, { showToast: true });
-      setStatementSaveStatus("Saved just now");
+      const { outcome } = await persistDraft(statementDraft, { showToast: true });
+      setStatementSaveStatus(outcome === "session" ? "Saved in current session only" : "Save failed");
       return;
     }
-    const { savedRemotely } = await persistDraft(statementDraft, { showToast: true });
-    setStatementSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    const { outcome } = await persistDraft(statementDraft, { showToast: true });
+    setStatementSaveStatus(outcome === "saved" ? "Saved just now" : "Save failed - server unavailable");
   }
 
   function buildSavedQuoteName(integrationRequests: GeneratedDocumentDraft["integrationRequests"]) {
@@ -1923,8 +1931,8 @@ export function IncomeProtectionPage({
       nextSnapshot,
       ...resolvedDraft.savedQuotes.filter((savedQuote) => savedQuote.id !== nextSnapshot.id),
     ];
-    const { savedRemotely } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
-    setQuoteSaveStatus(savedRemotely ? "Saved just now" : "Saved locally - server unavailable");
+    const { outcome } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
+    setQuoteSaveStatus(outcome === "saved" ? "Saved just now" : "Save failed - server unavailable");
     setQuoteNameInput(snapshotName);
     addToast(`Saved quote as ${snapshotName}`, "success");
   }
@@ -1985,7 +1993,7 @@ export function IncomeProtectionPage({
       setQuoteSmoker(savedQuote.quoteSmoker);
     }
 
-    const { savedRemotely } = await persistDraft(nextDraft, { showToast: false });
+    const { outcome } = await persistDraft(nextDraft, { showToast: false });
     syncLocalGeneratedDraft(quoteDocumentType, {
       generationStatus: savedQuote.generationStatus || "completed",
       lastGeneratedHtml: generatedDocument.generatedHtml,
@@ -1994,23 +2002,23 @@ export function IncomeProtectionPage({
       editedHtml: nextEditedHtml || buildGeneratedEditorHtmlForProfile(editorProfile, quoteDocumentType, generatedDocument),
     });
     setQuoteDocumentStatus("Document: Draft loaded");
-    setQuoteSaveStatus(savedRemotely ? "Loaded saved quote" : "Loaded saved quote locally");
+    setQuoteSaveStatus(outcome === "saved" ? "Loaded saved quote" : "Loaded saved quote - changes not persisted");
     setQuoteNameInput(savedQuote.name);
     addToast(`Loaded ${savedQuote.name}`, "success");
   }
 
   async function deleteSavedQuoteSnapshot(savedQuote: SavedQuoteSnapshot) {
     const nextSavedQuotes = resolvedDraft.savedQuotes.filter((entry) => entry.id !== savedQuote.id);
-    const { savedRemotely } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
+    const { outcome } = await persistDraft({ ...resolvedDraft, savedQuotes: nextSavedQuotes }, { showToast: false });
     if (quoteNameInput.trim() === savedQuote.name) {
       setQuoteNameInput("");
     }
     setQuoteSaveStatus(
       nextSavedQuotes.filter((entry) => entry.documentType === quoteDocumentType).length === 0
         ? "No saved quotes yet"
-        : savedRemotely
+        : outcome === "saved"
         ? "Saved just now"
-        : "Saved locally - server unavailable",
+        : "Save failed - changes not persisted",
     );
     addToast(`Deleted ${savedQuote.name}`, "success");
   }

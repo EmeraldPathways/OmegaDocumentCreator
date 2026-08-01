@@ -32,7 +32,7 @@ services:
       - ../../templates/docx:/app/templates/docx
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')\""]
       interval: 15s
       timeout: 5s
       retries: 3

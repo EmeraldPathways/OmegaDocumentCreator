@@ -14,10 +14,10 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
-os.environ.setdefault("ADMIN_EMAIL", "admin@omega.local")
-os.environ.setdefault("ADMIN_PASSWORD", "ChangeMe123!")
-os.environ.setdefault("STAFF_EMAIL", "staff@omega.local")
-os.environ.setdefault("STAFF_PASSWORD", "ChangeMe123!")
+os.environ["ADMIN_EMAIL"] = "admin@omega.local"
+os.environ["ADMIN_PASSWORD"] = "ChangeMe123!"
+os.environ["STAFF_EMAIL"] = "staff@omega.local"
+os.environ["STAFF_PASSWORD"] = "ChangeMe123!"
 
 # Import test helpers from the tests package
 import db_test_helpers  # noqa: E402
@@ -26,9 +26,6 @@ import app.db  # noqa: E402
 import app.main as app_main  # noqa: E402
 
 from app.main import app  # noqa: E402
-
-app_main.SYSTEM_ACCESS_EMAILS = set(app_main.SYSTEM_ACCESS_EMAILS) | {"admin@omega.local"}
-app_main.FULL_RECORD_ACCESS_EMAILS = set(app_main.FULL_RECORD_ACCESS_EMAILS) | {"staff@omega.local"}
 
 
 def _db_is_available() -> bool:
@@ -112,7 +109,7 @@ class StartupConfigurationTests(unittest.TestCase):
             get_settings(
                 ENVIRONMENT="development",
                 SESSION_SECRET="development-only",
-                APP_URL="http://office-server.local",
+                APP_URL="http://127.0.0.1:3007",
             ),
         ):
             self.assertEqual(app_main._startup_configuration_errors(), [])
@@ -127,7 +124,7 @@ class StartupConfigurationTests(unittest.TestCase):
                 ENVIRONMENT="production",
                 REMOTE_ACCESS_MODE="remote",
                 SESSION_SECRET="development-only",
-                APP_URL="http://office-server.local",
+                APP_URL="http://127.0.0.1:3007",
                 COOKIE_SECURE="false",
                 CORS_ORIGINS="",
                 CSRF_TRUSTED_ORIGINS="",
@@ -252,7 +249,7 @@ class ApiTests(unittest.TestCase):
         finally:
             db.close()
 
-        self.client = TestClient(app, headers={"Origin": "http://127.0.0.1:8007"})
+        self.client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"})
 
     # ------------------------------------------------------------------
     # Auth tests
@@ -854,6 +851,20 @@ class ApiTests(unittest.TestCase):
         )
 
     def _create_staff_user(self, *, email: str, first_name: str, last_name: str, password: str = "Omega123") -> dict[str, object]:
+        return self._create_user(email=email, first_name=first_name, last_name=last_name, role="staff", password=password)
+
+    def _create_manager_user(self, *, email: str, first_name: str, last_name: str, password: str = "Omega123") -> dict[str, object]:
+        return self._create_user(email=email, first_name=first_name, last_name=last_name, role="manager", password=password)
+
+    def _create_user(
+        self,
+        *,
+        email: str,
+        first_name: str,
+        last_name: str,
+        role: str,
+        password: str = "Omega123",
+    ) -> dict[str, object]:
         self._login_as_admin()
         response = self.client.post(
             "/admin/users",
@@ -862,7 +873,7 @@ class ApiTests(unittest.TestCase):
                 "last_name": last_name,
                 "email": email,
                 "password": password,
-                "role": "staff",
+                "role": role,
             },
         )
         self.assertEqual(response.status_code, 201, response.text)
@@ -913,9 +924,9 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/clients/CLI-2026-0002/workflow")
         self.assertEqual(response.status_code, 401)
 
-    def test_full_access_user_can_see_all_seeded_clients(self) -> None:
-        self._create_staff_user(email="info@omegafinancial.ie", first_name="Info", last_name="Omega")
-        self._login_as("info@omegafinancial.ie")
+    def test_manager_can_see_all_seeded_clients(self) -> None:
+        self._create_manager_user(email="manager@omegafinancial.ie", first_name="Manager", last_name="Omega")
+        self._login_as("manager@omegafinancial.ie")
         response = self.client.get("/clients")
         self.assertEqual(response.status_code, 200)
         refs = {item["client_reference"] for item in response.json()["items"]}
@@ -944,9 +955,9 @@ class ApiTests(unittest.TestCase):
         blocked_detail = self.client.get("/clients/CLI-2026-0001")
         self.assertEqual(blocked_detail.status_code, 403)
 
-    def test_delegated_user_can_access_john_records_only(self) -> None:
+    def test_manager_can_access_other_staff_records(self) -> None:
         self._create_staff_user(email="john@omegafinancial.ie", first_name="John", last_name="Omega")
-        self._create_staff_user(email="alison@omegafinancial.ie", first_name="Alison", last_name="Omega")
+        self._create_manager_user(email="alison@omegafinancial.ie", first_name="Alison", last_name="Omega")
         self._create_staff_user(email="sophie@omegafinancial.ie", first_name="Sophie", last_name="Omega")
 
         john_client = self._create_client_as(
@@ -990,8 +1001,8 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(docs_resp.status_code, 200)
         self.assertGreaterEqual(len(docs_resp.json()["items"]), 1)
 
-        blocked_resp = self.client.get(f"/clients/{sophie_ref}")
-        self.assertEqual(blocked_resp.status_code, 403)
+        allowed_resp = self.client.get(f"/clients/{sophie_ref}")
+        self.assertEqual(allowed_resp.status_code, 200)
 
     def test_workflow_save_and_reload_roundtrip(self) -> None:
         self._login_as_admin()
@@ -1123,7 +1134,7 @@ class ApiTests(unittest.TestCase):
     def test_csrf_accepts_same_origin_referer_fallback(self) -> None:
         """State-changing POST with Referer matching APP_URL and no Origin succeeds."""
         # Omit Origin entirely, provide only same-origin Referer
-        referer_client = TestClient(app, headers={"Referer": "http://127.0.0.1:8007/clients/new"})
+        referer_client = TestClient(app, headers={"Referer": "http://127.0.0.1:3007/clients/new"})
         referer_client.post(
             "/auth/login",
             json={"email": "staff@omega.local", "password": "ChangeMe123!"},
@@ -1609,7 +1620,7 @@ class ApiTests(unittest.TestCase):
         token = validate_resp.json()["confirmation_token"]
 
         with patch("app.main.validate_restore", return_value={"valid": True, "manifest": {}, "warnings": [], "dump_file": "dumps/test.dump"}):
-            with patch("app.main.execute_restore", return_value=None) as execute_restore_mock:
+            with patch("app.main.execute_restore", return_value={"restored_archives": {"files": 0, "documents": 0}}) as execute_restore_mock:
                 response = self.client.post(
                     f"/admin/backups/{backup_id}/restore",
                     json={"confirm": "yes-do-restore-now", "confirmation_token": token},
@@ -1617,6 +1628,7 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["restored"])
+        self.assertEqual(response.json()["restored_archives"], {"files": 0, "documents": 0})
         execute_restore_mock.assert_called_once()
 
     def test_scheduler_status_shows_last_run_after_manual_backup(self) -> None:
@@ -2429,7 +2441,7 @@ class ApiTests(unittest.TestCase):
         from app.main import settings as app_settings
         from fastapi.testclient import TestClient
 
-        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:8007"}, raise_server_exceptions=False)
+        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"}, raise_server_exceptions=False)
         login_resp = failing_client.post(
             "/auth/login",
             json={"email": "admin@omega.local", "password": "ChangeMe123!"},
@@ -2450,7 +2462,7 @@ class ApiTests(unittest.TestCase):
         from app.main import settings as app_settings
         from fastapi.testclient import TestClient
 
-        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:8007"}, raise_server_exceptions=False)
+        failing_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"}, raise_server_exceptions=False)
         login_resp = failing_client.post(
             "/auth/login",
             json={"email": "staff@omega.local", "password": "ChangeMe123!"},

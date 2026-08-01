@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import io
 import json
 import secrets
+import tempfile
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
+from starlette.background import BackgroundTask
 from starlette.middleware.sessions import SessionMiddleware
 
 import app.db as app_db
@@ -54,27 +55,6 @@ from app.services.storage import (
 )
 
 settings = get_settings()
-
-SYSTEM_ACCESS_EMAILS = {
-    "andrew@omegafinancial.ie",
-}
-
-FULL_RECORD_ACCESS_EMAILS = {
-    "info@omegafinancial.ie",
-    "john@omegafinancial.ie",
-    "aideen@omegafinancial.ie",
-    "aimee@omegafinancial.ie",
-}
-
-OWN_RECORD_ACCESS_EMAILS = {
-    "sophie@omegafinancial.ie",
-    "declan@omegafinancial.ie",
-    "tadhg@omegafinancial.ie",
-}
-
-DELEGATED_OWNER_ACCESS: dict[str, set[str]] = {
-    "alison@omegafinancial.ie": {"john@omegafinancial.ie"},
-}
 
 RESTORE_APPROVAL_WINDOW_MINUTES = 10
 
@@ -132,6 +112,11 @@ async def _csrf_middleware(request: Request, call_next: object) -> object:
 
 def _startup_configuration_errors() -> list[str]:
     errors: list[str] = []
+    local_default_urls = {
+        "http://127.0.0.1:3007",
+        "http://localhost:3007",
+        "http://office-server.local",
+    }
 
     if settings.environment == "development":
         return errors
@@ -139,7 +124,7 @@ def _startup_configuration_errors() -> list[str]:
     if settings.session_secret == "development-only":
         errors.append("SESSION_SECRET must be changed from the default for non-development environments.")
 
-    if not settings.app_url or settings.app_url.startswith("http://office-server.local"):
+    if not settings.app_url or settings.app_url.rstrip("/") in local_default_urls:
         errors.append("APP_URL must be set to the deployed base URL for non-development environments.")
 
     if settings.remote_access_mode != "local_only":
@@ -211,30 +196,11 @@ def _startup_db_check() -> None:
             repo = UserRepository(db)
             if repo.count() == 0:
                 logger.warning("No users found in database. Create users through the admin flow or direct DB bootstrap.")
-            else:
-                promoted_manager_emails: list[str] = []
-                for user_model in repo.list_all():
-                    email = _normalized_email(user_model.email)
-                    if email not in FULL_RECORD_ACCESS_EMAILS:
-                        continue
-                    if user_model.role == UserRole.MANAGER.value:
-                        continue
-                    if user_model.role == UserRole.ADMIN.value:
-                        continue
-                    user_model.role = UserRole.MANAGER.value
-                    promoted_manager_emails.append(email)
-                if promoted_manager_emails:
-                    logger.info(
-                        "Promoted %d user(s) to manager based on record-access policy: %s",
-                        len(promoted_manager_emails),
-                        ", ".join(promoted_manager_emails),
-                    )
-
             db.commit()
         finally:
             db.close()
     except Exception:
-        logger.warning("Database not available — continuing with in-memory store.", exc_info=True)
+        logger.exception("Database connection failed during startup. Live routes require PostgreSQL and readiness checks will fail.")
 
     # Start backup scheduler if configured
     if settings.backup_schedule_enabled:
@@ -363,8 +329,9 @@ class AdminSettingsRequest(BaseModel):
     remote_access_mode: str
     session_timeout_minutes: int
     ai_enabled: bool = False
-    ai_model: str = "gpt-4o-mini"
-    ai_api_key: str = ""
+    ai_model: str = "gemini-2.0-flash"
+    ai_api_key: str | None = None
+    clear_ai_api_key: bool = False
 
 
 class AdminPathTestRequest(BaseModel):
@@ -427,21 +394,15 @@ def _normalized_email(value: str | None) -> str:
 
 
 def _is_admin_user(user: dict[str, str]) -> bool:
-    email = _normalized_email(user.get("email"))
-    return user.get("role") == UserRole.ADMIN.value or email in SYSTEM_ACCESS_EMAILS
+    return user.get("role") == UserRole.ADMIN.value
 
 
 def _resolve_record_access_policy(user: dict[str, str]) -> str:
-    email = _normalized_email(user.get("email"))
     if _is_admin_user(user):
         return "admin"
     if user.get("role") == UserRole.MANAGER.value:
         return "global"
-    if email in OWN_RECORD_ACCESS_EMAILS:
-        return "own"
-    if email in DELEGATED_OWNER_ACCESS:
-        return "delegated"
-    return "none"
+    return "own"
 
 
 def _has_global_record_access(user: dict[str, str]) -> bool:
@@ -449,7 +410,7 @@ def _has_global_record_access(user: dict[str, str]) -> bool:
 
 
 def _can_create_client(user: dict[str, str]) -> bool:
-    return _resolve_record_access_policy(user) != "none"
+    return bool(_normalized_email(user.get("email")))
 
 
 def _resolve_user_email_by_id(db: object, user_id: uuid.UUID | None) -> str:
@@ -466,10 +427,7 @@ def _can_access_owner_email(user: dict[str, str], owner_email: str) -> bool:
     policy = _resolve_record_access_policy(user)
     if policy in {"admin", "global"}:
         return True
-    if policy == "own":
-        return bool(record_owner) and record_owner == user_email
-    delegated_owners = DELEGATED_OWNER_ACCESS.get(user_email, set()) if policy == "delegated" else set()
-    return bool(record_owner) and record_owner in delegated_owners
+    return bool(record_owner) and record_owner == user_email
 
 
 def _can_access_client_emails(user: dict[str, str], *emails: str) -> bool:
@@ -1244,10 +1202,12 @@ def download_document_pack(client_reference: str, request: Request) -> object:
         docs = doc_repo.list_by_client(client.id)
 
         storage = ClientStorage(settings.file_storage_path)
-        zip_buffer = io.BytesIO()
+        zip_temp = tempfile.NamedTemporaryFile(prefix="omega-document-pack-", suffix=".zip", delete=False)
+        zip_temp.close()
+        zip_path = Path(zip_temp.name)
         packed = 0
 
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             seen: set[str] = set()
             for doc in docs:
                 for artifact_path in (doc.pdf_file_path, doc.docx_file_path):
@@ -1287,10 +1247,12 @@ def download_document_pack(client_reference: str, request: Request) -> object:
         db.commit()
 
         zip_filename = f"{client_reference.replace(' ', '_')}_documents.zip"
-        return Response(
-            content=zip_buffer.getvalue(),
+        return FileResponse(
+            path=zip_path,
             media_type="application/zip",
+            filename=None,
             headers=_attachment_headers(zip_filename),
+            background=BackgroundTask(lambda: zip_path.unlink(missing_ok=True)),
         )
     finally:
         db.close()
@@ -1310,12 +1272,7 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
         if not doc or doc.client_id != client.id:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        # Remove disk artifacts (graceful if missing)
-        storage = ClientStorage(settings.file_storage_path)
-        for path in (doc.pdf_file_path, doc.docx_file_path):
-            if path:
-                storage.delete_relative_file(path)
-
+        artifact_paths = [path for path in (doc.pdf_file_path, doc.docx_file_path) if path]
         document_name = doc.document_name
         deleted = doc_repo.delete(str(resolved_document_id))
         if deleted is None:
@@ -1330,6 +1287,7 @@ def delete_document(client_reference: str, document_id: str, request: Request) -
             details={"document_name": document_name},
         )
         db.commit()
+        _delete_storage_artifacts(artifact_paths)
         return {"deleted": True, "document_id": str(resolved_document_id)}
     finally:
         db.close()
@@ -1667,10 +1625,13 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
 
         # Attempt real restore — only with correct confirmation marker
         try:
-            execute_restore(
+            restore_result = execute_restore(
                 backup_root=settings.backup_path,
                 dump_relative_path=run.database_backup,
                 database_url=settings.database_url,
+                file_storage_root=settings.file_storage_path,
+                files_relative_path=validation.get("files_backup"),
+                documents_relative_path=validation.get("documents_backup"),
                 pg_restore_bin=settings.pg_restore_bin,
                 confirm=payload.confirm,
             )
@@ -1692,10 +1653,17 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
             action="restore_executed",
             entity_type="backup_run",
             entity_id=backup_id,
-            details={"dump_file": run.database_backup},
+            details={
+                "dump_file": run.database_backup,
+                "restored_archives": restore_result.get("restored_archives", {}),
+            },
         )
         db.commit()
-        return {"restored": True, "dump_file": run.database_backup}
+        return {
+            "restored": True,
+            "dump_file": run.database_backup,
+            "restored_archives": restore_result.get("restored_archives", {}),
+        }
     finally:
         db.close()
 
@@ -1744,6 +1712,25 @@ def _persist_restore_attempt(
         error_message=error_message,
     )
     backup_repo.add_restore_attempt(attempt)
+
+
+def _delete_storage_artifacts(relative_paths: list[str]) -> None:
+    if not relative_paths:
+        return
+
+    import logging
+
+    logger = logging.getLogger("omega.storage")
+    storage = ClientStorage(settings.file_storage_path)
+    for relative_path in relative_paths:
+        try:
+            storage.delete_relative_file(relative_path)
+        except Exception:
+            logger.warning(
+                "Failed to remove storage artifact after database commit: %s",
+                relative_path,
+                exc_info=True,
+            )
 
 
 @app.get("/admin/backups/schedule-status")
@@ -1914,13 +1901,13 @@ def _default_admin_settings_payload() -> dict[str, object]:
         "file_storage_path": str(settings.file_storage_path),
         "remote_access_mode": settings.remote_access_mode,
         "session_timeout_minutes": settings.session_timeout_minutes,
-        "ai_enabled": False,
-        "ai_model": "gpt-4o-mini",
+        "ai_enabled": settings.ai_enabled,
+        "ai_model": settings.ai_model,
         "ai_api_key": "",
     }
 
 
-def _load_admin_settings_payload() -> dict[str, object]:
+def _load_raw_admin_settings_payload() -> dict[str, object]:
     defaults = _default_admin_settings_payload()
     settings_file = _admin_settings_file_path()
     if not settings_file.is_file():
@@ -1937,11 +1924,25 @@ def _load_admin_settings_payload() -> dict[str, object]:
     return {**defaults, **stored}
 
 
+def _sanitize_admin_settings_payload(payload: dict[str, object]) -> dict[str, object]:
+    sanitized = dict(payload)
+    api_key = str(sanitized.get("ai_api_key") or "").strip()
+    sanitized["ai_api_key"] = ""
+    sanitized["ai_api_key_configured"] = bool(api_key)
+    sanitized["ai_provider"] = "gemini"
+    sanitized["requires_restart"] = True
+    return sanitized
+
+
+def _load_admin_settings_payload() -> dict[str, object]:
+    return _sanitize_admin_settings_payload(_load_raw_admin_settings_payload())
+
+
 def _save_admin_settings_payload(payload: dict[str, object]) -> dict[str, object]:
     settings_file = _admin_settings_file_path()
     settings_file.parent.mkdir(parents=True, exist_ok=True)
     settings_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return payload
+    return _sanitize_admin_settings_payload(payload)
 
 
 def _test_operator_path(path_value: str) -> tuple[bool, str]:
@@ -2084,6 +2085,12 @@ def admin_settings(request: Request) -> dict[str, object]:
 @app.put("/admin/settings")
 def admin_update_settings(payload: AdminSettingsRequest, request: Request) -> dict[str, object]:
     _require_admin(request)
+    existing_payload = _load_raw_admin_settings_payload()
+    ai_api_key = str(existing_payload.get("ai_api_key") or "")
+    if payload.clear_ai_api_key:
+        ai_api_key = ""
+    elif payload.ai_api_key is not None and payload.ai_api_key.strip():
+        ai_api_key = payload.ai_api_key.strip()
     normalized_payload = {
         "admin_email": payload.admin_email.strip().lower(),
         "app_url": payload.app_url.strip(),
@@ -2093,7 +2100,7 @@ def admin_update_settings(payload: AdminSettingsRequest, request: Request) -> di
         "session_timeout_minutes": payload.session_timeout_minutes,
         "ai_enabled": payload.ai_enabled,
         "ai_model": payload.ai_model.strip(),
-        "ai_api_key": payload.ai_api_key,
+        "ai_api_key": ai_api_key,
     }
     return _save_admin_settings_payload(normalized_payload)
 
@@ -2283,11 +2290,8 @@ def delete_file(client_reference: str, file_id: str, request: Request) -> dict[s
         if not file_model or file_model.client_id != client.id:
             raise HTTPException(status_code=404, detail="File not found")
 
-        # Remove disk artifact (graceful if missing)
-        storage = ClientStorage(settings.file_storage_path)
-        storage.delete_relative_file(file_model.file_path)
-
         original_filename = file_model.original_filename
+        artifact_paths = [file_model.file_path]
         deleted = file_repo.delete(resolved_file_id)
         if deleted is None:
             raise HTTPException(status_code=404, detail="File not found")
@@ -2301,6 +2305,7 @@ def delete_file(client_reference: str, file_id: str, request: Request) -> dict[s
             details={"filename": original_filename},
         )
         db.commit()
+        _delete_storage_artifacts(artifact_paths)
         return {"deleted": True, "file_id": str(resolved_file_id)}
     finally:
         db.close()

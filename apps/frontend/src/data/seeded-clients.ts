@@ -299,6 +299,41 @@ function createDefaultSavingsInvestmentRows(): SeededSavingsInvestmentRow[] {
   }));
 }
 
+export function createEmptyClientProfile(
+  overrides: Partial<SeededClientProfile> & Pick<SeededClientProfile, "clientReference">,
+): SeededClientProfile {
+  const seededTemplate = seededClientProfiles["CLI-2026-0001"];
+  const base = Object.fromEntries(
+    Object.entries(seededTemplate).map(([key, value]) => {
+      if (key === "documentDrafts") {
+        return [key, createDefaultDocumentDrafts()];
+      }
+      if (key === "savingsInvestmentRows") {
+        return [key, createDefaultSavingsInvestmentRows()];
+      }
+      if (Array.isArray(value)) {
+        return [key, []];
+      }
+      if (typeof value === "string") {
+        return [key, ""];
+      }
+      return [key, value];
+    }),
+  ) as SeededClientProfile;
+
+  return {
+    ...base,
+    ...overrides,
+    clientReference: overrides.clientReference,
+    dependants: overrides.dependants ?? [],
+    savingsInvestmentRows: overrides.savingsInvestmentRows ?? createDefaultSavingsInvestmentRows(),
+    savedQuotes: overrides.savedQuotes ?? [],
+    documentDrafts: overrides.documentDrafts ?? createDefaultDocumentDrafts(),
+    files: overrides.files ?? [],
+    generatedDocuments: overrides.generatedDocuments ?? [],
+  };
+}
+
 export const seededClientProfiles: Record<string, SeededClientProfile> = {
   "CLI-2026-0001": {
     clientReference: "CLI-2026-0001",

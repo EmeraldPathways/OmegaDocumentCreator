@@ -55,6 +55,7 @@ function readStoredUser(): SessionUser | null {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(() => readStoredUser());
+  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
 
   function coerceSessionUser(rawUser: SessionUser | null | undefined, fallbackEmail?: string): SessionUser {
     const role = rawUser?.role;
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const nextUser = coerceSessionUser(payload.user, email);
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
+    setSessionRefreshKey((current) => current + 1);
     return true;
   }
 
@@ -119,7 +121,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       })
       .catch(() => undefined);
-  }, [user]);
+  }, [sessionRefreshKey]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

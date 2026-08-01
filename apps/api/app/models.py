@@ -83,6 +83,13 @@ class Client(Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ClientReferenceCounter(Base):
+    __tablename__ = "client_reference_counters"
+
+    year: Mapped[int] = mapped_column(primary_key=True)
+    next_value: Mapped[int] = mapped_column(nullable=False)
+
+
 class Dependant(Base):
     __tablename__ = "dependants"
 

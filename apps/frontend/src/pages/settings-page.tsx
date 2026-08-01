@@ -17,13 +17,15 @@ type AiSettings = {
   enabled: boolean;
   model: string;
   apiKey: string;
+  apiKeyConfigured: boolean;
+  clearApiKey: boolean;
 };
 
 type PathTestResult = { status: "idle" | "loading" | "success" | "error"; message: string };
 
 const defaultSettings: AppSettings = {
   adminEmail: "",
-  appUrl: "http://office-server.local",
+  appUrl: "http://127.0.0.1:3007",
   backupPath: "D:\\Omega\\backups",
   fileStoragePath: "D:\\Omega\\clients",
   remoteAccessMode: "local_only",
@@ -32,8 +34,10 @@ const defaultSettings: AppSettings = {
 
 const defaultAiSettings: AiSettings = {
   enabled: false,
-  model: "gpt-4o-mini",
+  model: "gemini-2.0-flash",
   apiKey: "",
+  apiKeyConfigured: false,
+  clearApiKey: false,
 };
 
 const remoteAccessOptions = [
@@ -43,10 +47,7 @@ const remoteAccessOptions = [
 ];
 
 const modelOptions = [
-  { value: "gpt-4o-mini", label: "OpenAI GPT-4o mini" },
-  { value: "gpt-4o", label: "OpenAI GPT-4o" },
-  { value: "claude-3-haiku", label: "Anthropic Claude 3 Haiku" },
-  { value: "ollama-llama3", label: "Ollama Llama 3 (local)" },
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
 ];
 
 function validateSettings(settings: AppSettings) {
@@ -107,7 +108,9 @@ export function SettingsPage() {
         setAiSettings({
           enabled: payload.ai_enabled ?? false,
           model: payload.ai_model ?? defaultAiSettings.model,
-          apiKey: payload.ai_api_key ?? "",
+          apiKey: "",
+          apiKeyConfigured: payload.ai_api_key_configured ?? false,
+          clearApiKey: false,
         });
       })
       .catch(() => {
@@ -178,10 +181,17 @@ export function SettingsPage() {
         session_timeout_minutes: Number.parseInt(settings.sessionTimeoutMinutes, 10),
         ai_enabled: aiSettings.enabled,
         ai_model: aiSettings.model,
-        ai_api_key: aiSettings.apiKey,
+        ai_api_key: aiSettings.apiKey || undefined,
+        clear_ai_api_key: aiSettings.clearApiKey,
       });
+      setAiSettings((current) => ({
+        ...current,
+        apiKey: "",
+        apiKeyConfigured: current.clearApiKey ? false : current.apiKeyConfigured || current.apiKey.trim().length > 0,
+        clearApiKey: false,
+      }));
       setSaveStatus("saved");
-      addToast("Settings saved", "success");
+      addToast("Settings saved. Restart the backend to apply changes.", "success");
     } catch {
       setSaveStatus("error");
       addToast("Failed to save settings", "error");
@@ -195,7 +205,7 @@ export function SettingsPage() {
       <div className="page-heading page-heading-compact">
         <div>
           <h1>Settings</h1>
-          <p className="page-subtitle">Configure the Omega Document Creator application.</p>
+          <p className="page-subtitle">Configure the Omega Document Creator application. Saved changes apply after a backend restart.</p>
         </div>
       </div>
 
@@ -308,10 +318,17 @@ export function SettingsPage() {
 
       <section className="section-divided">
         <h2 className="section-title">AI Readiness</h2>
+        <p className="text-muted" style={{ marginBottom: "var(--space-3)" }}>
+          Only Gemini is currently supported by the backend. API keys are stored server-side and are not returned to the browser.
+        </p>
         <div className="status-row-flex">
             <Cpu size={18} color="var(--color-text-muted)" />
             <span>AI Assistant</span>
             <Badge variant={aiSettings.enabled ? "approved" : "default"}>{aiStatus}</Badge>
+            <Badge variant="default">Restart required</Badge>
+            <Badge variant={aiSettings.apiKeyConfigured ? "approved" : "pending"}>
+              {aiSettings.apiKeyConfigured ? "API key stored" : "No API key stored"}
+            </Badge>
           </div>
           <div className="form-grid" style={{ marginTop: "var(--space-4)" }}>
             <div className="form-grid-full">
@@ -334,11 +351,25 @@ export function SettingsPage() {
                 <Input
                   id="ai-api-key"
                   label="API key"
-                  onChange={(event) => updateAiField("apiKey", event.target.value)}
-                  placeholder="sk-..."
+                  hint="Leave blank to keep the stored key unchanged."
+                  onChange={(event) => {
+                    updateAiField("apiKey", event.target.value);
+                    if (event.target.value.trim()) {
+                      updateAiField("clearApiKey", false);
+                    }
+                  }}
+                  placeholder={aiSettings.apiKeyConfigured ? "Stored key unchanged" : "Enter Gemini API key"}
                   type="password"
                   value={aiSettings.apiKey}
                 />
+                <div className="form-grid-full">
+                  <Toggle
+                    checked={aiSettings.clearApiKey}
+                    id="ai-clear-api-key"
+                    label="Clear stored API key on save"
+                    onChange={(event) => updateAiField("clearApiKey", event.target.checked)}
+                  />
+                </div>
               </>
             ) : null}
           </div>

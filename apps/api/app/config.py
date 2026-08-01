@@ -98,7 +98,7 @@ def get_settings(**overrides: str) -> AppSettings:
         "file_storage_path": overrides.get("FILE_STORAGE_PATH") or _env_or("FILE_STORAGE_PATH", "storage/clients"),
         "backup_path": overrides.get("BACKUP_PATH") or _env_or("BACKUP_PATH", "storage/backups"),
         "session_secret": overrides.get("SESSION_SECRET") or _env_or("SESSION_SECRET", "development-only"),
-        "app_url": overrides.get("APP_URL") or _env_or("APP_URL", "http://office-server.local"),
+        "app_url": overrides.get("APP_URL") or _env_or("APP_URL", "http://127.0.0.1:3007"),
         "admin_email": overrides.get("ADMIN_EMAIL") or _env_or("ADMIN_EMAIL", "admin@omega.local"),
         "admin_password": overrides.get("ADMIN_PASSWORD") or _env_or("ADMIN_PASSWORD", "ChangeMe123!"),
         "staff_email": overrides.get("STAFF_EMAIL") or _env_or("STAFF_EMAIL", "staff@omega.local"),

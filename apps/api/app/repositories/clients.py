@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-import re
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.domain.clients import ClientStatus
@@ -36,22 +36,19 @@ class ClientRepository:
         return self._db.query(Client).count()
 
     def next_reference_sequence(self, year: int) -> int:
-        prefix = f"CLI-{year}-"
-        matching_references = (
-            self._db.query(Client.client_reference)
-            .filter(Client.client_reference.like(f"{prefix}%"))
-            .all()
+        result = self._db.execute(
+            text(
+                """
+                INSERT INTO client_reference_counters (year, next_value)
+                VALUES (:year, 2)
+                ON CONFLICT (year)
+                DO UPDATE SET next_value = client_reference_counters.next_value + 1
+                RETURNING next_value - 1 AS allocated_sequence
+                """
+            ),
+            {"year": year},
         )
-
-        highest = 0
-        for row in matching_references:
-            reference = str(row[0] or "")
-            match = re.fullmatch(rf"CLI-{year}-(\d+)", reference)
-            if not match:
-                continue
-            highest = max(highest, int(match.group(1)))
-
-        return highest + 1
+        return int(result.scalar_one())
 
     # ------------------------------------------------------------------
     # Helpers
