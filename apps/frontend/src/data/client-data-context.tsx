@@ -39,6 +39,7 @@ function isPristineDraft(draft?: Partial<GeneratedDocumentDraft>) {
 
   return (
     (draft.generationStatus ?? "idle") === "idle" &&
+    !draft.backendDocumentId &&
     !draft.lastGeneratedHtml &&
     (draft.lastGeneratedSections?.length ?? 0) === 0 &&
     (draft.integrationRequests?.length ?? 0) === 0 &&
@@ -60,6 +61,7 @@ function normalizeDraft(
     ...fallbackDraft,
     ...storedDraft,
     generationStatus: contentDraft?.generationStatus ?? fallbackDraft.generationStatus,
+    backendDocumentId: storedDraft?.backendDocumentId ?? fallbackDraft.backendDocumentId,
     lastGeneratedHtml: contentDraft?.lastGeneratedHtml ?? fallbackDraft.lastGeneratedHtml,
     lastGeneratedSections: contentDraft?.lastGeneratedSections ?? fallbackDraft.lastGeneratedSections,
     integrationRequests,

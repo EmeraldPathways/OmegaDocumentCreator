@@ -1055,6 +1055,7 @@ async def create_document_record(client_reference: str, request: Request) -> dic
         if content_type.startswith("multipart/form-data"):
             form = await request.form()
             payload = {
+                "document_id": form.get("document_id"),
                 "document_type": form.get("document_type"),
                 "document_name": form.get("document_name"),
                 "version": form.get("version"),
@@ -1074,18 +1075,34 @@ async def create_document_record(client_reference: str, request: Request) -> dic
         doc_name = str(payload.get("document_name", f"{doc_type} - {client_reference}"))
         preview_title = str(payload.get("preview_title", ""))
         preview_html = sanitize_preview_html(str(payload.get("preview_html", "")))
-        document_model = DocumentModel(
-            client_id=client.id,
-            document_type=doc_type,
-            document_name=doc_name,
-            status=str(payload.get("status", "draft")),
-            version=str(payload.get("version", "1")),
-            preview_title=preview_title if preview_title else None,
-            preview_html=preview_html if preview_html else None,
-            generated_by=user_model.id if user_model else None,
-        )
-        doc_repo.add(document_model)
-        doc_repo.flush()
+        document_id = str(payload.get("document_id") or "").strip()
+        if document_id:
+            document_model = doc_repo.get_by_id(document_id)
+            if document_model is None or str(document_model.client_id) != str(client.id):
+                raise HTTPException(status_code=404, detail="Document not found")
+            doc_repo.update_metadata(
+                document_id,
+                document_type=doc_type,
+                document_name=doc_name,
+                status=str(payload.get("status", "draft")),
+                version=str(payload.get("version", "1")),
+                preview_title=preview_title if preview_title else None,
+                preview_html=preview_html if preview_html else None,
+                generated_by=user_model.id if user_model else None,
+            )
+        else:
+            document_model = DocumentModel(
+                client_id=client.id,
+                document_type=doc_type,
+                document_name=doc_name,
+                status=str(payload.get("status", "draft")),
+                version=str(payload.get("version", "1")),
+                preview_title=preview_title if preview_title else None,
+                preview_html=preview_html if preview_html else None,
+                generated_by=user_model.id if user_model else None,
+            )
+            doc_repo.add(document_model)
+            doc_repo.flush()
 
         if uploaded is not None and hasattr(uploaded, "filename") and getattr(uploaded, "filename", ""):
             artifact_name = str(uploaded.filename)
@@ -1193,13 +1210,20 @@ def download_document(client_reference: str, document_id: str, request: Request)
 
 @app.get("/clients/{client_reference}/documents/pack")
 def download_document_pack(client_reference: str, request: Request) -> object:
-    """Return a ZIP containing all generated document artifacts for a client."""
+    """Return a ZIP containing generated document artifacts for a client."""
     user = _current_user(request)
     db = get_session()
     try:
         client = _require_client_access(user, db, client_reference)
         doc_repo = DocumentRepository(db)
         docs = doc_repo.list_by_client(client.id)
+        selected_document_ids = {
+            document_id
+            for document_id in request.query_params.getlist("document_id")
+            if document_id
+        }
+        if selected_document_ids:
+            docs = [doc for doc in docs if str(doc.id) in selected_document_ids]
 
         storage = ClientStorage(settings.file_storage_path)
         zip_temp = tempfile.NamedTemporaryFile(prefix="omega-document-pack-", suffix=".zip", delete=False)

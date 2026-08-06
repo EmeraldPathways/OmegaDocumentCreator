@@ -1,4 +1,5 @@
 import { Download, Eye, FileDown, FileText, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge, Button, Modal } from "../components/ui";
 import type { SeededGeneratedDocument } from "../data/seeded-clients";
@@ -15,7 +16,7 @@ export interface GeneratedDocumentsTabProps {
   hasLoadedBackendGeneratedDocuments: boolean;
   selectedClientReference: string;
   onPreviewDocument: (doc: SeededGeneratedDocument | null) => void;
-  onDownloadPack: () => void;
+  onDownloadPack: (documentIds: string[]) => void;
   onNavigateToGenerate: () => void;
   onBackendDownload: (docId: string, docName: string) => void;
   onFallbackDownload: (doc: SeededGeneratedDocument) => void;
@@ -62,12 +63,30 @@ export function IncomeProtectionGeneratedDocumentsTab({
   addToast,
   downloadDocument,
 }: GeneratedDocumentsTabProps) {
-  const resolvedPreviewDocument = previewDocument
-    ? {
-        ...previewDocument,
-        generated_at: previewDocument.generatedAt,
-      }
-    : null;
+  const packableDocumentIds = useMemo(
+    () =>
+      displayDocuments
+        .filter((doc) => canUseBackend && hasLoadedBackendGeneratedDocuments && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path)))
+        .map((doc) => doc.id),
+    [canUseBackend, displayDocuments, hasLoadedBackendGeneratedDocuments],
+  );
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedDocumentIds((current) => current.filter((documentId) => packableDocumentIds.includes(documentId)));
+  }, [packableDocumentIds]);
+
+  const allPackableSelected = packableDocumentIds.length > 0 && selectedDocumentIds.length === packableDocumentIds.length;
+
+  function toggleDocumentSelection(documentId: string) {
+    setSelectedDocumentIds((current) =>
+      current.includes(documentId) ? current.filter((candidate) => candidate !== documentId) : [...current, documentId],
+    );
+  }
+
+  function toggleAllPackableDocuments() {
+    setSelectedDocumentIds(allPackableSelected ? [] : packableDocumentIds);
+  }
 
   return (
     <div className="page-stack">
@@ -75,12 +94,28 @@ export function IncomeProtectionGeneratedDocumentsTab({
         <div className="page-actions">
           <Button
             isLoading={documentPackStatus === "Pack: Preparing pack..."}
-            onClick={onDownloadPack}
+            onClick={() => onDownloadPack(selectedDocumentIds)}
             variant="primary"
           >
             <Download size={18} />
             Download Pack
           </Button>
+          <label className="document-pack-select-all">
+            <input
+              checked={allPackableSelected}
+              disabled={packableDocumentIds.length === 0}
+              onChange={() => toggleAllPackableDocuments()}
+              type="checkbox"
+            />
+            <span>Select saved</span>
+          </label>
+          <span className="document-pack-selection-count">
+            {selectedDocumentIds.length > 0
+              ? `${selectedDocumentIds.length} selected`
+              : packableDocumentIds.length > 0
+              ? "No selection uses all saved documents"
+              : "No saved documents available"}
+          </span>
           <Badge variant={documentPackStatus.includes("Downloaded") ? "saved" : "default"}>
             {documentPackStatus.replace("Pack: ", "")}
           </Badge>
@@ -115,9 +150,18 @@ export function IncomeProtectionGeneratedDocumentsTab({
                 && hasLoadedBackendGeneratedDocuments
                 && Boolean(doc.id && (doc.docx_file_path || doc.pdf_file_path));
               const previewPayload = buildPreviewPayload(doc);
+              const isSelected = selectedDocumentIds.includes(doc.id);
 
               return (
                 <div className="file-item generated-document-item" key={doc.id ?? `${doc.document_name}-${doc.version ?? ""}`}>
+                  <label className={`document-pack-checkbox${hasBackendArtifact ? "" : " is-disabled"}`}>
+                    <input
+                      checked={isSelected}
+                      disabled={!hasBackendArtifact}
+                      onChange={() => toggleDocumentSelection(doc.id)}
+                      type="checkbox"
+                    />
+                  </label>
                   <div className="file-icon">
                     <FileText size={20} />
                   </div>

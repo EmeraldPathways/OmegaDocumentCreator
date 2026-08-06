@@ -625,6 +625,7 @@ export function IncomeProtectionPage({
 
     saveGeneratedDraft(draft.clientReference, documentType, {
       generationStatus: resolvedStatementDraft.generationStatus,
+      backendDocumentId: currentStatementDraft.backendDocumentId,
       lastGeneratedHtml: resolvedStatementDraft.lastGeneratedHtml,
       lastGeneratedSections: resolvedStatementDraft.lastGeneratedSections,
       integrationRequests: resolvedStatementDraft.integrationRequests,
@@ -667,6 +668,7 @@ export function IncomeProtectionPage({
 
     saveGeneratedDraft(draft.clientReference, documentType, {
       generationStatus: resolvedFactFindDraft.generationStatus,
+      backendDocumentId: currentFactFindDraft.backendDocumentId,
       lastGeneratedHtml: resolvedFactFindDraft.lastGeneratedHtml,
       lastGeneratedSections: resolvedFactFindDraft.lastGeneratedSections,
       integrationRequests: resolvedFactFindDraft.integrationRequests,
@@ -1726,6 +1728,7 @@ export function IncomeProtectionPage({
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
     const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
     const previewArtifact = buildExportDocumentArtifact(sourceProfile, documentType);
+    const sourceDraft = getDocumentDraft(documentType);
     if (!previewArtifact.html) {
       return;
     }
@@ -1751,6 +1754,7 @@ export function IncomeProtectionPage({
       const persisted = await createDocument(
         resolvedDraft.clientReference,
         {
+          document_id: sourceDraft.backendDocumentId ?? undefined,
           document_type: documentType,
           document_name: nextDocument.documentName.replace(/\.(pdf|docx)$/i, ""),
           version: nextDocument.version,
@@ -1771,6 +1775,7 @@ export function IncomeProtectionPage({
 
       setBackendGeneratedDocuments((current) => [persisted, ...current.filter((doc) => doc.id !== persisted.id)]);
       setHasLoadedBackendGeneratedDocuments(true);
+      syncLocalGeneratedDraft(documentType, { backendDocumentId: persisted.id });
       upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
       upsertFile(resolvedDraft.clientReference, buildGeneratedFileRecord(nextDocument));
       addToast(`${documentType} exported`, "success");
@@ -1817,6 +1822,7 @@ export function IncomeProtectionPage({
       });
       saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", {
         generationStatus: "completed",
+        backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
         integrationRequests: generatedDocument.integrationRequests ?? getDocumentDraft("Fact Find").integrationRequests,
@@ -2040,6 +2046,7 @@ export function IncomeProtectionPage({
       });
       saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", {
         generationStatus: "completed",
+        backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
         integrationRequests: generatedDocument.integrationRequests ?? getDocumentDraft("Fact Find Update").integrationRequests,
@@ -2079,6 +2086,7 @@ export function IncomeProtectionPage({
       );
       syncLocalGeneratedDraft(statementDocumentType, {
         generationStatus: "completed",
+        backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
         integrationRequests,
@@ -2287,7 +2295,7 @@ export function IncomeProtectionPage({
     }
   }
 
-  async function handleDownloadPack() {
+  async function handleDownloadPack(documentIds: string[]) {
     setDocumentPackStatus("Pack: Preparing pack...");
     try {
       if (!canUseBackend) {
@@ -2295,7 +2303,7 @@ export function IncomeProtectionPage({
         addToast("Document pack downloaded", "success");
         return;
       }
-      await downloadDocumentPack(selectedClientReference);
+      await downloadDocumentPack(selectedClientReference, documentIds);
       setDocumentPackStatus("Pack: Downloaded");
       addToast("Document pack downloaded", "success");
     } catch (error) {

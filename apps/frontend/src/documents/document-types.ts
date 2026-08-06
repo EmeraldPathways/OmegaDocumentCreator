@@ -50,6 +50,7 @@ export type GeneratedDocumentDraftStatus = "idle" | "generating" | "completed" |
 export type GeneratedDocumentDraft = {
   selectedTemplateId: string;
   generationStatus: GeneratedDocumentDraftStatus;
+  backendDocumentId: string | null;
   lastGeneratedHtml: string;
   lastGeneratedSections: GeneratedDocumentSection[];
   integrationRequests: IntegrationRequestArtifact[];
@@ -77,4 +78,5 @@ export type ComposedDocument = {
   documentType: SupportedDocumentType;
   title: string;
   blocks: ComposedBlock[];
+  rootClassName?: string;
 };

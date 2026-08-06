@@ -73,6 +73,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Fact Find": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Fact Find"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -81,6 +82,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Fact Find Update": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Fact Find Update"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -89,6 +91,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Terms of Business": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Terms of Business"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -97,6 +100,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Statement of Suitability": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Statement of Suitability"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -105,6 +109,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Quote": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Quote"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -113,6 +118,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Pensions Statement": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Pensions Statement"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],
@@ -121,6 +127,7 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     "Pensions Quote": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Pensions Quote"],
       generationStatus: "idle",
+      backendDocumentId: null,
       lastGeneratedHtml: "",
       lastGeneratedSections: [],
       integrationRequests: [],

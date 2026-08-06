@@ -12,6 +12,7 @@ type GenerateDocumentRequest = {
 };
 
 type GenerateDocumentResponseItem = {
+  documentId: string | null;
   title: string;
   summary: string;
   sections: GeneratedDocumentSection[];
@@ -35,6 +36,7 @@ type RawGeneratedSection = {
 
 type RawGenerateDocumentResponse = {
   item?: {
+    document_id?: string | null;
     title?: string;
     summary?: string;
     sections?: RawGeneratedSection[];
@@ -253,6 +255,7 @@ export async function generateDocument({
   }
 
   return {
+    documentId: payload.item.document_id ?? null,
     title: payload.item.title ?? documentType,
     summary: payload.item.summary ?? "",
     sections: normalizeSections(payload.item.sections),

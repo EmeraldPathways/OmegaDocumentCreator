@@ -3274,6 +3274,40 @@ button {
   padding-block: var(--space-4);
 }
 
+.document-pack-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.document-pack-checkbox input,
+.document-pack-select-all input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-secondary);
+  cursor: pointer;
+}
+
+.document-pack-checkbox.is-disabled input,
+.document-pack-select-all input:disabled {
+  cursor: not-allowed;
+}
+
+.document-pack-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.document-pack-selection-count {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
 .generated-document-info {
   min-width: 0;
 }

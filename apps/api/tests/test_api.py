@@ -1916,6 +1916,39 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(download_response.status_code, 200)
         self.assertEqual(download_response.content, b"pdf-bytes")
 
+    def test_create_document_with_document_id_updates_existing_draft_row(self) -> None:
+        self._login_as_staff()
+        generated = self.client.post("/documents/generate", json=self._document_generation_payload())
+        self.assertEqual(generated.status_code, 200)
+        document_id = generated.json()["item"]["document_id"]
+        self.assertIsNotNone(document_id)
+
+        response = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_id": document_id,
+                "document_type": "Statement of Suitability",
+                "document_name": "Statement_for_Jamie",
+                "version": "Version 1",
+                "status": "PDF ready",
+                "preview_title": "Statement of Suitability",
+                "preview_html": "<article class=\"workflow-document\"><h1>Saved</h1></article>",
+            },
+            files={"artifact": ("Statement_for_Jamie.pdf", b"pdf-bytes", "application/pdf")},
+        )
+        self.assertEqual(response.status_code, 201)
+        item = response.json()["item"]
+        self.assertEqual(item["id"], document_id)
+        self.assertEqual(item["status"], "PDF ready")
+        self.assertEqual(item["document_name"], "Statement_for_Jamie")
+        self.assertIsNotNone(item["pdf_file_path"])
+        self.assertIn("workflow-document", item["preview_html"])
+
+        list_response = self.client.get("/clients/CLI-2026-0002/documents")
+        self.assertEqual(list_response.status_code, 200)
+        matching_items = [doc for doc in list_response.json()["items"] if doc["id"] == document_id]
+        self.assertEqual(len(matching_items), 1)
+
     def test_create_document_rejects_empty_artifact_upload(self) -> None:
         self._login_as_staff()
         response = self.client.post(
@@ -2019,6 +2052,42 @@ class ApiTests(unittest.TestCase):
         self.assertIn("Fact_Find_Jamie.docx", names)
         self.assertEqual(zip_file.read("Statement_for_Jamie.pdf"), b"pdf-content")
         self.assertEqual(zip_file.read("Fact_Find_Jamie.docx"), b"docx-content")
+
+    def test_document_pack_can_return_selected_subset(self) -> None:
+        self._login_as_staff()
+        first = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Statement of Suitability",
+                "document_name": "Statement_for_Jamie",
+                "version": "Version 1",
+                "status": "PDF ready",
+            },
+            files={"artifact": ("Statement_for_Jamie.pdf", b"pdf-content", "application/pdf")},
+        )
+        self.assertEqual(first.status_code, 201)
+        first_id = first.json()["item"]["id"]
+
+        second = self.client.post(
+            "/clients/CLI-2026-0002/documents",
+            data={
+                "document_type": "Fact Find",
+                "document_name": "Fact_Find_Jamie",
+                "version": "1",
+                "status": "DOCX ready",
+            },
+            files={"artifact": ("Fact_Find_Jamie.docx", b"docx-content", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+        )
+        self.assertEqual(second.status_code, 201)
+
+        pack_response = self.client.get(f"/clients/CLI-2026-0002/documents/pack?document_id={first_id}")
+        self.assertEqual(pack_response.status_code, 200)
+
+        import io, zipfile
+        zip_file = zipfile.ZipFile(io.BytesIO(pack_response.content))
+        names = sorted(zip_file.namelist())
+        self.assertEqual(names, ["Statement_for_Jamie.pdf"])
+        self.assertEqual(zip_file.read("Statement_for_Jamie.pdf"), b"pdf-content")
 
     def test_document_pack_includes_both_artifacts_when_doc_has_pdf_and_docx(self) -> None:
         """A single document row with both PDF and DOCX artifacts packs both."""

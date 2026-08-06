@@ -59,6 +59,30 @@ class DocumentRepository:
             doc.pdf_file_path = pdf_path
         return doc
 
+    def update_metadata(
+        self,
+        document_id: str,
+        *,
+        document_type: str,
+        document_name: str,
+        status: str,
+        version: str,
+        preview_title: str | None,
+        preview_html: str | None,
+        generated_by: str | None,
+    ) -> Document | None:
+        doc = self.get_by_id(document_id)
+        if doc is None:
+            return None
+        doc.document_type = document_type
+        doc.document_name = document_name
+        doc.status = status
+        doc.version = version
+        doc.preview_title = preview_title
+        doc.preview_html = preview_html
+        doc.generated_by = generated_by
+        return doc
+
     def get_terms(self, client_id: str) -> TermsOfBusiness | None:
         return self._db.query(TermsOfBusiness).filter(TermsOfBusiness.client_id == client_id).first()
 

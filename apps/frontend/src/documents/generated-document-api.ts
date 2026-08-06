@@ -18,6 +18,7 @@ export type BackendGeneratedDocument = {
 };
 
 export type CreateDocumentPayload = {
+  document_id?: string;
   document_type: string;
   document_name?: string;
   version?: string;
@@ -79,6 +80,7 @@ export async function createDocument(
 
   if (artifact) {
     const form = new FormData();
+    if (payload.document_id) form.append("document_id", payload.document_id);
     form.append("document_type", payload.document_type);
     if (payload.document_name) form.append("document_name", payload.document_name);
     if (payload.version) form.append("version", payload.version);
@@ -153,9 +155,17 @@ export async function deleteDocument(
 
 export async function downloadDocumentPack(
   clientReference: string,
+  documentIds?: string[],
 ): Promise<void> {
+  const query = new URLSearchParams();
+  (documentIds ?? []).forEach((documentId) => {
+    if (documentId) {
+      query.append("document_id", documentId);
+    }
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : "";
   const response = await fetch(
-    `/clients/${encodeURIComponent(clientReference)}/documents/pack`,
+    `/clients/${encodeURIComponent(clientReference)}/documents/pack${suffix}`,
     { credentials: "same-origin" },
   );
 
