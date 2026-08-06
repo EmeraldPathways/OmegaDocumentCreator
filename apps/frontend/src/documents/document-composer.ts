@@ -1220,6 +1220,10 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
     documentType,
     title: documentType,
     blocks: isStatement ? bodyBlocks : sharedBlocks,
+    rootClassName:
+      documentType === "Fact Find"
+        ? `workflow-document-fact-find-${profile.factFindType === "small" ? "small" : "all"}`
+        : undefined,
   };
 }
 
@@ -1332,18 +1336,19 @@ function renderEditorBlock(block: ComposedBlock) {
 }
 
 export function renderComposedDocumentHtml(document: ComposedDocument) {
-  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document.documentType))}">${document.blocks
+  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document))}">${document.blocks
     .map((block) => renderBlock(block))
     .join("")}</article>`;
 }
 
 export function renderComposedDocumentEditorHtml(document: ComposedDocument) {
-  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document.documentType))}">${document.blocks
+  return `<article class="${escapeHtml(getWorkflowDocumentClassNames(document))}">${document.blocks
     .map((block) => renderEditorBlock(block))
     .join("")}</article>`;
 }
 
-function getWorkflowDocumentClassNames(documentType: SupportedDocumentType) {
+function getWorkflowDocumentClassNames(document: ComposedDocument) {
+  const { documentType, rootClassName } = document;
   const classes = ["workflow-document", `workflow-document-${documentType.toLowerCase().replace(/\s+/g, "-")}`];
 
   if (documentType === "Pensions Statement") {
@@ -1352,6 +1357,10 @@ function getWorkflowDocumentClassNames(documentType: SupportedDocumentType) {
 
   if (documentType === "Pensions Quote") {
     classes.push("workflow-document-quote");
+  }
+
+  if (rootClassName) {
+    classes.push(rootClassName);
   }
 
   return classes.join(" ");

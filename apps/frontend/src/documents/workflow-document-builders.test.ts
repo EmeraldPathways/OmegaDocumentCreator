@@ -595,7 +595,7 @@ describe("buildWorkflowDocument", () => {
 
     const document = buildWorkflowEditorDocument(profile, "Fact Find");
 
-    expect(document.html).toContain('<article class="workflow-document workflow-document-fact-find">');
+    expect(document.html).toContain('<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all">');
     expect(document.html).toContain('class="document-inline-header"');
     expect(document.html).toContain('class="statement-letter-header"');
     expect(document.html).toContain('class="document-banner"');

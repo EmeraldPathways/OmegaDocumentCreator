@@ -23,6 +23,18 @@ function hasLegacyFactFindHeaderHtml(editedHtml: string) {
   );
 }
 
+function hasComposedFactFindHtml(editedHtml: string) {
+  return (
+    editedHtml.includes("workflow-document-fact-find")
+    && editedHtml.includes("statement-letter-header")
+  );
+}
+
+function hasMatchingFactFindVariant(editedHtml: string, factFindType: string | undefined) {
+  const normalizedType = factFindType === "small" ? "small" : "all";
+  return editedHtml.includes(`workflow-document-fact-find-${normalizedType}`);
+}
+
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   const hasComposedHtml = hasComposedStatementHtml(editedHtml);
@@ -79,8 +91,10 @@ export function resolveStatementDraft(
 export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
   const factFindDraft = profile.documentDrafts[FACT_FIND_DOCUMENT_TYPE];
   const editedHtml = factFindDraft.editedHtml.trim();
+  const shouldRebuildComposedHtml =
+    hasComposedFactFindHtml(editedHtml) && !hasMatchingFactFindVariant(editedHtml, profile.factFindType);
 
-  if (!hasLegacyFactFindHeaderHtml(editedHtml)) {
+  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !shouldRebuildComposedHtml) {
     return factFindDraft;
   }
 

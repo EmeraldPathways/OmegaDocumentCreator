@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
-import { resolveStatementDraft } from "./statement-draft";
+import { resolveFactFindDraft, resolveStatementDraft } from "./statement-draft";
 
 function cloneProfile(clientReference: string) {
   return JSON.parse(JSON.stringify(getSeededClientProfile(clientReference))) as SeededClientProfile;
@@ -47,5 +47,48 @@ describe("resolveStatementDraft", () => {
     expect(draft.editedHtml).toContain("106.64pm");
     expect(draft.editedHtml).not.toContain("165.50");
     expect(draft.editedHtml).not.toContain("99.30pm");
+  });
+});
+
+describe("resolveFactFindDraft", () => {
+  it("rebuilds composed fact find html when fact find small is selected", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindType = "small";
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-grid"><h2>Assets &amp; Liabilities</h2></div><div class="document-grid"><h2>Pension Arrangements</h2></div><div class="document-grid"><h2>Life Insurance &amp; Serious Illness</h2></div><div class="document-section"><h2>Savings &amp; Investments</h2></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("workflow-document-fact-find-small");
+    expect(draft.editedHtml).not.toContain("Assets &amp; Liabilities");
+    expect(draft.editedHtml).not.toContain("Pension Arrangements");
+    expect(draft.editedHtml).not.toContain("Life Insurance &amp; Serious Illness");
+    expect(draft.editedHtml).not.toContain("Savings &amp; Investments");
+  });
+
+  it("rebuilds composed fact find html when fact find all is selected", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindType = "all";
+    profile.assetHomeSelf = "350000";
+    profile.liabilityMortgageBalanceOutstanding = "180000";
+    profile.selfRetirementAge = "60";
+    profile.selfEmployeeDirectorSchemeType = "Executive Pension";
+    profile.selfLifeInsuranceAmount = "100000";
+    profile.savingsInvestmentRows[0] = {
+      financialInstitution: "AIB",
+      value: "12000",
+      startDate: "2024-01-01",
+      term: "5 years",
+    };
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-small"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-grid"><h2>Client Summary</h2></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("workflow-document-fact-find-all");
+    expect(draft.editedHtml).toContain("Assets &amp; Liabilities");
+    expect(draft.editedHtml).toContain("Pension Arrangements");
+    expect(draft.editedHtml).toContain("Life Insurance &amp; Serious Illness");
+    expect(draft.editedHtml).toContain("Savings &amp; Investments");
   });
 });
