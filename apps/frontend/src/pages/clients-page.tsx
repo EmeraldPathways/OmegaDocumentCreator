@@ -51,7 +51,7 @@ function getClientStatusVariant(status: string): Parameters<typeof Badge>[0]["va
   }
 }
 
-function MetricCard({
+function CompactMetric({
   icon: Icon,
   value,
   label,
@@ -61,13 +61,13 @@ function MetricCard({
   label: string;
 }) {
   return (
-    <div className="metric-card">
-      <div className="metric-icon">
-        <Icon size={22} />
+    <div className="clients-header-metric">
+      <div className="clients-header-metric-icon">
+        <Icon size={16} />
       </div>
-      <div>
-        <div className="metric-value">{value}</div>
-        <div className="metric-label">{label}</div>
+      <div className="clients-header-metric-copy">
+        <div className="clients-header-metric-value">{value}</div>
+        <div className="clients-header-metric-label">{label}</div>
       </div>
     </div>
   );
@@ -195,29 +195,32 @@ export function ClientsPage() {
   }
 
   return (
-    <div className="page-stack">
-      <section className="section-divided">
-        <div className="page-heading page-heading-compact">
-          <div>
-            <h1>Clients</h1>
-            <p className="page-subtitle">Manage your client records and insurance documents.</p>
+    <div className="page-stack clients-page">
+      <section className="clients-page-header-shell">
+        <section className="workflow-header clients-page-header" aria-label="Clients overview">
+          <div className="workflow-header-top">
+            <div className="workflow-header-title clients-page-header-title">
+              <div>
+                <h1>Clients</h1>
+                <p className="page-subtitle">Manage your client records and insurance documents.</p>
+              </div>
+            </div>
+            <div className="clients-page-header-metrics" aria-label="Client totals">
+              <CompactMetric icon={Users} label="Total clients" value={clients.length} />
+              <CompactMetric icon={FileText} label="Active files" value={activeClients} />
+              <CompactMetric icon={Edit3} label="Drafts" value={draftClients} />
+            </div>
+            <div className="workflow-header-actions clients-page-header-actions">
+              <Link className="btn btn-primary" to="/clients/new">
+                <Plus size={18} />
+                Create Client
+              </Link>
+            </div>
           </div>
-          <div className="page-actions">
-            <Link className="btn btn-primary" to="/clients/new">
-              <Plus size={18} />
-              Create Client
-            </Link>
-          </div>
-        </div>
-
-        <div className="metric-grid">
-          <MetricCard icon={Users} label="Total clients" value={clients.length} />
-          <MetricCard icon={FileText} label="Active files" value={activeClients} />
-          <MetricCard icon={Edit3} label="Drafts" value={draftClients} />
-        </div>
+        </section>
       </section>
 
-      <section className="section-divided">
+      <section className="clients-page-content-shell">
         <div className="section-toolbar">
           <div className="field" style={{ maxWidth: "320px", width: "100%" }}>
             <label className="field-label" htmlFor="client-search">

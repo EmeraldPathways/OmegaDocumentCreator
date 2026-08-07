@@ -1606,6 +1606,111 @@ button {
   align-self: center;
 }
 
+.clients-page .clients-page-header {
+  margin-bottom: 0;
+}
+
+.clients-page .clients-page-header-title {
+  align-items: flex-start;
+}
+
+.clients-page .clients-page-header-title .page-subtitle {
+  margin-top: var(--space-2);
+}
+
+.clients-page .clients-page-header-metrics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.clients-page .clients-header-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: var(--radius-md);
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.clients-page .clients-header-metric-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--color-secondary-light);
+  color: var(--color-secondary);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.clients-page .clients-header-metric-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.clients-page .clients-header-metric-value {
+  font-size: 1.625rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.clients-page .clients-header-metric-label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.clients-page .clients-page-header-actions {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-top: 0;
+  border-radius: 0;
+  gap: var(--space-2);
+}
+
+.client-profile-page .client-profile-header {
+  margin-bottom: 0;
+}
+
+.client-profile-page .client-profile-header-title {
+  align-items: flex-start;
+  flex: 1 1 auto;
+}
+
+.client-profile-page .client-profile-header-actions {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-top: 0;
+  border-radius: 0;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  align-self: flex-start;
+  justify-content: flex-end;
+}
+
+.clients-page-header-shell,
+.clients-page-content-shell,
+.client-profile-header-shell {
+  border-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.client-profile-header-shell {
+  margin-bottom: var(--space-4);
+}
+
 .income-protection-page .workflow-client-field .field-label {
   margin-bottom: 6px;
 }
@@ -3272,27 +3377,39 @@ button {
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-8);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
 }
 
 .profile-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
   padding: var(--space-4);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.84);
 }
 
+.profile-section .section-title {
+  grid-column: 1 / -1;
+  margin-bottom: var(--space-1);
+}
+
 .profile-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 6px;
+  min-width: 0;
+}
+
+.profile-field-wide {
+  grid-column: 1 / -1;
 }
 
 .profile-field-label {
-  font-size: var(--font-size-small);
+  font-size: 11px;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -3302,10 +3419,13 @@ button {
 .profile-field-value {
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .profile-field-empty {
   color: var(--color-text-muted);
+  line-height: 1.35;
 }
 
 /* Section header */
@@ -4698,6 +4818,14 @@ button {
 
   .profile-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-section {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-field-wide {
+    grid-column: auto;
   }
 
   .header-row {

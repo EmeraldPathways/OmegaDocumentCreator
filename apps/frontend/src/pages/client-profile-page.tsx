@@ -362,14 +362,12 @@ export function ClientProfilePage() {
   const fullAddress = [resolvedDraft.townCity, resolvedDraft.county].filter(Boolean).join(", ") || "—";
 
   return (
-    <div className="page-stack">
-      <section className="section-divided">
-        <div className="profile-header">
-          <nav aria-label="Breadcrumb" className="breadcrumb">
-            <Link to="/clients">Clients</Link>
-            <span>/</span>
-            <span>{resolvedDraft.fullName}</span>
-          </nav>
+    <div className="page-stack client-profile-page">
+      <section className="client-profile-header-shell">
+        <section className="workflow-header client-profile-header" aria-label="Client summary">
+          <div className="workflow-header-top">
+            <div className="workflow-header-title client-profile-header-title">
+              <div>
           <h1 className="profile-name">{resolvedDraft.fullName}</h1>
           <div className="profile-meta-row">
             <span className="text-monospace" style={{ color: "var(--color-secondary)" }}>
@@ -380,9 +378,10 @@ export function ClientProfilePage() {
             <span>·</span>
             <span>last edited by {resolvedDraft.updatedBy}</span>
           </div>
-        </div>
+              </div>
+            </div>
+          <div className="workflow-header-actions client-profile-header-actions">
 
-        <div className="page-actions" style={{ marginBottom: "var(--space-5)" }}>
           <Link className="btn btn-primary" to={`/clients/${resolvedDraft.clientReference}/edit`}>
             <Edit size={18} />
             Edit Client
@@ -400,6 +399,8 @@ export function ClientProfilePage() {
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save Documents"}
           </Button>
         </div>
+          </div>
+        </section>
 
         <div className="profile-grid">
           <div className="profile-section">
@@ -427,8 +428,8 @@ export function ClientProfilePage() {
             <ProfileField label="Town / City" value={resolvedDraft.townCity} />
             <ProfileField label="County" value={resolvedDraft.county} />
             <ProfileField label="Eircode" value={resolvedDraft.eircode} />
-            <ProfileField label="Full address" value={fullAddress} />
-            <ProfileField label="General notes" value={resolvedDraft.generalNotes} />
+            <ProfileField label="Full address" value={fullAddress} wide />
+            <ProfileField label="General notes" value={resolvedDraft.generalNotes} wide />
           </div>
         </div>
       </section>
@@ -656,10 +657,10 @@ export function ClientProfilePage() {
   );
 }
 
-function ProfileField({ label, value }: { label: string; value: string | undefined | null }) {
+function ProfileField({ label, value, wide = false }: { label: string; value: string | undefined | null; wide?: boolean }) {
   const displayValue = formatEmpty(value);
   return (
-    <div className="profile-field">
+    <div className={`profile-field${wide ? " profile-field-wide" : ""}`}>
       <span className="profile-field-label">{label}</span>
       <span className={displayValue === "—" ? "profile-field-empty" : "profile-field-value"}>{displayValue}</span>
     </div>
