@@ -2130,10 +2130,20 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-row,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-row,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 84px minmax(220px, 1fr) 34px 104px;
+  align-items: center;
+  column-gap: 8px;
   margin-bottom: 12px;
+}
+
+.workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+.workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
+  margin-bottom: 20px;
 }
 
 .workflow-document-fact-find .fact-find-signature-label,
@@ -2142,9 +2152,11 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-label,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-label,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-label {
-  margin: 0 2px 4px 0;
-  min-width: 76px;
+  margin: 0;
+  min-width: 0;
   font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .workflow-document-fact-find .fact-find-signature-label-date,
@@ -2153,8 +2165,9 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-label-date,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-label-date,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-label-date {
-  min-width: 32px;
-  margin-left: 2px;
+  min-width: 0;
+  margin-left: 0;
+  text-align: left;
 }
 
 .workflow-document-fact-find .fact-find-signature-field,
@@ -2163,7 +2176,12 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field {
-  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  align-self: center;
+  padding-bottom: 1px;
+  border-bottom: 1px solid #6b7280;
 }
 
 .workflow-document-fact-find .fact-find-signature-field-date,
@@ -2172,7 +2190,7 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field-date,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field-date,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field-date {
-  flex: 0 0 116px;
+  width: 104px;
 }
 
 .workflow-document-fact-find .fact-find-signature-value,
@@ -2180,7 +2198,23 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-value,
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-value,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-value,
-.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-value,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-value {
+  margin: 0;
+  min-height: 0;
+  line-height: 1;
+  padding: 0;
+  font-weight: 600;
+}
+
+.workflow-document-fact-find .fact-find-signature-field .fact-find-signature-value,
+.workflow-document-fact-find-update .fact-find-signature-field .fact-find-signature-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-field .fact-find-signature-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field .fact-find-signature-value,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field .fact-find-signature-value,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field .fact-find-signature-value {
+  border-bottom: 0;
+}
+
 .workflow-document-fact-find .fact-find-request-value,
 .workflow-document-fact-find-update .fact-find-request-value,
 .generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-value,
@@ -2189,7 +2223,7 @@ button {
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-value {
   margin: 0;
   min-height: 24px;
-  padding: 0 0 4px;
+  padding: 0 0 2px;
   border-bottom: 1px solid #6b7280;
   font-weight: 600;
 }

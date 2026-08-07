@@ -1135,7 +1135,7 @@ function buildStatementClosingHtml(profile: SeededClientProfile) {
   ].join("");
 }
 
-function buildStatementDeclarationHtml() {
+function buildStatementDeclarationHtml(profile: SeededClientProfile) {
   return [
     '<div class="statement-section statement-declaration">',
     "<h2>Declaration to be completed by Client:</h2>",
@@ -1143,7 +1143,7 @@ function buildStatementDeclarationHtml() {
     '<div class="statement-signature-area statement-signature-row">',
     '<div class="statement-signature-block">',
     '<p class="statement-signature-line">_______________________</p>',
-    '<p class="statement-signature-label">&nbsp;</p>',
+    `<p class="statement-signature-label"><strong>${escapeHtml(valueOrFallback(profile.fullName, [profile.firstName, profile.surname].filter(Boolean).join(" ") || "Client"))}</strong></p>`,
     "</div>",
     '<div class="statement-signature-block statement-signature-block-date">',
     '<p class="statement-signature-line">______________</p>',
@@ -1203,7 +1203,7 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     buildStatementClosingHtml(profile),
     buildStatementImportantInfoHtml1(),
     buildStatementImportantInfoHtml2(),
-    buildStatementDeclarationHtml(),
+    buildStatementDeclarationHtml(profile),
   ].join("");
 
   return bodyHtml;

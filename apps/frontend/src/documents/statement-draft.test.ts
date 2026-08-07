@@ -103,6 +103,18 @@ describe("resolveFactFindDraft", () => {
     expect(draft.editedHtml).toContain("fact-find-request-row");
   });
 
+  it("rebuilds legacy non-composed fact find html into the current workflow layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].editedHtml =
+      "<p>Legacy Fact Find output</p>";
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("workflow-document-fact-find");
+    expect(draft.editedHtml).toContain("fact-find-signing-block");
+    expect(draft.editedHtml).not.toContain("Legacy Fact Find output");
+  });
+
   it("rebuilds composed fact find html when signature lines still contain saved values", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.documentDrafts["Fact Find"].editedHtml =
@@ -152,5 +164,17 @@ describe("resolveFactFindUpdateDraft", () => {
 
     expect(draft.editedHtml).toContain("fact-find-signing-block");
     expect(draft.editedHtml).toContain("FINANCIAL ADVISOR'S SIGNATURE");
+  });
+
+  it("rebuilds legacy non-composed fact find update html into the current workflow layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find Update"].editedHtml =
+      "<p>Legacy Fact Find Update output</p>";
+
+    const draft = resolveFactFindUpdateDraft(profile);
+
+    expect(draft.editedHtml).toContain("workflow-document-fact-find-update");
+    expect(draft.editedHtml).toContain("fact-find-signing-block");
+    expect(draft.editedHtml).not.toContain("Legacy Fact Find Update output");
   });
 });

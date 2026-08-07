@@ -85,6 +85,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("I am happy to proceed on the basis of the recommendation given to me and wish to affect the policy recommended.");
     expect(document.html).not.toContain("Amanda McLaughlin");
     expect(document.html).toContain('class="statement-signature-label"><strong>Office Staff</strong></p>');
+    expect(document.html).toContain('class="statement-signature-label"><strong>Jamie Murphy</strong></p>');
     expect(document.html).toContain('class="statement-signature-block statement-signature-block-date"');
     expect(document.html).toContain("statement-declaration");
     expect(document.html).toContain("statement-important-info");

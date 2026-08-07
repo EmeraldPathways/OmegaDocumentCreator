@@ -107,6 +107,16 @@ function hasComposedFactFindUpdateHtml(editedHtml: string) {
   );
 }
 
+function isLegacyFactFindDraft(draft: GeneratedDocumentDraft) {
+  const editedHtml = draft.editedHtml.trim();
+  return editedHtml.length > 0 && !hasComposedFactFindHtml(editedHtml);
+}
+
+function isLegacyFactFindUpdateDraft(draft: GeneratedDocumentDraft) {
+  const editedHtml = draft.editedHtml.trim();
+  return editedHtml.length > 0 && !hasComposedFactFindUpdateHtml(editedHtml);
+}
+
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   const hasComposedHtml = hasComposedStatementHtml(editedHtml);
@@ -173,7 +183,7 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
       !hasCurrentFactFindServicesLayout(editedHtml)
     );
 
-  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !shouldRebuildComposedHtml) {
+  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !isLegacyFactFindDraft(factFindDraft) && !shouldRebuildComposedHtml) {
     return factFindDraft;
   }
 
@@ -201,7 +211,7 @@ export function resolveFactFindUpdateDraft(profile: SeededClientProfile): Genera
     hasComposedFactFindUpdateHtml(editedHtml) &&
     !hasCurrentFactFindSigningLayout(editedHtml);
 
-  if (!shouldRebuildComposedHtml) {
+  if (!isLegacyFactFindUpdateDraft(factFindUpdateDraft) && !shouldRebuildComposedHtml) {
     return factFindUpdateDraft;
   }
 

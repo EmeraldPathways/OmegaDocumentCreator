@@ -217,11 +217,25 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-signature-area")) {
-    return "display:block;margin:16px 0 0";
+    return classList.contains("statement-signature-row")
+      ? "display:flex;align-items:flex-start;column-gap:24px;margin:16px 0 0"
+      : "display:block;margin:16px 0 0";
+  }
+
+  if (classList.contains("statement-signature-block")) {
+    return "display:flex;flex-direction:column;align-items:flex-start";
+  }
+
+  if (classList.contains("statement-signature-block-date")) {
+    return "display:flex;flex-direction:column;align-items:flex-start;margin-left:12px";
   }
 
   if (classList.contains("statement-signature-line")) {
     return "margin:0";
+  }
+
+  if (classList.contains("statement-signature-label")) {
+    return "margin:8px 0 0";
   }
 
   if (classList.contains("statement-declaration")) {
@@ -237,15 +251,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:flex;align-items:flex-end;gap:8px;margin:0 0 12px";
+    return "display:grid;grid-template-columns:84px minmax(220px,1fr) 34px 104px;align-items:center;column-gap:8px;margin:0 0 12px";
   }
 
   if (classList.contains("fact-find-signature-field")) {
-    return "display:block;flex:1 1 auto";
+    return "display:flex;align-items:center;min-width:0;align-self:center;padding-bottom:1px;border-bottom:1px solid #6b7280";
   }
 
   if (classList.contains("fact-find-signature-field-date")) {
-    return "display:block;flex:0 0 116px";
+    return "display:flex;align-items:center;min-width:0;align-self:center;width:104px;padding-bottom:1px;border-bottom:1px solid #6b7280";
   }
 
   if (classList.contains("fact-find-request-copy")) {
@@ -278,15 +292,19 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-label")) {
-    return "margin:0 2px 4px 0;min-width:76px;font-size:14px";
+    return "margin:0;min-width:0;font-size:14px;line-height:1;white-space:nowrap";
   }
 
   if (classList.contains("fact-find-signature-label-date")) {
-    return "margin:0 2px 4px 2px;min-width:32px;font-size:14px";
+    return "margin:0;min-width:0;font-size:14px;line-height:1;white-space:nowrap;text-align:left";
   }
 
-  if (classList.contains("fact-find-signature-value") || classList.contains("fact-find-request-value")) {
-    return "margin:0;min-height:24px;padding:0 0 4px;border-bottom:1px solid #6b7280;font-weight:600";
+  if (classList.contains("fact-find-signature-value")) {
+    return "margin:0;min-height:0;line-height:1;padding:0;border-bottom:0;font-weight:600";
+  }
+
+  if (classList.contains("fact-find-request-value")) {
+    return "margin:0;min-height:24px;padding:0 0 2px;border-bottom:1px solid #6b7280;font-weight:600";
   }
 
   if (classList.contains("fact-find-request-label")) {
@@ -1041,6 +1059,26 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-statement-of-suitability .statement-signature-area {
     margin-top: 16px;
   }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-row {
+    display: flex;
+    align-items: flex-start;
+    column-gap: 24px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-block-date {
+    margin-left: 12px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-line,
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-label {
+    margin: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-signature-label {
+    margin-top: 8px;
+  }
   .preview-page .workflow-document-statement-of-suitability .statement-declaration {
     border: 1px solid #000;
     padding: 14px 16px;
@@ -1063,37 +1101,60 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-row,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 84px minmax(220px, 1fr) 34px 104px;
+    align-items: center;
+    column-gap: 8px;
     margin-bottom: 12px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
+    margin-bottom: 20px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-label,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-label {
-    margin: 0 2px 4px 0;
-    min-width: 76px;
+    margin: 0;
+    min-width: 0;
     font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-label-date,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-label-date {
-    min-width: 32px;
-    margin-left: 2px;
+    min-width: 0;
+    margin-left: 0;
+    text-align: left;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-field,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-field {
-    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    align-self: center;
+    padding-bottom: 1px;
+    border-bottom: 1px solid #6b7280;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-field-date,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-field-date {
-    flex: 0 0 116px;
+    width: 104px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-value,
-  .preview-page .workflow-document-fact-find-update .fact-find-signature-value,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-value {
+    margin: 0;
+    min-height: 0;
+    line-height: 1;
+    padding: 0;
+    font-weight: 600;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-field .fact-find-signature-value,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-field .fact-find-signature-value {
+    border-bottom: 0;
+  }
   .preview-page .workflow-document-fact-find .fact-find-request-value,
   .preview-page .workflow-document-fact-find-update .fact-find-request-value {
     margin: 0;
     min-height: 24px;
-    padding: 0 0 4px;
+    padding: 0 0 2px;
     border-bottom: 1px solid #6b7280;
     font-weight: 600;
   }
