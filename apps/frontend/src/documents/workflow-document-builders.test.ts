@@ -547,6 +547,262 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("<p>Needs line 1.</p><p>Needs line 2.</p>");
   });
 
+  it("includes full liabilities, savings, life insurance, and pension detail fields in fact find output and editor html", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.assetLandPropertySelf = "450000";
+    profile.assetCreditUnionPartner = "18000";
+    profile.liabilityMortgageAmount = "6000";
+    profile.liabilityMortgageMonthlyRepayment = "500";
+    profile.liabilityMortgageProvider = "AIB";
+    profile.liabilityCarLoanAmount = "5000";
+    profile.liabilityCarLoanMonthlyRepayment = "250";
+    profile.liabilityCarLoanProvider = "BOI";
+    profile.liabilityOtherLoanPaymentsAmount = "3000";
+    profile.liabilityOtherLoanPaymentsMonthlyRepayment = "150";
+    profile.liabilityOtherLoanPaymentsProvider = "PTSB";
+    profile.liabilityOthersAmount = "1200";
+    profile.liabilityOthersMonthlyRepayment = "90";
+    profile.liabilityOthersProvider = "Revolut";
+    profile.liabilityOthersDetails = "Utilities, transport and childcare.";
+    profile.totalLiabilitiesPerMonthPartner = "950";
+    profile.liabilitiesCoveredByOtherInsuranceNo = "Yes";
+    profile.liabilitiesCoveredByOtherInsuranceDetails = "Covered under an existing group scheme.";
+    profile.savingsInvestmentRows[0] = {
+      financialInstitution: "AIB Savings",
+      value: "10000.00",
+      startDate: "2024-01-01",
+      term: "5%",
+    };
+    profile.savingsInvestmentRows[1] = {
+      financialInstitution: "BOI Savings",
+      value: "9000.00",
+      startDate: "2023-06-15",
+      term: "4%",
+    };
+    profile.savingsInvestmentComments = "TEST";
+    profile.mortgageProtectionYes = "Yes";
+    profile.mortgageProtection = "Mortgage plan reference 123";
+    profile.personalInsurance = "Personal cover notes";
+    profile.keymanInsurance = "Keyman cover";
+    profile.partnershipInsurance = "Partnership cover";
+    profile.selfLifeInsuranceAmount = "200000";
+    profile.partnerLifeInsuranceAmount = "150000";
+    profile.selfSeriousIllnessAmount = "80000";
+    profile.partnerSeriousIllnessAmount = "60000";
+    profile.selfNotRetired = "Yes";
+    profile.selfRetirementAge = "65";
+    profile.selfRetirementIncomeTargetPercent = "60";
+    profile.selfEmployeeDirectorPensionYes = "Yes";
+    profile.selfEmployeeDirectorSchemeType = "Executive Pension";
+    profile.selfEmployeeDirectorRetirementAge = "65";
+    profile.selfEmployeeDirectorEmployerContribution = "450";
+    profile.selfEmployeeDirectorPersonalContribution = "250";
+    profile.selfEmployeeDirectorYearsInForce = "12";
+    profile.selfPersonalPensionYes = "Yes";
+    profile.selfPersonalPensionCompany = "Zurich";
+    profile.selfPersonalPensionPolicyType = "PRSA";
+    profile.selfPersonalPensionContribution = "325";
+    profile.selfPersonalPensionCurrentValue = "20000";
+    profile.selfPersonalPensionYearsInForce = "7";
+    profile.partnerAlreadyRetired = "Yes";
+    profile.partnerRetirementAge = "63";
+    profile.partnerRetirementIncomeTargetPercent = "55";
+    profile.partnerEmployeeDirectorPensionNo = "Yes";
+    profile.partnerEmployeeDirectorSchemeType = "Occupational";
+    profile.partnerEmployeeDirectorRetirementAge = "63";
+    profile.partnerEmployeeDirectorEmployerContribution = "400";
+    profile.partnerEmployeeDirectorPersonalContribution = "200";
+    profile.partnerEmployeeDirectorYearsInForce = "10";
+    profile.partnerPersonalPensionNo = "Yes";
+    profile.partnerPersonalPensionCompany = "Irish Life";
+    profile.partnerPersonalPensionPolicyType = "Personal Pension";
+    profile.partnerPersonalPensionContribution = "175";
+    profile.partnerPersonalPensionCurrentValue = "15000";
+    profile.partnerPersonalPensionYearsInForce = "6";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+    const editorDocument = buildWorkflowEditorDocument(profile, "Fact Find");
+
+    expect(document.html).toContain("Assets &amp; Liabilities");
+    expect(document.html).toContain("<h3>Liabilities</h3>");
+    expect(document.html).toContain('<div class="statement-quote-cell"><p>Amount</p></div>');
+    expect(document.html).toContain('<div class="statement-quote-cell"><p>Mortgage</p></div>');
+    expect(document.html).toContain("Utilities, transport and childcare.");
+    expect(document.html).toContain("Liabilities covered by other insurance");
+    expect(document.html).toContain("Covered under an existing group scheme.");
+    expect(document.html).toContain("Savings &amp; Investments");
+    expect(document.html).toContain('<div class="statement-quote-cell"><p>Financial institution</p></div>');
+    expect(document.html).toContain("AIB Savings");
+    expect(document.html).toContain("01/01/2024");
+    expect(document.html).toContain("Comments");
+    expect(document.html).toContain("TEST");
+    expect(document.html).toContain('<div class="statement-quote-cell"><p>Field</p></div>');
+    expect(document.html).toContain("Mortgage protection selected");
+    expect(document.html).toContain("Mortgage plan reference 123");
+    expect(document.html).toContain("Keyman cover");
+    expect(document.html).toContain("Pension Arrangements - Self");
+    expect(document.html).toContain("Executive Pension");
+    expect(document.html).toContain("Self personal pension company");
+    expect(document.html).toContain("Pension Arrangements - Partner");
+    expect(document.html).toContain("Irish Life");
+    expect(editorDocument.html).toContain("<h3>Liabilities</h3>");
+    expect(editorDocument.html).toContain('<div class="statement-quote-cell"><p>Mortgage</p></div>');
+    expect(editorDocument.html).toContain("Savings 2");
+    expect(editorDocument.html).toContain("15/06/2023");
+    expect(editorDocument.html).toContain("Life Insurance &amp; Serious Illness");
+    expect(editorDocument.html).toContain("Pension Arrangements - Self");
+    expect(editorDocument.html).toContain("Pension Arrangements - Partner");
+  });
+
+  it("omits whole empty fact find detail sections from output", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.assetHomeSelf = "";
+    profile.assetHomePartner = "";
+    profile.assetLandPropertySelf = "";
+    profile.assetLandPropertyPartner = "";
+    profile.assetBankBuildSocSelf = "";
+    profile.assetBankBuildSocPartner = "";
+    profile.assetCreditUnionSelf = "";
+    profile.assetCreditUnionPartner = "";
+    profile.liabilityMortgageAmount = "";
+    profile.liabilityMortgageMonthlyRepayment = "";
+    profile.liabilityMortgageProvider = "";
+    profile.liabilityMortgageBalanceOutstanding = "";
+    profile.liabilityCarLoanAmount = "";
+    profile.liabilityCarLoanMonthlyRepayment = "";
+    profile.liabilityCarLoanProvider = "";
+    profile.liabilityCarLoanBalanceOutstanding = "";
+    profile.liabilityOtherLoanPaymentsAmount = "";
+    profile.liabilityOtherLoanPaymentsMonthlyRepayment = "";
+    profile.liabilityOtherLoanPaymentsProvider = "";
+    profile.liabilityOtherLoanPaymentsBalanceOutstanding = "";
+    profile.liabilityOthersAmount = "";
+    profile.liabilityOthersMonthlyRepayment = "";
+    profile.liabilityOthersProvider = "";
+    profile.liabilityOthersBalanceOutstanding = "";
+    profile.liabilityOthersDetails = "";
+    profile.totalLiabilitiesPerMonthSelf = "";
+    profile.totalLiabilitiesPerMonthPartner = "";
+    profile.totalLiabilitiesPerMonthJoint = "";
+    profile.liabilitiesCoveredByOtherInsuranceYes = "";
+    profile.liabilitiesCoveredByOtherInsuranceNo = "";
+    profile.liabilitiesCoveredByOtherInsuranceDetails = "";
+    profile.savingsInvestmentRows = profile.savingsInvestmentRows.map(() => ({
+      financialInstitution: "",
+      value: "",
+      startDate: "",
+      term: "",
+    }));
+    profile.savingsInvestmentComments = "";
+    profile.mortgageProtection = "";
+    profile.mortgageProtectionYes = "";
+    profile.mortgageProtectionNo = "";
+    profile.personalInsurance = "";
+    profile.keymanInsurance = "";
+    profile.partnershipInsurance = "";
+    profile.selfLifeInsuranceAmount = "";
+    profile.partnerLifeInsuranceAmount = "";
+    profile.selfSeriousIllnessAmount = "";
+    profile.partnerSeriousIllnessAmount = "";
+    profile.selfAlreadyRetired = "";
+    profile.selfNotRetired = "";
+    profile.selfRetirementAge = "";
+    profile.selfRetirementIncomeTargetPercent = "";
+    profile.selfEmployeeDirectorPensionYes = "";
+    profile.selfEmployeeDirectorPensionNo = "";
+    profile.selfEmployeeDirectorSchemeType = "";
+    profile.selfEmployeeDirectorRetirementAge = "";
+    profile.selfEmployeeDirectorEmployerContribution = "";
+    profile.selfEmployeeDirectorPersonalContribution = "";
+    profile.selfEmployeeDirectorYearsInForce = "";
+    profile.selfPersonalPensionYes = "";
+    profile.selfPersonalPensionNo = "";
+    profile.selfPersonalPensionCompany = "";
+    profile.selfPersonalPensionPolicyType = "";
+    profile.selfPersonalPensionContribution = "";
+    profile.selfPersonalPensionCurrentValue = "";
+    profile.selfPersonalPensionYearsInForce = "";
+    profile.partnerAlreadyRetired = "";
+    profile.partnerNotRetired = "";
+    profile.partnerRetirementAge = "";
+    profile.partnerRetirementIncomeTargetPercent = "";
+    profile.partnerEmployeeDirectorPensionYes = "";
+    profile.partnerEmployeeDirectorPensionNo = "";
+    profile.partnerEmployeeDirectorSchemeType = "";
+    profile.partnerEmployeeDirectorRetirementAge = "";
+    profile.partnerEmployeeDirectorEmployerContribution = "";
+    profile.partnerEmployeeDirectorPersonalContribution = "";
+    profile.partnerEmployeeDirectorYearsInForce = "";
+    profile.partnerPersonalPensionYes = "";
+    profile.partnerPersonalPensionNo = "";
+    profile.partnerPersonalPensionCompany = "";
+    profile.partnerPersonalPensionPolicyType = "";
+    profile.partnerPersonalPensionContribution = "";
+    profile.partnerPersonalPensionCurrentValue = "";
+    profile.partnerPersonalPensionYearsInForce = "";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Assets &amp; Liabilities");
+    expect(document.html).not.toContain("Savings &amp; Investments");
+    expect(document.html).not.toContain("Life Insurance &amp; Serious Illness");
+    expect(document.html).not.toContain("Pension Arrangements - Self");
+    expect(document.html).not.toContain("Pension Arrangements - Partner");
+  });
+
+  it("does not show pension or life insurance sections from seeded default no-values alone", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+
+    profile.selfRetirementAge = "";
+    profile.selfRetirementIncomeTargetPercent = "";
+    profile.selfEmployeeDirectorPensionYes = "";
+    profile.selfEmployeeDirectorPensionNo = "";
+    profile.selfEmployeeDirectorSchemeType = "";
+    profile.selfEmployeeDirectorRetirementAge = "";
+    profile.selfEmployeeDirectorEmployerContribution = "";
+    profile.selfEmployeeDirectorPersonalContribution = "";
+    profile.selfEmployeeDirectorYearsInForce = "";
+    profile.selfPersonalPensionYes = "";
+    profile.selfPersonalPensionNo = "";
+    profile.selfPersonalPensionCompany = "";
+    profile.selfPersonalPensionPolicyType = "";
+    profile.selfPersonalPensionContribution = "";
+    profile.selfPersonalPensionCurrentValue = "";
+    profile.selfPersonalPensionYearsInForce = "";
+    profile.partnerRetirementAge = "";
+    profile.partnerRetirementIncomeTargetPercent = "";
+    profile.partnerEmployeeDirectorPensionYes = "";
+    profile.partnerEmployeeDirectorPensionNo = "";
+    profile.partnerEmployeeDirectorSchemeType = "";
+    profile.partnerEmployeeDirectorRetirementAge = "";
+    profile.partnerEmployeeDirectorEmployerContribution = "";
+    profile.partnerEmployeeDirectorPersonalContribution = "";
+    profile.partnerEmployeeDirectorYearsInForce = "";
+    profile.partnerPersonalPensionYes = "";
+    profile.partnerPersonalPensionNo = "";
+    profile.partnerPersonalPensionCompany = "";
+    profile.partnerPersonalPensionPolicyType = "";
+    profile.partnerPersonalPensionContribution = "";
+    profile.partnerPersonalPensionCurrentValue = "";
+    profile.partnerPersonalPensionYearsInForce = "";
+    profile.mortgageProtection = "No";
+    profile.mortgageProtectionYes = "";
+    profile.mortgageProtectionNo = "Yes";
+    profile.personalInsurance = "No";
+    profile.keymanInsurance = "No";
+    profile.partnershipInsurance = "No";
+    profile.selfLifeInsuranceAmount = "";
+    profile.partnerLifeInsuranceAmount = "";
+    profile.selfSeriousIllnessAmount = "";
+    profile.partnerSeriousIllnessAmount = "";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Pension Arrangements - Self");
+    expect(document.html).not.toContain("Pension Arrangements - Partner");
+    expect(document.html).not.toContain("Life Insurance &amp; Serious Illness");
+  });
+
   it("renders fact find update personal circumstances, financial situation, and needs sections verbatim from workflow values", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.factFindUpdatePersonalCircumstances = "Update personal line 1\nUpdate personal line 2";

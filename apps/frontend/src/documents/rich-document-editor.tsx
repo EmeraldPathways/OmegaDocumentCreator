@@ -175,7 +175,7 @@ const WorkflowBlockNode = Node.create({
       class: {
         default: null,
         parseHTML: (element: HTMLElement) =>
-          normalizeClassNames(element.getAttribute("class"), WORKFLOW_BLOCK_CLASSES, ["document-callout-"]),
+          normalizeClassNames(element.getAttribute("class"), WORKFLOW_BLOCK_CLASSES, ["document-callout-", "fact-find-"]),
         renderHTML: (attributes: { class?: string | null }) => (attributes.class ? { class: attributes.class } : {}),
       },
     };

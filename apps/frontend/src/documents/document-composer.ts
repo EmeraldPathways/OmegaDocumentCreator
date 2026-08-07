@@ -111,6 +111,418 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
   };
 }
 
+function yesNoSelectionValue(yesValue: string | undefined, noValue: string | undefined) {
+  if (yesValue?.trim() === "Yes") {
+    return "Yes";
+  }
+  if (noValue?.trim() === "Yes") {
+    return "No";
+  }
+  return "Not recorded";
+}
+
+function hasNonDefaultValue(value: string | undefined, ignoredValues: string[] = []) {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) {
+    return false;
+  }
+  return !ignoredValues.some((ignored) => ignored.toLowerCase() === normalized.toLowerCase());
+}
+
+function hasFilledItems(items: Array<{ label: string; value: string }>) {
+  return items.some((item) => hasNonDefaultValue(item.value, ["Not recorded"]));
+}
+
+function hasFactFindSelfPensionContent(profile: SeededClientProfile) {
+  return [
+    profile.selfRetirementAge,
+    profile.selfRetirementIncomeTargetPercent,
+    profile.selfEmployeeDirectorPensionYes,
+    profile.selfEmployeeDirectorPensionNo,
+    profile.selfEmployeeDirectorSchemeType,
+    profile.selfEmployeeDirectorRetirementAge,
+    profile.selfEmployeeDirectorEmployerContribution,
+    profile.selfEmployeeDirectorPersonalContribution,
+    profile.selfEmployeeDirectorYearsInForce,
+    profile.selfPersonalPensionYes,
+    profile.selfPersonalPensionNo,
+    profile.selfPersonalPensionCompany,
+    profile.selfPersonalPensionPolicyType,
+    profile.selfPersonalPensionContribution,
+    profile.selfPersonalPensionCurrentValue,
+    profile.selfPersonalPensionYearsInForce,
+  ].some((value) => hasNonDefaultValue(value));
+}
+
+function hasFactFindPartnerPensionContent(profile: SeededClientProfile) {
+  return [
+    profile.partnerRetirementAge,
+    profile.partnerRetirementIncomeTargetPercent,
+    profile.partnerEmployeeDirectorPensionYes,
+    profile.partnerEmployeeDirectorPensionNo,
+    profile.partnerEmployeeDirectorSchemeType,
+    profile.partnerEmployeeDirectorRetirementAge,
+    profile.partnerEmployeeDirectorEmployerContribution,
+    profile.partnerEmployeeDirectorPersonalContribution,
+    profile.partnerEmployeeDirectorYearsInForce,
+    profile.partnerPersonalPensionYes,
+    profile.partnerPersonalPensionNo,
+    profile.partnerPersonalPensionCompany,
+    profile.partnerPersonalPensionPolicyType,
+    profile.partnerPersonalPensionContribution,
+    profile.partnerPersonalPensionCurrentValue,
+    profile.partnerPersonalPensionYearsInForce,
+  ].some((value) => hasNonDefaultValue(value));
+}
+
+function hasFactFindLifeInsuranceContent(profile: SeededClientProfile) {
+  return [
+    profile.mortgageProtectionYes,
+    profile.mortgageProtection,
+    profile.personalInsurance,
+    profile.keymanInsurance,
+    profile.partnershipInsurance,
+    profile.selfLifeInsuranceAmount,
+    profile.partnerLifeInsuranceAmount,
+    profile.selfSeriousIllnessAmount,
+    profile.partnerSeriousIllnessAmount,
+  ].some((value) => hasNonDefaultValue(value, ["No"]));
+}
+
+function buildFactFindLiabilitiesItems(profile: SeededClientProfile) {
+  return [
+    { label: "Home (Self)", value: profile.assetHomeSelf },
+    { label: "Home (Partner)", value: profile.assetHomePartner },
+    { label: "Land / property (Self)", value: profile.assetLandPropertySelf },
+    { label: "Land / property (Partner)", value: profile.assetLandPropertyPartner },
+    { label: "Bank / building society (Self)", value: profile.assetBankBuildSocSelf },
+    { label: "Bank / building society (Partner)", value: profile.assetBankBuildSocPartner },
+    { label: "Credit union (Self)", value: profile.assetCreditUnionSelf },
+    { label: "Credit union (Partner)", value: profile.assetCreditUnionPartner },
+    { label: "Mortgage amount", value: profile.liabilityMortgageAmount },
+    { label: "Mortgage monthly repayments", value: profile.liabilityMortgageMonthlyRepayment },
+    { label: "Mortgage bank / provider", value: profile.liabilityMortgageProvider },
+    { label: "Mortgage balance outstanding", value: profile.liabilityMortgageBalanceOutstanding },
+    { label: "Car loan amount", value: profile.liabilityCarLoanAmount },
+    { label: "Car loan monthly repayments", value: profile.liabilityCarLoanMonthlyRepayment },
+    { label: "Car loan bank / provider", value: profile.liabilityCarLoanProvider },
+    { label: "Car loan balance outstanding", value: profile.liabilityCarLoanBalanceOutstanding },
+    { label: "Other loan payments amount", value: profile.liabilityOtherLoanPaymentsAmount },
+    { label: "Other loan payments monthly repayments", value: profile.liabilityOtherLoanPaymentsMonthlyRepayment },
+    { label: "Other loan payments bank / provider", value: profile.liabilityOtherLoanPaymentsProvider },
+    { label: "Other loan payments balance outstanding", value: profile.liabilityOtherLoanPaymentsBalanceOutstanding },
+    { label: "Others amount", value: profile.liabilityOthersAmount },
+    { label: "Others monthly repayments", value: profile.liabilityOthersMonthlyRepayment },
+    { label: "Others bank / provider", value: profile.liabilityOthersProvider },
+    { label: "Others balance outstanding", value: profile.liabilityOthersBalanceOutstanding },
+    { label: "Other liability details", value: profile.liabilityOthersDetails },
+    { label: "Total liabilities per month - Self", value: profile.totalLiabilitiesPerMonthSelf },
+    { label: "Total liabilities per month - Partner", value: profile.totalLiabilitiesPerMonthPartner },
+    { label: "Total liabilities per month - Joint", value: profile.totalLiabilitiesPerMonthJoint },
+    {
+      label: "Liabilities covered by other insurance",
+      value: yesNoSelectionValue(profile.liabilitiesCoveredByOtherInsuranceYes, profile.liabilitiesCoveredByOtherInsuranceNo),
+    },
+    { label: "Liabilities cover details", value: profile.liabilitiesCoveredByOtherInsuranceDetails },
+  ];
+}
+
+function buildFactFindAssetsLiabilitiesHtml(profile: SeededClientProfile) {
+  const assetRows = [
+    {
+      label: "Home",
+      self: profile.assetHomeSelf,
+      partner: profile.assetHomePartner,
+    },
+    {
+      label: "Land / property",
+      self: profile.assetLandPropertySelf,
+      partner: profile.assetLandPropertyPartner,
+    },
+    {
+      label: "Bank / building society",
+      self: profile.assetBankBuildSocSelf,
+      partner: profile.assetBankBuildSocPartner,
+    },
+    {
+      label: "Credit union",
+      self: profile.assetCreditUnionSelf,
+      partner: profile.assetCreditUnionPartner,
+    },
+  ];
+
+  const liabilityRows = [
+    {
+      label: "Mortgage",
+      amount: profile.liabilityMortgageAmount,
+      repayment: profile.liabilityMortgageMonthlyRepayment,
+      provider: profile.liabilityMortgageProvider,
+      balance: profile.liabilityMortgageBalanceOutstanding,
+    },
+    {
+      label: "Car loan",
+      amount: profile.liabilityCarLoanAmount,
+      repayment: profile.liabilityCarLoanMonthlyRepayment,
+      provider: profile.liabilityCarLoanProvider,
+      balance: profile.liabilityCarLoanBalanceOutstanding,
+    },
+    {
+      label: "Other loan payments",
+      amount: profile.liabilityOtherLoanPaymentsAmount,
+      repayment: profile.liabilityOtherLoanPaymentsMonthlyRepayment,
+      provider: profile.liabilityOtherLoanPaymentsProvider,
+      balance: profile.liabilityOtherLoanPaymentsBalanceOutstanding,
+    },
+    {
+      label: "Others",
+      amount: profile.liabilityOthersAmount,
+      repayment: profile.liabilityOthersMonthlyRepayment,
+      provider: profile.liabilityOthersProvider,
+      balance: profile.liabilityOthersBalanceOutstanding,
+    },
+  ];
+
+  const summaryItems = [
+    { label: "Other liability details", value: profile.liabilityOthersDetails },
+    { label: "Total liabilities per month - Self", value: profile.totalLiabilitiesPerMonthSelf },
+    { label: "Total liabilities per month - Partner", value: profile.totalLiabilitiesPerMonthPartner },
+    { label: "Total liabilities per month - Joint", value: profile.totalLiabilitiesPerMonthJoint },
+    {
+      label: "Liabilities covered by other insurance",
+      value: yesNoSelectionValue(profile.liabilitiesCoveredByOtherInsuranceYes, profile.liabilitiesCoveredByOtherInsuranceNo),
+    },
+    { label: "Liabilities cover details", value: profile.liabilitiesCoveredByOtherInsuranceDetails },
+  ];
+
+  return [
+    '<div class="fact-find-asset-liability-layout">',
+    '<section class="fact-find-detail-subsection">',
+    '<h3>Assets</h3>',
+    '<div class="statement-quote-table fact-find-detail-table fact-find-assets-table">',
+    '<div class="statement-quote-row statement-quote-row-header">',
+    '<div class="statement-quote-cell"><p>Asset</p></div>',
+    '<div class="statement-quote-cell"><p>Self</p></div>',
+    '<div class="statement-quote-cell"><p>Partner</p></div>',
+    '</div>',
+    ...assetRows.map((row) =>
+      [
+        '<div class="statement-quote-row">',
+        `<div class="statement-quote-cell"><p>${escapeHtml(row.label)}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.self))}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.partner))}</p></div>`,
+        "</div>",
+      ].join(""),
+    ),
+    "</div>",
+    "</section>",
+    '<section class="fact-find-detail-subsection">',
+    '<h3>Liabilities</h3>',
+    '<div class="statement-quote-table fact-find-detail-table fact-find-liabilities-table">',
+    '<div class="statement-quote-row statement-quote-row-header">',
+    '<div class="statement-quote-cell"><p>Liability</p></div>',
+    '<div class="statement-quote-cell"><p>Amount</p></div>',
+    '<div class="statement-quote-cell"><p>Monthly repayments</p></div>',
+    '<div class="statement-quote-cell"><p>Bank / provider</p></div>',
+    '<div class="statement-quote-cell"><p>Balance outstanding</p></div>',
+    '</div>',
+    ...liabilityRows.map((row) =>
+      [
+        '<div class="statement-quote-row">',
+        `<div class="statement-quote-cell"><p>${escapeHtml(row.label)}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.amount))}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.repayment))}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.provider))}</p></div>`,
+        `<div class="statement-quote-cell"><p>${escapeHtml(valueOrFallback(row.balance))}</p></div>`,
+        "</div>",
+      ].join(""),
+    ),
+    "</div>",
+    "</section>",
+    '<section class="fact-find-detail-subsection">',
+    '<h3>Summary</h3>',
+    '<div class="grid-items fact-find-liability-summary-grid">',
+    ...summaryItems.map((item) =>
+      `<div class="grid-item"><span class="grid-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(valueOrFallback(item.value))}</strong></div>`,
+    ),
+    "</div>",
+    "</section>",
+    "</div>",
+  ].join("");
+}
+
+function buildFactFindSavingsItems(profile: SeededClientProfile) {
+  return profile.savingsInvestmentRows.flatMap((row, index) => {
+    const position = index + 1;
+    return [
+      { label: `Savings institution ${position}`, value: row.financialInstitution },
+      { label: `Savings value ${position}`, value: row.value },
+      { label: `Savings start date ${position}`, value: formatDocumentDate(row.startDate) },
+      { label: `Savings term ${position}`, value: row.term },
+    ];
+  }).concat([
+    { label: "Comments", value: profile.savingsInvestmentComments },
+  ]);
+}
+
+function buildFactFindDetailTableHtml(
+  tableClassName: string,
+  headers: string[],
+  rows: string[][],
+) {
+  return [
+    `<div class="statement-quote-table fact-find-detail-table ${escapeHtml(tableClassName)}">`,
+    '<div class="statement-quote-row statement-quote-row-header">',
+    ...headers.map((header) => `<div class="statement-quote-cell"><p>${escapeHtml(header)}</p></div>`),
+    '</div>',
+    ...rows.map((row) =>
+      [
+        '<div class="statement-quote-row">',
+        ...row.map((cell) => `<div class="statement-quote-cell"><p>${escapeHtml(cell)}</p></div>`),
+        '</div>',
+      ].join(""),
+    ),
+    '</div>',
+  ].join("");
+}
+
+function buildFactFindSavingsHtml(profile: SeededClientProfile) {
+  return [
+    buildFactFindDetailTableHtml(
+      "fact-find-savings-table",
+      ["Entry", "Financial institution", "Value", "Start date", "Term"],
+      profile.savingsInvestmentRows.map((row, index) => [
+        `Savings ${index + 1}`,
+        valueOrFallback(row.financialInstitution),
+        valueOrFallback(row.value),
+        valueOrFallback(formatDocumentDate(row.startDate)),
+        valueOrFallback(row.term),
+      ]),
+    ),
+    buildFactFindDetailTableHtml(
+      "fact-find-comments-table",
+      ["Field", "Value"],
+      [["Comments", valueOrFallback(profile.savingsInvestmentComments)]],
+    ),
+  ].join("");
+}
+
+function buildFactFindLifeInsuranceItems(profile: SeededClientProfile) {
+  return [
+    {
+      label: "Mortgage protection selected",
+      value: yesNoSelectionValue(profile.mortgageProtectionYes, profile.mortgageProtectionNo),
+    },
+    { label: "Mortgage protection", value: profile.mortgageProtection },
+    { label: "Life insurance self", value: profile.selfLifeInsuranceAmount },
+    { label: "Life insurance partner", value: profile.partnerLifeInsuranceAmount },
+    { label: "Serious illness self", value: profile.selfSeriousIllnessAmount },
+    { label: "Serious illness partner", value: profile.partnerSeriousIllnessAmount },
+    { label: "Personal insurance", value: profile.personalInsurance },
+    { label: "Keyman insurance", value: profile.keymanInsurance },
+    { label: "Partnership insurance", value: profile.partnershipInsurance },
+    { label: "Self life insurance amount", value: profile.selfLifeInsuranceAmount },
+    { label: "Partner serious illness amount", value: profile.partnerSeriousIllnessAmount },
+  ];
+}
+
+function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
+  return buildFactFindDetailTableHtml(
+    "fact-find-life-insurance-table",
+    ["Field", "Value"],
+    [
+      ["Mortgage protection selected", yesNoSelectionValue(profile.mortgageProtectionYes, profile.mortgageProtectionNo)],
+      ["Mortgage protection", valueOrFallback(profile.mortgageProtection)],
+      ["Personal insurance", valueOrFallback(profile.personalInsurance)],
+      ["Keyman insurance", valueOrFallback(profile.keymanInsurance)],
+      ["Partnership insurance", valueOrFallback(profile.partnershipInsurance)],
+      ["Life insurance self", valueOrFallback(profile.selfLifeInsuranceAmount)],
+      ["Life insurance partner", valueOrFallback(profile.partnerLifeInsuranceAmount)],
+      ["Serious illness self", valueOrFallback(profile.selfSeriousIllnessAmount)],
+      ["Serious illness partner", valueOrFallback(profile.partnerSeriousIllnessAmount)],
+    ],
+  );
+}
+
+function buildFactFindPensionItems(
+  profile: SeededClientProfile,
+  section: "self" | "partner",
+) {
+  const prefix = section === "self" ? "Self" : "Partner";
+  const fields = section === "self"
+    ? {
+        retiredYes: profile.selfAlreadyRetired,
+        retiredNo: profile.selfNotRetired,
+        retirementAge: profile.selfRetirementAge,
+        target: profile.selfRetirementIncomeTargetPercent,
+        employeeYes: profile.selfEmployeeDirectorPensionYes,
+        employeeNo: profile.selfEmployeeDirectorPensionNo,
+        schemeType: profile.selfEmployeeDirectorSchemeType,
+        schemeRetirementAge: profile.selfEmployeeDirectorRetirementAge,
+        employerContribution: profile.selfEmployeeDirectorEmployerContribution,
+        personalContribution: profile.selfEmployeeDirectorPersonalContribution,
+        employeeYears: profile.selfEmployeeDirectorYearsInForce,
+        personalYes: profile.selfPersonalPensionYes,
+        personalNo: profile.selfPersonalPensionNo,
+        personalCompany: profile.selfPersonalPensionCompany,
+        personalPolicyType: profile.selfPersonalPensionPolicyType,
+        personalContributionField: profile.selfPersonalPensionContribution,
+        personalCurrentValue: profile.selfPersonalPensionCurrentValue,
+        personalYears: profile.selfPersonalPensionYearsInForce,
+      }
+    : {
+        retiredYes: profile.partnerAlreadyRetired,
+        retiredNo: profile.partnerNotRetired,
+        retirementAge: profile.partnerRetirementAge,
+        target: profile.partnerRetirementIncomeTargetPercent,
+        employeeYes: profile.partnerEmployeeDirectorPensionYes,
+        employeeNo: profile.partnerEmployeeDirectorPensionNo,
+        schemeType: profile.partnerEmployeeDirectorSchemeType,
+        schemeRetirementAge: profile.partnerEmployeeDirectorRetirementAge,
+        employerContribution: profile.partnerEmployeeDirectorEmployerContribution,
+        personalContribution: profile.partnerEmployeeDirectorPersonalContribution,
+        employeeYears: profile.partnerEmployeeDirectorYearsInForce,
+        personalYes: profile.partnerPersonalPensionYes,
+        personalNo: profile.partnerPersonalPensionNo,
+        personalCompany: profile.partnerPersonalPensionCompany,
+        personalPolicyType: profile.partnerPersonalPensionPolicyType,
+        personalContributionField: profile.partnerPersonalPensionContribution,
+        personalCurrentValue: profile.partnerPersonalPensionCurrentValue,
+        personalYears: profile.partnerPersonalPensionYearsInForce,
+      };
+
+  return [
+    { label: `${prefix} already retired`, value: yesNoSelectionValue(fields.retiredYes, fields.retiredNo) },
+    { label: `${prefix} planned retirement age`, value: fields.retirementAge },
+    { label: `${prefix} retirement income target (%)`, value: fields.target },
+    {
+      label: `${prefix} employee / director pension provisions in place`,
+      value: yesNoSelectionValue(fields.employeeYes, fields.employeeNo),
+    },
+    { label: `${prefix} scheme type`, value: fields.schemeType },
+    { label: `${prefix} scheme retirement age`, value: fields.schemeRetirementAge },
+    { label: `${prefix} employer contribution`, value: fields.employerContribution },
+    { label: `${prefix} personal contribution`, value: fields.personalContribution },
+    { label: `${prefix} employee scheme years in force`, value: fields.employeeYears },
+    {
+      label: `${prefix} personal pension plan`,
+      value: yesNoSelectionValue(fields.personalYes, fields.personalNo),
+    },
+    { label: `${prefix} personal pension company`, value: fields.personalCompany },
+    { label: `${prefix} personal pension policy type`, value: fields.personalPolicyType },
+    { label: `${prefix} personal pension contribution`, value: fields.personalContributionField },
+    { label: `${prefix} personal pension current value`, value: fields.personalCurrentValue },
+    { label: `${prefix} personal pension years in force`, value: fields.personalYears },
+  ];
+}
+
+function buildFactFindPensionHtml(profile: SeededClientProfile, section: "self" | "partner") {
+  return buildFactFindDetailTableHtml(
+    `fact-find-pension-${section}-table`,
+    ["Field", "Value"],
+    buildFactFindPensionItems(profile, section).map((item) => [item.label, valueOrFallback(item.value)]),
+  );
+}
+
 function lineValueHtml(value: string | undefined) {
   const trimmedValue = value?.trim() ?? "";
   return trimmedValue.length > 0 ? escapeHtml(trimmedValue) : "&nbsp;";
@@ -929,14 +1341,11 @@ function buildFactFindBlocks(
     { label: "Savings & Protection", value: profile.servicesRequestedSavingsProtection },
     { label: "Pension Planning", value: profile.servicesRequestedPensionPlanning },
   ]);
-
-  const savingsRows = profile.savingsInvestmentRows
-    .map((row) =>
-      [row.financialInstitution, row.value ? `Value: ${row.value}` : "", row.startDate ? `Start: ${row.startDate}` : "", row.term ? `Term: ${row.term}` : ""]
-        .filter(Boolean)
-        .join(", "),
-    )
-    .filter((row) => row.length > 0);
+  const liabilitiesItems = buildFactFindLiabilitiesItems(profile);
+  const selfPensionItems = buildFactFindPensionItems(profile, "self");
+  const partnerPensionItems = buildFactFindPensionItems(profile, "partner");
+  const lifeInsuranceItems = buildFactFindLifeInsuranceItems(profile);
+  const savingsItems = buildFactFindSavingsItems(profile);
 
   return [
     buildInlineLetterHeaderBlock(profile),
@@ -990,35 +1399,46 @@ function buildFactFindBlocks(
       { label: "Cover to age", value: profile.coverAge },
       { label: "Monthly premium", value: profile.premium },
     ]),
-    ...(!isSmall ? [detailGrid("Assets & Liabilities", [
-      { label: "Home (Self)", value: profile.assetHomeSelf },
-      { label: "Home (Partner)", value: profile.assetHomePartner },
-      { label: "Mortgage balance outstanding", value: profile.liabilityMortgageBalanceOutstanding },
-      { label: "Mortgage monthly repayment", value: profile.liabilityMortgageMonthlyRepayment },
-      { label: "Total liabilities per month - Self", value: profile.totalLiabilitiesPerMonthSelf },
-      { label: "Total liabilities per month - Joint", value: profile.totalLiabilitiesPerMonthJoint },
-    ])] : []),
-    ...(!isSmall ? [detailGrid("Pension Arrangements", [
-      { label: "Self retirement age", value: profile.selfRetirementAge },
-      { label: "Self pension scheme", value: profile.selfEmployeeDirectorSchemeType },
-      { label: "Self personal pension company", value: profile.selfPersonalPensionCompany },
-      { label: "Partner retirement age", value: profile.partnerRetirementAge },
-      { label: "Partner pension scheme", value: profile.partnerEmployeeDirectorSchemeType },
-      { label: "Partner personal pension company", value: profile.partnerPersonalPensionCompany },
-    ])] : []),
-    ...(!isSmall ? [detailGrid("Life Insurance & Serious Illness", [
-      { label: "Mortgage protection", value: profile.mortgageProtection || yesNoValue(profile.mortgageProtectionYes) },
-      { label: "Life Insurance (Self)", value: profile.selfLifeInsuranceAmount },
-      { label: "Life Insurance (Partner)", value: profile.partnerLifeInsuranceAmount },
-      { label: "Serious Illness (Self)", value: profile.selfSeriousIllnessAmount },
-      { label: "Serious Illness (Partner)", value: profile.partnerSeriousIllnessAmount },
-      { label: "Personal insurance record", value: profile.personalInsurance },
-    ])] : []),
-    ...(!isSmall ? [{
-      kind: "section" as const,
-      title: "Savings & Investments",
-      bodyHtml: [listHtml(savingsRows, "No savings or investments recorded."), paragraphHtml(profile.savingsInvestmentComments, "No comments recorded.")].join(""),
-    }] : []),
+    ...(!isSmall && hasFilledItems(liabilitiesItems)
+      ? [{
+          kind: "section" as const,
+          title: "Assets & Liabilities",
+          className: "document-grid fact-find-asset-liability-section",
+          bodyHtml: buildFactFindAssetsLiabilitiesHtml(profile),
+        }]
+      : []),
+    ...(!isSmall && hasFactFindSelfPensionContent(profile)
+      ? [{
+          kind: "section" as const,
+          title: "Pension Arrangements - Self",
+          className: "document-grid fact-find-finance-section",
+          bodyHtml: buildFactFindPensionHtml(profile, "self"),
+        }]
+      : []),
+    ...(!isSmall && hasFactFindPartnerPensionContent(profile)
+      ? [{
+          kind: "section" as const,
+          title: "Pension Arrangements - Partner",
+          className: "document-grid fact-find-finance-section",
+          bodyHtml: buildFactFindPensionHtml(profile, "partner"),
+        }]
+      : []),
+    ...(!isSmall && hasFactFindLifeInsuranceContent(profile)
+      ? [{
+          kind: "section" as const,
+          title: "Life Insurance & Serious Illness",
+          className: "document-grid fact-find-finance-section",
+          bodyHtml: buildFactFindLifeInsuranceHtml(profile),
+        }]
+      : []),
+    ...(!isSmall && hasFilledItems(savingsItems)
+      ? [{
+          kind: "section" as const,
+          title: "Savings & Investments",
+          className: "document-grid fact-find-finance-section",
+          bodyHtml: buildFactFindSavingsHtml(profile),
+        }]
+      : []),
     {
       kind: "section",
       title: "Recommendation Section",

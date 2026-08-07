@@ -1502,14 +1502,26 @@ export function IncomeProtectionPage({
   }
 
   function renderYesNoGroup(title: string, yesField: SeededClientStringKey, noField: SeededClientStringKey, prefix: string) {
+    const isYes = isAffirmative(resolvedDraft[yesField]);
+
     return (
-      <div className="form-section">
+      <div className="form-section yes-no-toggle-group">
         <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
           {title}
         </p>
-        <div className="form-grid">
-          {renderToggleField(`${prefix}-yes`, "Yes", yesField)}
-          {renderToggleField(`${prefix}-no`, "No", noField)}
+        <div className="yes-no-toggle-row">
+          <span className={`yes-no-toggle-state${isYes ? "" : " is-active"}`}>No</span>
+          <Toggle
+            checked={isYes}
+            id={`${prefix}-toggle`}
+            label=""
+            onChange={(event) => {
+              const checked = event.target.checked;
+              updateField(yesField, checked ? "Yes" : "");
+              updateField(noField, checked ? "" : "Yes");
+            }}
+          />
+          <span className={`yes-no-toggle-state${isYes ? " is-active" : ""}`}>Yes</span>
         </div>
       </div>
     );
@@ -2643,11 +2655,11 @@ export function IncomeProtectionPage({
                       <div className="form-grid form-grid-desktop-2">
                         {renderTextInput("ff-homeAddress1", "Home address line 1", "homeAddressLine1")}
                         {renderTextInput("ff-homeAddress2", "Home address line 2", "homeAddressLine2")}
+                        {renderTextInput("ff-homeAddress3", "Home address line 3", "clientHomeAddressLine3")}
+                        {renderTextInput("ff-homeAddress4", "Home address line 4", "clientHomeAddressLine4")}
                         {renderTextInput("ff-townCity", requiredLabel("Town / city"), "townCity")}
                         {renderTextInput("ff-county", requiredLabel("County"), "county")}
                         {renderTextInput("ff-eircode", "Eircode", "eircode")}
-                        {renderTextInput("ff-homeAddress3", "Home address line 3", "clientHomeAddressLine3")}
-                        {renderTextInput("ff-homeAddress4", "Home address line 4", "clientHomeAddressLine4")}
                       </div>
                     </section>
 
