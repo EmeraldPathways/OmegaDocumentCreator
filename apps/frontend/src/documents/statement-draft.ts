@@ -3,6 +3,7 @@ import type { GeneratedDocumentDraft, SupportedDocumentType } from "./document-t
 import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 const FACT_FIND_DOCUMENT_TYPE = "Fact Find" satisfies SupportedDocumentType;
+const FACT_FIND_UPDATE_DOCUMENT_TYPE = "Fact Find Update" satisfies SupportedDocumentType;
 const statementDocumentTypes = ["Statement of Suitability", "Pensions Statement"] as const satisfies SupportedDocumentType[];
 type StatementDocumentType = (typeof statementDocumentTypes)[number];
 
@@ -35,6 +36,77 @@ function hasMatchingFactFindVariant(editedHtml: string, factFindType: string | u
   return editedHtml.includes(`workflow-document-fact-find-${normalizedType}`);
 }
 
+function hasCurrentStatementSignatureLayout(editedHtml: string) {
+  return (
+    editedHtml.includes("statement-signature-label") &&
+    !editedHtml.includes("Amanda McLaughlin") &&
+    editedHtml.indexOf("Declaration to be completed by Client:") > editedHtml.lastIndexOf("IMPORTANT INFORMATION:")
+  );
+}
+
+function hasCurrentFactFindSigningLayout(editedHtml: string) {
+  if (!editedHtml.includes("fact-find-signing-block")) {
+    return false;
+  }
+
+  const signatureValues = Array.from(
+    editedHtml.matchAll(/<p class="fact-find-signature-value">([\s\S]*?)<\/p>/g),
+    (match) => match[1].trim(),
+  );
+
+  return signatureValues.length > 0 && signatureValues.every((value) => value === "&nbsp;");
+}
+
+function hasCurrentFactFindRequestLayout(editedHtml: string) {
+  const requestRows = Array.from(
+    editedHtml.matchAll(/<div class="fact-find-request-row">([\s\S]*?)<\/div>/g),
+    (match) => match[1],
+  );
+
+  if (requestRows.length < 2) {
+    return false;
+  }
+
+  const signingRow = requestRows[0];
+  const companyPoliciesRow = requestRows[1];
+
+  const signingValues = Array.from(
+    signingRow.matchAll(/<p class="fact-find-request-value">([\s\S]*?)<\/p>/g),
+    (match) => match[1].trim(),
+  );
+
+  const hasBlankSigningRow =
+    signingValues.length === 2 &&
+    signingValues.every((value) => value === "&nbsp;");
+
+  const hasCompanyPoliciesTwoColumnRow =
+    companyPoliciesRow.includes("Company:") &&
+    companyPoliciesRow.includes("Policies:") &&
+    Array.from(companyPoliciesRow.matchAll(/<div class="fact-find-request-field/g)).length === 2;
+
+  return hasBlankSigningRow && hasCompanyPoliciesTwoColumnRow;
+}
+
+function hasCurrentFactFindServicesLayout(editedHtml: string) {
+  const servicesHeading = editedHtml.indexOf("<h2>Services Requested</h2>");
+  const clientSummaryHeading = editedHtml.indexOf("<h2>Client Summary</h2>");
+
+  return (
+    servicesHeading >= 0 &&
+    clientSummaryHeading >= 0 &&
+    servicesHeading < clientSummaryHeading &&
+    editedHtml.includes('class="client-summary-grid"><h2>Services Requested</h2>') &&
+    editedHtml.includes('<span class="grid-label">Requested service</span>')
+  );
+}
+
+function hasComposedFactFindUpdateHtml(editedHtml: string) {
+  return (
+    editedHtml.includes("workflow-document-fact-find-update") &&
+    editedHtml.includes("statement-letter-header")
+  );
+}
+
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   const hasComposedHtml = hasComposedStatementHtml(editedHtml);
@@ -65,7 +137,9 @@ export function resolveStatementDraft(
 ): GeneratedDocumentDraft {
   const statementDraft = profile.documentDrafts[documentType];
   const editedHtml = statementDraft.editedHtml.trim();
-  const shouldRebuildComposedHtml = hasComposedStatementHtml(editedHtml);
+  const shouldRebuildComposedHtml =
+    hasComposedStatementHtml(editedHtml) &&
+    !hasCurrentStatementSignatureLayout(editedHtml);
 
   if (!isLegacyStatementDraft(statementDraft) && !shouldRebuildComposedHtml) {
     return statementDraft;
@@ -92,7 +166,12 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
   const factFindDraft = profile.documentDrafts[FACT_FIND_DOCUMENT_TYPE];
   const editedHtml = factFindDraft.editedHtml.trim();
   const shouldRebuildComposedHtml =
-    hasComposedFactFindHtml(editedHtml) && !hasMatchingFactFindVariant(editedHtml, profile.factFindType);
+    hasComposedFactFindHtml(editedHtml) && (
+      !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
+      !hasCurrentFactFindSigningLayout(editedHtml) ||
+      !hasCurrentFactFindRequestLayout(editedHtml) ||
+      !hasCurrentFactFindServicesLayout(editedHtml)
+    );
 
   if (!hasLegacyFactFindHeaderHtml(editedHtml) && !shouldRebuildComposedHtml) {
     return factFindDraft;
@@ -115,6 +194,34 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
   };
 }
 
+export function resolveFactFindUpdateDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
+  const factFindUpdateDraft = profile.documentDrafts[FACT_FIND_UPDATE_DOCUMENT_TYPE];
+  const editedHtml = factFindUpdateDraft.editedHtml.trim();
+  const shouldRebuildComposedHtml =
+    hasComposedFactFindUpdateHtml(editedHtml) &&
+    !hasCurrentFactFindSigningLayout(editedHtml);
+
+  if (!shouldRebuildComposedHtml) {
+    return factFindUpdateDraft;
+  }
+
+  const factFindUpdateProfile = {
+    ...profile,
+    documentDrafts: {
+      ...profile.documentDrafts,
+      [FACT_FIND_UPDATE_DOCUMENT_TYPE]: {
+        ...factFindUpdateDraft,
+        editedHtml: "",
+      },
+    },
+  } satisfies SeededClientProfile;
+
+  return {
+    ...factFindUpdateDraft,
+    editedHtml: buildWorkflowEditorDocument(factFindUpdateProfile, FACT_FIND_UPDATE_DOCUMENT_TYPE).html,
+  };
+}
+
 export function resolveWorkspaceDocumentDraft(
   profile: SeededClientProfile,
   documentType: SupportedDocumentType,
@@ -125,6 +232,10 @@ export function resolveWorkspaceDocumentDraft(
 
   if (documentType === FACT_FIND_DOCUMENT_TYPE) {
     return resolveFactFindDraft(profile);
+  }
+
+  if (documentType === FACT_FIND_UPDATE_DOCUMENT_TYPE) {
+    return resolveFactFindUpdateDraft(profile);
   }
 
   return profile.documentDrafts[documentType];

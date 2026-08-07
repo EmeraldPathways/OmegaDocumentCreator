@@ -83,11 +83,14 @@ describe("buildWorkflowDocument", () => {
     // Declaration and important information blocks (Statement-only)
     expect(document.html).toContain("Declaration to be completed by Client:");
     expect(document.html).toContain("I am happy to proceed on the basis of the recommendation given to me and wish to affect the policy recommended.");
-    expect(document.html).toContain("Amanda McLaughlin");
+    expect(document.html).not.toContain("Amanda McLaughlin");
+    expect(document.html).toContain('class="statement-signature-label"><strong>Office Staff</strong></p>');
+    expect(document.html).toContain('class="statement-signature-block statement-signature-block-date"');
     expect(document.html).toContain("statement-declaration");
     expect(document.html).toContain("statement-important-info");
     expect(document.html).toContain("It is vital to make full disclosure of relevant facts");
     expect(document.html).toContain("I wish to confirm that I have read the Customer Information Booklet");
+    expect(document.html.indexOf("Declaration to be completed by Client:")).toBeGreaterThan(document.html.lastIndexOf("IMPORTANT INFORMATION:"));
     expect(document.html.indexOf("statement-important-notice")).toBeGreaterThan(document.html.indexOf("statement-letter-header"));
     expect(document.html.indexOf("statement-important-notice")).toBeLessThan(document.html.indexOf("statement-opening"));
     expect(document.html.indexOf("Needs and Objectives")).toBeGreaterThan(document.html.indexOf("Financial Situation"));
@@ -504,10 +507,13 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Pension Arrangements");
     expect(document.html).toContain("AIB");
     expect(document.html).toContain("Recommendation Acknowledgement");
+    expect(document.html).toContain("Signatures and Record");
     expect(document.html).toContain("Request for Information");
-    expect(document.html).toContain("31 The Mall");
-    expect(document.html).toContain("Not recorded");
-    expect(document.html).toContain("signatures-footer");
+    expect(document.html).toContain("I/We understood the recommendation is based on the information disclosed");
+    expect(document.html).toContain("I/We request that you furnish Omega Financial Management");
+    expect(document.html).toContain("Income Protection");
+    expect(document.html).not.toContain("signatures-footer");
+    expect(document.html.indexOf("Signatures and Record")).toBeLessThan(document.html.indexOf("Request for Information"));
   });
 
   it("renders fact find personal circumstances, financial situation, and needs sections verbatim from generated draft sections", () => {
@@ -567,9 +573,12 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Data Protection &amp; Marketing Preferences");
     expect(document.html).toContain("Marketing Preferences");
     expect(document.html).toContain("PEP Confirmation");
-    expect(document.html).toContain("Signatures");
+    expect(document.html).toContain("Signatures and Record");
     expect(document.html).toContain("Jamie Murphy");
-    expect(document.html).toContain("Advisor Name");
+    expect(document.html).toContain("FINANCIAL ADVISOR'S SIGNATURE");
+    expect(document.html).not.toContain("Advisor Name");
+    expect(document.html).not.toContain("17/07/2026");
+    expect(document.html).not.toContain("signatures-footer");
   });
 
   it("preserves terms of business issue confirmations and contact preferences", () => {
@@ -603,7 +612,9 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain('class="client-summary-grid"');
     expect(document.html).toContain('class="document-section"');
     expect(document.html).toContain('class="document-callout document-callout-warning"');
-    expect(document.html).toContain('class="signatures-footer"');
+    expect(document.html).toContain('class="fact-find-signing-block"');
+    expect(document.html).toContain('class="fact-find-request-row"');
+    expect(document.html).not.toContain('class="signatures-footer"');
     expect(document.html).toContain('class="grid-label">Client</span><strong>Jamie Murphy</strong>');
   });
 

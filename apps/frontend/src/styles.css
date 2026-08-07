@@ -2095,6 +2095,174 @@ button {
   border-top: 2px solid #5b2230;
 }
 
+.workflow-document-fact-find .fact-find-signing-block,
+.workflow-document-fact-find-update .fact-find-signing-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signing-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signing-block,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signing-block,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signing-block {
+  display: block;
+}
+
+.workflow-document-fact-find .fact-find-signing-intro,
+.workflow-document-fact-find-update .fact-find-signing-intro,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signing-intro,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signing-intro,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signing-intro,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signing-intro {
+  margin: 0 0 18px;
+  font-weight: 600;
+}
+
+.workflow-document-fact-find .fact-find-signing-subheading,
+.workflow-document-fact-find-update .fact-find-signing-subheading,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signing-subheading,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signing-subheading,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signing-subheading,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signing-subheading {
+  margin: 18px 0 12px;
+  font-weight: 700;
+}
+
+.workflow-document-fact-find .fact-find-signature-row,
+.workflow-document-fact-find-update .fact-find-signature-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-row,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-row,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.workflow-document-fact-find .fact-find-signature-label,
+.workflow-document-fact-find-update .fact-find-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-label {
+  margin: 0 2px 4px 0;
+  min-width: 76px;
+  font-size: 14px;
+}
+
+.workflow-document-fact-find .fact-find-signature-label-date,
+.workflow-document-fact-find-update .fact-find-signature-label-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-label-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-label-date,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-label-date,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-label-date {
+  min-width: 32px;
+  margin-left: 2px;
+}
+
+.workflow-document-fact-find .fact-find-signature-field,
+.workflow-document-fact-find-update .fact-find-signature-field,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-field,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field {
+  flex: 1 1 auto;
+}
+
+.workflow-document-fact-find .fact-find-signature-field-date,
+.workflow-document-fact-find-update .fact-find-signature-field-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-field-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field-date,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field-date,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field-date {
+  flex: 0 0 116px;
+}
+
+.workflow-document-fact-find .fact-find-signature-value,
+.workflow-document-fact-find-update .fact-find-signature-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-signature-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-value,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-value,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-value,
+.workflow-document-fact-find .fact-find-request-value,
+.workflow-document-fact-find-update .fact-find-request-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-value,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-value,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-value {
+  margin: 0;
+  min-height: 24px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid #6b7280;
+  font-weight: 600;
+}
+
+.workflow-document-fact-find .fact-find-request-copy,
+.workflow-document-fact-find-update .fact-find-request-copy,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-copy,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-copy,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-copy,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-copy {
+  margin-bottom: 18px;
+}
+
+.workflow-document-fact-find .fact-find-request-copy p,
+.workflow-document-fact-find-update .fact-find-request-copy p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-copy p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-copy p,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-copy p,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-copy p {
+  margin: 0 0 18px;
+}
+
+.workflow-document-fact-find .fact-find-request-row,
+.workflow-document-fact-find-update .fact-find-request-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-row,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-row,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.workflow-document-fact-find .fact-find-request-field,
+.workflow-document-fact-find-update .fact-find-request-field,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-field,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-field,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-field,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-field {
+  flex: 1 1 auto;
+}
+
+.workflow-document-fact-find .fact-find-request-field-date,
+.workflow-document-fact-find-update .fact-find-request-field-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-field-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-field-date,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-field-date,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-field-date {
+  flex: 0 0 132px;
+}
+
+.workflow-document-fact-find .fact-find-request-label,
+.workflow-document-fact-find-update .fact-find-request-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-label,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-label,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-label {
+  margin: 6px 0 0;
+  font-weight: 700;
+}
+
+.workflow-document-fact-find .fact-find-request-footnote,
+.workflow-document-fact-find-update .fact-find-request-footnote,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-request-footnote,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-request-footnote,
+.generated-output-pdf-page-body .workflow-document-fact-find .fact-find-request-footnote,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-request-footnote {
+  margin: 22px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+
 .generated-output-editor.ProseMirror .workflow-document h1,
 .generated-output-pdf-page-body .workflow-document h1 {
   margin: 0;
@@ -3665,6 +3833,56 @@ button {
   display: none;
 }
 
+.workflow-document-statement-of-suitability .statement-signature-area,
+.workflow-document-quote .statement-signature-area,
+.workflow-document-fact-find .statement-signature-area,
+.workflow-document-fact-find-update .statement-signature-area {
+  margin-top: 16px;
+}
+
+.workflow-document-statement-of-suitability .statement-signature-row,
+.workflow-document-quote .statement-signature-row,
+.workflow-document-fact-find .statement-signature-row,
+.workflow-document-fact-find-update .statement-signature-row {
+  display: flex;
+  align-items: flex-start;
+  column-gap: 24px;
+}
+
+.workflow-document-statement-of-suitability .statement-signature-block,
+.workflow-document-quote .statement-signature-block,
+.workflow-document-fact-find .statement-signature-block,
+.workflow-document-fact-find-update .statement-signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.workflow-document-statement-of-suitability .statement-signature-block-date,
+.workflow-document-quote .statement-signature-block-date,
+.workflow-document-fact-find .statement-signature-block-date,
+.workflow-document-fact-find-update .statement-signature-block-date {
+  margin-left: 12px;
+}
+
+.workflow-document-statement-of-suitability .statement-signature-line,
+.workflow-document-statement-of-suitability .statement-signature-label,
+.workflow-document-quote .statement-signature-line,
+.workflow-document-quote .statement-signature-label,
+.workflow-document-fact-find .statement-signature-line,
+.workflow-document-fact-find .statement-signature-label,
+.workflow-document-fact-find-update .statement-signature-line,
+.workflow-document-fact-find-update .statement-signature-label {
+  margin: 0;
+}
+
+.workflow-document-statement-of-suitability .statement-signature-label,
+.workflow-document-quote .statement-signature-label,
+.workflow-document-fact-find .statement-signature-label,
+.workflow-document-fact-find-update .statement-signature-label {
+  margin-top: 6px;
+}
+
 /* Statement letter header: logo left, client name + address right */
 .workflow-document-statement-of-suitability .statement-letter-header,
 .workflow-document-quote .statement-letter-header,
@@ -3882,6 +4100,56 @@ button {
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .signatures-footer {
   display: none;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-area,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-area,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-area,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-area {
+  margin-top: 16px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-row,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-row,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-row {
+  display: flex;
+  align-items: flex-start;
+  column-gap: 24px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-block,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-block-date,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-block-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-block-date,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-block-date {
+  margin-left: 12px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-line,
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-line,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-line,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-line,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-label {
+  margin: 0;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .statement-signature-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .statement-signature-label {
+  margin-top: 6px;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-letter-header,
@@ -4105,6 +4373,56 @@ button {
 .generated-output-pdf-page-body .workflow-document-fact-find .signatures-footer,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .signatures-footer {
   display: none;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-area,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-area,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-area,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-area {
+  margin-top: 16px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-row,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-row,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-row,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-row {
+  display: flex;
+  align-items: flex-start;
+  column-gap: 24px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-block,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-block,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-block,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-block-date,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-block-date,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-block-date,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-block-date {
+  margin-left: 12px;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-line,
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-line,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-line,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-line,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-label {
+  margin: 0;
+}
+
+.generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-quote .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find .statement-signature-label,
+.generated-output-pdf-page-body .workflow-document-fact-find-update .statement-signature-label {
+  margin-top: 6px;
 }
 
 .generated-output-pdf-page-body .workflow-document-statement-of-suitability .statement-letter-header,

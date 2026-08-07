@@ -111,6 +111,11 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
   };
 }
 
+function lineValueHtml(value: string | undefined) {
+  const trimmedValue = value?.trim() ?? "";
+  return trimmedValue.length > 0 ? escapeHtml(trimmedValue) : "&nbsp;";
+}
+
 function isStatementDocumentType(documentType: SupportedDocumentType) {
   return documentType === "Statement of Suitability" || documentType === "Pensions Statement";
 }
@@ -183,6 +188,87 @@ function buildFactFindFinancialSituationHtml(profile: SeededClientProfile, docum
   }
 
   return paragraphHtml(profile.financialSituation, "No financial situation recorded.");
+}
+
+function buildFactFindSignatureRowHtml(
+  signatureLabel: string,
+  signatureValue: string | undefined,
+  dateValue: string | undefined,
+) {
+  return [
+    '<div class="fact-find-signature-row">',
+    `<p class="fact-find-signature-label">${escapeHtml(signatureLabel)}</p>`,
+    '<div class="fact-find-signature-field">',
+    `<p class="fact-find-signature-value">${lineValueHtml(signatureValue)}</p>`,
+    "</div>",
+    '<p class="fact-find-signature-label fact-find-signature-label-date">Date</p>',
+    '<div class="fact-find-signature-field fact-find-signature-field-date">',
+    `<p class="fact-find-signature-value">${lineValueHtml(formatDocumentDate(dateValue))}</p>`,
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
+function buildFactFindSignaturesHtml(profile: SeededClientProfile) {
+  return [
+    '<div class="fact-find-signing-block">',
+    "<p class=\"fact-find-signing-intro\">I/We understood the recommendation is based on the information disclosed and that the actions agreed are to my / our satisfaction</p>",
+    buildFactFindSignatureRowHtml("Signature (1)", "", ""),
+    buildFactFindSignatureRowHtml("Signature (2)", "", ""),
+    "<p class=\"fact-find-signing-subheading\">FINANCIAL ADVISOR'S SIGNATURE</p>",
+    buildFactFindSignatureRowHtml("Signature", "", ""),
+    "</div>",
+  ].join("");
+}
+
+function buildFactFindRequestFieldHtml(label: string, value: string | undefined, className?: string) {
+  return [
+    `<div class="${escapeHtml(className ?? "fact-find-request-field")}">`,
+    `<p class="fact-find-request-value">${lineValueHtml(value)}</p>`,
+    `<p class="fact-find-request-label">${escapeHtml(label)}</p>`,
+    "</div>",
+  ].join("");
+}
+
+function buildFactFindRequestInfoHtml(profile: SeededClientProfile) {
+  return [
+    '<div class="fact-find-request-copy">',
+    "<p>I/We request that you furnish Omega Financial Management, Suite 31 The Mall, Beacon Court, Sandyford, Dublin 18 with all of the information they require to prepare a full analysis of all of my Pension, Life Assurance, Income Protection and Investment Policies.</p>",
+    "<p>Please given them my full co-operation.</p>",
+    "<p>You may email Omega Financial Management with the relevant information.</p>",
+    "<p>Yours sincerely,</p>",
+    "</div>",
+    '<div class="fact-find-request-row">',
+    buildFactFindRequestFieldHtml("Client(s)", "", "fact-find-request-field fact-find-request-field-signature"),
+    buildFactFindRequestFieldHtml("Date", "", "fact-find-request-field fact-find-request-field-date fact-find-request-field-signature"),
+    "</div>",
+    '<div class="fact-find-request-row">',
+    buildFactFindRequestFieldHtml("Company:", profile.requestCompanyName),
+    buildFactFindRequestFieldHtml("Policies:", profile.requestPolicies),
+    "</div>",
+    '<p class="fact-find-request-footnote">OFM Financial Ltd t/a Omega Financial Management is regulated by the Central Bank of Ireland. Registration Number 349635.</p>',
+  ].join("");
+}
+
+function buildFactFindServicesRequestedHtml(servicesRequested: string[]) {
+  const values = servicesRequested.map((item) => item.trim()).filter((item) => item.length > 0);
+
+  if (values.length === 0) {
+    return [
+      '<div class="grid-items">',
+      '<div class="grid-item"><span class="grid-label">Requested service</span><strong>Not recorded</strong></div>',
+      "</div>",
+    ].join("");
+  }
+
+  return [
+    '<div class="grid-items">',
+    ...values.map(
+      (item) =>
+        `<div class="grid-item"><span class="grid-label">Requested service</span><strong>${escapeHtml(item)}</strong></div>`,
+    ),
+    "</div>",
+  ].join("");
 }
 
 function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
@@ -820,14 +906,11 @@ function buildFactFindUpdateBlocks(
     detailGrid("PEP Confirmation", [
       { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
     ]),
-    detailGrid("Signatures", [
-      { label: "Client signature 1", value: profile.clientSignature1 },
-      { label: "Client signature 1 date", value: profile.clientSignature1Date },
-      { label: "Client signature 2", value: profile.clientSignature2 },
-      { label: "Client signature 2 date", value: profile.clientSignature2Date },
-      { label: "Financial Advisor signature", value: profile.financialAdvisorSignature },
-      { label: "Financial Advisor signature date", value: profile.financialAdvisorSignatureDate },
-    ]),
+    {
+      kind: "section",
+      title: "Signatures and Record",
+      bodyHtml: buildFactFindSignaturesHtml(profile),
+    },
   ];
 }
 
@@ -858,16 +941,17 @@ function buildFactFindBlocks(
   return [
     buildInlineLetterHeaderBlock(profile),
     buildTitleBannerBlock("Fact Find", profile),
+    {
+      kind: "section",
+      title: "Services Requested",
+      className: "client-summary-grid",
+      bodyHtml: buildFactFindServicesRequestedHtml(servicesRequested),
+    },
     detailGrid(
       "Client Summary",
       summaryGridItems(profile, "Fact Find"),
       "client-summary-grid",
     ),
-    {
-      kind: "section",
-      title: "Services Requested",
-      bodyHtml: listHtml(servicesRequested, "No services requested recorded."),
-    },
     detailGrid("Contact Details", [
       { label: "Email", value: profile.email },
       { label: "Phone", value: profile.mobileNumber },
@@ -948,14 +1032,16 @@ function buildFactFindBlocks(
       { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
       { label: "Recommendation Acknowledgement", value: profile.recommendationAcknowledged },
     ]),
-    detailGrid("Request for Information", [
-      { label: "Client Name(s)", value: profile.requestClientNames },
-      { label: "Address", value: addressSummary(profile.requestInfoAddressLine1, profile.requestInfoAddressLine2, profile.requestInfoAddressLine3, profile.requestInfoAddressLine4) },
-      { label: "Date of Birth", value: profile.requestDateOfBirth },
-      { label: "Company", value: profile.requestCompanyName },
-      { label: "Policies", value: profile.requestPolicies },
-      { label: "Date", value: profile.requestLetterDate },
-    ]),
+    {
+      kind: "section",
+      title: "Signatures and Record",
+      bodyHtml: buildFactFindSignaturesHtml(profile),
+    },
+    {
+      kind: "section",
+      title: "Request for Information",
+      bodyHtml: buildFactFindRequestInfoHtml(profile),
+    },
     {
       kind: "callout",
       tone: "warning",
@@ -1042,9 +1128,8 @@ function buildStatementClosingHtml(profile: SeededClientProfile) {
     "<p>Kind regards.</p>",
     "<p>Yours sincerely</p>",
     '<div class="statement-signature-area">',
-    `<p><strong>${escapeHtml(valueOrFallback(profile.advisorName, "Omega Advisor"))}</strong></p>`,
     '<p class="statement-signature-line">______________________________</p>',
-    "<p>Financial Advisor</p>",
+    `<p class="statement-signature-label"><strong>${escapeHtml(valueOrFallback(profile.advisorName, "Omega Advisor"))}</strong></p>`,
     "</div>",
     "</div>",
   ].join("");
@@ -1055,9 +1140,15 @@ function buildStatementDeclarationHtml() {
     '<div class="statement-section statement-declaration">',
     "<h2>Declaration to be completed by Client:</h2>",
     "<p>I am happy to proceed on the basis of the recommendation given to me and wish to affect the policy recommended.</p>",
-    '<div class="statement-signature-area">',
-    "<p>_______________________    ______________</p>",
-    "<p>Amanda McLaughlin    Date</p>",
+    '<div class="statement-signature-area statement-signature-row">',
+    '<div class="statement-signature-block">',
+    '<p class="statement-signature-line">_______________________</p>',
+    '<p class="statement-signature-label">&nbsp;</p>',
+    "</div>",
+    '<div class="statement-signature-block statement-signature-block-date">',
+    '<p class="statement-signature-line">______________</p>',
+    '<p class="statement-signature-label">Date</p>',
+    "</div>",
     "</div>",
     "</div>",
   ].join("");
@@ -1110,9 +1201,9 @@ function buildStatementSectionHtml(profile: SeededClientProfile, recommendationH
     warningHtml,
     "</div>",
     buildStatementClosingHtml(profile),
-    buildStatementDeclarationHtml(),
     buildStatementImportantInfoHtml1(),
     buildStatementImportantInfoHtml2(),
+    buildStatementDeclarationHtml(),
   ].join("");
 
   return bodyHtml;
@@ -1201,6 +1292,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
 
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
   const isStatement = isStatementDocumentType(documentType);
+  const usesCustomFactFindSigning = isFactFind;
   const usesStatementHeader = isStatement || isQuoteDocumentType(documentType) || isFactFind;
 
   const sharedBlocks: ComposedBlock[] = [
@@ -1213,7 +1305,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
           subtitle: `${profile.fullName} (${profile.clientReference})`,
         }]),
     ...bodyBlocks,
-    ...(isStatement ? [] : [buildFooterBlock(profile, documentType)]),
+    ...(isStatement || usesCustomFactFindSigning ? [] : [buildFooterBlock(profile, documentType)]),
   ];
 
   return {

@@ -690,6 +690,49 @@ export function IncomeProtectionPage({
     });
   }, [draft, saveGeneratedDraft]);
 
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    const documentType = "Fact Find Update" satisfies SupportedDocumentType;
+    const currentFactFindUpdateDraft = draft.documentDrafts[documentType];
+    const resolvedFactFindUpdateDraft = resolveWorkspaceDocumentDraft(draft, documentType);
+
+    const needsRepair =
+      currentFactFindUpdateDraft.editedHtml !== resolvedFactFindUpdateDraft.editedHtml ||
+      currentFactFindUpdateDraft.lastGeneratedHtml !== resolvedFactFindUpdateDraft.lastGeneratedHtml ||
+      JSON.stringify(currentFactFindUpdateDraft.lastGeneratedSections) !== JSON.stringify(resolvedFactFindUpdateDraft.lastGeneratedSections) ||
+      JSON.stringify(currentFactFindUpdateDraft.integrationRequests) !== JSON.stringify(resolvedFactFindUpdateDraft.integrationRequests);
+
+    if (!needsRepair) {
+      return;
+    }
+
+    saveGeneratedDraft(draft.clientReference, documentType, {
+      generationStatus: resolvedFactFindUpdateDraft.generationStatus,
+      backendDocumentId: currentFactFindUpdateDraft.backendDocumentId,
+      lastGeneratedHtml: resolvedFactFindUpdateDraft.lastGeneratedHtml,
+      lastGeneratedSections: resolvedFactFindUpdateDraft.lastGeneratedSections,
+      integrationRequests: resolvedFactFindUpdateDraft.integrationRequests,
+      editedHtml: resolvedFactFindUpdateDraft.editedHtml,
+    });
+
+    setDraft((currentDraft) => {
+      if (!currentDraft) {
+        return currentDraft;
+      }
+
+      return {
+        ...currentDraft,
+        documentDrafts: {
+          ...currentDraft.documentDrafts,
+          [documentType]: resolvedFactFindUpdateDraft,
+        },
+      };
+    });
+  }, [draft, saveGeneratedDraft]);
+
   const hasResolvedClient = Boolean(client && draft);
   const resolvedDraft = draft ?? client ?? emptyClientFallback;
   const factFindType = resolvedDraft.factFindType ?? "all";

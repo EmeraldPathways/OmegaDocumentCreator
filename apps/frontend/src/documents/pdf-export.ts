@@ -89,7 +89,15 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "statement-closing") ||
     hasPdfClass(sourceElement, "statement-declaration") ||
     hasPdfClass(sourceElement, "statement-important-info") ||
-    hasPdfClass(sourceElement, "statement-footer-contact")
+    hasPdfClass(sourceElement, "statement-footer-contact") ||
+    hasPdfClass(sourceElement, "fact-find-signing-block") ||
+    hasPdfClass(sourceElement, "fact-find-signature-row") ||
+    hasPdfClass(sourceElement, "fact-find-signature-field") ||
+    hasPdfClass(sourceElement, "fact-find-signature-field-date") ||
+    hasPdfClass(sourceElement, "fact-find-request-copy") ||
+    hasPdfClass(sourceElement, "fact-find-request-row") ||
+    hasPdfClass(sourceElement, "fact-find-request-field") ||
+    hasPdfClass(sourceElement, "fact-find-request-field-date")
   );
 }
 
@@ -224,9 +232,69 @@ function elementStyles(sourceElement: Element) {
     return "display:block;border:1px solid #000;padding:14px 16px;margin:20px 0 0;page-break-inside:avoid";
   }
 
+  if (classList.contains("fact-find-signing-block")) {
+    return "display:block";
+  }
+
+  if (classList.contains("fact-find-signature-row")) {
+    return "display:flex;align-items:flex-end;gap:8px;margin:0 0 12px";
+  }
+
+  if (classList.contains("fact-find-signature-field")) {
+    return "display:block;flex:1 1 auto";
+  }
+
+  if (classList.contains("fact-find-signature-field-date")) {
+    return "display:block;flex:0 0 116px";
+  }
+
+  if (classList.contains("fact-find-request-copy")) {
+    return "display:block;margin:0 0 18px";
+  }
+
+  if (classList.contains("fact-find-request-row")) {
+    return "display:flex;align-items:flex-start;gap:18px;margin:0 0 14px";
+  }
+
+  if (classList.contains("fact-find-request-field")) {
+    return "display:block;flex:1 1 auto";
+  }
+
+  if (classList.contains("fact-find-request-field-date")) {
+    return "display:block;flex:0 0 132px";
+  }
+
   // Statement paragraphs: black, serif, tighter spacing
   if (isStmt && tagName === "p") {
     return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";
+  }
+
+  if (classList.contains("fact-find-signing-intro")) {
+    return "margin:0 0 18px;font-weight:600";
+  }
+
+  if (classList.contains("fact-find-signing-subheading")) {
+    return "margin:18px 0 12px;font-weight:700";
+  }
+
+  if (classList.contains("fact-find-signature-label")) {
+    return "margin:0 2px 4px 0;min-width:76px;font-size:14px";
+  }
+
+  if (classList.contains("fact-find-signature-label-date")) {
+    return "margin:0 2px 4px 2px;min-width:32px;font-size:14px";
+  }
+
+  if (classList.contains("fact-find-signature-value") || classList.contains("fact-find-request-value")) {
+    return "margin:0;min-height:24px;padding:0 0 4px;border-bottom:1px solid #6b7280;font-weight:600";
+  }
+
+  if (classList.contains("fact-find-request-label")) {
+    return "margin:6px 0 0;font-weight:700";
+  }
+
+  if (classList.contains("fact-find-request-footnote")) {
+    return "margin:22px 0 0;font-size:11px;color:#6b7280";
   }
 
   if (isStmt && tagName === "strong") {
@@ -982,6 +1050,86 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     border: 1px solid #000;
     padding: 14px 16px;
     margin-top: 20px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signing-intro,
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-intro {
+    margin: 0 0 18px;
+    font-weight: 600;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signing-subheading,
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-subheading {
+    margin: 18px 0 12px;
+    font-weight: 700;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-label,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-label {
+    margin: 0 2px 4px 0;
+    min-width: 76px;
+    font-size: 14px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-label-date,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-label-date {
+    min-width: 32px;
+    margin-left: 2px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-field,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-field {
+    flex: 1 1 auto;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-field-date,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-field-date {
+    flex: 0 0 116px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signature-value,
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-value,
+  .preview-page .workflow-document-fact-find .fact-find-request-value,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-value {
+    margin: 0;
+    min-height: 24px;
+    padding: 0 0 4px;
+    border-bottom: 1px solid #6b7280;
+    font-weight: 600;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-copy,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-copy {
+    margin-bottom: 18px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-copy p,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-copy p {
+    margin: 0 0 18px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-field,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-field {
+    flex: 1 1 auto;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-field-date,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-field-date {
+    flex: 0 0 132px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-label,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-label {
+    margin: 6px 0 0;
+    font-weight: 700;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-request-footnote,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-footnote {
+    margin: 22px 0 0;
+    font-size: 11px;
+    color: #6b7280;
   }
   .preview-page .workflow-document-statement-of-suitability p {
     margin: 0 0 8px;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
-import { resolveFactFindDraft, resolveStatementDraft } from "./statement-draft";
+import { resolveFactFindDraft, resolveFactFindUpdateDraft, resolveStatementDraft } from "./statement-draft";
 
 function cloneProfile(clientReference: string) {
   return JSON.parse(JSON.stringify(getSeededClientProfile(clientReference))) as SeededClientProfile;
@@ -90,5 +90,67 @@ describe("resolveFactFindDraft", () => {
     expect(draft.editedHtml).toContain("Pension Arrangements");
     expect(draft.editedHtml).toContain("Life Insurance &amp; Serious Illness");
     expect(draft.editedHtml).toContain("Savings &amp; Investments");
+  });
+
+  it("rebuilds composed fact find html when the new signing and request layout is missing", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-section"><h2>Signatures and Record</h2></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("fact-find-signing-block");
+    expect(draft.editedHtml).toContain("fact-find-request-row");
+  });
+
+  it("rebuilds composed fact find html when signature lines still contain saved values", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-section"><h2>Signatures and Record</h2><div class="fact-find-signing-block"><div class="fact-find-signature-row"><p class="fact-find-signature-value">Jamie Murphy</p></div><div class="fact-find-signature-row"><p class="fact-find-signature-value">17/07/2026</p></div></div></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain('class="fact-find-signature-value">&nbsp;</p>');
+    expect(draft.editedHtml).not.toContain('class="fact-find-signature-value">Jamie Murphy</p>');
+    expect(draft.editedHtml).not.toContain('class="fact-find-signature-value">17/07/2026</p>');
+  });
+
+  it("rebuilds composed fact find html when request signing lines or company policies row use the old layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-section"><h2>Request for Information</h2><div class="fact-find-request-row"><div class="fact-find-request-field"><p class="fact-find-request-value">Steve Johnson</p><p class="fact-find-request-label">Client(s)</p></div><div class="fact-find-request-field fact-find-request-field-date"><p class="fact-find-request-value">15/01/2026</p><p class="fact-find-request-label">Date</p></div></div><div class="fact-find-request-row"><div class="fact-find-request-field"><p class="fact-find-request-value">Aviva</p><p class="fact-find-request-label">Company:</p></div></div><div class="fact-find-request-row"><div class="fact-find-request-field"><p class="fact-find-request-value">Income Protection</p><p class="fact-find-request-label">Policies:</p></div></div></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain('class="fact-find-request-value">&nbsp;</p>');
+    expect(draft.editedHtml).not.toContain('class="fact-find-request-value">Steve Johnson</p>');
+    expect(draft.editedHtml).not.toContain('class="fact-find-request-value">15/01/2026</p>');
+    expect(draft.editedHtml).toContain("Company:");
+    expect(draft.editedHtml).toContain("Policies:");
+  });
+
+  it("rebuilds composed fact find html when services requested is below client summary or not in the card container", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="client-summary-grid"><h2>Client Summary</h2></div><div class="document-section"><h2>Services Requested</h2><ul><li>Income Protection</li></ul></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain('class="client-summary-grid"><h2>Services Requested</h2>');
+    expect(draft.editedHtml.indexOf("<h2>Services Requested</h2>")).toBeLessThan(draft.editedHtml.indexOf("<h2>Client Summary</h2>"));
+    expect(draft.editedHtml).toContain('<span class="grid-label">Requested service</span>');
+  });
+});
+
+describe("resolveFactFindUpdateDraft", () => {
+  it("rebuilds composed fact find update html when the new signing layout is missing", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find Update"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find-update"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-section"><h2>Signatures and Record</h2></div></article>';
+
+    const draft = resolveFactFindUpdateDraft(profile);
+
+    expect(draft.editedHtml).toContain("fact-find-signing-block");
+    expect(draft.editedHtml).toContain("FINANCIAL ADVISOR'S SIGNATURE");
   });
 });
