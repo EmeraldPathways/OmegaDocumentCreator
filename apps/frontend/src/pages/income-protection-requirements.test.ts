@@ -15,7 +15,7 @@ function buildDraft() {
 }
 
 describe("income protection requirement mappings", () => {
-  it("maps statement smoker and PHI fields back to the fact find income-protection section", () => {
+  it("maps statement smoker and PHI fields back to the quote section", () => {
     const draft = buildDraft();
     draft.smokerStatus = "Non-Smoker";
     draft.phiOccupationalClass = "2";
@@ -32,19 +32,19 @@ describe("income protection requirement mappings", () => {
     });
 
     expect(requirements.find((item) => item.key === "smokerStatus")?.target).toEqual({
-      tabId: "fact-find",
-      sectionId: "income-protection",
-      fieldId: "ff-smokerStatus",
+      tabId: "quote",
+      sectionId: "quote-output",
+      fieldId: "quote-smoker",
     });
     expect(requirements.find((item) => item.key === "phiOccupationalClass")?.target).toEqual({
-      tabId: "fact-find",
-      sectionId: "income-protection",
-      fieldId: "ff-phiOccupationalClass",
+      tabId: "quote",
+      sectionId: "quote-output",
+      fieldId: "quote-occupationClass",
     });
     expect(requirements.find((item) => item.key === "phiIndexation")?.target).toEqual({
-      tabId: "fact-find",
-      sectionId: "income-protection",
-      fieldId: "ff-phiIndexation",
+      tabId: "quote",
+      sectionId: "quote-output",
+      fieldId: "quote-phiIndexation",
     });
   });
 
@@ -67,7 +67,7 @@ describe("income protection requirement mappings", () => {
     });
   });
 
-  it("keeps quote gender linked to fact find for income protection quotes", () => {
+  it("does not require gender for income protection quotes", () => {
     const draft = buildDraft();
     draft.gender = "";
 
@@ -81,11 +81,7 @@ describe("income protection requirement mappings", () => {
       quotePensionRetirementAge: "",
     });
 
-    expect(requirements.find((item) => item.key === "gender")?.target).toEqual({
-      tabId: "fact-find",
-      sectionId: "client-profile",
-      fieldId: "ff-gender",
-    });
+    expect(requirements.find((item) => item.key === "gender")).toBeUndefined();
   });
 
   it("keeps pensions quote requirements on the quote form only", () => {

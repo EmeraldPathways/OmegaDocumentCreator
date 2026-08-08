@@ -224,31 +224,6 @@ export function StatementWorkflowSection({
                 <h3 className="form-section-title">Cover summary</h3>
                 <div className="form-grid">
                   <Input
-                    id="sos-recommendedCover"
-                    label={requiredLabel("Annual Cover Amount (EUR)")}
-                    onBlur={(event) => onUpdateField("recommendedCover", formatCurrency(event.target.value))}
-                    onChange={(event) => onUpdateField("recommendedCover", event.target.value)}
-                    prefix="EUR"
-                    inputMode="decimal"
-                    step="0.01"
-                    type="text"
-                    value={draft.recommendedCover}
-                  />
-                  <Select
-                    id="sos-deferredPeriod"
-                    label={requiredLabel("Deferred period")}
-                    onChange={(event) => onUpdateField("deferredPeriod", event.target.value)}
-                    options={deferredPeriodOptions}
-                    value={draft.deferredPeriod}
-                  />
-                  <Select
-                    id="sos-coverAge"
-                    label={requiredLabel("Cover to age")}
-                    onChange={(event) => onUpdateField("coverAge", event.target.value)}
-                    options={coverAgeOptions}
-                    value={draft.coverAge}
-                  />
-                  <Input
                     hint="Gross premium minus tax relief at your marginal rate"
                     id="sos-netMonthlyCost"
                     label={requiredLabel("Net monthly cost")}

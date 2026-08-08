@@ -438,7 +438,6 @@ export function IncomeProtectionPage({
   const [quotePensionMonthlyContribution, setQuotePensionMonthlyContribution] = useState("");
   const [showPartnerFields, setShowPartnerFields] = useState(false);
   const [showDifferentWorkAddress, setShowDifferentWorkAddress] = useState(false);
-  const [showNoDeferredFields, setShowNoDeferredFields] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -566,7 +565,6 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
     setShowPartnerFields(false);
-    setShowNoDeferredFields(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
@@ -849,9 +847,9 @@ export function IncomeProtectionPage({
   const fieldToInputId: Partial<Record<keyof SeededClientProfile, string>> = {
     advisorName: "ff-advisorName",
     county: "ff-county",
-    coverAge: "sos-coverAge",
+    coverAge: "quote-coverToAge",
     dateOfBirth: "ff-dob",
-    deferredPeriod: "sos-deferredPeriod",
+    deferredPeriod: "quote-deferredPeriod",
     email: "ff-email",
     fullName: "ff-fullName",
     gender: "ff-gender",
@@ -859,11 +857,11 @@ export function IncomeProtectionPage({
     letterDate: "sos-letterDate",
     mobileNumber: "ff-phone",
     occupation: "ff-occupation",
-    phiIndexation: "ff-phiIndexation",
-    phiOccupationalClass: "ff-phiOccupationalClass",
+    phiIndexation: "quote-phiIndexation",
+    phiOccupationalClass: "quote-occupationClass",
     productType: "sos-productType",
-    recommendedCover: "sos-recommendedCover",
-    smokerStatus: "ff-smokerStatus",
+    recommendedCover: "quote-annualCoverAmount",
+    smokerStatus: "quote-smoker",
     statementSelectedQuoteKey: "sos-statementSelectedQuoteKey",
     statementType: "sos-statementType",
     townCity: "ff-townCity",
@@ -1048,9 +1046,6 @@ export function IncomeProtectionPage({
     "ff-email": "Required for document if the other contact field is blank",
     "ff-gender": "Required for statement output",
     "ff-phone": "Required for document if the other contact field is blank",
-    "ff-phiIndexation": "Required for statement output",
-    "ff-phiOccupationalClass": "Required for statement output",
-    "ff-smokerStatus": "Required for statement output",
     "ffu-personalCircumstances": "Required for this update document",
   };
 
@@ -2531,27 +2526,6 @@ export function IncomeProtectionPage({
     );
   }
 
-  function renderIncomeProtectionProviderDetailsToggle() {
-    return (
-      <div
-        className="form-grid-full"
-        style={{ marginBlock: "var(--space-4)" }}
-      >
-        <div className="form-section">
-          <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
-            Turn this on only if you need to capture the no deferred provider details.
-          </p>
-          <Toggle
-            checked={showNoDeferredFields}
-            id="ff-showNoDeferredDetails"
-            label="Add no deferred provider details"
-            onChange={(event) => setShowNoDeferredFields(event.target.checked)}
-          />
-        </div>
-      </div>
-    );
-  }
-
   function renderTabPanel(tabId: (typeof moduleTabs)[number]["id"] = activeTab.id) {
     if (tabId === "fact-find") {
       const factFindDraft = getDocumentDraft("Fact Find");
@@ -2741,105 +2715,39 @@ export function IncomeProtectionPage({
 
             <AccordionItem
               indicator={getSectionProgress([
-                resolvedDraft.recommendedCover,
-                resolvedDraft.deferredPeriod,
-                resolvedDraft.coverAge,
-                resolvedDraft.smokerStatus,
-                resolvedDraft.phiOccupationalClass,
+                resolvedDraft.incomeProtectionNoDeferredProvider,
+                resolvedDraft.incomeProtectionNoDeferredMonthlyPremium,
+                resolvedDraft.incomeProtectionDeferredProvider,
+                resolvedDraft.incomeProtectionDeferredMonthlyPremium,
               ])}
               isOpen={factFindAccordion.isOpen("income-protection")}
               onToggle={() => factFindAccordion.toggle("income-protection")}
               title="Income Protection"
             >
-              <div className="form-grid form-grid-desktop-3">
-                <Input
-                  id="ff-provider"
-                  label="Provider"
-                  onChange={(event) => updateField("provider", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.provider}
-                />
-                <Input
-                  id="ff-recommendedCover"
-                  label="Annual Cover Amount (€)"
-                  onChange={(event) => updateField("recommendedCover", event.target.value)}
-                  type="text"
-                  value={resolvedDraft.recommendedCover}
-                />
-                <Input
-                  id="ff-premium"
-                  label="Monthly premium"
-                  onBlur={(event) => updateField("premium", formatCurrency(event.target.value))}
-                  onChange={(event) => updateField("premium", event.target.value)}
-                  prefix="€"
-                  inputMode="decimal"
-                  step="0.01"
-                  type="text"
-                  value={resolvedDraft.premium}
-                />
-                <Select
-                  id="ff-deferredPeriod"
-                  label="Deferred period"
-                  onChange={(event) => updateField("deferredPeriod", event.target.value)}
-                  options={deferredPeriodOptions}
-                  value={resolvedDraft.deferredPeriod}
-                />
-                <Select
-                  id="ff-coverAge"
-                  label="Cover to age"
-                  onChange={(event) => updateField("coverAge", event.target.value)}
-                  options={coverAgeOptions}
-                  value={resolvedDraft.coverAge}
-                />
-                <Select
-                  id="ff-smokerStatus"
-                  label="Smoker status"
-                  onChange={(event) => updateField("smokerStatus", event.target.value)}
-                  options={smokerStatusOptions}
-                  value={resolvedDraft.smokerStatus}
-                />
-                <Select
-                  id="ff-phiOccupationalClass"
-                  label="PHI occupational class"
-                  onChange={(event) => updateField("phiOccupationalClass", event.target.value)}
-                  options={phiOccupationalClassOptions}
-                  value={resolvedDraft.phiOccupationalClass}
-                />
-                <Select
-                  id="ff-phiIndexation"
-                  label="PHI indexation"
-                  onChange={(event) => updateField("phiIndexation", event.target.value)}
-                  options={phiIndexationOptions}
-                  value={resolvedDraft.phiIndexation}
-                />
-              </div>
-              {renderIncomeProtectionProviderDetailsToggle()}
               <div className="form-section">
                 <p className="text-small text-muted" style={{ marginBottom: "var(--space-2)" }}>
                   Income Protection with No Deferred Period
                 </p>
                 <div className="provider-detail-grid">
-                  {showNoDeferredFields ? (
-                    <>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Policy details</p>
-                        {renderTextInput("ff-noDeferredProvider", "No deferred provider", "incomeProtectionNoDeferredProvider")}
-                        {renderCurrencyInput("ff-noDeferredMonthlyPremium", "No deferred monthly premium", "incomeProtectionNoDeferredMonthlyPremium")}
-                      </div>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Cover details</p>
-                        {renderCurrencyInput("ff-noDeferredWeeklyCover", "No deferred current weekly cover", "incomeProtectionNoDeferredCurrentWeeklyCover")}
-                        {renderToggleField("ff-noDeferredAge60", "Cover to Age 60", "incomeProtectionNoDeferredCoverToAge60")}
-                        {renderToggleField("ff-noDeferredAge65", "Cover to Age 65", "incomeProtectionNoDeferredCoverToAge65")}
-                      </div>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Provider options</p>
-                        {renderToggleField("ff-noDeferredDentistProvident", "Dentist Provident", "incomeProtectionNoDeferredDentistProvident")}
-                        {renderToggleField("ff-noDeferredDentistGeneral", "Dentist & General", "incomeProtectionNoDeferredDentistGeneral")}
-                        {renderToggleField("ff-noDeferredOther", "Other", "incomeProtectionNoDeferredOther")}
-                      </div>
-                    </>
-                  ) : null}
+                  <>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Policy details</p>
+                      {renderTextInput("ff-noDeferredProvider", "No deferred provider", "incomeProtectionNoDeferredProvider")}
+                      {renderCurrencyInput("ff-noDeferredMonthlyPremium", "No deferred monthly premium", "incomeProtectionNoDeferredMonthlyPremium")}
+                    </div>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Cover details</p>
+                      {renderCurrencyInput("ff-noDeferredWeeklyCover", "No deferred current weekly cover", "incomeProtectionNoDeferredCurrentWeeklyCover")}
+                      {renderToggleField("ff-noDeferredAge60", "Cover to Age 60", "incomeProtectionNoDeferredCoverToAge60")}
+                      {renderToggleField("ff-noDeferredAge65", "Cover to Age 65", "incomeProtectionNoDeferredCoverToAge65")}
+                    </div>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Provider options</p>
+                      {renderToggleField("ff-noDeferredDentistProvident", "Dentist Provident", "incomeProtectionNoDeferredDentistProvident")}
+                      {renderToggleField("ff-noDeferredDentistGeneral", "Dentist & General", "incomeProtectionNoDeferredDentistGeneral")}
+                      {renderToggleField("ff-noDeferredOther", "Other", "incomeProtectionNoDeferredOther")}
+                    </div>
+                  </>
                 </div>
               </div>
               <div className="form-section">
@@ -2847,30 +2755,28 @@ export function IncomeProtectionPage({
                   Income Protection with Deferred Period
                 </p>
                 <div className="provider-detail-grid">
-                  {showNoDeferredFields ? (
-                    <>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Policy details</p>
-                        {renderTextInput("ff-deferredProviderDetailed", "Deferred period provider", "incomeProtectionDeferredProvider")}
-                        {renderCurrencyInput("ff-deferredMonthlyPremium", "Deferred monthly premium", "incomeProtectionDeferredMonthlyPremium")}
-                      </div>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Deferred options</p>
-                        {renderCurrencyInput("ff-deferredWeeklyCover", "Deferred current weekly cover", "incomeProtectionDeferredCurrentWeeklyCover")}
-                        {renderToggleField("ff-deferred13Weeks", "13 Weeks", "incomeProtectionDeferred13Weeks")}
-                        {renderToggleField("ff-deferred26Weeks", "26 Weeks", "incomeProtectionDeferred26Weeks")}
-                        {renderToggleField("ff-deferred52Weeks", "52 Weeks", "incomeProtectionDeferred52Weeks")}
-                        {renderToggleField("ff-deferredAge60", "Deferred Cover to Age 60", "incomeProtectionDeferredCoverToAge60")}
-                        {renderToggleField("ff-deferredAge65", "Deferred Cover to Age 65", "incomeProtectionDeferredCoverToAge65")}
-                      </div>
-                      <div className="provider-detail-column">
-                        <p className="provider-detail-column-title">Provider options</p>
-                        {renderToggleField("ff-deferredFriendsFirst", "Friends First", "incomeProtectionDeferredFriendsFirst")}
-                        {renderToggleField("ff-deferredIrishLife", "Irish Life", "incomeProtectionDeferredIrishLife")}
-                        {renderToggleField("ff-deferredOther", "Other", "incomeProtectionDeferredOther")}
-                      </div>
-                    </>
-                  ) : null}
+                  <>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Policy details</p>
+                      {renderTextInput("ff-deferredProviderDetailed", "Deferred period provider", "incomeProtectionDeferredProvider")}
+                      {renderCurrencyInput("ff-deferredMonthlyPremium", "Deferred monthly premium", "incomeProtectionDeferredMonthlyPremium")}
+                    </div>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Deferred options</p>
+                      {renderCurrencyInput("ff-deferredWeeklyCover", "Deferred current weekly cover", "incomeProtectionDeferredCurrentWeeklyCover")}
+                      {renderToggleField("ff-deferred13Weeks", "13 Weeks", "incomeProtectionDeferred13Weeks")}
+                      {renderToggleField("ff-deferred26Weeks", "26 Weeks", "incomeProtectionDeferred26Weeks")}
+                      {renderToggleField("ff-deferred52Weeks", "52 Weeks", "incomeProtectionDeferred52Weeks")}
+                      {renderToggleField("ff-deferredAge60", "Deferred Cover to Age 60", "incomeProtectionDeferredCoverToAge60")}
+                      {renderToggleField("ff-deferredAge65", "Deferred Cover to Age 65", "incomeProtectionDeferredCoverToAge65")}
+                    </div>
+                    <div className="provider-detail-column">
+                      <p className="provider-detail-column-title">Provider options</p>
+                      {renderToggleField("ff-deferredFriendsFirst", "Friends First", "incomeProtectionDeferredFriendsFirst")}
+                      {renderToggleField("ff-deferredIrishLife", "Irish Life", "incomeProtectionDeferredIrishLife")}
+                      {renderToggleField("ff-deferredOther", "Other", "incomeProtectionDeferredOther")}
+                    </div>
+                  </>
                 </div>
               </div>
             </AccordionItem>
@@ -4024,3 +3930,5 @@ export function IncomeProtectionPage({
     </WorkflowPageLayout>
   );
 }
+
+

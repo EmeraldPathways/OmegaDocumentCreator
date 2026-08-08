@@ -37,21 +37,19 @@ describe("FactFindPage", () => {
     cleanup();
   });
 
-  it("hides partner and no deferred provider sections until toggled on", () => {
+  it("hides partner-only fields and keeps deferred provider sections visible", () => {
     renderFactFindPage();
 
     expect(screen.getByLabelText(/Add partner details/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Add no deferred provider details/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Annual Cover Amount/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Monthly premium$/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Deferred period$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Partner Name/i)).not.toBeInTheDocument();
     expect(screen.queryAllByLabelText(/Partner Address/i)).toHaveLength(0);
-    expect(screen.queryByLabelText(/^No deferred provider$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Deferred period provider$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Client signature 2$/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Client signature 2 date$/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText(/Add no deferred provider details/i));
     expect(screen.getByLabelText(/^No deferred provider$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Deferred period provider$/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Client signature 2$/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Client signature 2 date$/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/Add partner details/i));
     expect(screen.getByLabelText(/Partner Name/i)).toBeInTheDocument();

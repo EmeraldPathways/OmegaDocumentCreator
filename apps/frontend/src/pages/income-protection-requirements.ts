@@ -163,44 +163,44 @@ export function buildStatementGenerationRequirements({
             key: "recommendedCover",
             label: "Recommended cover",
             complete: hasValue(draft.recommendedCover),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-recommendedCover" },
+            location: "Quote form",
+            target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" },
           },
           {
             key: "deferredPeriod",
             label: "Deferred period",
             complete: hasValue(draft.deferredPeriod),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-deferredPeriod" },
+            location: "Quote form",
+            target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-deferredPeriod" },
           },
           {
             key: "coverAge",
             label: "Cover to age",
             complete: hasValue(draft.coverAge),
-            location: "Cover summary",
-            target: { tabId: "statement-of-suitability", sectionId: "statement-form", fieldId: "sos-coverAge" },
+            location: "Quote form",
+            target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" },
           },
         ]),
     {
       key: "smokerStatus",
       label: "Smoker status",
       complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-smokerStatus" },
+      location: "Quote form",
+      target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-smoker" },
     },
     {
       key: "phiOccupationalClass",
       label: "PHI occupational class",
       complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiOccupationalClass" },
+      location: "Quote form",
+      target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" },
     },
     {
       key: "phiIndexation",
       label: "PHI indexation",
       complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation),
-      location: "Income protection",
-      target: { tabId: "fact-find", sectionId: "income-protection", fieldId: "ff-phiIndexation" },
+      location: "Quote form",
+      target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-phiIndexation" },
     },
     {
       key: "letterDate",
@@ -307,9 +307,6 @@ export function buildValidationMessages({
     "ff-income": hasValue(draft.income) ? "" : "Income / salary is required for document generation.",
     "ff-occupation": hasValue(draft.occupation) ? "" : "Occupation is required for document generation.",
     "ff-phone": hasValue(draft.email) || hasValue(draft.mobileNumber) ? "" : "Provide either a phone number or an email address.",
-    "ff-phiIndexation": hasValue(effectiveIncomeProtectionDraft.phiIndexation) ? "" : "PHI indexation is required for the statement output.",
-    "ff-phiOccupationalClass": hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "" : "PHI occupational class is required for the statement output.",
-    "ff-smokerStatus": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required for the statement output.",
     "ff-townCity": hasValue(`${draft.townCity ?? ""} ${draft.county ?? ""}`.trim()) ? "" : "Town/county is required for document generation.",
     "ffu-personalCircumstances": hasValue(draft.factFindUpdatePersonalCircumstances) ? "" : "Add updated personal circumstances before generating the update.",
     "quote-annualCoverAmount": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Annual cover amount is required.",
@@ -323,11 +320,8 @@ export function buildValidationMessages({
     "quote-pensionRetirementAge": hasValue(quotePensionRetirementAge) ? "" : "Retirement age is required.",
     "quote-smoker": hasValue(effectiveIncomeProtectionDraft.smokerStatus) ? "" : "Smoker status is required.",
     "sos-advisorName": hasValue(draft.advisorName) ? "" : "Advisor name is required for document generation.",
-    "sos-coverAge": hasValue(effectiveIncomeProtectionDraft.coverAge) ? "" : "Cover to age is required.",
-    "sos-deferredPeriod": hasValue(effectiveIncomeProtectionDraft.deferredPeriod) ? "" : "Deferred period is required.",
     "sos-letterDate": hasValue(draft.letterDate) ? "" : "Letter date is required for the statement.",
     "sos-productType": hasValue(draft.productType) ? "" : "Product type is required.",
-    "sos-recommendedCover": hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "" : "Recommended cover is required.",
     "sos-statementSelectedQuoteKey": statementHasSelectedQuote ? "" : "Choose a policy before generating the statement.",
     "sos-statementType": hasValue(draft.statementType) ? "" : "Statement type is required.",
   };
@@ -359,15 +353,17 @@ export function buildFactFindSectionProgressItems(
       id: "income-protection",
       title: "Income protection",
       completeCount: [
-        hasValue(effectiveIncomeProtectionDraft.smokerStatus),
-        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass),
-        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
+        hasValue(draft.incomeProtectionNoDeferredProvider),
+        hasValue(draft.incomeProtectionNoDeferredMonthlyPremium),
+        hasValue(draft.incomeProtectionDeferredProvider),
+        hasValue(draft.incomeProtectionDeferredMonthlyPremium),
       ].filter(Boolean).length,
-      requiredCount: 3,
+      requiredCount: 4,
       complete:
-        hasValue(effectiveIncomeProtectionDraft.smokerStatus) &&
-        hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) &&
-        hasValue(effectiveIncomeProtectionDraft.phiIndexation),
+        hasValue(draft.incomeProtectionNoDeferredProvider) &&
+        hasValue(draft.incomeProtectionNoDeferredMonthlyPremium) &&
+        hasValue(draft.incomeProtectionDeferredProvider) &&
+        hasValue(draft.incomeProtectionDeferredMonthlyPremium),
     },
   ];
 }
