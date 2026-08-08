@@ -152,6 +152,49 @@ describe("resolveFactFindDraft", () => {
     expect(draft.editedHtml.indexOf("<h2>Services Requested</h2>")).toBeLessThan(draft.editedHtml.indexOf("<h2>Client Summary</h2>"));
     expect(draft.editedHtml).toContain('<span class="grid-label">Requested service</span>');
   });
+
+  it("rebuilds composed fact find html when an old fallback recommendation section is present without generated recommendation data", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindType = "small";
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-small"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="client-summary-grid"><h2>Services Requested</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">Requested service</span><strong>Income Protection</strong></div></div></div><div class="client-summary-grid"><h2>Client Summary</h2></div><div class="document-section"><h2>Recommendation Section</h2><p>Income protection fact find draft generated for Test Client.</p></div><div class="document-section"><h2>Signatures and Record</h2><div class="fact-find-signing-block"><div class="fact-find-signature-row"><p class="fact-find-signature-value">&nbsp;</p></div></div></div><div class="document-section"><h2>Request for Information</h2><div class="fact-find-request-row"><div class="fact-find-request-field fact-find-request-field-signature"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Client(s)</p></div><div class="fact-find-request-field fact-find-request-field-date fact-find-request-field-signature"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Date</p></div></div><div class="fact-find-request-row"><div class="fact-find-request-field"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Company:</p></div><div class="fact-find-request-field"><p class="fact-find-request-value">Income Protection</p><p class="fact-find-request-label">Policies:</p></div></div></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).not.toContain("Recommendation Section");
+    expect(draft.editedHtml).not.toContain("Income protection fact find draft generated for Test Client.");
+  });
+
+  it("rebuilds composed fact find html when income protection arrangement fields change", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="document-grid"><h2>Income Protection Arrangements</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">No deferred provider</span><strong>Aviva</strong></div><div class="grid-item"><span class="grid-label">Deferred provider</span><strong>Not recorded</strong></div></div></div></article>';
+    profile.incomeProtectionNoDeferredProvider = "Aviva";
+    profile.incomeProtectionNoDeferredCurrentWeeklyCover = "200.00";
+    profile.incomeProtectionNoDeferredMonthlyPremium = "200.00";
+    profile.incomeProtectionNoDeferredCoverToAge65 = "Yes";
+    profile.incomeProtectionDeferredProvider = "";
+    profile.incomeProtectionDeferredCurrentWeeklyCover = "";
+    profile.incomeProtectionDeferred13Weeks = "";
+    profile.incomeProtectionDeferred26Weeks = "";
+    profile.incomeProtectionDeferred52Weeks = "";
+    profile.incomeProtectionDeferredCoverToAge60 = "";
+    profile.incomeProtectionDeferredCoverToAge65 = "";
+    profile.incomeProtectionDeferredMonthlyPremium = "";
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("Income Protection Arrangements");
+    expect(draft.editedHtml).toContain(">Aviva<");
+    expect(draft.editedHtml).toContain("200.00");
+    expect(draft.editedHtml).toContain(">65<");
+    expect(draft.editedHtml).toContain('<span class="grid-label">No deferred provider</span><strong>Aviva</strong>');
+    expect(draft.editedHtml).toContain('<span class="grid-label">No deferred current weekly cover</span><strong>200.00</strong>');
+    expect(draft.editedHtml).toContain('<span class="grid-label">No deferred monthly premium</span><strong>200.00</strong>');
+    expect(draft.editedHtml).toContain('<span class="grid-label">No deferred cover to age</span><strong>65</strong>');
+  });
 });
 
 describe("resolveFactFindUpdateDraft", () => {

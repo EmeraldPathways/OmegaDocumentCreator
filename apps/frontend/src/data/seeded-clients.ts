@@ -552,15 +552,9 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
       ...createDefaultDocumentDrafts(),
       "Fact Find": {
         ...createDefaultDocumentDrafts()["Fact Find"],
-        generationStatus: "completed",
-        lastGeneratedHtml: "<p>Income protection fact find draft generated for Test Client.</p>",
-        lastGeneratedSections: [
-          {
-            id: "summary",
-            title: "Summary",
-            bodyHtml: "<p>Income protection fact find draft generated for Test Client.</p>",
-          },
-        ],
+        generationStatus: "idle",
+        lastGeneratedHtml: "",
+        lastGeneratedSections: [],
       },
     },
     files: [
@@ -581,8 +575,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
           version: "Version 1",
           status: "DOCX ready",
           generatedAt: "2026-01-15",
-          previewHtml:
-            '<article class="workflow-document workflow-document-fact-find"><header class="document-banner"><p class="document-eyebrow">Fact Find</p><h1>Income Protection Fact Find</h1><p class="document-subtitle">Test Client (CLI-2026-0001)</p></header><section class="document-section"><h2>Summary</h2><p>Income protection fact find draft generated for Test Client.</p></section><footer class="signatures-footer"><h2>Signatures and Record</h2><p><strong>Advisor:</strong> Omega Advisor</p><p><strong>Client signature:</strong> Pending</p></footer></article>',
+          previewHtml: "",
           previewTitle: "Fact Find",
         },
     ],

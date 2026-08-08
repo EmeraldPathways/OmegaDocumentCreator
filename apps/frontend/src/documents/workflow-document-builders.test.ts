@@ -517,6 +517,71 @@ describe("buildWorkflowDocument", () => {
     expect(document.html.indexOf("Signatures and Record")).toBeLessThan(document.html.indexOf("Request for Information"));
   });
 
+  it("hides income protection arrangements when dedicated arrangement fields are blank", () => {
+    const profile = cloneProfile("CLI-2026-0001");
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
+    profile.provider = "Aviva";
+    profile.recommendedCover = "75000";
+    profile.deferredPeriod = "52 weeks";
+    profile.coverAge = "65";
+    profile.premium = "165.50";
+    profile.incomeProtectionNoDeferredProvider = "";
+    profile.incomeProtectionNoDeferredDentistProvident = "";
+    profile.incomeProtectionNoDeferredDentistGeneral = "";
+    profile.incomeProtectionNoDeferredOther = "";
+    profile.incomeProtectionNoDeferredCurrentWeeklyCover = "";
+    profile.incomeProtectionNoDeferredMonthlyPremium = "";
+    profile.incomeProtectionNoDeferredCoverToAge60 = "";
+    profile.incomeProtectionNoDeferredCoverToAge65 = "";
+    profile.incomeProtectionDeferredProvider = "";
+    profile.incomeProtectionDeferredFriendsFirst = "";
+    profile.incomeProtectionDeferredIrishLife = "";
+    profile.incomeProtectionDeferredOther = "";
+    profile.incomeProtectionDeferred13Weeks = "";
+    profile.incomeProtectionDeferred26Weeks = "";
+    profile.incomeProtectionDeferred52Weeks = "";
+    profile.incomeProtectionDeferredCurrentWeeklyCover = "";
+    profile.incomeProtectionDeferredMonthlyPremium = "";
+    profile.incomeProtectionDeferredCoverToAge60 = "";
+    profile.incomeProtectionDeferredCoverToAge65 = "";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Income Protection Arrangements");
+  });
+
+  it("does not add a fallback recommendation section to small fact find editor output", () => {
+    const profile = cloneProfile("CLI-2026-0001");
+    profile.factFindType = "small";
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
+    profile.documentDrafts["Fact Find"].lastGeneratedHtml = "";
+    profile.documentDrafts["Fact Find"].editedHtml = "";
+
+    const document = buildWorkflowEditorDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Recommendation Section");
+    expect(document.html).not.toContain("Income Protection recommendation");
+    expect(document.html).not.toContain("Recommended cover:");
+  });
+
+  it("does not treat a legacy fact find summary section as recommendation content", () => {
+    const profile = cloneProfile("CLI-2026-0001");
+    profile.documentDrafts["Fact Find"].lastGeneratedSections = [
+      {
+        id: "summary",
+        title: "Summary",
+        bodyHtml: "<p>Income protection fact find draft generated for Test Client.</p>",
+      },
+    ];
+    profile.documentDrafts["Fact Find"].lastGeneratedHtml = "<p>Income protection fact find draft generated for Test Client.</p>";
+    profile.documentDrafts["Fact Find"].editedHtml = "";
+
+    const document = buildWorkflowEditorDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Recommendation Section");
+    expect(document.html).not.toContain("Income protection fact find draft generated for Test Client.");
+  });
+
   it("renders fact find personal circumstances, financial situation, and needs sections verbatim from generated draft sections", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.documentDrafts["Fact Find"].lastGeneratedSections = [

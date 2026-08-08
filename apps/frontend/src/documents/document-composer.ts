@@ -189,6 +189,143 @@ function hasFactFindLifeInsuranceContent(profile: SeededClientProfile) {
   ].some((value) => hasNonDefaultValue(value, ["No"]));
 }
 
+function hasFactFindIncomeProtectionArrangementContent(profile: SeededClientProfile) {
+  return [
+    profile.incomeProtectionNoDeferredProvider,
+    profile.incomeProtectionNoDeferredDentistProvident,
+    profile.incomeProtectionNoDeferredDentistGeneral,
+    profile.incomeProtectionNoDeferredOther,
+    profile.incomeProtectionNoDeferredCurrentWeeklyCover,
+    profile.incomeProtectionNoDeferredMonthlyPremium,
+    profile.incomeProtectionNoDeferredCoverToAge60,
+    profile.incomeProtectionNoDeferredCoverToAge65,
+    profile.incomeProtectionDeferredProvider,
+    profile.incomeProtectionDeferredFriendsFirst,
+    profile.incomeProtectionDeferredIrishLife,
+    profile.incomeProtectionDeferredOther,
+    profile.incomeProtectionDeferred13Weeks,
+    profile.incomeProtectionDeferred26Weeks,
+    profile.incomeProtectionDeferred52Weeks,
+    profile.incomeProtectionDeferredCurrentWeeklyCover,
+    profile.incomeProtectionDeferredMonthlyPremium,
+    profile.incomeProtectionDeferredCoverToAge60,
+    profile.incomeProtectionDeferredCoverToAge65,
+  ].some((value) => hasNonDefaultValue(value));
+}
+
+function selectedFactFindDeferredPeriod(profile: SeededClientProfile) {
+  return checkedItemLabels([
+    { label: "13 weeks", value: profile.incomeProtectionDeferred13Weeks },
+    { label: "26 weeks", value: profile.incomeProtectionDeferred26Weeks },
+    { label: "52 weeks", value: profile.incomeProtectionDeferred52Weeks },
+  ]).join(", ");
+}
+
+function selectedFactFindNoDeferredCoverToAge(profile: SeededClientProfile) {
+  return checkedItemLabels([
+    { label: "60", value: profile.incomeProtectionNoDeferredCoverToAge60 },
+    { label: "65", value: profile.incomeProtectionNoDeferredCoverToAge65 },
+  ]).join(", ");
+}
+
+function hasFactFindNoDeferredArrangementDetails(profile: SeededClientProfile) {
+  return [
+    profile.incomeProtectionNoDeferredProvider,
+    profile.incomeProtectionNoDeferredDentistProvident,
+    profile.incomeProtectionNoDeferredDentistGeneral,
+    profile.incomeProtectionNoDeferredOther,
+    profile.incomeProtectionNoDeferredCurrentWeeklyCover,
+    profile.incomeProtectionNoDeferredMonthlyPremium,
+    profile.incomeProtectionNoDeferredCoverToAge60,
+    profile.incomeProtectionNoDeferredCoverToAge65,
+  ].some((value) => hasNonDefaultValue(value));
+}
+
+function hasFactFindDeferredArrangementDetails(profile: SeededClientProfile) {
+  return [
+    profile.incomeProtectionDeferredProvider,
+    profile.incomeProtectionDeferredFriendsFirst,
+    profile.incomeProtectionDeferredIrishLife,
+    profile.incomeProtectionDeferredOther,
+    profile.incomeProtectionDeferred13Weeks,
+    profile.incomeProtectionDeferred26Weeks,
+    profile.incomeProtectionDeferred52Weeks,
+    profile.incomeProtectionDeferredCurrentWeeklyCover,
+    profile.incomeProtectionDeferredMonthlyPremium,
+    profile.incomeProtectionDeferredCoverToAge60,
+    profile.incomeProtectionDeferredCoverToAge65,
+  ].some((value) => hasNonDefaultValue(value));
+}
+
+function selectedFactFindCoverToAge(profile: SeededClientProfile) {
+  return checkedItemLabels([
+    { label: "60", value: profile.incomeProtectionDeferredCoverToAge60 },
+    { label: "65", value: profile.incomeProtectionDeferredCoverToAge65 },
+  ]).join(", ");
+}
+
+function resolvedFactFindCurrentWeeklyCover(profile: SeededClientProfile) {
+  return profile.incomeProtectionNoDeferredCurrentWeeklyCover || profile.incomeProtectionDeferredCurrentWeeklyCover;
+}
+
+function resolvedFactFindDeferredPeriod(profile: SeededClientProfile) {
+  if (hasFactFindDeferredArrangementDetails(profile)) {
+    const deferredPeriod = selectedFactFindDeferredPeriod(profile);
+    if (deferredPeriod) {
+      return deferredPeriod;
+    }
+
+    return "";
+  }
+
+  if (hasFactFindNoDeferredArrangementDetails(profile)) {
+    return "No deferred period";
+  }
+
+  const deferredPeriod = selectedFactFindDeferredPeriod(profile);
+  if (deferredPeriod) {
+    return deferredPeriod;
+  }
+
+  return "";
+}
+
+function resolvedFactFindCoverToAge(profile: SeededClientProfile) {
+  return selectedFactFindNoDeferredCoverToAge(profile) || selectedFactFindCoverToAge(profile);
+}
+
+function resolvedFactFindMonthlyPremium(profile: SeededClientProfile) {
+  return profile.incomeProtectionNoDeferredMonthlyPremium || profile.incomeProtectionDeferredMonthlyPremium;
+}
+
+function buildFactFindIncomeProtectionArrangementItems(profile: SeededClientProfile) {
+  const items: Array<{ label: string; value: string }> = [];
+  const noDeferredCoverToAge = selectedFactFindNoDeferredCoverToAge(profile);
+  const deferredPeriod = selectedFactFindDeferredPeriod(profile);
+  const deferredCoverToAge = selectedFactFindCoverToAge(profile);
+
+  if (hasFactFindNoDeferredArrangementDetails(profile)) {
+    items.push(
+      { label: "No deferred provider", value: profile.incomeProtectionNoDeferredProvider },
+      { label: "No deferred current weekly cover", value: profile.incomeProtectionNoDeferredCurrentWeeklyCover },
+      { label: "No deferred monthly premium", value: profile.incomeProtectionNoDeferredMonthlyPremium },
+      { label: "No deferred cover to age", value: noDeferredCoverToAge },
+    );
+  }
+
+  if (hasFactFindDeferredArrangementDetails(profile)) {
+    items.push(
+      { label: "Deferred period provider", value: profile.incomeProtectionDeferredProvider },
+      { label: "Deferred current weekly cover", value: profile.incomeProtectionDeferredCurrentWeeklyCover },
+      { label: "Deferred monthly premium", value: profile.incomeProtectionDeferredMonthlyPremium },
+      { label: "Deferred period", value: deferredPeriod },
+      { label: "Deferred cover to age", value: deferredCoverToAge },
+    );
+  }
+
+  return items;
+}
+
 function buildFactFindLiabilitiesItems(profile: SeededClientProfile) {
   return [
     { label: "Home (Self)", value: profile.assetHomeSelf },
@@ -688,10 +825,11 @@ function buildNeedsNarrativeHtml(profile: SeededClientProfile, documentType: Sup
     const dependantItems = profile.dependants.map((dependant) =>
       [dependant.name, dependant.dateOfBirth ? `(${dependant.dateOfBirth})` : "", dependant.notes].filter(Boolean).join(" "),
     );
+    const hasDependantItems = dependantItems.some((item) => item.trim().length > 0);
 
     return [
       paragraphHtml(profile.needsObjectives || "Income Protection cover review requested."),
-      listHtml(dependantItems),
+      hasDependantItems ? listHtml(dependantItems) : "",
     ].join("");
   }
 
@@ -1328,7 +1466,7 @@ function buildFactFindUpdateBlocks(
 
 function buildFactFindBlocks(
   profile: SeededClientProfile,
-  recommendationHtml: string,
+  recommendationHtml: string | null,
   personalCircumstancesHtml: string,
   financialSituationHtml: string,
   needsHtml: string,
@@ -1391,14 +1529,9 @@ function buildFactFindBlocks(
       title: "Needs and Objectives",
       bodyHtml: needsHtml,
     },
-    detailGrid("Income Protection Arrangements", [
-      { label: "No deferred provider", value: profile.incomeProtectionNoDeferredProvider },
-      { label: "Deferred provider", value: profile.incomeProtectionDeferredProvider || profile.provider },
-      { label: "Current weekly cover", value: profile.incomeProtectionDeferredCurrentWeeklyCover || profile.recommendedCover },
-      { label: "Deferred period", value: profile.deferredPeriod },
-      { label: "Cover to age", value: profile.coverAge },
-      { label: "Monthly premium", value: profile.premium },
-    ]),
+    ...(hasFactFindIncomeProtectionArrangementContent(profile)
+      ? [detailGrid("Income Protection Arrangements", buildFactFindIncomeProtectionArrangementItems(profile))]
+      : []),
     ...(!isSmall && hasFilledItems(liabilitiesItems)
       ? [{
           kind: "section" as const,
@@ -1439,11 +1572,13 @@ function buildFactFindBlocks(
           bodyHtml: buildFactFindSavingsHtml(profile),
         }]
       : []),
-    {
-      kind: "section",
-      title: "Recommendation Section",
-      bodyHtml: recommendationHtml,
-    },
+    ...(recommendationHtml
+      ? [{
+          kind: "section" as const,
+          title: "Recommendation Section",
+          bodyHtml: recommendationHtml,
+        }]
+      : []),
     detailGrid("Declarations and Confirmations", [
       { label: "Execution only", value: profile.executionOnlyConfirmation },
       { label: "Terms reviewed", value: profile.termsReviewedReceived },
@@ -1671,7 +1806,10 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
       : documentType === "Terms of Business" ? "Terms of Business"
       : documentType;
   const draftSections = getDraftSections(profile, documentType);
-  const recommendationSection = findDraftSection(draftSections, "recommendation", "summary", "issue");
+  const recommendationSection =
+    documentType === "Fact Find"
+      ? findDraftSection(draftSections, "recommendation", "issue")
+      : findDraftSection(draftSections, "recommendation", "summary", "issue");
   const personalCircumstancesSection = findDraftSection(draftSections, "personal circumstance");
   const financialSituationSection = findDraftSection(draftSections, "financial situation");
   const needsSection =
@@ -1681,7 +1819,9 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const warningSection = findDraftSection(draftSections, "warning", "disclaimer", "risk");
   const computedRecommendationHtml = buildRecommendationHtml(profile, documentType);
   const recommendationHtml =
-    isStatementDocumentType(documentType)
+    documentType === "Fact Find"
+      ? recommendationSection?.bodyHtml ?? null
+      : isStatementDocumentType(documentType)
       ? mergeStatementRecommendationHtml(computedRecommendationHtml, recommendationSection?.bodyHtml)
       : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);

@@ -100,6 +100,18 @@ function hasCurrentFactFindServicesLayout(editedHtml: string) {
   );
 }
 
+function hasUnexpectedFactFindRecommendationSection(draft: GeneratedDocumentDraft) {
+  const editedHtml = draft.editedHtml.trim();
+  if (!editedHtml.includes("<h2>Recommendation Section</h2>")) {
+    return false;
+  }
+
+  return !draft.lastGeneratedSections.some((section) => {
+    const haystack = `${section.id} ${section.title}`.toLowerCase();
+    return haystack.includes("recommendation") || haystack.includes("issue");
+  });
+}
+
 function hasComposedFactFindUpdateHtml(editedHtml: string) {
   return (
     editedHtml.includes("workflow-document-fact-find-update") &&
@@ -175,15 +187,17 @@ export function resolveStatementDraft(
 export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
   const factFindDraft = profile.documentDrafts[FACT_FIND_DOCUMENT_TYPE];
   const editedHtml = factFindDraft.editedHtml.trim();
+  const hasComposedHtml = hasComposedFactFindHtml(editedHtml);
   const shouldRebuildComposedHtml =
-    hasComposedFactFindHtml(editedHtml) && (
+    hasComposedHtml && (
       !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
       !hasCurrentFactFindSigningLayout(editedHtml) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
-      !hasCurrentFactFindServicesLayout(editedHtml)
+      !hasCurrentFactFindServicesLayout(editedHtml) ||
+      hasUnexpectedFactFindRecommendationSection(factFindDraft)
     );
 
-  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !isLegacyFactFindDraft(factFindDraft) && !shouldRebuildComposedHtml) {
+  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !isLegacyFactFindDraft(factFindDraft) && !shouldRebuildComposedHtml && !hasComposedHtml) {
     return factFindDraft;
   }
 

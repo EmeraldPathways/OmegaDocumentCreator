@@ -166,6 +166,40 @@ function stripNumericFormatting(value: string | undefined) {
   return (value ?? "").replace(/[^\d.]/g, "").trim();
 }
 
+function hasDraftField<T extends object>(draft: T | undefined, key: keyof T) {
+  return Boolean(draft && Object.prototype.hasOwnProperty.call(draft, key));
+}
+
+function mergeSingleDocumentDraft(
+  currentDraft: GeneratedDocumentDraft,
+  incomingDraft?: Partial<GeneratedDocumentDraft>,
+) {
+  if (!incomingDraft) {
+    return currentDraft;
+  }
+
+  return {
+    ...currentDraft,
+    ...incomingDraft,
+    lastGeneratedHtml: hasDraftField(incomingDraft, "lastGeneratedHtml")
+      ? (incomingDraft.lastGeneratedHtml ?? "")
+      : currentDraft.lastGeneratedHtml,
+    lastGeneratedSections: hasDraftField(incomingDraft, "lastGeneratedSections")
+      ? (incomingDraft.lastGeneratedSections ?? [])
+      : currentDraft.lastGeneratedSections,
+    integrationRequests: hasDraftField(incomingDraft, "integrationRequests")
+      ? (incomingDraft.integrationRequests ?? [])
+      : currentDraft.integrationRequests,
+    editedHtml: hasDraftField(incomingDraft, "editedHtml")
+      ? (incomingDraft.editedHtml ?? "")
+      : currentDraft.editedHtml,
+    generationStatus:
+      hasGeneratedDraftArtifacts(incomingDraft) || hasDraftField(incomingDraft, "generationStatus")
+        ? incomingDraft.generationStatus ?? currentDraft.generationStatus
+        : currentDraft.generationStatus,
+  };
+}
+
 function mergeDocumentDrafts(
   currentDrafts: SeededClientProfile["documentDrafts"],
   incomingDrafts?: Partial<Record<SupportedDocumentType, Partial<GeneratedDocumentDraft>>>,
@@ -175,140 +209,13 @@ function mergeDocumentDrafts(
   }
 
   return {
-    "Fact Find": {
-      ...currentDrafts["Fact Find"],
-      ...incomingDrafts["Fact Find"],
-      lastGeneratedHtml:
-        incomingDrafts["Fact Find"]?.lastGeneratedHtml || currentDrafts["Fact Find"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Fact Find"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Fact Find"]?.lastGeneratedSections ?? currentDrafts["Fact Find"].lastGeneratedSections)
-          : currentDrafts["Fact Find"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Fact Find"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Fact Find"]?.integrationRequests ?? currentDrafts["Fact Find"].integrationRequests)
-          : currentDrafts["Fact Find"].integrationRequests,
-      editedHtml: incomingDrafts["Fact Find"]?.editedHtml || currentDrafts["Fact Find"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find"])
-        ? incomingDrafts["Fact Find"]?.generationStatus ?? currentDrafts["Fact Find"].generationStatus
-        : currentDrafts["Fact Find"].generationStatus,
-    },
-    "Fact Find Update": {
-      ...currentDrafts["Fact Find Update"],
-      ...incomingDrafts["Fact Find Update"],
-      lastGeneratedHtml:
-        incomingDrafts["Fact Find Update"]?.lastGeneratedHtml || currentDrafts["Fact Find Update"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Fact Find Update"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Fact Find Update"]?.lastGeneratedSections ?? currentDrafts["Fact Find Update"].lastGeneratedSections)
-          : currentDrafts["Fact Find Update"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Fact Find Update"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Fact Find Update"]?.integrationRequests ?? currentDrafts["Fact Find Update"].integrationRequests)
-          : currentDrafts["Fact Find Update"].integrationRequests,
-      editedHtml: incomingDrafts["Fact Find Update"]?.editedHtml || currentDrafts["Fact Find Update"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Fact Find Update"])
-        ? incomingDrafts["Fact Find Update"]?.generationStatus ?? currentDrafts["Fact Find Update"].generationStatus
-        : currentDrafts["Fact Find Update"].generationStatus,
-    },
-    "Terms of Business": {
-      ...currentDrafts["Terms of Business"],
-      ...incomingDrafts["Terms of Business"],
-      lastGeneratedHtml:
-        incomingDrafts["Terms of Business"]?.lastGeneratedHtml || currentDrafts["Terms of Business"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Terms of Business"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Terms of Business"]?.lastGeneratedSections ?? currentDrafts["Terms of Business"].lastGeneratedSections)
-          : currentDrafts["Terms of Business"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Terms of Business"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Terms of Business"]?.integrationRequests ?? currentDrafts["Terms of Business"].integrationRequests)
-          : currentDrafts["Terms of Business"].integrationRequests,
-      editedHtml: incomingDrafts["Terms of Business"]?.editedHtml || currentDrafts["Terms of Business"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Terms of Business"])
-        ? incomingDrafts["Terms of Business"]?.generationStatus ?? currentDrafts["Terms of Business"].generationStatus
-        : currentDrafts["Terms of Business"].generationStatus,
-    },
-    "Statement of Suitability": {
-      ...currentDrafts["Statement of Suitability"],
-      ...incomingDrafts["Statement of Suitability"],
-      lastGeneratedHtml:
-        incomingDrafts["Statement of Suitability"]?.lastGeneratedHtml ||
-        currentDrafts["Statement of Suitability"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Statement of Suitability"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Statement of Suitability"]?.lastGeneratedSections ?? currentDrafts["Statement of Suitability"].lastGeneratedSections)
-          : currentDrafts["Statement of Suitability"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Statement of Suitability"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Statement of Suitability"]?.integrationRequests ?? currentDrafts["Statement of Suitability"].integrationRequests)
-          : currentDrafts["Statement of Suitability"].integrationRequests,
-      editedHtml:
-        incomingDrafts["Statement of Suitability"]?.editedHtml ||
-        currentDrafts["Statement of Suitability"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Statement of Suitability"])
-        ? incomingDrafts["Statement of Suitability"]?.generationStatus ??
-          currentDrafts["Statement of Suitability"].generationStatus
-        : currentDrafts["Statement of Suitability"].generationStatus,
-    },
-    "Quote": {
-      ...currentDrafts["Quote"],
-      ...incomingDrafts["Quote"],
-      lastGeneratedHtml:
-        incomingDrafts["Quote"]?.lastGeneratedHtml || currentDrafts["Quote"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Quote"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Quote"]?.lastGeneratedSections ?? currentDrafts["Quote"].lastGeneratedSections)
-          : currentDrafts["Quote"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Quote"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Quote"]?.integrationRequests ?? currentDrafts["Quote"].integrationRequests)
-          : currentDrafts["Quote"].integrationRequests,
-      editedHtml: incomingDrafts["Quote"]?.editedHtml || currentDrafts["Quote"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Quote"])
-        ? incomingDrafts["Quote"]?.generationStatus ?? currentDrafts["Quote"].generationStatus
-        : currentDrafts["Quote"].generationStatus,
-    },
-    "Pensions Statement": {
-      ...currentDrafts["Pensions Statement"],
-      ...incomingDrafts["Pensions Statement"],
-      lastGeneratedHtml:
-        incomingDrafts["Pensions Statement"]?.lastGeneratedHtml ||
-        currentDrafts["Pensions Statement"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Pensions Statement"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Pensions Statement"]?.lastGeneratedSections ?? currentDrafts["Pensions Statement"].lastGeneratedSections)
-          : currentDrafts["Pensions Statement"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Pensions Statement"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Pensions Statement"]?.integrationRequests ?? currentDrafts["Pensions Statement"].integrationRequests)
-          : currentDrafts["Pensions Statement"].integrationRequests,
-      editedHtml:
-        incomingDrafts["Pensions Statement"]?.editedHtml ||
-        currentDrafts["Pensions Statement"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Pensions Statement"])
-        ? incomingDrafts["Pensions Statement"]?.generationStatus ??
-          currentDrafts["Pensions Statement"].generationStatus
-        : currentDrafts["Pensions Statement"].generationStatus,
-    },
-    "Pensions Quote": {
-      ...currentDrafts["Pensions Quote"],
-      ...incomingDrafts["Pensions Quote"],
-      lastGeneratedHtml:
-        incomingDrafts["Pensions Quote"]?.lastGeneratedHtml || currentDrafts["Pensions Quote"].lastGeneratedHtml,
-      lastGeneratedSections:
-        (incomingDrafts["Pensions Quote"]?.lastGeneratedSections?.length ?? 0) > 0
-          ? (incomingDrafts["Pensions Quote"]?.lastGeneratedSections ?? currentDrafts["Pensions Quote"].lastGeneratedSections)
-          : currentDrafts["Pensions Quote"].lastGeneratedSections,
-      integrationRequests:
-        (incomingDrafts["Pensions Quote"]?.integrationRequests?.length ?? 0) > 0
-          ? (incomingDrafts["Pensions Quote"]?.integrationRequests ?? currentDrafts["Pensions Quote"].integrationRequests)
-          : currentDrafts["Pensions Quote"].integrationRequests,
-      editedHtml: incomingDrafts["Pensions Quote"]?.editedHtml || currentDrafts["Pensions Quote"].editedHtml,
-      generationStatus: hasGeneratedDraftArtifacts(incomingDrafts["Pensions Quote"])
-        ? incomingDrafts["Pensions Quote"]?.generationStatus ?? currentDrafts["Pensions Quote"].generationStatus
-        : currentDrafts["Pensions Quote"].generationStatus,
-    },
+    "Fact Find": mergeSingleDocumentDraft(currentDrafts["Fact Find"], incomingDrafts["Fact Find"]),
+    "Fact Find Update": mergeSingleDocumentDraft(currentDrafts["Fact Find Update"], incomingDrafts["Fact Find Update"]),
+    "Terms of Business": mergeSingleDocumentDraft(currentDrafts["Terms of Business"], incomingDrafts["Terms of Business"]),
+    "Statement of Suitability": mergeSingleDocumentDraft(currentDrafts["Statement of Suitability"], incomingDrafts["Statement of Suitability"]),
+    "Quote": mergeSingleDocumentDraft(currentDrafts["Quote"], incomingDrafts["Quote"]),
+    "Pensions Statement": mergeSingleDocumentDraft(currentDrafts["Pensions Statement"], incomingDrafts["Pensions Statement"]),
+    "Pensions Quote": mergeSingleDocumentDraft(currentDrafts["Pensions Quote"], incomingDrafts["Pensions Quote"]),
   };
 }
 
