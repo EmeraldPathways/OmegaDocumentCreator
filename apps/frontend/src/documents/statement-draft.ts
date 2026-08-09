@@ -100,6 +100,64 @@ function hasCurrentFactFindServicesLayout(editedHtml: string) {
   );
 }
 
+function hasCurrentFactFindLifeInsuranceLayout(editedHtml: string) {
+  return editedHtml.includes("fact-find-life-insurance-card");
+}
+
+function hasCurrentFactFindPensionSelfLayout(editedHtml: string) {
+  return editedHtml.includes("fact-find-pension-self-section");
+}
+
+function hasCurrentFactFindSavingsCommentsLayout(profile: SeededClientProfile, editedHtml: string) {
+  const hasComments = hasNonDefaultFactFindValue(profile.savingsInvestmentComments, ["Not recorded"]);
+  const hasCommentsTable = editedHtml.includes("fact-find-comments-table");
+  return hasComments ? hasCommentsTable : !hasCommentsTable;
+}
+
+function hasNonDefaultFactFindValue(value: string | undefined, ignoredValues: string[] = []) {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) {
+    return false;
+  }
+
+  return !ignoredValues.some((ignored) => ignored.toLowerCase() === normalized.toLowerCase());
+}
+
+function hasFactFindSelfPensionContentForRebuild(profile: SeededClientProfile) {
+  return [
+    profile.selfRetirementAge,
+    profile.selfRetirementIncomeTargetPercent,
+    profile.selfEmployeeDirectorPensionYes,
+    profile.selfEmployeeDirectorPensionNo,
+    profile.selfEmployeeDirectorSchemeType,
+    profile.selfEmployeeDirectorRetirementAge,
+    profile.selfEmployeeDirectorEmployerContribution,
+    profile.selfEmployeeDirectorPersonalContribution,
+    profile.selfEmployeeDirectorYearsInForce,
+    profile.selfPersonalPensionYes,
+    profile.selfPersonalPensionNo,
+    profile.selfPersonalPensionCompany,
+    profile.selfPersonalPensionPolicyType,
+    profile.selfPersonalPensionContribution,
+    profile.selfPersonalPensionCurrentValue,
+    profile.selfPersonalPensionYearsInForce,
+  ].some((value) => hasNonDefaultFactFindValue(value));
+}
+
+function hasFactFindLifeInsuranceContentForRebuild(profile: SeededClientProfile) {
+  return [
+    profile.mortgageProtectionYes,
+    profile.mortgageProtection,
+    profile.personalInsurance,
+    profile.keymanInsurance,
+    profile.partnershipInsurance,
+    profile.selfLifeInsuranceAmount,
+    profile.partnerLifeInsuranceAmount,
+    profile.selfSeriousIllnessAmount,
+    profile.partnerSeriousIllnessAmount,
+  ].some((value) => hasNonDefaultFactFindValue(value, ["No"]));
+}
+
 function hasUnexpectedFactFindRecommendationSection(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   if (!editedHtml.includes("<h2>Recommendation Section</h2>")) {
@@ -194,6 +252,9 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
       !hasCurrentFactFindSigningLayout(editedHtml) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
       !hasCurrentFactFindServicesLayout(editedHtml) ||
+      !hasCurrentFactFindSavingsCommentsLayout(profile, editedHtml) ||
+      (hasFactFindLifeInsuranceContentForRebuild(profile) && !hasCurrentFactFindLifeInsuranceLayout(editedHtml)) ||
+      (hasFactFindSelfPensionContentForRebuild(profile) && !hasCurrentFactFindPensionSelfLayout(editedHtml)) ||
       hasUnexpectedFactFindRecommendationSection(factFindDraft)
     );
 

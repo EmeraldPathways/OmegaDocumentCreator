@@ -523,7 +523,7 @@ function buildFactFindDetailTableHtml(
 }
 
 function buildFactFindSavingsHtml(profile: SeededClientProfile) {
-  return [
+  const sections = [
     buildFactFindDetailTableHtml(
       "fact-find-savings-table",
       ["Entry", "Financial institution", "Value", "Start date", "Term"],
@@ -535,12 +535,19 @@ function buildFactFindSavingsHtml(profile: SeededClientProfile) {
         valueOrFallback(row.term),
       ]),
     ),
-    buildFactFindDetailTableHtml(
-      "fact-find-comments-table",
-      ["Field", "Value"],
-      [["Comments", valueOrFallback(profile.savingsInvestmentComments)]],
-    ),
-  ].join("");
+  ];
+
+  if (hasNonDefaultValue(profile.savingsInvestmentComments, ["Not recorded"])) {
+    sections.push(
+      buildFactFindDetailTableHtml(
+        "fact-find-comments-table",
+        ["Field", "Value"],
+        [["Comments", valueOrFallback(profile.savingsInvestmentComments)]],
+      ),
+    );
+  }
+
+  return sections.join("");
 }
 
 function buildFactFindLifeInsuranceItems(profile: SeededClientProfile) {
@@ -549,35 +556,76 @@ function buildFactFindLifeInsuranceItems(profile: SeededClientProfile) {
       label: "Mortgage protection selected",
       value: yesNoSelectionValue(profile.mortgageProtectionYes, profile.mortgageProtectionNo),
     },
-    { label: "Mortgage protection", value: profile.mortgageProtection },
+    { label: "Mortgage protection details", value: profile.mortgageProtection },
     { label: "Life insurance self", value: profile.selfLifeInsuranceAmount },
     { label: "Life insurance partner", value: profile.partnerLifeInsuranceAmount },
     { label: "Serious illness self", value: profile.selfSeriousIllnessAmount },
     { label: "Serious illness partner", value: profile.partnerSeriousIllnessAmount },
     { label: "Personal insurance", value: profile.personalInsurance },
-    { label: "Keyman insurance", value: profile.keymanInsurance },
+    { label: "Key person insurance", value: profile.keymanInsurance },
     { label: "Partnership insurance", value: profile.partnershipInsurance },
-    { label: "Self life insurance amount", value: profile.selfLifeInsuranceAmount },
-    { label: "Partner serious illness amount", value: profile.partnerSeriousIllnessAmount },
   ];
 }
 
+function buildFactFindLifeInsuranceValueHtml(value: string | undefined) {
+  const normalized = valueOrFallback(value);
+  return `<p class="fact-find-life-insurance-value${normalized === "Not recorded" ? " is-muted" : ""}">${escapeHtml(normalized)}</p>`;
+}
+
 function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
-  return buildFactFindDetailTableHtml(
-    "fact-find-life-insurance-table",
-    ["Field", "Value"],
-    [
-      ["Mortgage protection selected", yesNoSelectionValue(profile.mortgageProtectionYes, profile.mortgageProtectionNo)],
-      ["Mortgage protection", valueOrFallback(profile.mortgageProtection)],
-      ["Personal insurance", valueOrFallback(profile.personalInsurance)],
-      ["Keyman insurance", valueOrFallback(profile.keymanInsurance)],
-      ["Partnership insurance", valueOrFallback(profile.partnershipInsurance)],
-      ["Life insurance self", valueOrFallback(profile.selfLifeInsuranceAmount)],
-      ["Life insurance partner", valueOrFallback(profile.partnerLifeInsuranceAmount)],
-      ["Serious illness self", valueOrFallback(profile.selfSeriousIllnessAmount)],
-      ["Serious illness partner", valueOrFallback(profile.partnerSeriousIllnessAmount)],
-    ],
-  );
+  const mortgageProtectionValue = yesNoSelectionValue(profile.mortgageProtectionYes, profile.mortgageProtectionNo);
+
+  return [
+    '<div class="fact-find-life-insurance-card">',
+    '<div class="fact-find-life-insurance-summary-row">',
+    '<p class="fact-find-life-insurance-summary-label">Mortgage protection</p>',
+    buildFactFindLifeInsuranceValueHtml(mortgageProtectionValue),
+    '</div>',
+    '<div class="fact-find-life-insurance-divider"></div>',
+    '<div class="fact-find-life-insurance-block">',
+    '<h3>Personal cover</h3>',
+    '<div class="statement-quote-table fact-find-life-insurance-compare-table">',
+    '<div class="statement-quote-row statement-quote-row-header">',
+    '<div class="statement-quote-cell"><p>Cover</p></div>',
+    '<div class="statement-quote-cell"><p>Self</p></div>',
+    '<div class="statement-quote-cell"><p>Partner</p></div>',
+    '</div>',
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Life insurance</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.selfLifeInsuranceAmount)}</div>`,
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.partnerLifeInsuranceAmount)}</div>`,
+    '</div>',
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Serious illness cover</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.selfSeriousIllnessAmount)}</div>`,
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.partnerSeriousIllnessAmount)}</div>`,
+    '</div>',
+    '</div>',
+    '</div>',
+    '<div class="fact-find-life-insurance-divider"></div>',
+    '<div class="fact-find-life-insurance-block">',
+    '<h3>Other policies</h3>',
+    '<div class="fact-find-life-insurance-policy-list">',
+    '<div class="fact-find-life-insurance-policy-row">',
+    '<p class="fact-find-life-insurance-policy-label">Mortgage protection details</p>',
+    buildFactFindLifeInsuranceValueHtml(profile.mortgageProtection),
+    '</div>',
+    '<div class="fact-find-life-insurance-policy-row">',
+    '<p class="fact-find-life-insurance-policy-label">Personal insurance</p>',
+    buildFactFindLifeInsuranceValueHtml(profile.personalInsurance),
+    '</div>',
+    '<div class="fact-find-life-insurance-policy-row">',
+    '<p class="fact-find-life-insurance-policy-label">Key person insurance</p>',
+    buildFactFindLifeInsuranceValueHtml(profile.keymanInsurance),
+    '</div>',
+    '<div class="fact-find-life-insurance-policy-row">',
+    '<p class="fact-find-life-insurance-policy-label">Partnership insurance</p>',
+    buildFactFindLifeInsuranceValueHtml(profile.partnershipInsurance),
+    '</div>',
+    '</div>',
+    '</div>',
+    '</div>',
+  ].join("");
 }
 
 function buildFactFindPensionItems(
@@ -652,12 +700,152 @@ function buildFactFindPensionItems(
   ];
 }
 
+function buildFactFindPensionValueHtml(value: string | undefined, options?: { currency?: boolean; percent?: boolean }) {
+  const normalized = valueOrFallback(value);
+  let displayValue = normalized;
+
+  if (normalized !== "Not recorded") {
+    if (options?.currency) {
+      displayValue = normalized.startsWith("EUR") || normalized.startsWith("€") ? normalized : `€${normalized}`;
+    } else if (options?.percent && !normalized.endsWith("%")) {
+      displayValue = `${normalized}%`;
+    }
+  }
+
+  return `<p class="fact-find-pension-value${displayValue === "Not recorded" ? " is-muted" : ""}">${escapeHtml(displayValue)}</p>`;
+}
+
+function buildFactFindPensionMetricRowHtml(label: string, valueHtml: string) {
+  return [
+    '<div class="fact-find-pension-metric-row">',
+    `<p class="fact-find-pension-metric-label">${escapeHtml(label)}</p>`,
+    valueHtml,
+    "</div>",
+  ].join("");
+}
+
+function buildFactFindPensionDetailListHtml(
+  fields: Array<{ label: string; value: string | undefined; currency?: boolean; percent?: boolean }>,
+) {
+  return [
+    '<div class="fact-find-pension-detail-list">',
+    ...fields.map((field) =>
+      buildFactFindPensionMetricRowHtml(field.label, buildFactFindPensionValueHtml(field.value, {
+        currency: field.currency,
+        percent: field.percent,
+      }))),
+    "</div>",
+  ].join("");
+}
+
 function buildFactFindPensionHtml(profile: SeededClientProfile, section: "self" | "partner") {
-  return buildFactFindDetailTableHtml(
-    `fact-find-pension-${section}-table`,
-    ["Field", "Value"],
-    buildFactFindPensionItems(profile, section).map((item) => [item.label, valueOrFallback(item.value)]),
-  );
+  const prefix = section === "self" ? "Self" : "Partner";
+  const fields = section === "self"
+    ? {
+        retiredYes: profile.selfAlreadyRetired,
+        retiredNo: profile.selfNotRetired,
+        retirementAge: profile.selfRetirementAge,
+        target: profile.selfRetirementIncomeTargetPercent,
+        employeeYes: profile.selfEmployeeDirectorPensionYes,
+        employeeNo: profile.selfEmployeeDirectorPensionNo,
+        schemeType: profile.selfEmployeeDirectorSchemeType,
+        schemeRetirementAge: profile.selfEmployeeDirectorRetirementAge,
+        employerContribution: profile.selfEmployeeDirectorEmployerContribution,
+        personalContribution: profile.selfEmployeeDirectorPersonalContribution,
+        employeeYears: profile.selfEmployeeDirectorYearsInForce,
+        personalYes: profile.selfPersonalPensionYes,
+        personalNo: profile.selfPersonalPensionNo,
+        personalCompany: profile.selfPersonalPensionCompany,
+        personalPolicyType: profile.selfPersonalPensionPolicyType,
+        personalContributionField: profile.selfPersonalPensionContribution,
+        personalCurrentValue: profile.selfPersonalPensionCurrentValue,
+        personalYears: profile.selfPersonalPensionYearsInForce,
+      }
+    : {
+        retiredYes: profile.partnerAlreadyRetired,
+        retiredNo: profile.partnerNotRetired,
+        retirementAge: profile.partnerRetirementAge,
+        target: profile.partnerRetirementIncomeTargetPercent,
+        employeeYes: profile.partnerEmployeeDirectorPensionYes,
+        employeeNo: profile.partnerEmployeeDirectorPensionNo,
+        schemeType: profile.partnerEmployeeDirectorSchemeType,
+        schemeRetirementAge: profile.partnerEmployeeDirectorRetirementAge,
+        employerContribution: profile.partnerEmployeeDirectorEmployerContribution,
+        personalContribution: profile.partnerEmployeeDirectorPersonalContribution,
+        employeeYears: profile.partnerEmployeeDirectorYearsInForce,
+        personalYes: profile.partnerPersonalPensionYes,
+        personalNo: profile.partnerPersonalPensionNo,
+        personalCompany: profile.partnerPersonalPensionCompany,
+        personalPolicyType: profile.partnerPersonalPensionPolicyType,
+        personalContributionField: profile.partnerPersonalPensionContribution,
+        personalCurrentValue: profile.partnerPersonalPensionCurrentValue,
+        personalYears: profile.partnerPersonalPensionYearsInForce,
+      };
+
+  const retirementStatus = yesNoSelectionValue(fields.retiredYes, fields.retiredNo);
+  const employerStatus = yesNoSelectionValue(fields.employeeYes, fields.employeeNo);
+  const personalStatus = yesNoSelectionValue(fields.personalYes, fields.personalNo);
+  const personalDetailFields = [
+    { label: `${prefix} personal pension company`, value: fields.personalCompany },
+    { label: `${prefix} personal pension policy type`, value: fields.personalPolicyType },
+    { label: `${prefix} personal pension contribution`, value: fields.personalContributionField, currency: true },
+    { label: `${prefix} personal pension current value`, value: fields.personalCurrentValue, currency: true },
+    { label: `${prefix} personal pension years in force`, value: fields.personalYears },
+  ];
+  const hasPersonalDetails = personalDetailFields.some((field) => valueOrFallback(field.value) !== "Not recorded");
+
+  return [
+    '<div class="fact-find-pension-card">',
+    buildFactFindPensionMetricRowHtml("Retirement status", buildFactFindPensionValueHtml(retirementStatus === "Yes" ? "Retired" : "Not retired")),
+    '<div class="fact-find-pension-panel">',
+    '<div class="fact-find-pension-panel-header">',
+    '<h3>Retirement plan</h3>',
+    "</div>",
+    buildFactFindPensionDetailListHtml([
+      { label: "Planned retirement age", value: fields.retirementAge },
+      { label: "Retirement income target", value: fields.target, percent: true },
+    ]),
+    "</div>",
+    '<div class="fact-find-pension-panel">',
+    '<div class="fact-find-pension-panel-header">',
+    '<h3>Employer pension</h3>',
+    `<p class="fact-find-pension-panel-status${employerStatus === "Yes" ? " is-positive" : ""}">${escapeHtml(employerStatus === "Yes" ? "In place" : "Not in place")}</p>`,
+    "</div>",
+    buildFactFindPensionDetailListHtml([
+      { label: "Scheme type", value: fields.schemeType },
+      { label: "Scheme retirement age", value: fields.schemeRetirementAge },
+    ]),
+    '<div class="fact-find-pension-contributions-row">',
+    '<p class="fact-find-pension-metric-label">Contributions</p>',
+    '<div class="fact-find-pension-contributions-values">',
+    '<div class="fact-find-pension-contribution-block">',
+    '<p class="fact-find-pension-contribution-label">Employer</p>',
+    buildFactFindPensionValueHtml(fields.employerContribution, { currency: true }),
+    "</div>",
+    '<div class="fact-find-pension-contribution-block">',
+    '<p class="fact-find-pension-contribution-label">Personal</p>',
+    buildFactFindPensionValueHtml(fields.personalContribution, { currency: true }),
+    "</div>",
+    "</div>",
+    "</div>",
+    buildFactFindPensionMetricRowHtml("Years in force", buildFactFindPensionValueHtml(fields.employeeYears)),
+    "</div>",
+    '<div class="fact-find-pension-panel">',
+    '<div class="fact-find-pension-panel-header">',
+    '<h3>Personal pension</h3>',
+    `<p class="fact-find-pension-panel-status${personalStatus === "Yes" ? " is-positive" : ""}">${escapeHtml(personalStatus === "Yes" ? "Plan in place" : "Not in place")}</p>`,
+    "</div>",
+    (hasPersonalDetails
+      ? buildFactFindPensionDetailListHtml(personalDetailFields)
+      : [
+          '<div class="fact-find-pension-empty-state">',
+          '<p class="fact-find-pension-empty-title">Further details not recorded</p>',
+          '<p class="fact-find-pension-empty-copy">Company, policy type, contribution, current value and years in force</p>',
+          "</div>",
+        ].join("")),
+    "</div>",
+    "</div>",
+  ].join("");
 }
 
 function lineValueHtml(value: string | undefined) {
@@ -1540,14 +1728,6 @@ function buildFactFindBlocks(
           bodyHtml: buildFactFindAssetsLiabilitiesHtml(profile),
         }]
       : []),
-    ...(!isSmall && hasFactFindSelfPensionContent(profile)
-      ? [{
-          kind: "section" as const,
-          title: "Pension Arrangements - Self",
-          className: "document-grid fact-find-finance-section",
-          bodyHtml: buildFactFindPensionHtml(profile, "self"),
-        }]
-      : []),
     ...(!isSmall && hasFactFindPartnerPensionContent(profile)
       ? [{
           kind: "section" as const,
@@ -1570,6 +1750,14 @@ function buildFactFindBlocks(
           title: "Savings & Investments",
           className: "document-grid fact-find-finance-section",
           bodyHtml: buildFactFindSavingsHtml(profile),
+        }]
+      : []),
+    ...(!isSmall && hasFactFindSelfPensionContent(profile)
+      ? [{
+          kind: "section" as const,
+          title: "Pension Arrangements - Self",
+          className: "document-grid fact-find-finance-section fact-find-pension-self-section",
+          bodyHtml: buildFactFindPensionHtml(profile, "self"),
         }]
       : []),
     ...(recommendationHtml

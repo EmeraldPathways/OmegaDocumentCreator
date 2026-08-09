@@ -1366,6 +1366,220 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-weight: 700;
     color: #374151;
   }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-card {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 22px 24px;
+    border: 1px solid #e6d6c7;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at top left, rgba(214, 188, 160, 0.18), transparent 40%),
+      linear-gradient(180deg, #fffdfa 0%, #fff8f1 100%);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: baseline;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-label,
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-label,
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-value {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.45;
+    color: #1f2937;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-label,
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-label {
+    flex: 1 1 auto;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-value.is-muted {
+    color: #7b7b7b;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-value {
+    flex: 0 0 min(180px, 38%);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-divider {
+    height: 1px;
+    background: rgba(91, 34, 48, 0.18);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-block h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #5b2230;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table {
+    overflow: hidden;
+    border: 1px solid #e6d6c7;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.86);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row {
+    grid-template-columns: minmax(180px, 1.3fr) repeat(2, minmax(120px, 1fr));
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row-header {
+    background: rgba(250, 240, 231, 0.95);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-cell:first-child p {
+    font-weight: 600;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(91, 34, 48, 0.12);
+    align-items: baseline;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-row:first-child {
+    padding-top: 0;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-section {
+    padding: 18px 20px;
+    border: 1px solid #e6d6c7;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at top left, rgba(214, 188, 160, 0.16), transparent 38%),
+      linear-gradient(180deg, #fffdfa 0%, #fff8f1 100%);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-section > h2 {
+    color: #5b2230;
+    margin-bottom: 14px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table {
+    overflow: hidden;
+    border: 1px solid #e6d6c7;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row {
+    grid-template-columns: minmax(220px, 1.55fr) minmax(140px, 1fr);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row-header {
+    background: rgba(250, 240, 231, 0.95);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-cell:first-child p {
+    font-weight: 600;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel {
+    overflow: hidden;
+    border: 1px solid #e6d6c7;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(230, 214, 199, 0.9);
+    background: rgba(250, 240, 231, 0.95);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5b2230;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5b2230;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status.is-positive {
+    color: #2f8a48;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-metric-row,
+  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 16px;
+    border-top: 1px solid rgba(230, 214, 199, 0.9);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list .fact-find-pension-metric-row:first-child {
+    border-top: 0;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-metric-label {
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: 15px;
+    color: #1f2937;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-value {
+    margin: 0;
+    flex: 0 0 auto;
+    min-width: 120px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1f2937;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-value.is-muted {
+    color: #7b7b7b;
+    font-weight: 500;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-label {
+    margin: 0;
+    font-size: 13px;
+    color: #5f5146;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-state {
+    padding: 16px;
+    background: linear-gradient(180deg, #fbf7f1 0%, #f6efe5 100%);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-title {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #5b2230;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-copy {
+    margin: 0;
+    font-size: 13px;
+    color: #5f5146;
+  }
   .preview-page p {
     margin: 0 0 10px;
     line-height: 1.6;

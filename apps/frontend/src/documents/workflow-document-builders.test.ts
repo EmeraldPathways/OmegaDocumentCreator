@@ -702,7 +702,9 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Comments");
     expect(document.html).toContain("TEST");
     expect(document.html).toContain('<div class="statement-quote-cell"><p>Field</p></div>');
-    expect(document.html).toContain("Mortgage protection selected");
+    expect(document.html).toContain("Mortgage protection");
+    expect(document.html).toContain("Personal cover");
+    expect(document.html).toContain("Other policies");
     expect(document.html).toContain("Mortgage plan reference 123");
     expect(document.html).toContain("Keyman cover");
     expect(document.html).toContain("Pension Arrangements - Self");
@@ -710,6 +712,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Self personal pension company");
     expect(document.html).toContain("Pension Arrangements - Partner");
     expect(document.html).toContain("Irish Life");
+    expect(document.html.indexOf("Savings &amp; Investments")).toBeLessThan(document.html.indexOf("Pension Arrangements - Self"));
     expect(editorDocument.html).toContain("<h3>Liabilities</h3>");
     expect(editorDocument.html).toContain('<div class="statement-quote-cell"><p>Mortgage</p></div>');
     expect(editorDocument.html).toContain("Savings 2");
@@ -866,6 +869,23 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("Pension Arrangements - Self");
     expect(document.html).not.toContain("Pension Arrangements - Partner");
     expect(document.html).not.toContain("Life Insurance &amp; Serious Illness");
+  });
+
+  it("omits the savings comments box when no comments are recorded", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.savingsInvestmentRows[0] = {
+      financialInstitution: "AIB Savings",
+      value: "10000.00",
+      startDate: "2026-08-01",
+      term: "5%",
+    };
+    profile.savingsInvestmentComments = "";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).toContain("Savings &amp; Investments");
+    expect(document.html).not.toContain("fact-find-comments-table");
+    expect(document.html).not.toContain('<div class="statement-quote-cell"><p>Comments</p></div>');
   });
 
   it("renders fact find update personal circumstances, financial situation, and needs sections verbatim from workflow values", () => {
