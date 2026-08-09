@@ -100,6 +100,26 @@ function hasCurrentFactFindServicesLayout(editedHtml: string) {
   );
 }
 
+function hasCurrentClientSummaryLayout(editedHtml: string) {
+  const clientSummaryMatch = editedHtml.match(
+    /<div class="client-summary-grid"><h2>Client Summary<\/h2>([\s\S]*?)<\/div>/i,
+  );
+  const clientSummaryHtml = clientSummaryMatch?.[1] ?? "";
+
+  return (
+    clientSummaryHtml.includes('<span class="grid-label">Client</span>') &&
+    clientSummaryHtml.includes('<span class="grid-label">Reference</span>') &&
+    clientSummaryHtml.includes('<span class="grid-label">Advisor</span>') &&
+    !clientSummaryHtml.includes("Date of birth") &&
+    !clientSummaryHtml.includes("Occupation") &&
+    !clientSummaryHtml.includes("Recommended cover") &&
+    !clientSummaryHtml.includes("Deferred period") &&
+    !clientSummaryHtml.includes("Cover to age") &&
+    !clientSummaryHtml.includes("Smoker status") &&
+    !clientSummaryHtml.includes("Occupation class")
+  );
+}
+
 function hasCurrentFactFindLifeInsuranceLayout(editedHtml: string) {
   return editedHtml.includes("fact-find-life-insurance-card");
 }
@@ -248,6 +268,7 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
   const hasComposedHtml = hasComposedFactFindHtml(editedHtml);
   const shouldRebuildComposedHtml =
     hasComposedHtml && (
+      !hasCurrentClientSummaryLayout(editedHtml) ||
       !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
       !hasCurrentFactFindSigningLayout(editedHtml) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
@@ -284,7 +305,10 @@ export function resolveFactFindUpdateDraft(profile: SeededClientProfile): Genera
   const editedHtml = factFindUpdateDraft.editedHtml.trim();
   const shouldRebuildComposedHtml =
     hasComposedFactFindUpdateHtml(editedHtml) &&
-    !hasCurrentFactFindSigningLayout(editedHtml);
+    (
+      !hasCurrentClientSummaryLayout(editedHtml) ||
+      !hasCurrentFactFindSigningLayout(editedHtml)
+    );
 
   if (!isLegacyFactFindUpdateDraft(factFindUpdateDraft) && !shouldRebuildComposedHtml) {
     return factFindUpdateDraft;

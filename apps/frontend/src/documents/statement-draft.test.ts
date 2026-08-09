@@ -220,4 +220,18 @@ describe("resolveFactFindUpdateDraft", () => {
     expect(draft.editedHtml).toContain("fact-find-signing-block");
     expect(draft.editedHtml).not.toContain("Legacy Fact Find Update output");
   });
+
+  it("rebuilds composed fact find update html when client summary still uses the old larger layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Fact Find Update"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find-update"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="client-summary-grid"><h2>Client Summary</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">Client</span><strong>Jamie Murphy</strong></div><div class="grid-item"><span class="grid-label">Reference</span><strong>CLI-2026-0002</strong></div><div class="grid-item"><span class="grid-label">Date of birth</span><strong>01/01/1990</strong></div><div class="grid-item"><span class="grid-label">Occupation</span><strong>Teacher</strong></div><div class="grid-item"><span class="grid-label">Advisor</span><strong>Omega Advisor</strong></div></div></div><div class="document-section"><h2>Signatures and Record</h2><div class="fact-find-signing-block"></div></div></article>';
+
+    const draft = resolveFactFindUpdateDraft(profile);
+
+    expect(draft.editedHtml).toContain('<span class="grid-label">Client</span>');
+    expect(draft.editedHtml).toContain('<span class="grid-label">Reference</span>');
+    expect(draft.editedHtml).toContain('<span class="grid-label">Advisor</span>');
+    expect(draft.editedHtml).not.toContain("Date of birth");
+    expect(draft.editedHtml).not.toContain("Occupation");
+  });
 });
