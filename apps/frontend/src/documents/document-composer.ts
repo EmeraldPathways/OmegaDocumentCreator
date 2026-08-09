@@ -51,6 +51,10 @@ function yesNoValue(value: string | undefined) {
   return value?.trim() === "Yes" ? "Yes" : "No";
 }
 
+function isAffirmative(value: string | undefined) {
+  return value?.trim() === "Yes";
+}
+
 function checkedItemLabels(items: Array<{ label: string; value: string | undefined }>) {
   return items.filter((item) => item.value?.trim() === "Yes").map((item) => item.label);
 }
@@ -135,6 +139,10 @@ function hasFactFindSelfPensionContent(profile: SeededClientProfile) {
 }
 
 function hasFactFindPartnerPensionContent(profile: SeededClientProfile) {
+  if (!isAffirmative(profile.factFindShowPartnerDetails)) {
+    return false;
+  }
+
   return [
     profile.partnerRetirementAge,
     profile.partnerRetirementIncomeTargetPercent,
@@ -1689,7 +1697,14 @@ function buildFactFindBlocks(
       { label: "Address", value: addressSummary(profile.homeAddressLine1, profile.homeAddressLine2, profile.clientHomeAddressLine3, profile.clientHomeAddressLine4, profile.townCity, profile.county) },
       { label: "Work phone", value: profile.workPhone },
       { label: "Marital status", value: profile.maritalStatus },
-      { label: "Partner", value: profile.partnerName },
+      ...(isAffirmative(profile.factFindShowPartnerDetails)
+        ? [
+            { label: "Partner name", value: profile.partnerName },
+            { label: "Partner email", value: profile.partnerEmail },
+            { label: "Partner phone", value: profile.partnerHomeMobile },
+            { label: "Partner date of birth", value: profile.partnerDateOfBirth },
+          ]
+        : []),
     ]),
     detailGrid("Employment Details", [
       { label: "Occupation", value: profile.occupation },

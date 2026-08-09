@@ -343,8 +343,6 @@ export function IncomeProtectionPage({
   const [quotePensionExistingFund, setQuotePensionExistingFund] = useState("");
   const [quotePensionRequired, setQuotePensionRequired] = useState("");
   const [quotePensionMonthlyContribution, setQuotePensionMonthlyContribution] = useState("");
-  const [showPartnerFields, setShowPartnerFields] = useState(false);
-  const [showDifferentWorkAddress, setShowDifferentWorkAddress] = useState(false);
   const [fileUploadStatus, setFileUploadStatus] = useState("Upload: Ready");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [documentPackStatus, setDocumentPackStatus] = useState("Pack: Waiting for request");
@@ -445,14 +443,6 @@ export function IncomeProtectionPage({
     setWorkflowSaveState("saved");
     setWorkflowSavedAt(null);
     setFieldErrors({});
-    setShowDifferentWorkAddress(
-      Boolean(
-        client.clientWorkAddressLine1 ||
-        client.clientWorkAddressLine2 ||
-        client.clientWorkAddressLine3 ||
-        client.clientWorkAddressLine4,
-      ),
-    );
   }, [actorLabel, client]);
 
   useEffect(() => {
@@ -472,10 +462,6 @@ export function IncomeProtectionPage({
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
-
-  useEffect(() => {
-    setShowPartnerFields(false);
-  }, [quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
     if (!client || (workflowKind !== "pensions" && quoteDocumentType !== "Pensions Quote")) {
@@ -644,6 +630,8 @@ export function IncomeProtectionPage({
   const hasResolvedClient = Boolean(client && draft);
   const resolvedDraft = draft ?? client ?? emptyClientFallback;
   const factFindType = resolvedDraft.factFindType ?? "all";
+  const showPartnerFields = isAffirmative(resolvedDraft.factFindShowPartnerDetails);
+  const showDifferentWorkAddress = isAffirmative(resolvedDraft.factFindShowDifferentWorkAddress);
   const isIncomeProtectionDocumentFlow =
     quoteDocumentType === "Quote" && statementDocumentType === "Statement of Suitability";
   const isPensionsQuoteWorkflow = workflowKind === "pensions" || quoteDocumentType === "Pensions Quote";
@@ -2430,7 +2418,7 @@ export function IncomeProtectionPage({
           checked={showPartnerFields}
           id="ff-showPartnerDetails"
           label="Add partner details"
-          onChange={(event) => setShowPartnerFields(event.target.checked)}
+          onChange={(event) => updateField("factFindShowPartnerDetails", event.target.checked ? "Yes" : "")}
         />
       </>
     );
@@ -2557,7 +2545,9 @@ export function IncomeProtectionPage({
                           checked={showDifferentWorkAddress}
                           id="ff-differentWorkAddress"
                           label="Different work address"
-                          onChange={(event) => setShowDifferentWorkAddress(event.target.checked)}
+                          onChange={(event) =>
+                            updateField("factFindShowDifferentWorkAddress", event.target.checked ? "Yes" : "")
+                          }
                         />
                       </div>
                       {showDifferentWorkAddress ? (

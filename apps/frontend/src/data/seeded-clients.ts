@@ -75,6 +75,8 @@ export type SavedQuoteSnapshot = {
 export type SeededClientProfile = {
   clientReference: string;
   factFindType: string;
+  factFindShowPartnerDetails: string;
+  factFindShowDifferentWorkAddress: string;
   fullName: string;
   firstName: string;
   surname: string;
@@ -338,6 +340,8 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
   "CLI-2026-0001": {
     clientReference: "CLI-2026-0001",
     factFindType: "all",
+    factFindShowPartnerDetails: "",
+    factFindShowDifferentWorkAddress: "",
     fullName: "Test Client",
     firstName: "Test",
     surname: "Client",
@@ -583,6 +587,8 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
   "CLI-2026-0002": {
     clientReference: "CLI-2026-0002",
     factFindType: "all",
+    factFindShowPartnerDetails: "",
+    factFindShowDifferentWorkAddress: "",
     fullName: "Jamie Murphy",
     firstName: "Jamie",
     surname: "Murphy",

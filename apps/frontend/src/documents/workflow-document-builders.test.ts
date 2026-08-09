@@ -669,7 +669,11 @@ describe("buildWorkflowDocument", () => {
     profile.selfPersonalPensionContribution = "325";
     profile.selfPersonalPensionCurrentValue = "20000";
     profile.selfPersonalPensionYearsInForce = "7";
+    profile.factFindShowPartnerDetails = "Yes";
     profile.partnerAlreadyRetired = "Yes";
+    profile.partnerDateOfBirth = "1987-06-14";
+    profile.partnerHomeMobile = "0871234567";
+    profile.partnerEmail = "partner@example.com";
     profile.partnerRetirementAge = "63";
     profile.partnerRetirementIncomeTargetPercent = "55";
     profile.partnerEmployeeDirectorPensionNo = "Yes";
@@ -710,6 +714,13 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Pension Arrangements - Self");
     expect(document.html).toContain("Executive Pension");
     expect(document.html).toContain("Self personal pension company");
+    expect(document.html).toContain("Partner name");
+    expect(document.html).toContain("Partner email");
+    expect(document.html).toContain("partner@example.com");
+    expect(document.html).toContain("Partner phone");
+    expect(document.html).toContain("0871234567");
+    expect(document.html).toContain("Partner date of birth");
+    expect(document.html).toContain("1987-06-14");
     expect(document.html).toContain("Pension Arrangements - Partner");
     expect(document.html).toContain("Irish Life");
     expect(document.html.indexOf("Savings &amp; Investments")).toBeLessThan(document.html.indexOf("Pension Arrangements - Self"));
@@ -719,11 +730,46 @@ describe("buildWorkflowDocument", () => {
     expect(editorDocument.html).toContain("Savings 2");
     expect(editorDocument.html).toContain("15/06/2023");
     expect(editorDocument.html).toContain("Life Insurance &amp; Serious Illness");
+    expect(editorDocument.html).toContain("Partner name");
+    expect(editorDocument.html).toContain("Partner email");
+    expect(editorDocument.html).toContain("Partner phone");
+    expect(editorDocument.html).toContain("Partner date of birth");
     expect(editorDocument.html).toContain("Pension Arrangements - Self");
     expect(editorDocument.html).toContain("Pension Arrangements - Partner");
     expect(editorDocument.html.indexOf("Pension Arrangements - Self")).toBeLessThan(
       editorDocument.html.indexOf("Pension Arrangements - Partner"),
     );
+  });
+
+  it("hides partner contact details and partner pension when partner details are not selected", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+
+    profile.partnerName = "Pam";
+    profile.partnerDateOfBirth = "1987-06-14";
+    profile.partnerHomeMobile = "0871234567";
+    profile.partnerEmail = "partner@example.com";
+    profile.partnerRetirementAge = "63";
+    profile.partnerRetirementIncomeTargetPercent = "55";
+    profile.partnerEmployeeDirectorPensionNo = "Yes";
+    profile.partnerEmployeeDirectorSchemeType = "Occupational";
+    profile.partnerEmployeeDirectorRetirementAge = "63";
+    profile.partnerEmployeeDirectorEmployerContribution = "400";
+    profile.partnerEmployeeDirectorPersonalContribution = "200";
+    profile.partnerEmployeeDirectorYearsInForce = "10";
+    profile.partnerPersonalPensionNo = "Yes";
+    profile.partnerPersonalPensionCompany = "Irish Life";
+    profile.partnerPersonalPensionPolicyType = "Personal Pension";
+    profile.partnerPersonalPensionContribution = "175";
+    profile.partnerPersonalPensionCurrentValue = "15000";
+    profile.partnerPersonalPensionYearsInForce = "6";
+
+    const document = buildWorkflowDocument(profile, "Fact Find");
+
+    expect(document.html).not.toContain("Partner name");
+    expect(document.html).not.toContain("Partner email");
+    expect(document.html).not.toContain("Partner phone");
+    expect(document.html).not.toContain("Partner date of birth");
+    expect(document.html).not.toContain("Pension Arrangements - Partner");
   });
 
   it("omits whole empty fact find detail sections from output", () => {

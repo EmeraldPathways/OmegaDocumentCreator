@@ -70,4 +70,16 @@ describe("FactFindPage", () => {
     expect(screen.getByDisplayValue("Taylor Partner")).toBeInTheDocument();
     expect(screen.getByLabelText(/^Client signature 2$/i)).toBeInTheDocument();
   }, 15000);
+
+  it("keeps work address open while editing work address fields", () => {
+    renderFactFindPage();
+
+    fireEvent.click(screen.getByLabelText(/Different work address/i));
+
+    const workAddressInput = screen.getByLabelText(/Work address line 1/i);
+    fireEvent.change(workAddressInput, { target: { value: "2 Office Park" } });
+
+    expect(screen.getByLabelText(/Work address line 1/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2 Office Park")).toBeInTheDocument();
+  }, 15000);
 });
