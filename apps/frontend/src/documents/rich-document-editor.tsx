@@ -79,6 +79,8 @@ const WORKFLOW_TEXT_CLASSES = new Set([
   "document-subtitle",
   "statement-client-name",
   "statement-letter-date",
+  "statement-recommendation-paragraph",
+  "statement-recommendation-reasons-intro",
   "statement-signature-line",
   "statement-signature-label",
   "fact-find-signing-intro",

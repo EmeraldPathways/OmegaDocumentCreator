@@ -74,31 +74,11 @@ function formatDocumentDate(value: string | undefined) {
   return trimmedValue;
 }
 
-function summaryGridItems(profile: SeededClientProfile, documentType: SupportedDocumentType) {
-  const commonItems = [
+function summaryGridItems(profile: SeededClientProfile, _documentType: SupportedDocumentType) {
+  return [
     { label: "Client", value: profile.fullName },
     { label: "Reference", value: profile.clientReference },
-    { label: "Date of birth", value: formatDocumentDate(profile.dateOfBirth) },
-    { label: "Occupation", value: profile.occupation },
     { label: "Advisor", value: profile.advisorName },
-  ];
-
-  if (documentType === "Terms of Business") {
-    return [
-      ...commonItems,
-      { label: "Terms version", value: profile.termsVersion },
-      { label: "Delivery method", value: profile.termsDeliveryMethod },
-      { label: "Issued by", value: profile.termsIssuedBy },
-    ];
-  }
-
-  return [
-    ...commonItems,
-    { label: "Recommended cover", value: profile.recommendedCover },
-    { label: "Deferred period", value: profile.deferredPeriod },
-    { label: "Cover to age", value: profile.coverAge },
-    { label: "Smoker status", value: profile.smokerStatus },
-    { label: "Occupation class", value: profile.phiOccupationalClass },
   ];
 }
 
@@ -578,9 +558,15 @@ function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
 
   return [
     '<div class="fact-find-life-insurance-card">',
-    '<div class="fact-find-life-insurance-summary-row">',
-    '<p class="fact-find-life-insurance-summary-label">Mortgage protection</p>',
-    buildFactFindLifeInsuranceValueHtml(mortgageProtectionValue),
+    '<div class="statement-quote-table fact-find-life-insurance-summary-table">',
+    '<div class="statement-quote-row statement-quote-row-header">',
+    '<div class="statement-quote-cell"><p>Cover</p></div>',
+    '<div class="statement-quote-cell"><p>Status</p></div>',
+    '</div>',
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Mortgage protection</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(mortgageProtectionValue)}</div>`,
+    '</div>',
     '</div>',
     '<div class="fact-find-life-insurance-divider"></div>',
     '<div class="fact-find-life-insurance-block">',
@@ -606,22 +592,26 @@ function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
     '<div class="fact-find-life-insurance-divider"></div>',
     '<div class="fact-find-life-insurance-block">',
     '<h3>Other policies</h3>',
-    '<div class="fact-find-life-insurance-policy-list">',
-    '<div class="fact-find-life-insurance-policy-row">',
-    '<p class="fact-find-life-insurance-policy-label">Mortgage protection details</p>',
-    buildFactFindLifeInsuranceValueHtml(profile.mortgageProtection),
+    '<div class="statement-quote-table fact-find-life-insurance-policy-table">',
+    '<div class="statement-quote-row statement-quote-row-header">',
+    '<div class="statement-quote-cell"><p>Policy</p></div>',
+    '<div class="statement-quote-cell"><p>Details</p></div>',
     '</div>',
-    '<div class="fact-find-life-insurance-policy-row">',
-    '<p class="fact-find-life-insurance-policy-label">Personal insurance</p>',
-    buildFactFindLifeInsuranceValueHtml(profile.personalInsurance),
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Mortgage protection details</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.mortgageProtection)}</div>`,
     '</div>',
-    '<div class="fact-find-life-insurance-policy-row">',
-    '<p class="fact-find-life-insurance-policy-label">Key person insurance</p>',
-    buildFactFindLifeInsuranceValueHtml(profile.keymanInsurance),
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Personal insurance</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.personalInsurance)}</div>`,
     '</div>',
-    '<div class="fact-find-life-insurance-policy-row">',
-    '<p class="fact-find-life-insurance-policy-label">Partnership insurance</p>',
-    buildFactFindLifeInsuranceValueHtml(profile.partnershipInsurance),
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Key person insurance</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.keymanInsurance)}</div>`,
+    '</div>',
+    '<div class="statement-quote-row">',
+    '<div class="statement-quote-cell"><p>Partnership insurance</p></div>',
+    `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(profile.partnershipInsurance)}</div>`,
     '</div>',
     '</div>',
     '</div>',
@@ -1394,19 +1384,19 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile, document
     (statementProfile.clientHappyToProceed?.trim() ?? "").toLowerCase() === "yes" ||
     profile.recommendationAcknowledged.trim().toLowerCase() === "yes";
 
-  const summaryLine = `<p><strong>Recommendation: ${escapeHtml(provider)} ${escapeHtml(deferredPeriod)} deferred plan for ${escapeHtml(coverAmount)} per annum</strong></p>`;
-  const recommendationLine = `<p>We recommend ${escapeHtml(
+  const summaryLine = `<strong>Recommendation: ${escapeHtml(provider)} ${escapeHtml(deferredPeriod)} deferred plan for ${escapeHtml(coverAmount)} per annum.</strong>`;
+  const recommendationLine = escapeHtml(
     `${indefiniteArticle(provider)} ${provider} ${productLabel} ${deferredPeriod} deferred plan for ${coverAmount} to cover you to age ${coverAge}`,
-  )}.</p>`;
+  );
 
   const rationaleLine =
     coverShare === null
-      ? "<p>This level of cover is intended to protect your income and support your standard of living if you are unable to work due to illness or injury.</p>"
-      : `<p>As this represents ${escapeHtml(String(coverShare))}% of your salary, this keeps you within Revenue limits while giving you the cover needed to maintain your standard of living.</p>`;
+      ? "This level of cover is intended to protect your income and support your standard of living if you are unable to work due to illness or injury."
+      : `As this represents ${escapeHtml(String(coverShare))}% of your salary, this keeps you within Revenue limits while giving you the cover needed to maintain your standard of living.`;
 
   const quoteDetailLine =
     selectedQuote?.policyType || grossPremiumNumber !== null
-      ? `<p>${escapeHtml(
+      ? escapeHtml(
           [
             `The returned quote from ${provider}`,
             selectedQuote?.policyType ? `is on a ${selectedQuote.policyType.toLowerCase()} premium basis` : "matches the returned premium basis",
@@ -1414,7 +1404,7 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile, document
           ]
             .filter(Boolean)
             .join(" "),
-        )}.</p>`
+        ) + "."
       : "";
 
   const costParts = [
@@ -1423,11 +1413,11 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile, document
     taxReliefPercentage === null ? "" : `less tax relief @${Math.round(taxReliefPercentage)}%`,
     netMonthlyCostNumber === null ? "" : `giving a net cost of €${formatEuroAmount(netMonthlyCostNumber)}pm`,
   ].filter(Boolean);
-  const costLine = costParts.length === 0 ? "" : `<p>${escapeHtml(costParts.join(" "))}.</p>`;
+  const costLine = costParts.length === 0 ? "" : `${escapeHtml(costParts.join(" "))}.`;
 
   const affordabilityLine = affordabilityConfirmed
-    ? "<p>We have discussed affordability of this plan and you are happy to proceed.</p>"
-    : "<p>Affordability of this plan should be reviewed and confirmed before proceeding.</p>";
+    ? "We have discussed affordability of this plan and you are happy to proceed."
+    : "Affordability of this plan should be reviewed and confirmed before proceeding.";
 
   const reasonItems = [
     `The cover amount and ${deferredPeriod} deferred period align with the protection need identified in your Fact Find.`,
@@ -1443,13 +1433,17 @@ function buildStatementRecommendationHtml(profile: SeededClientProfile, document
   ];
 
   return [
+    `<p class="statement-recommendation-paragraph">${[
     summaryLine,
-    recommendationLine,
+    `We recommend ${recommendationLine}.`,
     rationaleLine,
     quoteDetailLine,
     costLine,
     affordabilityLine,
-    `<p>We recommend this ${escapeHtml(provider)} Income Protection policy for the following reasons:</p>`,
+  ]
+      .filter(Boolean)
+      .join(" ")}</p>`,
+    `<p class="statement-recommendation-reasons-intro">We recommend this ${escapeHtml(provider)} Income Protection policy for the following reasons:</p>`,
     listHtml(reasonItems),
   ]
     .filter(Boolean)
