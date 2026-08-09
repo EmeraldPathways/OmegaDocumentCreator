@@ -1723,14 +1723,6 @@ function buildFactFindBlocks(
           bodyHtml: buildFactFindAssetsLiabilitiesHtml(profile),
         }]
       : []),
-    ...(!isSmall && hasFactFindPartnerPensionContent(profile)
-      ? [{
-          kind: "section" as const,
-          title: "Pension Arrangements - Partner",
-          className: "document-grid fact-find-finance-section",
-          bodyHtml: buildFactFindPensionHtml(profile, "partner"),
-        }]
-      : []),
     ...(!isSmall && hasFactFindLifeInsuranceContent(profile)
       ? [{
           kind: "section" as const,
@@ -1753,6 +1745,14 @@ function buildFactFindBlocks(
           title: "Pension Arrangements - Self",
           className: "document-grid fact-find-finance-section fact-find-pension-self-section",
           bodyHtml: buildFactFindPensionHtml(profile, "self"),
+        }]
+      : []),
+    ...(!isSmall && hasFactFindPartnerPensionContent(profile)
+      ? [{
+          kind: "section" as const,
+          title: "Pension Arrangements - Partner",
+          className: "document-grid fact-find-finance-section",
+          bodyHtml: buildFactFindPensionHtml(profile, "partner"),
         }]
       : []),
     ...(recommendationHtml

@@ -471,8 +471,11 @@ export function IncomeProtectionPage({
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
-    setShowPartnerFields(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
+
+  useEffect(() => {
+    setShowPartnerFields(false);
+  }, [quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
     if (!client || (workflowKind !== "pensions" && quoteDocumentType !== "Pensions Quote")) {

@@ -57,4 +57,17 @@ describe("FactFindPage", () => {
     expect(screen.getByLabelText(/^Client signature 2$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Client signature 2 date$/i)).toBeInTheDocument();
   }, 15000);
+
+  it("keeps partner details open while editing partner fields", () => {
+    renderFactFindPage();
+
+    fireEvent.click(screen.getByLabelText(/Add partner details/i));
+
+    const partnerNameInput = screen.getByLabelText(/Partner Name/i);
+    fireEvent.change(partnerNameInput, { target: { value: "Taylor Partner" } });
+
+    expect(screen.getByLabelText(/Partner Name/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Taylor Partner")).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Client signature 2$/i)).toBeInTheDocument();
+  }, 15000);
 });

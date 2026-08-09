@@ -713,6 +713,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Pension Arrangements - Partner");
     expect(document.html).toContain("Irish Life");
     expect(document.html.indexOf("Savings &amp; Investments")).toBeLessThan(document.html.indexOf("Pension Arrangements - Self"));
+    expect(document.html.indexOf("Pension Arrangements - Self")).toBeLessThan(document.html.indexOf("Pension Arrangements - Partner"));
     expect(editorDocument.html).toContain("<h3>Liabilities</h3>");
     expect(editorDocument.html).toContain('<div class="statement-quote-cell"><p>Mortgage</p></div>');
     expect(editorDocument.html).toContain("Savings 2");
@@ -720,6 +721,9 @@ describe("buildWorkflowDocument", () => {
     expect(editorDocument.html).toContain("Life Insurance &amp; Serious Illness");
     expect(editorDocument.html).toContain("Pension Arrangements - Self");
     expect(editorDocument.html).toContain("Pension Arrangements - Partner");
+    expect(editorDocument.html.indexOf("Pension Arrangements - Self")).toBeLessThan(
+      editorDocument.html.indexOf("Pension Arrangements - Partner"),
+    );
   });
 
   it("omits whole empty fact find detail sections from output", () => {
