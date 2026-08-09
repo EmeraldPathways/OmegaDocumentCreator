@@ -539,11 +539,12 @@ function buildFactFindSavingsHtml(profile: SeededClientProfile) {
 
   if (hasNonDefaultValue(profile.savingsInvestmentComments, ["Not recorded"])) {
     sections.push(
-      buildFactFindDetailTableHtml(
-        "fact-find-comments-table",
-        ["Field", "Value"],
-        [["Comments", valueOrFallback(profile.savingsInvestmentComments)]],
-      ),
+      [
+        '<div class="fact-find-comments-box">',
+        '<p class="fact-find-comments-label">Comments</p>',
+        `<p class="fact-find-comments-value">${escapeHtml(valueOrFallback(profile.savingsInvestmentComments))}</p>`,
+        "</div>",
+      ].join(""),
     );
   }
 
@@ -796,12 +797,12 @@ function buildFactFindPensionHtml(profile: SeededClientProfile, section: "self" 
 
   return [
     '<div class="fact-find-pension-card">',
-    buildFactFindPensionMetricRowHtml("Retirement status", buildFactFindPensionValueHtml(retirementStatus === "Yes" ? "Retired" : "Not retired")),
     '<div class="fact-find-pension-panel">',
     '<div class="fact-find-pension-panel-header">',
     '<h3>Retirement plan</h3>',
     "</div>",
     buildFactFindPensionDetailListHtml([
+      { label: "Retirement status", value: retirementStatus === "Yes" ? "Retired" : "Not retired" },
       { label: "Planned retirement age", value: fields.retirementAge },
       { label: "Retirement income target", value: fields.target, percent: true },
     ]),

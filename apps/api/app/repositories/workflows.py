@@ -93,11 +93,14 @@ _PROTECTION_MAP: list[tuple[str, str]] = [
     ("notes", "protectionNotes"),
 ]
 
+_LIFE_SI_DETAIL_FIELDS = {
+    "mortgageProtection",
+    "personalInsurance",
+    "keymanInsurance",
+    "partnershipInsurance",
+}
+
 _LIFE_SI_MAP: list[tuple[str, str]] = [
-    ("mortgage_protection", "mortgageProtection"),
-    ("personal_insurance", "personalInsurance"),
-    ("keyman_insurance", "keymanInsurance"),
-    ("partnership_insurance", "partnershipInsurance"),
     ("self_life_cover", "selfLifeInsuranceAmount"),
     ("self_serious_illness_cover", "selfSeriousIllnessAmount"),
     ("partner_life_cover", "partnerLifeInsuranceAmount"),
@@ -343,7 +346,7 @@ def _extract_unmapped_workflow_fields(data: dict[str, object]) -> dict[str, obje
     return {
         key: value
         for key, value in data.items()
-        if isinstance(key, str) and key not in _KNOWN_FRONTEND_KEYS
+        if isinstance(key, str) and (key not in _KNOWN_FRONTEND_KEYS or key in _LIFE_SI_DETAIL_FIELDS)
     }
 
 
@@ -542,12 +545,5 @@ class WorkflowRepository:
                     "partner_serious_illness_cover",
                 ):
                     setattr(life, db_col, _coerce_decimal(raw) or None)
-                elif db_col in (
-                    "mortgage_protection",
-                    "personal_insurance",
-                    "keyman_insurance",
-                    "partnership_insurance",
-                ):
-                    setattr(life, db_col, _coerce_bool(raw))
                 else:
                     setattr(life, db_col, str(raw).strip() or None)

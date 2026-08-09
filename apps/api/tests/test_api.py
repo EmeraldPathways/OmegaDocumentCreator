@@ -1074,6 +1074,28 @@ class ApiTests(unittest.TestCase):
         self.assertIn("165.50", item["premium"])
         self.assertIn("2026-01-10", item["termsIssuedDate"])
 
+    def test_life_insurance_detail_text_fields_roundtrip(self) -> None:
+        self._login_as_admin()
+        fields = {
+            "mortgageProtection": "Covered through lender policy",
+            "personalInsurance": "Executive income plan",
+            "keymanInsurance": "Shared across two directors",
+            "partnershipInsurance": "Buy-sell cover in place",
+        }
+        save_resp = self.client.put(
+            "/clients/CLI-2026-0002/workflow",
+            json=fields,
+        )
+        self.assertEqual(save_resp.status_code, 200)
+
+        fetch_resp = self.client.get("/clients/CLI-2026-0002/workflow")
+        self.assertEqual(fetch_resp.status_code, 200)
+        item = fetch_resp.json()["item"]
+        self.assertEqual(item["mortgageProtection"], "Covered through lender policy")
+        self.assertEqual(item["personalInsurance"], "Executive income plan")
+        self.assertEqual(item["keymanInsurance"], "Shared across two directors")
+        self.assertEqual(item["partnershipInsurance"], "Buy-sell cover in place")
+
     # ------------------------------------------------------------------
     # CSRF and rate-limit tests
     # ------------------------------------------------------------------

@@ -1382,6 +1382,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     justify-content: space-between;
     gap: 18px;
     align-items: baseline;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #ffffff;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-label,
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-label,
@@ -1425,6 +1428,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row {
     grid-template-columns: minmax(180px, 1.3fr) repeat(2, minmax(120px, 1fr));
   }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row:not(.statement-quote-row-header) {
+    background: #ffffff;
+  }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row-header {
     background: rgba(250, 240, 231, 0.95);
   }
@@ -1442,6 +1448,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     padding: 12px 0;
     border-bottom: 1px solid rgba(91, 34, 48, 0.12);
     align-items: baseline;
+    background: #ffffff;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-row:first-child {
     padding-top: 0;
@@ -1579,6 +1586,36 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     margin: 0;
     font-size: 13px;
     color: #5f5146;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-comments-box {
+    margin-top: 12px;
+    padding: 8px 12px 10px;
+    border: 1px solid #d9e2ee;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  .preview-page .workflow-document-fact-find .fact-find-comments-label {
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #7c4b2a;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-comments-value {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #172033;
+    line-height: 1.35;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-savings-table .statement-quote-row:not(.statement-quote-row-header) {
+    background: #ffffff;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-assets-table .statement-quote-row:not(.statement-quote-row-header),
+  .preview-page .workflow-document-fact-find .fact-find-liabilities-table .statement-quote-row:not(.statement-quote-row-header) {
+    background: #ffffff;
   }
   .preview-page p {
     margin: 0 0 10px;

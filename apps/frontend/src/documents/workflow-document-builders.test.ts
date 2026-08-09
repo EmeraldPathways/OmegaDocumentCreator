@@ -701,7 +701,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("01/01/2024");
     expect(document.html).toContain("Comments");
     expect(document.html).toContain("TEST");
-    expect(document.html).toContain('<div class="statement-quote-cell"><p>Field</p></div>');
+    expect(document.html).toContain("fact-find-comments-box");
     expect(document.html).toContain("Mortgage protection");
     expect(document.html).toContain("Personal cover");
     expect(document.html).toContain("Other policies");
