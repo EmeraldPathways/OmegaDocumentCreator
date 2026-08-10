@@ -4,9 +4,9 @@ import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 export const A4_WIDTH_PX = 794;
 export const A4_HEIGHT_PX = 1123;
 export const HEADER_HEIGHT = 120;
-export const FOOTER_HEIGHT = 110;
+export const FOOTER_HEIGHT = 128;
 const REPEATING_HEADER_TOP_OFFSET = 20;
-const REPEATING_HEADER_BOTTOM_GAP = 43;
+const REPEATING_HEADER_BOTTOM_GAP = 10;
 const PAGE_TOP_PADDING_WITH_REPEATING_HEADER =
   REPEATING_HEADER_TOP_OFFSET + HEADER_HEIGHT + REPEATING_HEADER_BOTTOM_GAP;
 export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_TOP_PADDING_WITH_REPEATING_HEADER - FOOTER_HEIGHT - 20;
@@ -14,6 +14,23 @@ const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const PAGE_TOP_PADDING_WITHOUT_HEADER = 28;
+
+function resolvePageTopPaddingWithHeader(headerHeight = HEADER_HEIGHT) {
+  return REPEATING_HEADER_TOP_OFFSET + headerHeight + REPEATING_HEADER_BOTTOM_GAP;
+}
+
+function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
+  return A4_HEIGHT_PX - resolvePageTopPaddingWithHeader(headerHeight) - FOOTER_HEIGHT - 20;
+}
+
+function shouldStartOnFreshPdfPage(element: Element) {
+  return (
+    element.classList.contains("fact-find-asset-liability-section") ||
+    element.classList.contains("fact-find-finance-section") ||
+    element.classList.contains("fact-find-pension-self-section")
+  );
+}
+
 type JsPdfCtor = typeof import("jspdf").jsPDF;
 type JsPdfInstance = InstanceType<JsPdfCtor>;
 
@@ -77,6 +94,7 @@ function isPdfBlock(sourceElement: Element) {
     hasPdfClass(sourceElement, "statement-header-top") ||
     hasPdfClass(sourceElement, "statement-client-details") ||
     hasPdfClass(sourceElement, "statement-address-block") ||
+    hasPdfClass(sourceElement, "statement-address-line") ||
     hasPdfClass(sourceElement, "statement-opening") ||
     hasPdfClass(sourceElement, "statement-section") ||
     hasPdfClass(sourceElement, "statement-important-notice") ||
@@ -109,6 +127,7 @@ function elementIsStatement(sourceElement: Element) {
     classList.contains("statement-client-details") ||
     classList.contains("statement-logo") ||
     classList.contains("statement-address-block") ||
+    classList.contains("statement-address-line") ||
     classList.contains("statement-letter-date") ||
     classList.contains("statement-opening") ||
     classList.contains("statement-section") ||
@@ -131,11 +150,50 @@ function elementIsStatement(sourceElement: Element) {
   );
 }
 
+function getFactFindQuoteGridTemplate(sourceElement: Element) {
+  const rowContainer = sourceElement.classList.contains("statement-quote-row")
+    || sourceElement.classList.contains("statement-quote-row-header")
+    ? sourceElement
+    : sourceElement.closest(".statement-quote-row, .statement-quote-row-header");
+
+  if (!rowContainer) {
+    return null;
+  }
+
+  if (rowContainer.closest(".fact-find-assets-table")) {
+    return "minmax(160px,1.2fr) repeat(2,minmax(120px,1fr))";
+  }
+
+  if (rowContainer.closest(".fact-find-liabilities-table")) {
+    return "minmax(120px,1.1fr) repeat(4,minmax(110px,1fr))";
+  }
+
+  if (rowContainer.closest(".fact-find-savings-table")) {
+    return "minmax(82px,0.85fr) minmax(138px,1.35fr) minmax(88px,1fr) minmax(88px,1fr) minmax(72px,0.72fr)";
+  }
+
+  if (rowContainer.closest(".fact-find-life-insurance-compare-table")) {
+    return "minmax(180px,1.3fr) repeat(2,minmax(120px,1fr))";
+  }
+
+  if (
+    rowContainer.closest(".fact-find-life-insurance-summary-table")
+    || rowContainer.closest(".fact-find-life-insurance-policy-table")
+    || rowContainer.closest(".fact-find-pension-self-table")
+    || rowContainer.closest(".fact-find-pension-partner-table")
+  ) {
+    return "minmax(200px,1.5fr) minmax(140px,1fr)";
+  }
+
+  return null;
+}
+
 function elementStyles(sourceElement: Element) {
   const tagName = sourceElement.tagName.toLowerCase();
   const classList = sourceElement.classList;
   const isStmt = elementIsStatement(sourceElement);
   const workflowRoot = sourceElement.closest(".workflow-document");
+  const isQuoteDoc = Boolean(workflowRoot?.classList.contains("workflow-document-quote"));
   const isFactFindDoc = Boolean(
     workflowRoot?.classList.contains("workflow-document-fact-find")
     || workflowRoot?.classList.contains("workflow-document-fact-find-update"),
@@ -147,11 +205,11 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-letter-header")) {
-    return "display:flex;align-items:flex-start;gap:32px;margin:0 0 28px;padding-bottom:20px;border-bottom:2px solid #c68b2c;page-break-inside:avoid";
+    return "display:flex;align-items:flex-start;gap:24px;margin:0 0 18px;padding-bottom:14px;border-bottom:2px solid #c68b2c;page-break-inside:avoid";
   }
 
   if (classList.contains("statement-header-top")) {
-    return "display:flex;flex-direction:row;align-items:flex-start;gap:32px;margin-bottom:16px";
+    return "display:flex;flex-direction:row;align-items:flex-start;gap:24px;margin-bottom:8px";
   }
 
   if (classList.contains("statement-logo")) {
@@ -159,7 +217,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-client-details")) {
-    return "display:flex;flex:1;flex-direction:column;align-items:flex-end;min-width:0;margin-left:auto;text-align:right";
+    return "display:flex;flex:1;flex-direction:column;align-items:flex-end;min-width:0;margin-left:auto;text-align:right;line-height:1";
   }
 
   if (classList.contains("statement-client-name")) {
@@ -167,49 +225,65 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-address-block")) {
-    return "display:block;text-align:right;margin:0 0 10px";
+    return "display:block;text-align:right;margin:0 0 6px";
+  }
+
+  if (classList.contains("statement-address-line")) {
+    return "display:block;margin:0;line-height:1;font-size:12px;color:#1f2937";
+  }
+
+  if (isStmt && tagName === "p" && sourceElement.parentElement?.classList.contains("statement-address-block")) {
+    return "display:block;margin:0;line-height:1;font-size:12px;color:#1f2937";
   }
 
   if (isStmt && classList.contains("statement-letter-date")) {
-    return "margin:0;text-align:right;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;color:#5b2230";
+    return "margin:0;text-align:right;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:600;line-height:1.15;color:#5b2230";
   }
 
   if (classList.contains("statement-opening")) {
-    return "display:block;margin:0 0 24px;page-break-inside:avoid";
+    return `display:block;margin:0 0 ${isQuoteDoc ? "10px" : "24px"};page-break-inside:avoid`;
   }
 
   // Statement section headings: black, bold, underlined, serif
   if (isStmt && tagName === "h2") {
-    return "margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #e5e7eb;font-family:Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:0.02em;color:#5b2230";
+    return `margin:0 0 ${isQuoteDoc ? "6px" : "10px"};padding-bottom:${isQuoteDoc ? "4px" : "6px"};border-bottom:1px solid #e5e7eb;font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteDoc ? "15px" : "16px"};font-weight:700;letter-spacing:0.02em;color:#5b2230`;
   }
 
   if (classList.contains("statement-important-notice")) {
     return "display:block;border:1.5px solid #000;padding:14px 16px;margin:0 0 20px;page-break-inside:avoid";
   }
 
+  if (classList.contains("statement-recommendation-paragraph")) {
+    return "display:block;margin:0;padding:12px 14px;border:1px solid #e5d5c5;border-radius:12px;background:#fffaf4;line-height:1.65;page-break-inside:avoid";
+  }
+
   if (classList.contains("statement-quote-block")) {
-    return "display:block;margin:0 0 20px;page-break-inside:avoid";
+    return `display:block;margin:0 0 ${isQuoteDoc ? "12px" : "20px"};page-break-inside:avoid`;
   }
 
   if (classList.contains("statement-quote-summary")) {
-    return "display:block;margin:0 0 8px";
+    return isQuoteDoc
+      ? "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;row-gap:2px;margin:0 0 6px;page-break-inside:avoid"
+      : "display:block;margin:0 0 12px";
   }
 
   if (classList.contains("statement-quote-table")) {
-    return "display:block;border:1px solid #000;margin:0 0 8px";
+    return `display:block;margin:0 0 ${isQuoteDoc ? "6px" : "8px"};border:1px solid #d6d3d1;border-radius:12px;overflow:hidden`;
   }
 
   if (classList.contains("statement-quote-row-header")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;background:#e8e8e8;border-bottom:1px solid #000";
+    const gridTemplateColumns = getFactFindQuoteGridTemplate(sourceElement) ?? "1.4fr 1fr 1fr 1fr";
+    return `display:grid;grid-template-columns:${gridTemplateColumns};background:#f6ede3`;
   }
 
   if (classList.contains("statement-quote-row")) {
-    return "display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-bottom:1px solid #ccc";
+    const gridTemplateColumns = getFactFindQuoteGridTemplate(sourceElement) ?? "1.4fr 1fr 1fr 1fr";
+    return `display:grid;grid-template-columns:${gridTemplateColumns};border-top:1px solid #e5e7eb`;
   }
 
   if (classList.contains("statement-quote-cell")) {
-    const baseStyle = "display:block;padding:8px 10px";
-    return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #ccc`;
+    const baseStyle = `display:block;padding:${isQuoteDoc ? "3px 6px" : "10px 12px"}`;
+    return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
   }
 
   if (classList.contains("statement-closing")) {
@@ -280,7 +354,26 @@ function elementStyles(sourceElement: Element) {
 
   // Statement paragraphs: black, serif, tighter spacing
   if (isStmt && tagName === "p") {
+    if (sourceElement.parentElement?.classList.contains("statement-quote-summary")) {
+      return `margin:0;line-height:${isQuoteDoc ? "1.05" : "1.5"};white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : "14px"}`;
+    }
+
+    if (
+      sourceElement.parentElement?.classList.contains("statement-quote-cell")
+      && sourceElement.parentElement.parentElement?.classList.contains("statement-quote-row-header")
+    ) {
+      return `margin:0;line-height:1;white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteDoc ? "10px" : "12px"};font-weight:700;letter-spacing:0.02em;text-transform:uppercase`;
+    }
+
+    if (sourceElement.parentElement?.classList.contains("statement-quote-cell")) {
+      return `margin:0;line-height:${isQuoteDoc ? "1" : "1.7"};white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : "14px"}`;
+    }
+
     return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";
+  }
+
+  if (tagName === "strong" && sourceElement.parentElement?.classList.contains("statement-recommendation-paragraph")) {
+    return "color:#5b2230;font-weight:700";
   }
 
   if (classList.contains("fact-find-signing-intro")) {
@@ -313,6 +406,117 @@ function elementStyles(sourceElement: Element) {
 
   if (classList.contains("fact-find-request-footnote")) {
     return "margin:22px 0 0;font-size:11px;color:#6b7280";
+  }
+
+  if (classList.contains("fact-find-asset-liability-section")) {
+    return "display:block;border:1px solid #e5e7eb;border-radius:14px;background:#faf7f2;padding:14px 16px;margin:0 0 12px;page-break-inside:avoid";
+  }
+
+  if (classList.contains("fact-find-asset-liability-layout")) {
+    return "display:flex;flex-direction:column;gap:14px";
+  }
+
+  if (classList.contains("fact-find-detail-subsection")) {
+    return "display:flex;flex-direction:column;gap:8px";
+  }
+
+  if (classList.contains("fact-find-comments-box")) {
+    return "display:block;margin-top:12px;padding:8px 12px 10px;border:1px solid #d9e2ee;border-radius:12px;background:#ffffff";
+  }
+
+  if (classList.contains("fact-find-comments-label")) {
+    return "margin:0 0 4px;font-size:11px;font-weight:700;color:#7c4b2a;letter-spacing:0.08em;text-transform:uppercase";
+  }
+
+  if (classList.contains("fact-find-comments-value")) {
+    return "margin:0;font-size:14px;font-weight:600;color:#172033;line-height:1.35";
+  }
+
+  if (classList.contains("fact-find-life-insurance-card")) {
+    return "display:flex;flex-direction:column;gap:18px";
+  }
+
+  if (classList.contains("fact-find-life-insurance-divider")) {
+    return "display:block;height:1px;background:rgba(91,34,48,0.18)";
+  }
+
+  if (classList.contains("fact-find-life-insurance-block")) {
+    return "display:flex;flex-direction:column;gap:12px";
+  }
+
+  if (
+    classList.contains("fact-find-life-insurance-summary-label")
+    || classList.contains("fact-find-life-insurance-policy-label")
+  ) {
+    return "margin:0;flex:1 1 auto;font-size:14px;line-height:1.45;color:#1f2937";
+  }
+
+  if (classList.contains("fact-find-life-insurance-value")) {
+    return `margin:0;font-size:14px;line-height:1.45;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"};flex:0 0 min(180px,38%)`;
+  }
+
+  if (classList.contains("fact-find-life-insurance-compare-table")) {
+    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:18px;background:rgba(255,255,255,0.86)";
+  }
+
+  if (classList.contains("fact-find-pension-self-section")) {
+    return "display:block;padding:18px 20px;border:1px solid #e6d6c7;border-radius:22px;background:linear-gradient(180deg,#fffdfa 0%,#fff8f1 100%);page-break-inside:avoid";
+  }
+
+  if (classList.contains("fact-find-pension-card")) {
+    return "display:flex;flex-direction:column;gap:16px";
+  }
+
+  if (classList.contains("fact-find-pension-panel")) {
+    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:20px;background:rgba(255,255,255,0.88)";
+  }
+
+  if (classList.contains("fact-find-pension-panel-header")) {
+    return "display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 16px;border-bottom:1px solid rgba(230,214,199,0.9);background:rgba(250,240,231,0.95)";
+  }
+
+  if (classList.contains("fact-find-pension-panel-status")) {
+    return `margin:0;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${classList.contains("is-positive") ? "#2f8a48" : "#5b2230"}`;
+  }
+
+  if (classList.contains("fact-find-pension-detail-list")) {
+    return "display:flex;flex-direction:column";
+  }
+
+  if (classList.contains("fact-find-pension-metric-row") || classList.contains("fact-find-pension-contributions-row")) {
+    return "display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 16px;border-top:1px solid rgba(230,214,199,0.9)";
+  }
+
+  if (classList.contains("fact-find-pension-metric-label")) {
+    return "margin:0;flex:1 1 auto;font-size:14px;color:#1f2937";
+  }
+
+  if (classList.contains("fact-find-pension-value")) {
+    return `margin:0;flex:0 0 auto;min-width:120px;font-size:14px;font-weight:500;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"}`;
+  }
+
+  if (classList.contains("fact-find-pension-contributions-values")) {
+    return "display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:12px";
+  }
+
+  if (classList.contains("fact-find-pension-contribution-block")) {
+    return "display:flex;flex-direction:column;gap:2px";
+  }
+
+  if (classList.contains("fact-find-pension-contribution-label")) {
+    return "margin:0;font-size:12px;color:#5f5146";
+  }
+
+  if (classList.contains("fact-find-pension-empty-state")) {
+    return "display:block;padding:16px;background:linear-gradient(180deg,#fbf7f1 0%,#f6efe5 100%)";
+  }
+
+  if (classList.contains("fact-find-pension-empty-title")) {
+    return "margin:0 0 8px;font-size:14px;font-weight:700;color:#5b2230";
+  }
+
+  if (classList.contains("fact-find-pension-empty-copy")) {
+    return "margin:0;font-size:12px;color:#5f5146";
   }
 
   if (isStmt && tagName === "strong") {
@@ -501,7 +705,8 @@ export function buildPdfStyledHtml(html: string, addBlockClass = false, options?
   return targetDocument.body.innerHTML.trim();
 }
 
-function splitContentIntoPages(htmlContent: string) {
+function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: number }) {
+  const pageContentHeight = resolvePageContentHeight(options?.headerHeight);
   const pages: string[] = [];
   const tempContainer = document.createElement("div");
   tempContainer.style.cssText = `
@@ -565,13 +770,24 @@ function splitContentIntoPages(htmlContent: string) {
     return fragmentElement.outerHTML;
   };
 
-  const splitOversizedStatementBlock = (element: Element, measuredHeight: number) => {
-    const canSplit =
-      element.classList.contains("statement-section") ||
-      element.classList.contains("statement-opening") ||
-      element.classList.contains("statement-closing");
+  const canSplitPdfElement = (element: Element) =>
+    element.classList.contains("statement-section") ||
+    element.classList.contains("statement-opening") ||
+    element.classList.contains("statement-closing") ||
+    element.classList.contains("document-section") ||
+    element.classList.contains("document-grid") ||
+    element.classList.contains("client-summary-grid") ||
+    element.classList.contains("statement-quote-table") ||
+    element.classList.contains("fact-find-asset-liability-layout") ||
+    element.classList.contains("fact-find-detail-subsection") ||
+    element.classList.contains("fact-find-life-insurance-card") ||
+    element.classList.contains("fact-find-life-insurance-block") ||
+    element.classList.contains("fact-find-pension-card") ||
+    element.classList.contains("fact-find-pension-panel") ||
+    element.classList.contains("fact-find-pension-detail-list");
 
-    if (!canSplit) {
+  const splitOversizedStatementBlock = (element: Element, measuredHeight: number): Array<{ height: number; html: string }> | null => {
+    if (!canSplitPdfElement(element)) {
       return null;
     }
 
@@ -580,25 +796,35 @@ function splitContentIntoPages(htmlContent: string) {
       return null;
     }
 
-    const childHeights = children.map((child) => getElementHeight(child));
-    if (childHeights.some((height) => height > PAGE_CONTENT_HEIGHT)) {
-      return null;
+    const childItems: Array<{ height: number; html: string }> = [];
+    for (const child of children) {
+      const childHeight = getElementHeight(child);
+      if (childHeight > pageContentHeight) {
+        const splitChildren = splitOversizedStatementBlock(child, childHeight);
+        if (!splitChildren) {
+          return null;
+        }
+        childItems.push(...splitChildren);
+        continue;
+      }
+
+      childItems.push({
+        height: childHeight,
+        html: (child as HTMLElement).outerHTML,
+      });
     }
 
     const wrapperHeight = Math.max(
       0,
-      measuredHeight - childHeights.reduce((total, height) => total + height, 0),
+      measuredHeight - childItems.reduce((total, child) => total + child.height, 0),
     );
 
     const fragments: Array<{ height: number; html: string }> = [];
     let fragmentChildren: string[] = [];
     let fragmentHeight = wrapperHeight;
 
-    for (let index = 0; index < children.length; index += 1) {
-      const child = children[index];
-      const childHeight = childHeights[index];
-
-      if (fragmentChildren.length > 0 && fragmentHeight + childHeight > PAGE_CONTENT_HEIGHT) {
+    for (const childItem of childItems) {
+      if (fragmentChildren.length > 0 && fragmentHeight + childItem.height > pageContentHeight) {
         fragments.push({
           height: fragmentHeight,
           html: createWrappedFragmentHtml(element, fragmentChildren.join("")),
@@ -607,8 +833,8 @@ function splitContentIntoPages(htmlContent: string) {
         fragmentHeight = wrapperHeight;
       }
 
-      fragmentChildren.push((child as HTMLElement).outerHTML);
-      fragmentHeight += childHeight;
+      fragmentChildren.push(childItem.html);
+      fragmentHeight += childItem.height;
     }
 
     if (fragmentChildren.length > 0) {
@@ -632,7 +858,17 @@ function splitContentIntoPages(htmlContent: string) {
     const nextHeight = nextItem.element ? getElementHeight(nextItem.element) : (nextItem.height ?? 0);
     const nextHtml = nextItem.element ? (nextItem.element as HTMLElement).outerHTML : (nextItem.html ?? "");
 
-    if (nextHeight > PAGE_CONTENT_HEIGHT) {
+    if (
+      nextItem.element &&
+      currentPageElements.length > 0 &&
+      shouldStartOnFreshPdfPage(nextItem.element)
+    ) {
+      pages.push(wrapPageHtml(currentPageElements.join("")));
+      currentPageElements = [];
+      currentPageHeight = 0;
+    }
+
+    if (nextHeight > pageContentHeight) {
       if (nextItem.element) {
         const splitFragments = splitOversizedStatementBlock(nextItem.element, nextHeight);
         if (splitFragments) {
@@ -647,7 +883,7 @@ function splitContentIntoPages(htmlContent: string) {
       return { mode: "continuous", html: htmlContent } as const;
     }
 
-    if (currentPageElements.length > 0 && currentPageHeight + nextHeight > PAGE_CONTENT_HEIGHT) {
+    if (currentPageElements.length > 0 && currentPageHeight + nextHeight > pageContentHeight) {
       pages.push(wrapPageHtml(currentPageElements.join("")));
       currentPageElements = [nextHtml];
       currentPageHeight = nextHeight;
@@ -682,7 +918,8 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export const OMEGA_FOOTER_LINES = [
-  "Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18. Tel: 01 293 8554 Email: info@omegafinancial.ie Website: www.omegafinancial.ie",
+  "Suite 31, The Mall, Beacon Court, Sandyford, Dublin 18. Tel: 01 293 8554",
+  "Email: info@omegafinancial.ie Website: www.omegafinancial.ie",
   "Directors: John O'Connor B.A. CIM, Hilary O'Connor B.A. DBS",
   "OFM Financial Ltd trading as Omega Financial Management is regulated by the Central Bank of Ireland. Registered in Ireland Number 226937",
 ];
@@ -717,11 +954,49 @@ function extractRepeatingHeaderHtml(html: string) {
   };
 }
 
-function buildPageHtml(content: string, pageNumber: number, totalPages: number, options?: { headerHtml?: string }) {
+function measureRepeatingHeaderHeight(headerHtml: string) {
+  if (typeof document === "undefined" || !headerHtml) {
+    return HEADER_HEIGHT;
+  }
+
+  const measureContainer = document.createElement("div");
+  measureContainer.style.cssText = `
+    position:absolute;
+    left:-9999px;
+    top:-9999px;
+    width:${A4_WIDTH_PX - 100}px;
+    visibility:hidden;
+    box-sizing:border-box;
+  `;
+  measureContainer.innerHTML = headerHtml;
+  document.body.appendChild(measureContainer);
+
+  try {
+    const headerElement = measureContainer.querySelector(".statement-letter-header");
+    if (!headerElement) {
+      return HEADER_HEIGHT;
+    }
+
+    const computedStyle = window.getComputedStyle(headerElement);
+    const rectHeight = headerElement.getBoundingClientRect().height;
+    const marginTop = parseFloat(computedStyle.marginTop) || 0;
+    const marginBottom = parseFloat(computedStyle.marginBottom) || 0;
+    return Math.ceil(rectHeight + marginTop + marginBottom);
+  } finally {
+    document.body.removeChild(measureContainer);
+  }
+}
+
+function buildPageHtml(
+  content: string,
+  pageNumber: number,
+  totalPages: number,
+  options?: { headerHtml?: string; headerHeight?: number },
+) {
   const footerLines = OMEGA_FOOTER_LINES.map(
-    (line) => `<div style="font-size:7.5px;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:3px;">${line}</div>`,
+    (line, index) => `<div style="font-size:7px;line-height:1.2;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:${index === 0 ? "0" : "2px"};">${line}</div>`,
   ).join("");
-  const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
+  const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7px;line-height:1.1;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
   const headerHtml = options?.headerHtml
     ? `
       <div style="position:absolute;top:${REPEATING_HEADER_TOP_OFFSET}px;left:50px;right:50px;">
@@ -729,7 +1004,9 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
       </div>
     `
     : "";
-  const contentTop = options?.headerHtml ? PAGE_TOP_PADDING_WITH_REPEATING_HEADER : PAGE_TOP_PADDING_WITHOUT_HEADER;
+  const contentTop = options?.headerHtml
+    ? resolvePageTopPaddingWithHeader(options.headerHeight)
+    : PAGE_TOP_PADDING_WITHOUT_HEADER;
 
   return `
     <div class="pdf-page" style="
@@ -747,7 +1024,7 @@ function buildPageHtml(content: string, pageNumber: number, totalPages: number, 
       <div style="position:absolute;top:${contentTop}px;left:50px;right:50px;bottom:${FOOTER_HEIGHT}px;overflow:hidden;">
         ${content}
       </div>
-      <div style="position:absolute;bottom:20px;left:42px;right:42px;border-top:1px solid #000;padding-top:6px;text-align:center;">
+      <div style="position:absolute;bottom:18px;left:42px;right:42px;border-top:1px solid #000;padding-top:6px;text-align:center;">
         ${footerLines}
         ${pageNumberHtml}
       </div>
@@ -769,12 +1046,13 @@ function drawPdfPageChrome(pdf: JsPdfInstance, pageNumber: number, totalPages: n
   pdf.line(42, 275, 168, 275);
 
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(7.5);
+  pdf.setFontSize(7);
   pdf.setTextColor(68, 68, 68);
   let footerY = 279;
   OMEGA_FOOTER_LINES.forEach((line) => {
-    pdf.text(line, 105, footerY, { align: "center", maxWidth: 126 });
-    footerY += 3.6;
+    const wrappedLines = pdf.splitTextToSize(line, 126);
+    pdf.text(wrappedLines, 105, footerY, { align: "center", maxWidth: 126 });
+    footerY += wrappedLines.length * 3.1 + 1;
   });
 
   if (totalPages > 1) {
@@ -817,7 +1095,10 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
     stripFactFindLogosForPreview: !isStatement,
   });
   const headerExtraction = extractRepeatingHeaderHtml(parsedContent);
-  const pagination = splitContentIntoPages(headerExtraction.contentHtml);
+  const headerHeight = headerExtraction.headerHtml
+    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml)
+    : HEADER_HEIGHT;
+  const pagination = splitContentIntoPages(headerExtraction.contentHtml, { headerHeight });
   const container = document.createElement("div");
   container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
   document.body.appendChild(container);
@@ -836,6 +1117,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
         const pageDiv = document.createElement("div");
         pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length, {
           headerHtml: headerExtraction.headerHtml,
+          headerHeight,
         });
         container.appendChild(pageDiv);
 
@@ -890,7 +1172,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 
       const pageHeightPx = (
         A4_HEIGHT_PX
-        - (headerExtraction.headerHtml ? REPEATING_HEADER_TOP_OFFSET : PAGE_TOP_PADDING_WITHOUT_HEADER)
+        - (headerExtraction.headerHtml ? resolvePageTopPaddingWithHeader(headerHeight) : PAGE_TOP_PADDING_WITHOUT_HEADER)
         - FOOTER_HEIGHT
       ) * RENDER_SCALE;
       const totalPages = Math.max(1, Math.ceil(flowCanvas.height / pageHeightPx));
@@ -949,22 +1231,31 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-size: 13px;
     line-height: 1.65;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-letter-header {
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-header,
+  .preview-page .workflow-document-quote .statement-letter-header,
+  .preview-page .workflow-document-fact-find .statement-letter-header,
+  .preview-page .workflow-document-fact-find-update .statement-letter-header {
     display: flex;
     align-items: flex-start;
-    gap: 32px;
-    margin-bottom: 32px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #000;
+    gap: 24px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #c68b2c;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-header-top {
+  .preview-page .workflow-document-statement-of-suitability .statement-header-top,
+  .preview-page .workflow-document-quote .statement-header-top,
+  .preview-page .workflow-document-fact-find .statement-header-top,
+  .preview-page .workflow-document-fact-find-update .statement-header-top {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 32px;
-    margin-bottom: 16px;
+    gap: 24px;
+    margin-bottom: 8px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-logo {
+  .preview-page .workflow-document-statement-of-suitability .statement-logo,
+  .preview-page .workflow-document-quote .statement-logo,
+  .preview-page .workflow-document-fact-find .statement-logo,
+  .preview-page .workflow-document-fact-find-update .statement-logo {
     display: block;
     width: 180px;
     height: auto;
@@ -972,7 +1263,10 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     border-radius: 0;
     flex-shrink: 0;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-client-details {
+  .preview-page .workflow-document-statement-of-suitability .statement-client-details,
+  .preview-page .workflow-document-quote .statement-client-details,
+  .preview-page .workflow-document-fact-find .statement-client-details,
+  .preview-page .workflow-document-fact-find-update .statement-client-details {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -980,32 +1274,51 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     min-width: 0;
     margin-left: auto;
     text-align: right;
+    line-height: 1;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-client-name {
+  .preview-page .workflow-document-statement-of-suitability .statement-client-name,
+  .preview-page .workflow-document-quote .statement-client-name,
+  .preview-page .workflow-document-fact-find .statement-client-name,
+  .preview-page .workflow-document-fact-find-update .statement-client-name {
     margin: 0 0 8px;
     font-family: Georgia, "Times New Roman", serif;
     font-size: 14px;
     font-weight: 700;
     color: #000;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-address-block {
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block,
+  .preview-page .workflow-document-quote .statement-address-block,
+  .preview-page .workflow-document-fact-find .statement-address-block,
+  .preview-page .workflow-document-fact-find-update .statement-address-block {
     text-align: right;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-address-block p {
-    margin: 0 0 2px;
-    font-family: Georgia, "Times New Roman", serif;
+  .preview-page .workflow-document-statement-of-suitability .statement-address-line,
+  .preview-page .workflow-document-quote .statement-address-line,
+  .preview-page .workflow-document-fact-find .statement-address-line,
+  .preview-page .workflow-document-fact-find-update .statement-address-line,
+  .preview-page .workflow-document-statement-of-suitability .statement-address-block p,
+  .preview-page .workflow-document-quote .statement-address-block p,
+  .preview-page .workflow-document-fact-find .statement-address-block p,
+  .preview-page .workflow-document-fact-find-update .statement-address-block p {
+    display: block;
+    margin: 0;
+    font-family: Helvetica, Arial, sans-serif;
     font-size: 12px;
-    color: #000;
-    line-height: 1.4;
+    color: #1f2937;
+    line-height: 1;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-letter-date {
-    margin: 12px 0 0;
+  .preview-page .workflow-document-statement-of-suitability .statement-letter-date,
+  .preview-page .workflow-document-quote .statement-letter-date,
+  .preview-page .workflow-document-fact-find .statement-letter-date,
+  .preview-page .workflow-document-fact-find-update .statement-letter-date {
+    margin: 0;
     text-align: right;
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: Helvetica, Arial, sans-serif;
     font-size: 12px;
-    font-weight: 400;
-    color: #000;
+    font-weight: 600;
+    line-height: 1.15;
+    color: #5b2230;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-opening {
     margin-bottom: 20px;
@@ -1023,32 +1336,100 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     padding: 14px 16px;
     margin-bottom: 20px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-block {
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-block,
+  .preview-page .workflow-document-quote .statement-quote-block {
     margin-bottom: 20px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-summary {
-    margin-bottom: 8px;
+  .preview-page .workflow-document-quote .statement-opening {
+    margin-bottom: 10px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-table {
-    border: 1px solid #000;
-    margin-bottom: 8px;
+  .preview-page .workflow-document-quote .statement-section h2 {
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    font-size: 15px;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header {
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-summary,
+  .preview-page .workflow-document-quote .statement-quote-summary {
+    margin-bottom: 12px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-block {
+    margin-bottom: 12px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 18px;
+    row-gap: 2px;
+    margin-bottom: 6px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-summary p,
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell p,
+  .preview-page .workflow-document-quote .statement-quote-summary p,
+  .preview-page .workflow-document-quote .statement-quote-cell p {
+    margin: 0;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary p {
+    margin-bottom: 0;
+    line-height: 1.05;
+    font-size: 13px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary p:last-child {
+    margin-bottom: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-table,
+  .preview-page .workflow-document-quote .statement-quote-table {
+    margin-bottom: 8px;
+    border: 1px solid #d6d3d1;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .preview-page .workflow-document-quote .statement-quote-table {
+    margin-bottom: 6px;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header,
+  .preview-page .workflow-document-quote .statement-quote-row-header {
     display: grid;
     grid-template-columns: 1.4fr 1fr 1fr 1fr;
-    background: #e8e8e8;
-    border-bottom: 1px solid #000;
+    background: #f6ede3;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-row {
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row,
+  .preview-page .workflow-document-quote .statement-quote-row {
     display: grid;
     grid-template-columns: 1.4fr 1fr 1fr 1fr;
-    border-bottom: 1px solid #ccc;
+    border-top: 1px solid #e5e7eb;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell {
-    padding: 8px 10px;
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row:first-child,
+  .preview-page .workflow-document-quote .statement-quote-row:first-child {
+    border-top: 0;
   }
-  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell + .statement-quote-cell {
-    border-left: 1px solid #ccc;
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell,
+  .preview-page .workflow-document-quote .statement-quote-cell {
+    padding: 10px 12px;
+    border-left: 1px solid #e5e7eb;
+  }
+  .preview-page .workflow-document-quote .statement-quote-cell {
+    padding: 3px 6px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-cell p {
+    line-height: 1;
+    font-size: 13px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
+    font-size: 10px;
+    line-height: 1;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-cell:first-child,
+  .preview-page .workflow-document-quote .statement-quote-cell:first-child {
+    border-left: 0;
+  }
+  .preview-page .workflow-document-statement-of-suitability .statement-quote-row-header .statement-quote-cell p,
+  .preview-page .workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #5b2230;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-section {
     margin-bottom: 16px;

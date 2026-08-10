@@ -128,6 +128,38 @@ function hasCurrentFactFindPensionSelfLayout(editedHtml: string) {
   return editedHtml.includes("fact-find-pension-self-section");
 }
 
+function hasCurrentFactFindExportSectionGrouping(profile: SeededClientProfile, editedHtml: string) {
+  if (profile.factFindType === "small") {
+    return true;
+  }
+
+  if (hasFilledItems(buildFactFindLiabilityProbe(profile)) && !editedHtml.includes("fact-find-asset-liability-section")) {
+    return false;
+  }
+
+  if (hasFactFindLifeInsuranceContentForRebuild(profile) && !editedHtml.includes("fact-find-finance-section")) {
+    return false;
+  }
+
+  if (hasFilledItems(buildFactFindSavingsProbe(profile)) && !editedHtml.includes("fact-find-finance-section")) {
+    return false;
+  }
+
+  if (hasFactFindSelfPensionContentForRebuild(profile) && !editedHtml.includes("fact-find-pension-self-section")) {
+    return false;
+  }
+
+  if (hasFactFindPartnerPensionContentForRebuild(profile) && !editedHtml.includes("fact-find-finance-section")) {
+    return false;
+  }
+
+  return true;
+}
+
+function hasFilledItems(items: Array<unknown>) {
+  return items.length > 0;
+}
+
 function hasCurrentFactFindSavingsCommentsLayout(profile: SeededClientProfile, editedHtml: string) {
   const hasComments = hasNonDefaultFactFindValue(profile.savingsInvestmentComments, ["Not recorded"]);
   const hasCommentsTable = editedHtml.includes("fact-find-comments-table");
@@ -176,6 +208,54 @@ function hasFactFindLifeInsuranceContentForRebuild(profile: SeededClientProfile)
     profile.selfSeriousIllnessAmount,
     profile.partnerSeriousIllnessAmount,
   ].some((value) => hasNonDefaultFactFindValue(value, ["No"]));
+}
+
+function hasFactFindPartnerPensionContentForRebuild(profile: SeededClientProfile) {
+  return [
+    profile.partnerRetirementAge,
+    profile.partnerRetirementIncomeTargetPercent,
+    profile.partnerEmployeeDirectorPensionYes,
+    profile.partnerEmployeeDirectorPensionNo,
+    profile.partnerEmployeeDirectorSchemeType,
+    profile.partnerEmployeeDirectorRetirementAge,
+    profile.partnerEmployeeDirectorEmployerContribution,
+    profile.partnerEmployeeDirectorPersonalContribution,
+    profile.partnerEmployeeDirectorYearsInForce,
+    profile.partnerPersonalPensionYes,
+    profile.partnerPersonalPensionNo,
+    profile.partnerPersonalPensionCompany,
+    profile.partnerPersonalPensionPolicyType,
+    profile.partnerPersonalPensionContribution,
+    profile.partnerPersonalPensionCurrentValue,
+    profile.partnerPersonalPensionYearsInForce,
+  ].some((value) => hasNonDefaultFactFindValue(value));
+}
+
+function buildFactFindLiabilityProbe(profile: SeededClientProfile) {
+  return [
+    profile.assetHomeSelf,
+    profile.assetHomePartner,
+    profile.assetLandPropertySelf,
+    profile.assetLandPropertyPartner,
+    profile.assetBankBuildSocSelf,
+    profile.assetBankBuildSocPartner,
+    profile.assetCreditUnionSelf,
+    profile.assetCreditUnionPartner,
+    profile.liabilityMortgageAmount,
+    profile.liabilityMortgageMonthlyRepayment,
+    profile.liabilityMortgageProvider,
+    profile.liabilityMortgageBalanceOutstanding,
+  ].filter((value) => hasNonDefaultFactFindValue(value));
+}
+
+function buildFactFindSavingsProbe(profile: SeededClientProfile) {
+  return profile.savingsInvestmentRows.flatMap((row, index) => [
+    `Savings ${index + 1}`,
+    row.financialInstitution,
+    row.value,
+    row.startDate,
+    row.term,
+  ]).filter((value) => hasNonDefaultFactFindValue(value));
 }
 
 function hasUnexpectedFactFindRecommendationSection(draft: GeneratedDocumentDraft) {
@@ -270,6 +350,7 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
     hasComposedHtml && (
       !hasCurrentClientSummaryLayout(editedHtml) ||
       !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
+      !hasCurrentFactFindExportSectionGrouping(profile, editedHtml) ||
       !hasCurrentFactFindSigningLayout(editedHtml) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
       !hasCurrentFactFindServicesLayout(editedHtml) ||

@@ -1857,7 +1857,7 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
     '<img class="statement-logo" src="' + escapeHtml(OMEGA_LOGO_DATA_URI) + '" alt="Omega Financial Management" />',
     '<div class="statement-client-details">',
     '<div class="statement-address-block">',
-    ...addressLines.map((line) => `<p>${escapeHtml(line)}</p>`),
+    ...addressLines.map((line) => `<div class="statement-address-line">${escapeHtml(line)}</div>`),
     "</div>",
     `<p class="statement-letter-date">${escapeHtml(profile.letterDate || "Date not recorded")}</p>`,
     "</div>",
@@ -2022,6 +2022,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
       : isStatementDocumentType(documentType)
       ? mergeStatementRecommendationHtml(computedRecommendationHtml, recommendationSection?.bodyHtml)
       : recommendationSection?.bodyHtml ?? computedRecommendationHtml;
+  const requiredRecommendationHtml = recommendationHtml ?? computedRecommendationHtml;
   const needsHtml = needsSection?.bodyHtml ?? buildNeedsNarrativeHtml(profile, documentType);
   const warningHtml = warningSection?.bodyHtml ?? buildWarningHtml(profile, documentType);
 
@@ -2043,10 +2044,10 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
             buildNeedsNarrativeHtml(profile, documentType),
           )
         : documentType === "Terms of Business"
-          ? buildTermsBlocks(profile, recommendationHtml, needsHtml, warningHtml)
+          ? buildTermsBlocks(profile, requiredRecommendationHtml, needsHtml, warningHtml)
           : isQuoteDocumentType(documentType)
             ? buildQuoteBlocks(profile, documentType)
-            : buildStatementBlocks(profile, recommendationHtml, needsHtml, warningHtml);
+            : buildStatementBlocks(profile, requiredRecommendationHtml, needsHtml, warningHtml);
 
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
   const isStatement = isStatementDocumentType(documentType);
