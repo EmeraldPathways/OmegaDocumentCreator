@@ -26,7 +26,10 @@ function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
 function shouldStartOnFreshPdfPage(element: Element) {
   return (
     element.classList.contains("fact-find-asset-liability-section") ||
-    element.classList.contains("fact-find-finance-section") ||
+    (
+      element.classList.contains("fact-find-finance-section")
+      && !element.classList.contains("fact-find-savings-section")
+    ) ||
     element.classList.contains("fact-find-pension-self-section")
   );
 }
@@ -188,6 +191,25 @@ function getFactFindQuoteGridTemplate(sourceElement: Element) {
   return null;
 }
 
+function isCompactFactFindTableCell(sourceElement: Element) {
+  const rowContainer = sourceElement.classList.contains("statement-quote-cell")
+    ? sourceElement.parentElement
+    : sourceElement.closest(".statement-quote-cell")?.parentElement;
+
+  if (!rowContainer) {
+    return false;
+  }
+
+  return Boolean(
+    rowContainer.closest(".fact-find-assets-table")
+    || rowContainer.closest(".fact-find-liabilities-table")
+    || rowContainer.closest(".fact-find-savings-table")
+    || rowContainer.closest(".fact-find-life-insurance-summary-table")
+    || rowContainer.closest(".fact-find-life-insurance-compare-table")
+    || rowContainer.closest(".fact-find-life-insurance-policy-table"),
+  );
+}
+
 function elementStyles(sourceElement: Element) {
   const tagName = sourceElement.tagName.toLowerCase();
   const classList = sourceElement.classList;
@@ -282,7 +304,13 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-quote-cell")) {
-    const baseStyle = `display:block;padding:${isQuoteDoc ? "3px 6px" : "10px 12px"}`;
+    const baseStyle = `display:block;padding:${
+      isQuoteDoc
+        ? "3px 6px"
+        : isFactFindDoc && isCompactFactFindTableCell(sourceElement)
+          ? "4px 7px"
+          : "10px 12px"
+    }`;
     return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
   }
 
@@ -362,11 +390,15 @@ function elementStyles(sourceElement: Element) {
       sourceElement.parentElement?.classList.contains("statement-quote-cell")
       && sourceElement.parentElement.parentElement?.classList.contains("statement-quote-row-header")
     ) {
-      return `margin:0;line-height:1;white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteDoc ? "10px" : "12px"};font-weight:700;letter-spacing:0.02em;text-transform:uppercase`;
+      return `margin:0;line-height:1;white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${
+        isQuoteDoc ? "10px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "11px" : "12px"
+      };font-weight:700;letter-spacing:0.02em;text-transform:uppercase`;
     }
 
     if (sourceElement.parentElement?.classList.contains("statement-quote-cell")) {
-      return `margin:0;line-height:${isQuoteDoc ? "1" : "1.7"};white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : "14px"}`;
+      return `margin:0;line-height:${
+        isQuoteDoc ? "1" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "1.1" : "1.7"
+      };white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : "14px"}`;
     }
 
     return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";
@@ -409,31 +441,31 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-asset-liability-section")) {
-    return "display:block;border:1px solid #e5e7eb;border-radius:14px;background:#faf7f2;padding:14px 16px;margin:0 0 12px;page-break-inside:avoid";
+    return "display:block;border:1px solid #e5e7eb;border-radius:14px;background:#faf7f2;padding:8px 10px;margin:0 0 8px;page-break-inside:avoid";
   }
 
   if (classList.contains("fact-find-asset-liability-layout")) {
-    return "display:flex;flex-direction:column;gap:14px";
-  }
-
-  if (classList.contains("fact-find-detail-subsection")) {
     return "display:flex;flex-direction:column;gap:8px";
   }
 
+  if (classList.contains("fact-find-detail-subsection")) {
+    return "display:flex;flex-direction:column;gap:3px";
+  }
+
   if (classList.contains("fact-find-comments-box")) {
-    return "display:block;margin-top:12px;padding:8px 12px 10px;border:1px solid #d9e2ee;border-radius:12px;background:#ffffff";
+    return "display:block;margin-top:6px;padding:5px 8px 6px;border:1px solid #d9e2ee;border-radius:12px;background:#ffffff";
   }
 
   if (classList.contains("fact-find-comments-label")) {
-    return "margin:0 0 4px;font-size:11px;font-weight:700;color:#7c4b2a;letter-spacing:0.08em;text-transform:uppercase";
+    return "margin:0 0 2px;font-size:10px;font-weight:700;color:#7c4b2a;letter-spacing:0.08em;text-transform:uppercase";
   }
 
   if (classList.contains("fact-find-comments-value")) {
-    return "margin:0;font-size:14px;font-weight:600;color:#172033;line-height:1.35";
+    return "margin:0;font-size:13px;font-weight:600;color:#172033;line-height:1.15";
   }
 
   if (classList.contains("fact-find-life-insurance-card")) {
-    return "display:flex;flex-direction:column;gap:18px";
+    return "display:flex;flex-direction:column;gap:6px";
   }
 
   if (classList.contains("fact-find-life-insurance-divider")) {
@@ -441,22 +473,22 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-life-insurance-block")) {
-    return "display:flex;flex-direction:column;gap:12px";
+    return "display:flex;flex-direction:column;gap:3px";
   }
 
   if (
     classList.contains("fact-find-life-insurance-summary-label")
     || classList.contains("fact-find-life-insurance-policy-label")
   ) {
-    return "margin:0;flex:1 1 auto;font-size:14px;line-height:1.45;color:#1f2937";
+    return "margin:0;flex:1 1 auto;font-size:13px;line-height:1.15;color:#1f2937";
   }
 
   if (classList.contains("fact-find-life-insurance-value")) {
-    return `margin:0;font-size:14px;line-height:1.45;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"};flex:0 0 min(180px,38%)`;
+    return `margin:0;font-size:13px;line-height:1.15;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"};flex:0 0 min(180px,38%)`;
   }
 
   if (classList.contains("fact-find-life-insurance-compare-table")) {
-    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:18px;background:rgba(255,255,255,0.86)";
+    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:14px;background:rgba(255,255,255,0.86)";
   }
 
   if (classList.contains("fact-find-pension-self-section")) {

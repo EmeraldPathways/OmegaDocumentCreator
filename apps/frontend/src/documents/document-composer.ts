@@ -1750,7 +1750,7 @@ function buildFactFindBlocks(
       ? [{
           kind: "section" as const,
           title: "Savings & Investments",
-          className: "document-grid fact-find-finance-section",
+          className: "document-grid fact-find-finance-section fact-find-savings-section",
           bodyHtml: buildFactFindSavingsHtml(profile),
         }]
       : []),
