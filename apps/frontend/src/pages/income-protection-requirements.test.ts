@@ -67,7 +67,7 @@ describe("income protection requirement mappings", () => {
     });
   });
 
-  it("does not require gender for income protection quotes", () => {
+  it("requires gender for income protection quotes because the PHI request payload needs it", () => {
     const draft = buildDraft();
     draft.gender = "";
 
@@ -81,7 +81,22 @@ describe("income protection requirement mappings", () => {
       quotePensionRetirementAge: "",
     });
 
-    expect(requirements.find((item) => item.key === "gender")).toBeUndefined();
+    expect(requirements.find((item) => item.key === "quote-gender")?.target).toEqual({
+      tabId: "fact-find",
+      sectionId: "client-profile",
+      fieldId: "ff-gender",
+    });
+    expect(
+      buildQuoteMissingFields({
+        draft,
+        effectiveIncomeProtectionDraft: draft,
+        isPensionsQuoteWorkflow: false,
+        quotePensionGender: "",
+        quotePensionMonthlyContribution: "",
+        quotePensionRequired: "",
+        quotePensionRetirementAge: "",
+      }),
+    ).toContain("Gender");
   });
 
   it("keeps pensions quote requirements on the quote form only", () => {

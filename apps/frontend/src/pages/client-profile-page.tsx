@@ -133,12 +133,12 @@ export function ClientProfilePage() {
   const { clientReference = "" } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getClient, refreshClients } = useClientData();
+  const { getClient, refreshClients, saveClient } = useClientData();
   const { addToast } = useToast();
   const client = getClient(clientReference);
   const [draft, setDraft] = useState<SeededClientProfile | null>(client ?? null);
   const [isClientLoading, setIsClientLoading] = useState(Boolean(!client));
-  const [saveStatus, setSaveStatus] = useState<"notSaved" | "saving" | "saved">("notSaved");
+  const [saveStatus, setSaveStatus] = useState<"notSaved" | "saving" | "saved" | "error">("notSaved");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<SeededGeneratedDocument | null>(null);
   const [isAddingDependant, setIsAddingDependant] = useState(false);
@@ -308,10 +308,16 @@ export function ClientProfilePage() {
     }
   }
 
-  function handleAddDependant() {
+  async function handleAddDependant() {
     if (!dependantName.trim()) {
       return;
     }
+
+    const nextDependant = {
+      name: dependantName.trim(),
+      dateOfBirth: dependantDob,
+      notes: dependantRelationship.trim(),
+    };
 
     setDraft((currentDraft) => {
       if (!currentDraft) {
@@ -319,22 +325,32 @@ export function ClientProfilePage() {
       }
       return {
         ...currentDraft,
-        dependants: [
-          ...currentDraft.dependants,
-          {
-            name: dependantName.trim(),
-            dateOfBirth: dependantDob,
-            notes: dependantRelationship.trim(),
-          },
-        ],
+        dependants: [...currentDraft.dependants, nextDependant],
       };
     });
 
-    setDependantName("");
-    setDependantDob("");
-    setDependantRelationship("");
-    setIsAddingDependant(false);
-    addToast("Dependant added", "success");
+    if (!draft) {
+      return;
+    }
+
+    setSaveStatus("saving");
+    try {
+      const persistedClient = await saveClient({
+        ...draft,
+        dependants: [...draft.dependants, nextDependant],
+      });
+      setDraft(persistedClient);
+      setSaveStatus("saved");
+      setDependantName("");
+      setDependantDob("");
+      setDependantRelationship("");
+      setIsAddingDependant(false);
+      addToast("Dependant added", "success");
+      setTimeout(() => setSaveStatus("notSaved"), 2000);
+    } catch {
+      setSaveStatus("error");
+      addToast("Failed to save dependant", "error");
+    }
   }
 
   async function handleDeleteClient() {

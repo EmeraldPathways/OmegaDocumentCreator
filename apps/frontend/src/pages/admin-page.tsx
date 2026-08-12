@@ -147,6 +147,7 @@ export function AdminPage() {
     to_date: "",
   });
   const [busy, setBusy] = useState<string>("");
+  const restoreExecutionSupported = securityStatus?.environment === "development";
 
   function storeRestoreApproval(backupId: string, response: RestoreActionResponse) {
     if (!response.confirmation_token || !response.confirmation_expires_at) {
@@ -538,6 +539,7 @@ export function AdminPage() {
                       </Button>
                       <Button
                         className="btn-sm"
+                        disabled={!restoreExecutionSupported}
                         isLoading={busy === `execute-${backup.id}`}
                         onClick={() => setRestoreModalBackup(backup)}
                         variant="danger"
@@ -558,6 +560,11 @@ export function AdminPage() {
                     <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-text-muted)" }}>
                       Manifest: {renderArtifactStatus(backup.manifest_path, backup.manifest_present, "Not recorded")}
                     </div>
+                    {!restoreExecutionSupported ? (
+                      <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-danger-700)" }}>
+                        Live restore execution is disabled outside development. Use the offline restore procedure.
+                      </div>
+                    ) : null}
                     {backup.error_message ? (
                       <div style={{ marginTop: "8px", fontSize: "var(--font-size-small)", color: "var(--color-danger-700)" }}>
                         {backup.error_message}

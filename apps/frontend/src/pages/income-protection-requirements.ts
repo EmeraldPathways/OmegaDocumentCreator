@@ -233,6 +233,7 @@ export function buildQuoteMissingFields({
     : [
         !hasValue(draft.fullName) ? "Client name" : null,
         !hasValue(draft.dateOfBirth) ? "Date of birth" : null,
+        !hasValue(draft.gender) ? "Gender" : null,
         !hasValue(effectiveIncomeProtectionDraft.recommendedCover) ? "Annual cover amount" : null,
         !hasValue(effectiveIncomeProtectionDraft.coverAge) ? "Cover to age" : null,
         !hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass) ? "Occupation class" : null,
@@ -263,6 +264,7 @@ export function buildQuoteGenerationRequirements({
     : [
         { key: "fullName", label: "Client name", complete: hasValue(draft.fullName), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-name" } },
         { key: "dateOfBirth", label: "Date of birth", complete: hasValue(draft.dateOfBirth), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-dob" } },
+        { key: "quote-gender", label: "Gender", complete: hasValue(draft.gender), location: "Fact Find", target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-gender" } },
         { key: "quote-annualCoverAmount", label: "Annual cover amount", complete: hasValue(effectiveIncomeProtectionDraft.recommendedCover), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-annualCoverAmount" } },
         { key: "quote-coverToAge", label: "Cover to age", complete: hasValue(effectiveIncomeProtectionDraft.coverAge), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-coverToAge" } },
         { key: "quote-occupationClass", label: "Occupation class", complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass), location: "Quote form", target: { tabId: "quote", sectionId: "quote-output", fieldId: "quote-occupationClass" } },

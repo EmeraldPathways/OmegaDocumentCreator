@@ -50,6 +50,14 @@ class SessionRepository:
             SessionModel.id == session_id,
         ).delete()
 
+    def delete_by_user_email(self, user_email: str) -> int:
+        """Delete all persisted session rows for a user."""
+        return (
+            self._db.query(SessionModel)
+            .filter(SessionModel.user_email == user_email.lower())
+            .delete()
+        )
+
     def cleanup_expired(self) -> int:
         """Remove expired session rows. Returns count of removed rows."""
         result = self._db.query(SessionModel).filter(

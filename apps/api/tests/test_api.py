@@ -159,6 +159,30 @@ class StartupConfigurationTests(unittest.TestCase):
             warnings,
         )
 
+    @unittest.skipUnless(_DB_AVAILABLE, "PostgreSQL not available for startup bootstrap test")
+    def test_startup_db_check_bootstraps_first_admin_when_database_has_no_users(self) -> None:
+        assert _test_engine is not None
+        db = db_test_helpers.new_test_session(_test_engine)
+        try:
+            db_test_helpers.truncate_all(db)
+            db.commit()
+        finally:
+            db.close()
+
+        app_main._startup_db_check()
+
+        db = db_test_helpers.new_test_session(_test_engine)
+        try:
+            from app.models import User
+
+            users = db.query(User).all()
+            self.assertEqual(len(users), 1)
+            self.assertEqual(users[0].email, "admin@omega.local")
+            self.assertEqual(users[0].role, "admin")
+            db.commit()
+        finally:
+            db.close()
+
     def test_submit_phi_request_parses_live_output_quote_path(self) -> None:
         from app.config import get_settings
         from app.document_generation import submit_phi_request
@@ -515,6 +539,90 @@ class ApiTests(unittest.TestCase):
         response_a = self.client.get("/auth/me")
         self.assertEqual(response_a.status_code, 200)
         self.assertEqual(response_a.json()["user"]["role"], "admin")
+
+    def test_change_password_clears_force_password_change_and_rotates_session(self) -> None:
+        from app.db import get_session
+        from app.repositories.users import UserRepository
+        from app.security import hash_password
+
+        db = get_session()
+        try:
+            repo = UserRepository(db)
+            admin = repo.get_by_email("admin@omega.local")
+            self.assertIsNotNone(admin)
+            repo.reset_password_by_id(
+                admin.id,
+                password_hash=hash_password("TempPass123!"),
+                force_password_change=True,
+            )
+            db.commit()
+        finally:
+            db.close()
+
+        primary_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"})
+        secondary_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"})
+
+        login_response = primary_client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "TempPass123!"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        self.assertTrue(login_response.json()["user"]["force_password_change"])
+
+        second_login_response = secondary_client.post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "TempPass123!"},
+        )
+        self.assertEqual(second_login_response.status_code, 200)
+
+        change_response = primary_client.post(
+            "/auth/change-password",
+            json={"current_password": "TempPass123!", "new_password": "ChangedPass123!"},
+        )
+        self.assertEqual(change_response.status_code, 200, change_response.text)
+        self.assertFalse(change_response.json()["user"]["force_password_change"])
+
+        secondary_me = secondary_client.get("/auth/me")
+        self.assertEqual(secondary_me.status_code, 401)
+
+        old_password_login = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"}).post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "TempPass123!"},
+        )
+        self.assertEqual(old_password_login.status_code, 401)
+
+        new_password_login = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"}).post(
+            "/auth/login",
+            json={"email": "admin@omega.local", "password": "ChangedPass123!"},
+        )
+        self.assertEqual(new_password_login.status_code, 200)
+
+    def test_admin_reset_password_invalidates_existing_sessions(self) -> None:
+        self._login_as_admin()
+        created_user = self._create_user(
+            email="reset-target@omega.local",
+            first_name="Reset",
+            last_name="Target",
+            role="staff",
+            password="OriginalPass123!",
+        )
+
+        target_client = TestClient(app, headers={"Origin": "http://127.0.0.1:3007"})
+        login_response = target_client.post(
+            "/auth/login",
+            json={"email": "reset-target@omega.local", "password": "OriginalPass123!"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        self._login_as_admin()
+        reset_response = self.client.post(
+            f"/admin/users/{created_user['id']}/reset-password",
+            json={"password": "ResetPass123!", "force_password_change": True},
+        )
+        self.assertEqual(reset_response.status_code, 200, reset_response.text)
+
+        me_response = target_client.get("/auth/me")
+        self.assertEqual(me_response.status_code, 401)
 
     # ------------------------------------------------------------------
     # Phase 8: Health/readiness tests
@@ -1467,6 +1575,22 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("approval token", response.json()["detail"].lower())
+
+    def test_restore_execute_is_blocked_outside_development(self) -> None:
+        self._login_as_admin()
+        create_resp = self.client.post("/admin/backups")
+        backup_id = create_resp.json()["item"]["id"]
+
+        from app.config import get_settings
+
+        with patch.object(app_main, "settings", get_settings(ENVIRONMENT="production")):
+            response = self.client.post(
+                f"/admin/backups/{backup_id}/restore",
+                json={"confirm": "yes-do-restore-now"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("offline restore procedure", response.json()["detail"].lower())
 
     def test_restore_attempts_requires_admin(self) -> None:
         self._login_as_staff()

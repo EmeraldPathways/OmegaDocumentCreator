@@ -195,7 +195,8 @@ def _startup_db_check() -> None:
 
             repo = UserRepository(db)
             if repo.count() == 0:
-                logger.warning("No users found in database. Create users through the admin flow or direct DB bootstrap.")
+                _bootstrap_first_admin(repo)
+                logger.info("Bootstrapped first admin user from ADMIN_EMAIL and ADMIN_PASSWORD.")
             db.commit()
         finally:
             db.close()
@@ -222,6 +223,21 @@ def _shutdown_scheduler() -> None:
     stop_scheduler()
 
 
+def _bootstrap_first_admin(repo: UserRepository) -> dict[str, str | bool | None]:
+    user_model = repo.create(
+        first_name="Omega",
+        last_name="Admin",
+        email=settings.admin_email,
+        password_hash=hash_password(settings.admin_password),
+        role=UserRole.ADMIN,
+    )
+    return repo.to_response(user_model)
+
+
+def _restore_execution_supported() -> bool:
+    return settings.environment == "development"
+
+
 @asynccontextmanager
 async def _app_lifespan(inner_app: FastAPI) -> None:  # type: ignore[valid-type]
     """Lifespan context manager replacing deprecated @app.on_event hooks."""
@@ -241,6 +257,11 @@ app.router.lifespan_context = _app_lifespan
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 class AdminUserCreateRequest(BaseModel):
@@ -759,6 +780,48 @@ def logout(request: Request) -> dict[str, str]:
 @app.get("/auth/me")
 def me(request: Request) -> dict[str, dict[str, object]]:
     return {"user": _current_user(request)}
+
+
+@app.post("/auth/change-password")
+def change_password(payload: ChangePasswordRequest, request: Request) -> dict[str, dict[str, object]]:
+    user = _current_user(request)
+    db = get_session()
+    try:
+        user_repo = UserRepository(db)
+        session_repo = SessionRepository(db)
+        user_model = user_repo.get_by_email(str(user.get("email")))
+        if user_model is None:
+            request.session.clear()
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if not verify_password(payload.current_password, user_model.password_hash):
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+        user_repo.reset_password_by_id(
+            user_model.id,
+            password_hash=hash_password(payload.new_password),
+            force_password_change=False,
+        )
+        session_repo.delete_by_user_email(user_model.email)
+        session_row = session_repo.create(user_model.email, settings.session_timeout_minutes)
+        request.session["session_id"] = str(session_row.id)
+        request.session["user_email"] = user_model.email
+        request.session["last_seen_at"] = datetime.now(UTC).isoformat()
+
+        _log_audit(
+            request, db=db,
+            action="password_changed",
+            entity_type="auth",
+            entity_id=user_model.email,
+            details={"force_password_change_cleared": True},
+            user_email=user_model.email,
+        )
+        db.commit()
+        refreshed_user = user_repo.get_by_id(user_model.id)
+        if refreshed_user is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        return {"user": user_repo.to_response(refreshed_user)}
+    finally:
+        db.close()
 
 
 @app.get("/users/assignable")
@@ -1437,12 +1500,17 @@ def admin_reset_user_password(
         )
         if not result:
             raise HTTPException(status_code=404, detail="User not found")
+        session_repo = SessionRepository(db)
+        invalidated_sessions = session_repo.delete_by_user_email(str(result["email"]))
         _log_audit(
             request, db=db,
             action="user_password_reset",
             entity_type="user",
             entity_id=user_id,
-            details={"force_password_change": payload.force_password_change},
+            details={
+                "force_password_change": payload.force_password_change,
+                "invalidated_session_count": invalidated_sessions,
+            },
         )
         db.commit()
         return {"item": result}
@@ -1593,6 +1661,18 @@ def admin_execute_restore(backup_id: str, payload: RestoreConfirmRequest, reques
         run = backup_repo.get_by_id(backup_id)
         if not run:
             raise HTTPException(status_code=404, detail="Backup run not found")
+
+        if not _restore_execution_supported():
+            _persist_restore_attempt(
+                backup_repo, run.id, user, "failed",
+                mode="execute", dump_file=run.database_backup,
+                error_message="Live restore execution is disabled outside development. Use the offline restore procedure.",
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=409,
+                detail="Live restore execution is disabled outside development. Use the offline restore procedure.",
+            )
 
         if not _consume_restore_approval(request, backup_id, payload.confirmation_token):
             _persist_restore_attempt(

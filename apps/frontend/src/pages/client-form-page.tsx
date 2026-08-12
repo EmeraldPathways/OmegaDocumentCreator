@@ -74,7 +74,7 @@ export function ClientFormPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const debouncedFormState = useDebounce(formState, 1000);
@@ -113,7 +113,7 @@ export function ClientFormPage() {
     }
 
     if (debouncedFormState.firstName || debouncedFormState.surname || debouncedFormState.email) {
-      performSave(debouncedFormState, false);
+      void performSave(debouncedFormState, false).catch(() => undefined);
     }
   }, [debouncedFormState]);
 
@@ -196,15 +196,22 @@ export function ClientFormPage() {
       updatedBy: actorLabel,
       advisorName: state.advisorName || actorLabel,
     };
-
-    const nextClient = await saveClient(nextClientDraft);
-    setFormState(nextClient);
-    setSaveStatus("saved");
-    if (showToastOnSuccess) {
-      addToast("Client saved", "success");
+    try {
+      const nextClient = await saveClient(nextClientDraft);
+      setFormState(nextClient);
+      setSaveStatus("saved");
+      if (showToastOnSuccess) {
+        addToast("Client saved", "success");
+      }
+      setTimeout(() => setSaveStatus("idle"), 2000);
+      return nextClient;
+    } catch (error) {
+      setSaveStatus("error");
+      if (showToastOnSuccess) {
+        addToast("Client save failed", "error");
+      }
+      throw error;
     }
-    setTimeout(() => setSaveStatus("idle"), 2000);
-    return nextClient;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -219,9 +226,12 @@ export function ClientFormPage() {
     }
 
     setIsSubmitting(true);
-    const savedClient = await performSave(formState, true);
-    setIsSubmitting(false);
-    navigate(`/clients/${savedClient.clientReference}`);
+    try {
+      const savedClient = await performSave(formState, true);
+      navigate(`/clients/${savedClient.clientReference}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleCancel() {
@@ -267,6 +277,8 @@ export function ClientFormPage() {
                   <CheckIcon />
                   Saved
                 </>
+              ) : saveStatus === "error" ? (
+                "Save failed"
               ) : (
                 "Not saved yet"
               )}

@@ -20,9 +20,11 @@ type SessionUser = {
 };
 
 type AuthContextValue = {
+  changePassword: (currentPassword: string, newPassword: string) => Promise<SessionUser | null>;
   isAdmin: boolean;
+  isPasswordChangeRequired: boolean;
   isSignedIn: boolean;
-  signIn: (email: string, password: string) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<SessionUser | null>;
   signOut: () => void;
   user: SessionUser | null;
 };
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       ...rawUser,
       email: normalizeEmail(rawUser?.email ?? fallbackEmail ?? ""),
       role: role === "admin" || role === "manager" ? role : "staff",
+      force_password_change: rawUser?.force_password_change ?? false,
     };
   }
 
@@ -79,7 +82,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     });
 
     if (!response.ok) {
-      return false;
+      return null;
     }
 
     const payload = (await response.json()) as { user?: SessionUser };
@@ -87,7 +90,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
     setSessionRefreshKey((current) => current + 1);
-    return true;
+    return nextUser;
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string) {
+    const response = await fetch("/auth/change-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { user?: SessionUser };
+    const nextUser = coerceSessionUser(payload.user, user?.email);
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
+    setUser(nextUser);
+    setSessionRefreshKey((current) => current + 1);
+    return nextUser;
   }
 
   function signOut() {
@@ -125,7 +152,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      changePassword,
       isAdmin: user?.role === "admin",
+      isPasswordChangeRequired: user?.force_password_change === true,
       isSignedIn: user !== null,
       signIn,
       signOut,

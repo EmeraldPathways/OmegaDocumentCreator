@@ -15,13 +15,13 @@ export function LoginPage() {
     event.preventDefault();
     setError("");
 
-    const didSignIn = await signIn(email, password);
-    if (!didSignIn) {
+    const nextUser = await signIn(email, password);
+    if (!nextUser) {
       setError("Sign in failed");
       return;
     }
 
-    navigate("/income-protection");
+    navigate(nextUser.force_password_change ? "/change-password" : "/income-protection");
   }
 
   return (

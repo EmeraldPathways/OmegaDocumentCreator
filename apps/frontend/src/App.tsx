@@ -7,6 +7,7 @@ import { ToastProvider } from "./components/ui";
 import { ClientDataProvider } from "./data/client-data-context";
 import { useClientData } from "./data/client-data-context";
 import { AdminPage } from "./pages/admin-page";
+import { ChangePasswordPage } from "./pages/change-password-page";
 import { ClientFormPage } from "./pages/client-form-page";
 import { ClientProfilePage } from "./pages/client-profile-page";
 import { ClientsPage } from "./pages/clients-page";
@@ -18,7 +19,15 @@ import { PensionsPage } from "./pages/pensions-page";
 import { SettingsPage } from "./pages/settings-page";
 
 function RequireAdmin({ children }: { children: JSX.Element }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isPasswordChangeRequired, isSignedIn } = useAuth();
+
+  if (!isSignedIn) {
+    return <Navigate replace to="/login" />;
+  }
+
+  if (isPasswordChangeRequired) {
+    return <Navigate replace to="/change-password" />;
+  }
 
   if (!isAdmin) {
     return <Navigate replace to="/login" />;
@@ -28,10 +37,14 @@ function RequireAdmin({ children }: { children: JSX.Element }) {
 }
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const { isSignedIn } = useAuth();
+  const { isPasswordChangeRequired, isSignedIn } = useAuth();
 
   if (!isSignedIn) {
     return <Navigate replace to="/login" />;
+  }
+
+  if (isPasswordChangeRequired) {
+    return <Navigate replace to="/change-password" />;
   }
 
   return children;
@@ -75,6 +88,7 @@ function AppRoutes() {
         <Routes>
         <Route path="/" element={<Navigate replace to="/fact-find" />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/clients" element={<RequireAuth><ClientsPage /></RequireAuth>} />
         <Route path="/fact-find" element={<RequireAuth><RedirectFactFindHome /></RequireAuth>} />
         <Route path="/income-protection" element={<RequireAuth><RedirectIncomeProtectionHome /></RequireAuth>} />
