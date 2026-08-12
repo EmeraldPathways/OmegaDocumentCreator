@@ -31,7 +31,7 @@ describe("RichDocumentEditor", () => {
       <RichDocumentEditor
         content={[
           '<article class="workflow-document workflow-document-fact-find">',
-          '<div class="document-banner"><p class="document-eyebrow">Fact Find</p><h1>Income Protection Fact Find</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></div>',
+          '<div class="document-banner"><p class="document-eyebrow">Fact Find</p><h1>Fact Find</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></div>',
           '<div class="client-summary-grid"><h2>Client Summary</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">Client</span><strong>Jamie Murphy</strong></div></div></div>',
           "</article>",
         ].join("")}
@@ -44,7 +44,7 @@ describe("RichDocumentEditor", () => {
     const editor = document.querySelector(".ProseMirror");
     expect(editor).not.toBeNull();
 
-    const titleText = screen.getByRole("heading", { name: "Income Protection Fact Find" }).firstChild;
+    const titleText = screen.getByRole("heading", { name: "Fact Find" }).firstChild;
     expect(titleText).not.toBeNull();
 
     const selection = window.getSelection();

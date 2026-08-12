@@ -1495,12 +1495,12 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile, documentT
   const requestedCoverAmount = profile.recommendedCover || requestFieldValue(requests, "AnnualAmount", "Cover amount");
 
   const summaryItems = [
-    `Cover amount: ${valueOrFallback(requestedCoverAmount)}`,
-    `Date of birth: ${valueOrFallback(phiDob)}`,
-    `Deferred period: ${valueOrFallback(profile.deferredPeriod)}`,
-    `Cover to age: ${valueOrFallback(profile.coverAge)}`,
-    `Smoker status: ${valueOrFallback(profile.smokerStatus)}`,
-    `Occupation class: ${valueOrFallback(profile.phiOccupationalClass)}`,
+    { label: "Cover amount", value: valueOrFallback(requestedCoverAmount) },
+    { label: "Date of birth", value: valueOrFallback(phiDob) },
+    { label: "Deferred period", value: valueOrFallback(profile.deferredPeriod) },
+    { label: "Cover to age", value: valueOrFallback(profile.coverAge) },
+    { label: "Smoker status", value: valueOrFallback(profile.smokerStatus) },
+    { label: "Occupation class", value: valueOrFallback(profile.phiOccupationalClass) },
   ];
 
   const headers = ["Provider", "Quote", "Discount", "After Tax Discount"];
@@ -1555,7 +1555,18 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile, documentT
   return [
     '<div class="statement-section statement-quote-block">',
     `<h2>${escapeHtml(documentType === "Pensions Quote" ? "Pensions Quote Comparison" : "Income Protection Quote Comparison")}</h2>`,
-    `<div class="statement-quote-summary">${summaryItems.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}</div>`,
+    [
+      '<div class="client-summary-grid statement-quote-summary-grid">',
+      '<div class="grid-items">',
+      summaryItems
+        .map(
+          (item) =>
+            `<div class="grid-item"><span class="grid-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`,
+        )
+        .join(""),
+      "</div>",
+      "</div>",
+    ].join(""),
     groupedSections,
     "</div>",
   ].join("");
@@ -1617,7 +1628,7 @@ function buildTitleBannerBlock(documentType: SupportedDocumentType, profile: See
   return {
     kind: "banner",
     eyebrow: documentType,
-    title: documentType === "Fact Find" ? "Income Protection Fact Find" : documentType,
+    title: documentType === "Fact Find" ? "Fact Find" : documentType,
     subtitle: `${profile.fullName} (${profile.clientReference})`,
   };
 }
@@ -2055,7 +2066,7 @@ function buildQuoteBlocks(profile: SeededClientProfile, documentType: SupportedD
 
 export function composeWorkflowDocument(profile: SeededClientProfile, documentType: SupportedDocumentType): ComposedDocument {
   const title =
-    documentType === "Fact Find" ? "Income Protection Fact Find"
+    documentType === "Fact Find" ? "Fact Find"
       : documentType === "Quote" ? "Income Protection Quote Comparison"
       : documentType === "Pensions Quote" ? "Pensions Quote Comparison"
       : documentType === "Pensions Statement" ? "Pensions Statement"
@@ -2109,8 +2120,9 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
 
   const isFactFind = documentType === "Fact Find" || documentType === "Fact Find Update";
   const isStatement = isStatementDocumentType(documentType);
+  const isQuote = isQuoteDocumentType(documentType);
   const usesCustomFactFindSigning = isFactFind;
-  const usesStatementHeader = isStatement || isQuoteDocumentType(documentType) || isFactFind;
+  const usesStatementHeader = isStatement || isQuote || isFactFind;
 
   const sharedBlocks: ComposedBlock[] = [
     ...(usesStatementHeader
@@ -2122,7 +2134,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
           subtitle: `${profile.fullName} (${profile.clientReference})`,
         }]),
     ...bodyBlocks,
-    ...(isStatement || usesCustomFactFindSigning ? [] : [buildFooterBlock(profile, documentType)]),
+    ...(isStatement || isQuote || usesCustomFactFindSigning ? [] : [buildFooterBlock(profile, documentType)]),
   ];
 
   return {

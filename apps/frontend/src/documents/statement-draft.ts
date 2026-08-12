@@ -4,7 +4,9 @@ import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 const FACT_FIND_DOCUMENT_TYPE = "Fact Find" satisfies SupportedDocumentType;
 const FACT_FIND_UPDATE_DOCUMENT_TYPE = "Fact Find Update" satisfies SupportedDocumentType;
+const quoteDocumentTypes = ["Quote", "Pensions Quote"] as const satisfies SupportedDocumentType[];
 const statementDocumentTypes = ["Statement of Suitability", "Pensions Statement"] as const satisfies SupportedDocumentType[];
+type QuoteDocumentType = (typeof quoteDocumentTypes)[number];
 type StatementDocumentType = (typeof statementDocumentTypes)[number];
 
 function hasComposedStatementHtml(editedHtml: string) {
@@ -14,6 +16,19 @@ function hasComposedStatementHtml(editedHtml: string) {
       editedHtml.includes(`workflow-document-${documentType.toLowerCase().replace(/\s+/g, "-")}`),
     )
   );
+}
+
+function hasComposedQuoteHtml(editedHtml: string) {
+  return (
+    editedHtml.includes("statement-document-body") &&
+    quoteDocumentTypes.some((documentType) =>
+      editedHtml.includes(`workflow-document-${documentType.toLowerCase().replace(/\s+/g, "-")}`),
+    )
+  );
+}
+
+function hasCurrentQuoteSummaryGrid(editedHtml: string) {
+  return editedHtml.includes("statement-quote-summary-grid");
 }
 
 function hasLegacyFactFindHeaderHtml(editedHtml: string) {
@@ -29,6 +44,10 @@ function hasComposedFactFindHtml(editedHtml: string) {
     editedHtml.includes("workflow-document-fact-find")
     && editedHtml.includes("statement-letter-header")
   );
+}
+
+function hasCurrentFactFindTitle(editedHtml: string) {
+  return editedHtml.includes("<h1>Fact Find</h1>");
 }
 
 function hasMatchingFactFindVariant(editedHtml: string, factFindType: string | undefined) {
@@ -121,7 +140,23 @@ function hasCurrentClientSummaryLayout(editedHtml: string) {
 }
 
 function hasCurrentFactFindLifeInsuranceLayout(editedHtml: string) {
-  return editedHtml.includes("fact-find-life-insurance-card");
+  return (
+    editedHtml.includes("fact-find-life-insurance-section") &&
+    editedHtml.includes("fact-find-life-insurance-card") &&
+    editedHtml.includes("fact-find-life-insurance-block")
+  );
+}
+
+function hasCurrentFactFindDeclarationsLayout(editedHtml: string) {
+  return (
+    editedHtml.includes("fact-find-declarations-section") &&
+    editedHtml.includes('<span class="grid-label">Execution only</span>') &&
+    editedHtml.includes('<span class="grid-label">Terms reviewed</span>') &&
+    editedHtml.includes('<span class="grid-label">Do not contact</span>') &&
+    editedHtml.includes('<span class="grid-label">Marketing agreed</span>') &&
+    editedHtml.includes('<span class="grid-label">PEP confirmation</span>') &&
+    editedHtml.includes('<span class="grid-label">Recommendation Acknowledgement</span>')
+  );
 }
 
 function hasCurrentFactFindPensionSelfLayout(editedHtml: string) {
@@ -298,6 +333,11 @@ function isLegacyFactFindUpdateDraft(draft: GeneratedDocumentDraft) {
   return editedHtml.length > 0 && !hasComposedFactFindUpdateHtml(editedHtml);
 }
 
+function isLegacyQuoteDraft(draft: GeneratedDocumentDraft) {
+  const editedHtml = draft.editedHtml.trim();
+  return editedHtml.length > 0 && !hasComposedQuoteHtml(editedHtml);
+}
+
 export function isLegacyStatementDraft(draft: GeneratedDocumentDraft) {
   const editedHtml = draft.editedHtml.trim();
   const hasComposedHtml = hasComposedStatementHtml(editedHtml);
@@ -353,18 +393,51 @@ export function resolveStatementDraft(
   };
 }
 
+export function resolveQuoteDraft(
+  profile: SeededClientProfile,
+  documentType: QuoteDocumentType = "Quote",
+): GeneratedDocumentDraft {
+  const quoteDraft = profile.documentDrafts[documentType];
+  const editedHtml = quoteDraft.editedHtml.trim();
+  const shouldRebuildComposedHtml =
+    hasComposedQuoteHtml(editedHtml) &&
+    !hasCurrentQuoteSummaryGrid(editedHtml);
+
+  if (!isLegacyQuoteDraft(quoteDraft) && !shouldRebuildComposedHtml) {
+    return quoteDraft;
+  }
+
+  const quoteProfile = {
+    ...profile,
+    documentDrafts: {
+      ...profile.documentDrafts,
+      [documentType]: {
+        ...quoteDraft,
+        editedHtml: "",
+      },
+    },
+  } satisfies SeededClientProfile;
+
+  return {
+    ...quoteDraft,
+    editedHtml: buildWorkflowEditorDocument(quoteProfile, documentType).html,
+  };
+}
+
 export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDocumentDraft {
   const factFindDraft = profile.documentDrafts[FACT_FIND_DOCUMENT_TYPE];
   const editedHtml = factFindDraft.editedHtml.trim();
   const hasComposedHtml = hasComposedFactFindHtml(editedHtml);
   const shouldRebuildComposedHtml =
     hasComposedHtml && (
+      !hasCurrentFactFindTitle(editedHtml) ||
       !hasCurrentClientSummaryLayout(editedHtml) ||
       !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
       !hasCurrentFactFindExportSectionGrouping(profile, editedHtml) ||
       !hasCurrentFactFindSigningLayout(editedHtml) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
       !hasCurrentFactFindServicesLayout(editedHtml) ||
+      !hasCurrentFactFindDeclarationsLayout(editedHtml) ||
       !hasCurrentFactFindSavingsCommentsLayout(profile, editedHtml) ||
       (hasFactFindLifeInsuranceContentForRebuild(profile) && !hasCurrentFactFindLifeInsuranceLayout(editedHtml)) ||
       (hasFactFindSelfPensionContentForRebuild(profile) && !hasCurrentFactFindPensionSelfLayout(editedHtml)) ||
@@ -427,6 +500,10 @@ export function resolveWorkspaceDocumentDraft(
   profile: SeededClientProfile,
   documentType: SupportedDocumentType,
 ): GeneratedDocumentDraft {
+  if (quoteDocumentTypes.includes(documentType as QuoteDocumentType)) {
+    return resolveQuoteDraft(profile, documentType as QuoteDocumentType);
+  }
+
   if (statementDocumentTypes.includes(documentType as StatementDocumentType)) {
     return resolveStatementDraft(profile, documentType as StatementDocumentType);
   }

@@ -198,6 +198,8 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("Cover to age: 65");
     expect(document.html).toContain("Smoker status: Non-Smoker");
     expect(document.html).toContain("Occupation class: 2");
+    expect(document.html).toContain('class="client-summary-grid statement-quote-summary-grid"');
+    expect(document.html).toContain('<span class="grid-label">Cover amount</span><strong>30000</strong>');
     expect(document.html).toContain("Reviewable Rates");
     expect(document.html).toContain("Guaranteed Rates");
     expect(document.html).toContain("After Tax Discount");
@@ -218,6 +220,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("Indexation:");
     expect(document.html).not.toContain("statement-opening");
     expect(document.html).not.toContain("Personal Circumstances");
+    expect(document.html).not.toContain("Signatures and Record");
   });
 
   it("renders a populated statement recommendation using quote and fact find values", () => {
@@ -493,7 +496,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain("statement-letter-header");
     expect(document.html).toContain("document-banner");
     expect(document.html).toContain("client-summary-grid");
-    expect(document.html).toContain("Income Protection Fact Find");
+    expect(document.html).toContain("Fact Find");
     expect(document.html).toContain("Income Protection cover review requested.");
     expect(document.html).toContain("Please confirm that the information captured in this fact find is complete and accurate.");
     expect(document.html).toContain("Dublin");
@@ -1000,7 +1003,7 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).toContain('class="document-inline-header"');
     expect(document.html).toContain('class="statement-letter-header"');
     expect(document.html).toContain('class="document-banner"');
-    expect(document.html).toContain("<h1>Income Protection Fact Find</h1>");
+    expect(document.html).toContain("<h1>Fact Find</h1>");
     expect(document.html).toContain('class="client-summary-grid"');
     expect(document.html).toContain('class="document-section"');
     expect(document.html).toContain('class="document-callout document-callout-warning"');

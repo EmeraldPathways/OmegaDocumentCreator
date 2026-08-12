@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
-import { resolveFactFindDraft, resolveFactFindUpdateDraft, resolveStatementDraft } from "./statement-draft";
+import { resolveFactFindDraft, resolveFactFindUpdateDraft, resolveQuoteDraft, resolveStatementDraft } from "./statement-draft";
 
 function cloneProfile(clientReference: string) {
   return JSON.parse(JSON.stringify(getSeededClientProfile(clientReference))) as SeededClientProfile;
@@ -47,6 +47,20 @@ describe("resolveStatementDraft", () => {
     expect(draft.editedHtml).toContain("106.64pm");
     expect(draft.editedHtml).not.toContain("165.50");
     expect(draft.editedHtml).not.toContain("99.30pm");
+  });
+});
+
+describe("resolveQuoteDraft", () => {
+  it("rebuilds composed quote html when the legacy summary paragraph layout is still saved", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Quote"].editedHtml =
+      '<article class="workflow-document workflow-document-quote"><div class="statement-document-body"><h2>Income Protection Quote Comparison</h2><div class="statement-quote-summary"><p>Cover amount: 60000.00</p><p>Date of birth: 01/01/1990</p></div></div></article>';
+
+    const draft = resolveQuoteDraft(profile);
+
+    expect(draft.editedHtml).toContain("statement-quote-summary-grid");
+    expect(draft.editedHtml).toContain('<span class="grid-label">Cover amount</span>');
+    expect(draft.editedHtml).not.toContain('<div class="statement-quote-summary"><p>Cover amount: 60000.00</p>');
   });
 });
 
@@ -194,6 +208,43 @@ describe("resolveFactFindDraft", () => {
     expect(draft.editedHtml).toContain('<span class="grid-label">No deferred current weekly cover</span><strong>200.00</strong>');
     expect(draft.editedHtml).toContain('<span class="grid-label">No deferred monthly premium</span><strong>200.00</strong>');
     expect(draft.editedHtml).toContain('<span class="grid-label">No deferred cover to age</span><strong>65</strong>');
+  });
+
+  it("rebuilds composed fact find html when the old income protection title is still present", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindType = "small";
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-small"><div class="document-inline-header"><div class="statement-letter-header"></div></div><header class="document-banner"><p class="document-eyebrow">Fact Find</p><h1>Income Protection Fact Find</h1><p class="document-subtitle">Jamie Murphy (CLI-2026-0002)</p></header><div class="client-summary-grid"><h2>Services Requested</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">Requested service</span><strong>Income Protection</strong></div></div></div><div class="client-summary-grid"><h2>Client Summary</h2><div class="grid-items"><div class="grid-item"><span class="grid-label">Client</span><strong>Jamie Murphy</strong></div><div class="grid-item"><span class="grid-label">Reference</span><strong>CLI-2026-0002</strong></div><div class="grid-item"><span class="grid-label">Advisor</span><strong>John O\'Connor</strong></div></div></div><div class="document-section"><h2>Signatures and Record</h2><div class="fact-find-signing-block"><div class="fact-find-signature-row"><p class="fact-find-signature-value">&nbsp;</p></div><div class="fact-find-signature-row"><p class="fact-find-signature-value">&nbsp;</p></div><div class="fact-find-signature-row"><p class="fact-find-signature-value">&nbsp;</p></div></div></div><div class="document-section"><h2>Request for Information</h2><div class="fact-find-request-row"><div class="fact-find-request-field fact-find-request-field-signature"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Client(s)</p></div><div class="fact-find-request-field fact-find-request-field-date fact-find-request-field-signature"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Date</p></div></div><div class="fact-find-request-row"><div class="fact-find-request-field"><p class="fact-find-request-value">&nbsp;</p><p class="fact-find-request-label">Company:</p></div><div class="fact-find-request-field"><p class="fact-find-request-value">Income Protection</p><p class="fact-find-request-label">Policies:</p></div></div></div><div class="fact-find-final-section-group"></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("<h1>Fact Find</h1>");
+    expect(draft.editedHtml).not.toContain("Income Protection Fact Find");
+  });
+
+  it("rebuilds composed fact find html when life insurance and declarations still use the older edit layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindType = "all";
+    profile.mortgageProtectionNo = "Yes";
+    profile.selfLifeInsuranceAmount = "6000.00";
+    profile.partnerLifeInsuranceAmount = "6000.00";
+    profile.selfSeriousIllnessAmount = "6000.00";
+    profile.partnerSeriousIllnessAmount = "6000.00";
+    profile.executionOnlyConfirmation = "Yes";
+    profile.termsReviewedReceived = "Yes";
+    profile.doNotContact = "Yes";
+    profile.agreeToMarketing = "Yes";
+    profile.pepDeclarationConfirmed = "Yes";
+    profile.recommendationAcknowledged = "Yes";
+    profile.documentDrafts["Fact Find"].editedHtml =
+      '<article class="workflow-document workflow-document-fact-find workflow-document-fact-find-all"><div class="document-inline-header"><div class="statement-letter-header"></div></div><div class="fact-find-final-section-group"><div class="document-section"><h2>Life Insurance &amp; Serious Illness</h2><div class="statement-quote-table fact-find-life-insurance-summary-table"></div></div><div class="document-grid"><h2>Declarations and Confirmations</h2><div class="grid-items"><div class="grid-item"><strong>Yes</strong></div></div></div></div></article>';
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("fact-find-life-insurance-section");
+    expect(draft.editedHtml).toContain("fact-find-life-insurance-card");
+    expect(draft.editedHtml).toContain("fact-find-declarations-section");
+    expect(draft.editedHtml).toContain('<span class="grid-label">Execution only</span>');
   });
 });
 

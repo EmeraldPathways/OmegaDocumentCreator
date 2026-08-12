@@ -14,7 +14,7 @@ describe("buildExportDocumentArtifact", () => {
     const artifact = buildExportDocumentArtifact(profile, "Fact Find", {
       title: "Fact Find",
       html: [
-        "<h1>Income Protection Fact Find</h1>",
+        "<h1>Fact Find</h1>",
         "<p>Jamie Murphy (CLI-2026-0002)</p>",
         "<h2>Recommendation Section</h2>",
         "<p>Edited recommendation for export.</p>",

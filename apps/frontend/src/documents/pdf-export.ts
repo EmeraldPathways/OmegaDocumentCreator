@@ -615,6 +615,10 @@ function elementStyles(sourceElement: Element) {
     return "display:block;border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;margin:0;background:#faf7f2;page-break-inside:avoid";
   }
 
+  if ((tagName === "section" || tagName === "div") && classList.contains("statement-quote-summary-grid") && isQuoteDoc) {
+    return "display:block;border:1px solid #e5e7eb;border-radius:14px;padding:8px 10px;margin:0 0 4px;background:#faf7f2;page-break-inside:avoid";
+  }
+
   if ((tagName === "section" || tagName === "div") && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
     return `display:block;border:1px solid #e5e7eb;border-radius:14px;padding:${isFactFindDoc ? "14px 16px" : "18px 20px"};margin:0 0 ${isFactFindDoc ? "12px" : "16px"};background:#faf7f2;page-break-inside:avoid`;
   }
@@ -634,25 +638,29 @@ function elementStyles(sourceElement: Element) {
   if (tagName === "div" && classList.contains("grid-items")) {
     const isClientSummaryGrid = sourceElement.parentElement?.classList.contains("client-summary-grid") ?? false;
     const isDeclarationsGrid = sourceElement.parentElement?.classList.contains("fact-find-declarations-section") ?? false;
+    const isQuoteSummaryGrid = sourceElement.parentElement?.classList.contains("statement-quote-summary-grid") ?? false;
     const columns = isFactFindDoc && isClientSummaryGrid
       ? "repeat(3,minmax(180px,1fr))"
       : "repeat(2,minmax(0,1fr))";
-    return `display:grid;grid-template-columns:${columns};gap:${isDeclarationsGrid ? "5px" : isFactFindDoc ? "7px" : "10px"}`;
+    return `display:grid;grid-template-columns:${columns};gap:${isQuoteSummaryGrid ? "6px" : isDeclarationsGrid ? "5px" : isFactFindDoc ? "7px" : "10px"}`;
   }
 
   if (tagName === "div" && classList.contains("grid-item")) {
     const isDeclarationsItem = sourceElement.parentElement?.parentElement?.classList.contains("fact-find-declarations-section") ?? false;
+    const isQuoteSummaryItem = sourceElement.parentElement?.parentElement?.classList.contains("statement-quote-summary-grid") ?? false;
     return `display:block;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:${
-      isDeclarationsItem ? "4px 7px" : isFactFindDoc ? "6px 10px" : "10px 12px"
-    };min-height:${isDeclarationsItem ? "0" : "48px"};line-height:${isFactFindDoc ? "1.2" : "1.6"}`;
+      isQuoteSummaryItem ? "6px 8px" : isDeclarationsItem ? "4px 7px" : isFactFindDoc ? "6px 10px" : "10px 12px"
+    };min-height:${isQuoteSummaryItem || isDeclarationsItem ? "0" : "48px"};line-height:${isQuoteSummaryItem ? "1.1" : isFactFindDoc ? "1.2" : "1.6"}`;
   }
 
   if (tagName === "span" && classList.contains("grid-label")) {
-    return "display:block;font-family:Helvetica,Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#7c4b2a;margin-bottom:4px";
+    const isQuoteSummaryLabel = Boolean(sourceElement.closest(".statement-quote-summary-grid"));
+    return `display:block;font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteSummaryLabel ? "9px" : "10px"};font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#7c4b2a;margin-bottom:${isQuoteSummaryLabel ? "1px" : "4px"}`;
   }
 
   if (tagName === "strong" && sourceElement.parentElement?.classList.contains("grid-item")) {
-    return `display:block;font-size:13px;color:#111827;font-family:${isFactFindDoc ? "Helvetica,Arial,sans-serif" : "inherit"};line-height:${isFactFindDoc ? "1.2" : "inherit"}`;
+    const isQuoteSummaryValue = Boolean(sourceElement.closest(".statement-quote-summary-grid"));
+    return `display:block;font-size:${isQuoteSummaryValue ? "11px" : "13px"};color:#111827;font-family:${isFactFindDoc ? "Helvetica,Arial,sans-serif" : "inherit"};line-height:${isQuoteSummaryValue ? "1.05" : isFactFindDoc ? "1.2" : "inherit"}`;
   }
 
   if (!isStmt && tagName === "h1") {
@@ -1424,32 +1432,36 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-size: 15px;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-summary,
-  .preview-page .workflow-document-quote .statement-quote-summary {
+  .preview-page .workflow-document-quote .statement-quote-summary,
+  .preview-page .workflow-document-quote .statement-quote-summary-grid {
     margin-bottom: 12px;
   }
   .preview-page .workflow-document-quote .statement-quote-block {
     margin-bottom: 12px;
   }
-  .preview-page .workflow-document-quote .statement-quote-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 18px;
-    row-gap: 2px;
-    margin-bottom: 6px;
+  .preview-page .workflow-document-quote .statement-quote-summary-grid {
+    padding: 8px 10px;
+    margin-bottom: 2px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-items {
+    gap: 6px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-item {
+    padding: 6px 8px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-label {
+    margin-bottom: 1px;
+    font-size: 9px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-item strong {
+    font-size: 11px;
+    line-height: 1.05;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-summary p,
   .preview-page .workflow-document-statement-of-suitability .statement-quote-cell p,
   .preview-page .workflow-document-quote .statement-quote-summary p,
   .preview-page .workflow-document-quote .statement-quote-cell p {
     margin: 0;
-  }
-  .preview-page .workflow-document-quote .statement-quote-summary p {
-    margin-bottom: 0;
-    line-height: 1.05;
-    font-size: 13px;
-  }
-  .preview-page .workflow-document-quote .statement-quote-summary p:last-child {
-    margin-bottom: 0;
   }
   .preview-page .workflow-document-statement-of-suitability .statement-quote-table,
   .preview-page .workflow-document-quote .statement-quote-table {
@@ -1788,6 +1800,24 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     display: block;
     font-size: 13px;
     color: #111827;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid {
+    padding: 8px 10px;
+    margin-bottom: 2px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-items {
+    gap: 6px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-item {
+    padding: 6px 8px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-label {
+    margin-bottom: 1px;
+    font-size: 9px;
+  }
+  .preview-page .workflow-document-quote .statement-quote-summary-grid .grid-item strong {
+    font-size: 11px;
+    line-height: 1.05;
   }
   .preview-page .workflow-document-fact-find .grid-item strong,
   .preview-page .workflow-document-fact-find-update .grid-item strong {

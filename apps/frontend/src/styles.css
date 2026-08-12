@@ -2145,6 +2145,35 @@ button {
   color: #111827;
 }
 
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-items,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-items {
+  gap: 6px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-item,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-item {
+  padding: 6px 8px;
+  min-height: 0;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-label,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-label {
+  margin-bottom: 1px;
+  font-size: 9px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-item strong,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-item strong {
+  font-size: 11px;
+  line-height: 1.05;
+}
+
 .generated-output-editor.ProseMirror .workflow-document-fact-find .document-banner,
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .document-banner,
 .generated-output-pdf-page-body .workflow-document-fact-find .document-banner,
@@ -4875,8 +4904,37 @@ button {
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary,
-.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary {
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary,
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid {
   margin-bottom: 12px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-items,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-items {
+  gap: 6px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-item,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-item {
+  padding: 6px 8px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-label,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-label {
+  margin-bottom: 1px;
+  font-size: 9px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-item strong,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid .grid-item strong {
+  font-size: 11px;
+  line-height: 1.05;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary p,
@@ -5226,22 +5284,8 @@ button {
   font-size: 15px;
 }
 
-.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 18px;
-  row-gap: 2px;
-  margin-bottom: 6px;
-}
-
-.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary p {
-  margin-bottom: 0;
-  line-height: 1.05;
-  font-size: 13px;
-}
-
-.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary p:last-child {
-  margin-bottom: 0;
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-summary-grid {
+  margin-bottom: 2px;
 }
 
 .generated-output-pdf-page-body .workflow-document-quote .statement-quote-table {
