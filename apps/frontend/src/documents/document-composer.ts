@@ -95,6 +95,32 @@ function detailGrid(title: string, items: Array<{ label: string; value: string }
   };
 }
 
+function buildNamedSectionHtml(title: string, bodyHtml: string, className?: string) {
+  return `<section class="${escapeHtml(className ?? "document-section")}"><h2>${escapeHtml(title)}</h2>${bodyHtml}</section>`;
+}
+
+function buildGridSectionHtml(
+  title: string,
+  items: Array<{ label: string; value: string }>,
+  className?: string,
+) {
+  return [
+    `<section class="${escapeHtml(className ?? "document-grid")}">`,
+    `<h2>${escapeHtml(title)}</h2>`,
+    '<div class="grid-items">',
+    items
+      .map(
+        (item) =>
+          `<div class="grid-item"><span class="grid-label">${escapeHtml(item.label)}</span><strong>${escapeHtml(
+            valueOrFallback(item.value),
+          )}</strong></div>`,
+      )
+      .join(""),
+    "</div>",
+    "</section>",
+  ].join("");
+}
+
 function yesNoSelectionValue(yesValue: string | undefined, noValue: string | undefined) {
   if (yesValue?.trim() === "Yes") {
     return "Yes";
@@ -576,7 +602,6 @@ function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
     `<div class="statement-quote-cell">${buildFactFindLifeInsuranceValueHtml(mortgageProtectionValue)}</div>`,
     '</div>',
     '</div>',
-    '<div class="fact-find-life-insurance-divider"></div>',
     '<div class="fact-find-life-insurance-block">',
     '<h3>Personal cover</h3>',
     '<div class="statement-quote-table fact-find-life-insurance-compare-table">',
@@ -597,7 +622,6 @@ function buildFactFindLifeInsuranceHtml(profile: SeededClientProfile) {
     '</div>',
     '</div>',
     '</div>',
-    '<div class="fact-find-life-insurance-divider"></div>',
     '<div class="fact-find-life-insurance-block">',
     '<h3>Other policies</h3>',
     '<div class="statement-quote-table fact-find-life-insurance-policy-table">',
@@ -1738,27 +1762,19 @@ function buildFactFindBlocks(
           bodyHtml: buildFactFindAssetsLiabilitiesHtml(profile),
         }]
       : []),
-    ...(!isSmall && hasFactFindLifeInsuranceContent(profile)
+    ...(!isSmall && (hasFactFindLifeInsuranceContent(profile) || hasFilledItems(savingsItems))
       ? [{
           kind: "section" as const,
-          title: "Life Insurance & Serious Illness",
-          className: "document-grid fact-find-finance-section",
-          bodyHtml: buildFactFindLifeInsuranceHtml(profile),
-        }]
-      : []),
-    ...(!isSmall && hasFilledItems(savingsItems)
-      ? [{
-          kind: "section" as const,
-          title: "Savings & Investments",
-          className: "document-grid fact-find-finance-section fact-find-savings-section",
-          bodyHtml: buildFactFindSavingsHtml(profile),
+          title: "",
+          className: "document-section fact-find-life-savings-group",
+          bodyHtml: buildFactFindLifeSavingsGroupHtml(profile),
         }]
       : []),
     ...(!isSmall && hasFactFindSelfPensionContent(profile)
       ? [{
           kind: "section" as const,
           title: "Pension Arrangements - Self",
-          className: "document-grid fact-find-finance-section fact-find-pension-self-section",
+          className: "document-grid fact-find-pension-section fact-find-pension-self-section",
           bodyHtml: buildFactFindPensionHtml(profile, "self"),
         }]
       : []),
@@ -1766,7 +1782,7 @@ function buildFactFindBlocks(
       ? [{
           kind: "section" as const,
           title: "Pension Arrangements - Partner",
-          className: "document-grid fact-find-finance-section",
+          className: "document-grid fact-find-pension-section fact-find-pension-partner-section",
           bodyHtml: buildFactFindPensionHtml(profile, "partner"),
         }]
       : []),
@@ -1777,23 +1793,11 @@ function buildFactFindBlocks(
           bodyHtml: recommendationHtml,
         }]
       : []),
-    detailGrid("Declarations and Confirmations", [
-      { label: "Execution only", value: profile.executionOnlyConfirmation },
-      { label: "Terms reviewed", value: profile.termsReviewedReceived },
-      { label: "Do not contact", value: profile.doNotContact },
-      { label: "Marketing agreed", value: profile.agreeToMarketing },
-      { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
-      { label: "Recommendation Acknowledgement", value: profile.recommendationAcknowledged },
-    ]),
     {
       kind: "section",
-      title: "Signatures and Record",
-      bodyHtml: buildFactFindSignaturesHtml(profile),
-    },
-    {
-      kind: "section",
-      title: "Request for Information",
-      bodyHtml: buildFactFindRequestInfoHtml(profile),
+      title: "",
+      className: "document-section fact-find-final-section-group",
+      bodyHtml: buildFactFindFinalSectionGroupHtml(profile),
     },
     {
       kind: "callout",
@@ -1802,6 +1806,60 @@ function buildFactFindBlocks(
       bodyHtml: warningHtml,
     },
   ];
+}
+
+function buildFactFindLifeSavingsGroupHtml(profile: SeededClientProfile) {
+  const sections: string[] = [];
+  const savingsItems = buildFactFindSavingsItems(profile);
+
+  if (hasFactFindLifeInsuranceContent(profile)) {
+    sections.push(
+      buildNamedSectionHtml(
+        "Life Insurance & Serious Illness",
+        buildFactFindLifeInsuranceHtml(profile),
+        "document-grid fact-find-life-insurance-section",
+      ),
+    );
+  }
+
+  if (hasFilledItems(savingsItems)) {
+    sections.push(
+      buildNamedSectionHtml(
+        "Savings & Investments",
+        buildFactFindSavingsHtml(profile),
+        "document-grid fact-find-finance-section fact-find-savings-section",
+      ),
+    );
+  }
+
+  return sections.join("");
+}
+
+function buildFactFindFinalSectionGroupHtml(profile: SeededClientProfile) {
+  return [
+    buildGridSectionHtml(
+      "Declarations and Confirmations",
+      [
+        { label: "Execution only", value: profile.executionOnlyConfirmation },
+        { label: "Terms reviewed", value: profile.termsReviewedReceived },
+        { label: "Do not contact", value: profile.doNotContact },
+        { label: "Marketing agreed", value: profile.agreeToMarketing },
+        { label: "PEP confirmation", value: profile.pepDeclarationConfirmed },
+        { label: "Recommendation Acknowledgement", value: profile.recommendationAcknowledged },
+      ],
+      "document-grid fact-find-declarations-section",
+    ),
+    buildNamedSectionHtml(
+      "Signatures and Record",
+      buildFactFindSignaturesHtml(profile),
+      "document-section fact-find-signatures-section",
+    ),
+    buildNamedSectionHtml(
+      "Request for Information",
+      buildFactFindRequestInfoHtml(profile),
+      "document-section fact-find-request-section",
+    ),
+  ].join("");
 }
 
 function buildTermsBlocks(profile: SeededClientProfile, recommendationHtml: string, needsHtml: string, warningHtml: string): ComposedBlock[] {

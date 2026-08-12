@@ -2335,8 +2335,7 @@ button {
 
 .generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-divider,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-life-insurance-divider {
-  height: 1px;
-  background: rgba(91, 34, 48, 0.18);
+  display: none;
 }
 
 .generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-block,

@@ -129,6 +129,17 @@ function hasCurrentFactFindPensionSelfLayout(editedHtml: string) {
 }
 
 function hasCurrentFactFindExportSectionGrouping(profile: SeededClientProfile, editedHtml: string) {
+  if (!editedHtml.includes("fact-find-final-section-group")) {
+    return false;
+  }
+
+  if (
+    (hasFactFindLifeInsuranceContentForRebuild(profile) || hasFilledItems(buildFactFindSavingsProbe(profile)))
+    && !editedHtml.includes("fact-find-life-savings-group")
+  ) {
+    return false;
+  }
+
   if (profile.factFindType === "small") {
     return true;
   }
@@ -137,11 +148,11 @@ function hasCurrentFactFindExportSectionGrouping(profile: SeededClientProfile, e
     return false;
   }
 
-  if (hasFactFindLifeInsuranceContentForRebuild(profile) && !editedHtml.includes("fact-find-finance-section")) {
+  if (hasFactFindLifeInsuranceContentForRebuild(profile) && !editedHtml.includes("fact-find-life-insurance-section")) {
     return false;
   }
 
-  if (hasFilledItems(buildFactFindSavingsProbe(profile)) && !editedHtml.includes("fact-find-finance-section")) {
+  if (hasFilledItems(buildFactFindSavingsProbe(profile)) && !editedHtml.includes("fact-find-savings-section")) {
     return false;
   }
 
@@ -149,7 +160,7 @@ function hasCurrentFactFindExportSectionGrouping(profile: SeededClientProfile, e
     return false;
   }
 
-  if (hasFactFindPartnerPensionContentForRebuild(profile) && !editedHtml.includes("fact-find-finance-section")) {
+  if (hasFactFindPartnerPensionContentForRebuild(profile) && !editedHtml.includes("fact-find-pension-partner-section")) {
     return false;
   }
 

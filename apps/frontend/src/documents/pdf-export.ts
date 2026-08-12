@@ -25,12 +25,11 @@ function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
 
 function shouldStartOnFreshPdfPage(element: Element) {
   return (
+    element.classList.contains("fact-find-life-savings-group") ||
+    element.classList.contains("fact-find-final-section-group") ||
     element.classList.contains("fact-find-asset-liability-section") ||
-    (
-      element.classList.contains("fact-find-finance-section")
-      && !element.classList.contains("fact-find-savings-section")
-    ) ||
-    element.classList.contains("fact-find-pension-self-section")
+    element.classList.contains("fact-find-pension-self-section") ||
+    element.classList.contains("fact-find-pension-partner-section")
   );
 }
 
@@ -172,7 +171,7 @@ function getFactFindQuoteGridTemplate(sourceElement: Element) {
   }
 
   if (rowContainer.closest(".fact-find-savings-table")) {
-    return "minmax(82px,0.85fr) minmax(138px,1.35fr) minmax(88px,1fr) minmax(88px,1fr) minmax(72px,0.72fr)";
+    return "minmax(76px,0.8fr) minmax(126px,1.28fr) minmax(82px,0.94fr) minmax(82px,0.94fr) minmax(64px,0.64fr)";
   }
 
   if (rowContainer.closest(".fact-find-life-insurance-compare-table")) {
@@ -306,9 +305,9 @@ function elementStyles(sourceElement: Element) {
   if (classList.contains("statement-quote-cell")) {
     const baseStyle = `display:block;padding:${
       isQuoteDoc
-        ? "3px 6px"
+        ? "2px 5px"
         : isFactFindDoc && isCompactFactFindTableCell(sourceElement)
-          ? "4px 7px"
+          ? "2px 5px"
           : "10px 12px"
     }`;
     return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
@@ -353,7 +352,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:grid;grid-template-columns:84px minmax(220px,1fr) 34px 104px;align-items:center;column-gap:8px;margin:0 0 12px";
+    return "display:grid;grid-template-columns:76px minmax(200px,1fr) 28px 88px;align-items:center;column-gap:6px;margin:0 0 10px";
   }
 
   if (classList.contains("fact-find-signature-field")) {
@@ -361,15 +360,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-field-date")) {
-    return "display:flex;align-items:center;min-width:0;align-self:center;width:104px;padding-bottom:1px;border-bottom:1px solid #6b7280";
+    return "display:flex;align-items:center;min-width:0;align-self:center;width:88px;padding-bottom:1px;border-bottom:1px solid #6b7280";
   }
 
   if (classList.contains("fact-find-request-copy")) {
-    return "display:block;margin:0 0 18px";
+    return "display:block;margin:0 0 8px";
   }
 
   if (classList.contains("fact-find-request-row")) {
-    return "display:flex;align-items:flex-start;gap:18px;margin:0 0 14px";
+    return "display:flex;align-items:flex-start;gap:10px;margin:0 0 8px";
   }
 
   if (classList.contains("fact-find-request-field")) {
@@ -377,7 +376,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-request-field-date")) {
-    return "display:block;flex:0 0 132px";
+    return "display:block;flex:0 0 108px";
   }
 
   // Statement paragraphs: black, serif, tighter spacing
@@ -391,14 +390,14 @@ function elementStyles(sourceElement: Element) {
       && sourceElement.parentElement.parentElement?.classList.contains("statement-quote-row-header")
     ) {
       return `margin:0;line-height:1;white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${
-        isQuoteDoc ? "10px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "11px" : "12px"
+        isQuoteDoc ? "10px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "9px" : "12px"
       };font-weight:700;letter-spacing:0.02em;text-transform:uppercase`;
     }
 
     if (sourceElement.parentElement?.classList.contains("statement-quote-cell")) {
       return `margin:0;line-height:${
-        isQuoteDoc ? "1" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "1.1" : "1.7"
-      };white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : "14px"}`;
+        isQuoteDoc ? "1" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "1" : "1.7"
+      };white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "12px" : "14px"}`;
     }
 
     return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";
@@ -409,19 +408,19 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signing-intro")) {
-    return "margin:0 0 18px;font-weight:600";
+    return "margin:0 0 6px;font-weight:600";
   }
 
   if (classList.contains("fact-find-signing-subheading")) {
-    return "margin:18px 0 12px;font-weight:700";
+    return "margin:8px 0 6px;font-weight:700";
   }
 
   if (classList.contains("fact-find-signature-label")) {
-    return "margin:0;min-width:0;font-size:14px;line-height:1;white-space:nowrap";
+    return "margin:0;min-width:0;font-size:12px;line-height:1;white-space:nowrap";
   }
 
   if (classList.contains("fact-find-signature-label-date")) {
-    return "margin:0;min-width:0;font-size:14px;line-height:1;white-space:nowrap;text-align:left";
+    return "margin:0;min-width:0;font-size:12px;line-height:1;white-space:nowrap;text-align:left";
   }
 
   if (classList.contains("fact-find-signature-value")) {
@@ -429,15 +428,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-request-value")) {
-    return "margin:0;min-height:24px;padding:0 0 2px;border-bottom:1px solid #6b7280;font-weight:600";
+    return "margin:0;min-height:16px;padding:0 0 1px;border-bottom:1px solid #6b7280;font-weight:600";
   }
 
   if (classList.contains("fact-find-request-label")) {
-    return "margin:6px 0 0;font-weight:700";
+    return "margin:2px 0 0;font-weight:700";
   }
 
   if (classList.contains("fact-find-request-footnote")) {
-    return "margin:22px 0 0;font-size:11px;color:#6b7280";
+    return "margin:8px 0 0;font-size:9px;color:#6b7280";
   }
 
   if (classList.contains("fact-find-asset-liability-section")) {
@@ -453,7 +452,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-comments-box")) {
-    return "display:block;margin-top:6px;padding:5px 8px 6px;border:1px solid #d9e2ee;border-radius:12px;background:#ffffff";
+    return "display:block;margin-top:2px;padding:3px 6px 4px;border:1px solid #d9e2ee;border-radius:10px;background:#ffffff";
   }
 
   if (classList.contains("fact-find-comments-label")) {
@@ -461,37 +460,37 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-comments-value")) {
-    return "margin:0;font-size:13px;font-weight:600;color:#172033;line-height:1.15";
+    return "margin:0;font-size:11px;font-weight:600;color:#172033;line-height:1.05";
   }
 
   if (classList.contains("fact-find-life-insurance-card")) {
-    return "display:flex;flex-direction:column;gap:6px";
+    return "display:flex;flex-direction:column;gap:2px";
   }
 
   if (classList.contains("fact-find-life-insurance-divider")) {
-    return "display:block;height:1px;background:rgba(91,34,48,0.18)";
+    return "display:none";
   }
 
   if (classList.contains("fact-find-life-insurance-block")) {
-    return "display:flex;flex-direction:column;gap:3px";
+    return "display:flex;flex-direction:column;gap:1px";
   }
 
   if (
     classList.contains("fact-find-life-insurance-summary-label")
     || classList.contains("fact-find-life-insurance-policy-label")
   ) {
-    return "margin:0;flex:1 1 auto;font-size:13px;line-height:1.15;color:#1f2937";
+    return "margin:0;flex:1 1 auto;font-size:11px;line-height:1.05;color:#1f2937";
   }
 
   if (classList.contains("fact-find-life-insurance-value")) {
-    return `margin:0;font-size:13px;line-height:1.15;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"};flex:0 0 min(180px,38%)`;
+    return `margin:0;font-size:11px;line-height:1.05;color:${classList.contains("is-muted") ? "#7b7b7b" : "#1f2937"};flex:0 0 min(156px,34%)`;
   }
 
   if (classList.contains("fact-find-life-insurance-compare-table")) {
-    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:14px;background:rgba(255,255,255,0.86)";
+    return "display:block;overflow:hidden;border:1px solid #e6d6c7;border-radius:12px;background:rgba(255,255,255,0.86)";
   }
 
-  if (classList.contains("fact-find-pension-self-section")) {
+  if (classList.contains("fact-find-pension-self-section") || classList.contains("fact-find-pension-partner-section")) {
     return "display:block;padding:18px 20px;border:1px solid #e6d6c7;border-radius:22px;background:linear-gradient(180deg,#fffdfa 0%,#fff8f1 100%);page-break-inside:avoid";
   }
 
@@ -505,6 +504,10 @@ function elementStyles(sourceElement: Element) {
 
   if (classList.contains("fact-find-pension-panel-header")) {
     return "display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 16px;border-bottom:1px solid rgba(230,214,199,0.9);background:rgba(250,240,231,0.95)";
+  }
+
+  if (tagName === "h3" && sourceElement.parentElement?.classList.contains("fact-find-pension-panel-header")) {
+    return "margin:0;font-size:11px;font-weight:700;color:#5b2230;letter-spacing:0.06em;text-transform:uppercase";
   }
 
   if (classList.contains("fact-find-pension-panel-status")) {
@@ -584,6 +587,34 @@ function elementStyles(sourceElement: Element) {
     return "margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#6b7280";
   }
 
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-declarations-section")) {
+    return "display:block;border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;margin:0;background:#faf7f2;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-life-savings-group")) {
+    return "display:flex;flex-direction:column;gap:4px;margin:0 0 6px;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-final-section-group")) {
+    return "display:flex;flex-direction:column;gap:5px;margin:0 0 6px;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-signatures-section")) {
+    return "display:block;margin:0;padding:0;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-request-section")) {
+    return "display:block;margin:0;padding:0;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-life-insurance-section")) {
+    return "display:block;border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;margin:0;background:#faf7f2;page-break-inside:avoid";
+  }
+
+  if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-savings-section")) {
+    return "display:block;border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;margin:0;background:#faf7f2;page-break-inside:avoid";
+  }
+
   if ((tagName === "section" || tagName === "div") && (classList.contains("client-summary-grid") || classList.contains("document-grid"))) {
     return `display:block;border:1px solid #e5e7eb;border-radius:14px;padding:${isFactFindDoc ? "14px 16px" : "18px 20px"};margin:0 0 ${isFactFindDoc ? "12px" : "16px"};background:#faf7f2;page-break-inside:avoid`;
   }
@@ -602,14 +633,18 @@ function elementStyles(sourceElement: Element) {
 
   if (tagName === "div" && classList.contains("grid-items")) {
     const isClientSummaryGrid = sourceElement.parentElement?.classList.contains("client-summary-grid") ?? false;
+    const isDeclarationsGrid = sourceElement.parentElement?.classList.contains("fact-find-declarations-section") ?? false;
     const columns = isFactFindDoc && isClientSummaryGrid
       ? "repeat(3,minmax(180px,1fr))"
       : "repeat(2,minmax(0,1fr))";
-    return `display:grid;grid-template-columns:${columns};gap:${isFactFindDoc ? "7px" : "10px"}`;
+    return `display:grid;grid-template-columns:${columns};gap:${isDeclarationsGrid ? "5px" : isFactFindDoc ? "7px" : "10px"}`;
   }
 
   if (tagName === "div" && classList.contains("grid-item")) {
-    return `display:block;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:${isFactFindDoc ? "6px 10px" : "10px 12px"};min-height:48px;line-height:${isFactFindDoc ? "1.2" : "1.6"}`;
+    const isDeclarationsItem = sourceElement.parentElement?.parentElement?.classList.contains("fact-find-declarations-section") ?? false;
+    return `display:block;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;padding:${
+      isDeclarationsItem ? "4px 7px" : isFactFindDoc ? "6px 10px" : "10px 12px"
+    };min-height:${isDeclarationsItem ? "0" : "48px"};line-height:${isFactFindDoc ? "1.2" : "1.6"}`;
   }
 
   if (tagName === "span" && classList.contains("grid-label")) {
@@ -625,11 +660,19 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (!isStmt && tagName === "h2") {
-    return "margin:0 0 10px;font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;line-height:1.25;color:#5b2230";
+    const inTightFactFindGroup = Boolean(
+      sourceElement.closest(".fact-find-life-insurance-section")
+      || sourceElement.closest(".fact-find-savings-section")
+      || sourceElement.closest(".fact-find-declarations-section")
+      || sourceElement.closest(".fact-find-signatures-section")
+      || sourceElement.closest(".fact-find-request-section")
+    );
+    return `margin:0 0 ${inTightFactFindGroup ? "6px" : "10px"};font-family:Helvetica,Arial,sans-serif;font-size:${inTightFactFindGroup ? "17px" : "18px"};font-weight:700;line-height:${inTightFactFindGroup ? "1.15" : "1.25"};color:#5b2230`;
   }
 
   if (!isStmt && tagName === "h3") {
-    return "margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#374151";
+    const inLifeInsuranceSection = Boolean(sourceElement.closest(".fact-find-life-insurance-section"));
+    return `margin:0 0 ${inLifeInsuranceSection ? "4px" : "8px"};font-family:Helvetica,Arial,sans-serif;font-size:${inLifeInsuranceSection ? "13px" : "15px"};font-weight:700;color:#374151`;
   }
 
   if (!isStmt && tagName === "p") {
@@ -1514,21 +1557,21 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-intro,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-intro {
-    margin: 0 0 18px;
+    margin: 0 0 6px;
     font-weight: 600;
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-subheading,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-subheading {
-    margin: 18px 0 12px;
+    margin: 8px 0 6px;
     font-weight: 700;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-row,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-row {
     display: grid;
-    grid-template-columns: 84px minmax(220px, 1fr) 34px 104px;
+    grid-template-columns: 76px minmax(200px, 1fr) 28px 88px;
     align-items: center;
-    column-gap: 8px;
-    margin-bottom: 12px;
+    column-gap: 6px;
+    margin-bottom: 10px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
@@ -1538,7 +1581,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find-update .fact-find-signature-label {
     margin: 0;
     min-width: 0;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1;
     white-space: nowrap;
   }
@@ -1559,7 +1602,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-field-date,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-field-date {
-    width: 104px;
+    width: 88px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-value,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-value {
@@ -1576,25 +1619,25 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find .fact-find-request-value,
   .preview-page .workflow-document-fact-find-update .fact-find-request-value {
     margin: 0;
-    min-height: 24px;
-    padding: 0 0 2px;
+    min-height: 16px;
+    padding: 0 0 1px;
     border-bottom: 1px solid #6b7280;
     font-weight: 600;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-copy,
   .preview-page .workflow-document-fact-find-update .fact-find-request-copy {
-    margin-bottom: 18px;
+    margin-bottom: 8px;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-copy p,
   .preview-page .workflow-document-fact-find-update .fact-find-request-copy p {
-    margin: 0 0 18px;
+    margin: 0 0 8px;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-row,
   .preview-page .workflow-document-fact-find-update .fact-find-request-row {
     display: flex;
     align-items: flex-start;
-    gap: 18px;
-    margin-bottom: 14px;
+    gap: 10px;
+    margin-bottom: 8px;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-field,
   .preview-page .workflow-document-fact-find-update .fact-find-request-field {
@@ -1602,11 +1645,11 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-request-field-date,
   .preview-page .workflow-document-fact-find-update .fact-find-request-field-date {
-    flex: 0 0 132px;
+    flex: 0 0 108px;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-label,
   .preview-page .workflow-document-fact-find-update .fact-find-request-label {
-    margin: 6px 0 0;
+    margin: 4px 0 0;
     font-weight: 700;
   }
   .preview-page .workflow-document-fact-find .fact-find-request-footnote,
@@ -1789,20 +1832,76 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-weight: 700;
     color: #374151;
   }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-section > h2,
+  .preview-page .workflow-document-fact-find .fact-find-savings-section > h2,
+  .preview-page .workflow-document-fact-find .fact-find-declarations-section > h2,
+  .preview-page .workflow-document-fact-find .fact-find-signatures-section > h2,
+  .preview-page .workflow-document-fact-find .fact-find-request-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-life-insurance-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-savings-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-declarations-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-signatures-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-section > h2 {
+    margin-bottom: 6px;
+    font-size: 17px;
+    line-height: 1.15;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-section h3,
+  .preview-page .workflow-document-fact-find-update .fact-find-life-insurance-section h3 {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-savings-group,
+  .preview-page .workflow-document-fact-find-update .fact-find-life-savings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-final-section-group,
+  .preview-page .workflow-document-fact-find-update .fact-find-final-section-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 6px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-life-insurance-section,
+  .preview-page .workflow-document-fact-find .fact-find-savings-section,
+  .preview-page .workflow-document-fact-find .fact-find-declarations-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-life-insurance-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-savings-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-declarations-section {
+    padding: 8px 10px;
+    margin-bottom: 0;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-signatures-section,
+  .preview-page .workflow-document-fact-find .fact-find-request-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-signatures-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-request-section {
+    margin-bottom: 0;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-declarations-section .grid-items,
+  .preview-page .workflow-document-fact-find-update .fact-find-declarations-section .grid-items {
+    gap: 5px;
+  }
+  .preview-page .workflow-document-fact-find .fact-find-declarations-section .grid-item,
+  .preview-page .workflow-document-fact-find-update .fact-find-declarations-section .grid-item {
+    padding: 4px 7px;
+  }
   .preview-page .workflow-document-fact-find .fact-find-savings-table .statement-quote-row {
-    grid-template-columns: minmax(82px, 0.85fr) minmax(138px, 1.35fr) minmax(88px, 1fr) minmax(88px, 1fr) minmax(72px, 0.72fr);
+    grid-template-columns: minmax(76px, 0.8fr) minmax(126px, 1.28fr) minmax(82px, 0.94fr) minmax(82px, 0.94fr) minmax(64px, 0.64fr);
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-card {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 2px;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-label,
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-policy-label,
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-value {
     margin: 0;
-    font-size: 14px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.1;
     color: #1f2937;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-summary-label,
@@ -1813,27 +1912,26 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     color: #7b7b7b;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-value {
-    flex: 0 0 min(180px, 38%);
+    flex: 0 0 min(156px, 34%);
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-divider {
-    height: 1px;
-    background: rgba(91, 34, 48, 0.18);
+    display: none;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-block {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 1px;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-block h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: #5b2230;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table {
     overflow: hidden;
     border: 1px solid #e6d6c7;
-    border-radius: 18px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.86);
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-row {
@@ -1860,7 +1958,10 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-cell:first-child p {
     font-weight: 400;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-section {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-section,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-section,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-section {
     padding: 18px 20px;
     border: 1px solid #e6d6c7;
     border-radius: 22px;
@@ -1868,37 +1969,55 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
       radial-gradient(circle at top left, rgba(214, 188, 160, 0.16), transparent 38%),
       linear-gradient(180deg, #fffdfa 0%, #fff8f1 100%);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-section > h2 {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-section > h2,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-section > h2,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-section > h2 {
     color: #5b2230;
     margin-bottom: 14px;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-table {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-table,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-table,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-table {
     overflow: hidden;
     border: 1px solid #e6d6c7;
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.88);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-table .statement-quote-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-table .statement-quote-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-table .statement-quote-row {
     grid-template-columns: minmax(220px, 1.55fr) minmax(140px, 1fr);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row-header {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-row-header,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-table .statement-quote-row-header,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-table .statement-quote-row-header,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-table .statement-quote-row-header {
     background: rgba(250, 240, 231, 0.95);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-cell:first-child p {
+  .preview-page .workflow-document-fact-find .fact-find-pension-self-table .statement-quote-cell:first-child p,
+  .preview-page .workflow-document-fact-find .fact-find-pension-partner-table .statement-quote-cell:first-child p,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-self-table .statement-quote-cell:first-child p,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-partner-table .statement-quote-cell:first-child p {
     font-weight: 600;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-card {
+  .preview-page .workflow-document-fact-find .fact-find-pension-card,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-card {
     display: flex;
     flex-direction: column;
     gap: 16px;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-panel {
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-panel {
     overflow: hidden;
     border: 1px solid #e6d6c7;
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.88);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header {
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1907,7 +2026,8 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     border-bottom: 1px solid rgba(230, 214, 199, 0.9);
     background: rgba(250, 240, 231, 0.95);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header h3 {
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-header h3,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-panel-header h3 {
     margin: 0;
     font-size: 11px;
     font-weight: 700;
@@ -1915,7 +2035,8 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status {
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-panel-status {
     margin: 0;
     font-size: 11px;
     font-weight: 700;
@@ -1923,15 +2044,19 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status.is-positive {
+  .preview-page .workflow-document-fact-find .fact-find-pension-panel-status.is-positive,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-panel-status.is-positive {
     color: #2f8a48;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list {
+  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-detail-list {
     display: flex;
     flex-direction: column;
   }
   .preview-page .workflow-document-fact-find .fact-find-pension-metric-row,
-  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-row {
+  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-metric-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-contributions-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1939,16 +2064,19 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     padding: 10px 16px;
     border-top: 1px solid rgba(230, 214, 199, 0.9);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list .fact-find-pension-metric-row:first-child {
+  .preview-page .workflow-document-fact-find .fact-find-pension-detail-list .fact-find-pension-metric-row:first-child,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-detail-list .fact-find-pension-metric-row:first-child {
     border-top: 0;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-metric-label {
+  .preview-page .workflow-document-fact-find .fact-find-pension-metric-label,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-metric-label {
     margin: 0;
     flex: 1 1 auto;
     font-size: 14px;
     color: #1f2937;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-value {
+  .preview-page .workflow-document-fact-find .fact-find-pension-value,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-value {
     margin: 0;
     flex: 0 0 auto;
     min-width: 120px;
@@ -1956,51 +2084,58 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     font-weight: 500;
     color: #1f2937;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-value.is-muted {
+  .preview-page .workflow-document-fact-find .fact-find-pension-value.is-muted,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-value.is-muted {
     color: #7b7b7b;
     font-weight: 500;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-values {
+  .preview-page .workflow-document-fact-find .fact-find-pension-contributions-values,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-contributions-values {
     display: grid;
     grid-template-columns: repeat(2, minmax(120px, 1fr));
     gap: 12px;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-block {
+  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-block,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-contribution-block {
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-label {
+  .preview-page .workflow-document-fact-find .fact-find-pension-contribution-label,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-contribution-label {
     margin: 0;
     font-size: 12px;
     color: #5f5146;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-empty-state {
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-state,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-empty-state {
     padding: 16px;
     background: linear-gradient(180deg, #fbf7f1 0%, #f6efe5 100%);
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-empty-title {
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-title,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-empty-title {
     margin: 0 0 8px;
     font-size: 14px;
     font-weight: 700;
     color: #5b2230;
   }
-  .preview-page .workflow-document-fact-find .fact-find-pension-empty-copy {
+  .preview-page .workflow-document-fact-find .fact-find-pension-empty-copy,
+  .preview-page .workflow-document-fact-find-update .fact-find-pension-empty-copy {
     margin: 0;
     font-size: 12px;
     color: #5f5146;
   }
   .preview-page .workflow-document-fact-find .fact-find-comments-box {
-    margin-top: 12px;
-    padding: 8px 12px 10px;
+    margin-top: 2px;
+    padding: 3px 6px 4px;
     border: 1px solid #d9e2ee;
-    border-radius: 12px;
+    border-radius: 10px;
     background: #ffffff;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
   .preview-page .workflow-document-fact-find .fact-find-comments-label {
-    margin: 0 0 4px;
-    font-size: 11px;
+    margin: 0 0 2px;
+    font-size: 10px;
     font-weight: 700;
     color: #7c4b2a;
     letter-spacing: 0.08em;
@@ -2008,8 +2143,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-comments-value {
     margin: 0;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 600;
+    line-height: 1.05;
     color: #172033;
     line-height: 1.35;
   }
