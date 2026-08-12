@@ -46,6 +46,7 @@ from app.services.backups import create_backup_manifest
 from app.services.restore import RestoreValidationError, dry_run_restore, execute_restore, load_manifest, validate_restore
 from app.services.storage_reconciliation import build_storage_reconciliation_report, repair_storage_reconciliation_report
 from app.services.storage import (
+    DEFAULT_CLIENT_WORKFLOWS,
     DOCUMENT_BUCKET,
     FILE_BUCKET,
     ClientStorage,
@@ -486,6 +487,26 @@ def _resolve_storage_workflow_slug(*, workflow_hint: str | None = None, document
     return workflow_slug_for_document_type(document_type)
 
 
+def _storage_year_for_client(client: object) -> int:
+    client_reference = str(getattr(client, "client_reference", "") or "")
+    parts = client_reference.split("-")
+    if len(parts) >= 3 and parts[1].isdigit():
+        return int(parts[1])
+    created_at = getattr(client, "created_at", None)
+    created_year = getattr(created_at, "year", None)
+    if created_year is not None:
+        return int(created_year)
+    return datetime.now(UTC).year
+
+
+def _ensure_client_storage_contract(client: object) -> None:
+    ClientStorage(settings.file_storage_path).ensure_client_year_contract(
+        _build_client_slug_from_model(client),
+        _storage_year_for_client(client),
+        workflow_slugs=DEFAULT_CLIENT_WORKFLOWS,
+    )
+
+
 def _attachment_headers(filename: str) -> dict[str, str]:
     safe_name = safe_download_name(filename)
     encoded_name = quote(safe_name, safe="")
@@ -853,6 +874,8 @@ def clients(request: Request) -> dict[str, list[dict[str, object]]]:
     try:
         repo = ClientRepository(db)
         all_clients = repo.list_all()
+        for client in all_clients:
+            _ensure_client_storage_contract(client)
         items = [repo._to_list_item(c) for c in all_clients if _can_access_client_record(user, db, c)]
         db.commit()
         return {"items": items}
@@ -890,6 +913,8 @@ def create_client_record(payload: ClientCreateRequest, request: Request) -> dict
         )
         client_ref = item.get("client_reference", "")
         client_model = repo.get_by_reference(client_ref) if client_ref else None
+        if client_model is not None:
+            _ensure_client_storage_contract(client_model)
         _log_audit(
             request, db=db,
             action="client_created",
@@ -911,6 +936,7 @@ def client_detail(client_reference: str, request: Request) -> dict[str, dict[str
     try:
         repo = ClientRepository(db)
         client = _require_client_access(user, db, client_reference)
+        _ensure_client_storage_contract(client)
         item = repo._to_detail_response(client)
         db.commit()
         return {"item": item}
@@ -931,6 +957,9 @@ def update_client_record(
         item = repo.update(client_reference, updates, updated_by_email=user["email"])
         if not item:
             raise HTTPException(status_code=404, detail="Client not found")
+        client_model = repo.get_by_reference(client_reference)
+        if client_model is not None:
+            _ensure_client_storage_contract(client_model)
         _log_audit(
             request, db=db,
             action="client_updated",

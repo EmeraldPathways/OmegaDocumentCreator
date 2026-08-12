@@ -1,7 +1,8 @@
 """Storage service for client file operations on disk.
 
-Writes files under FILE_STORAGE_PATH / {client_slug} / {workflow_slug} /
-{files|documents} / and provides deterministic safe filenames.
+Writes files under FILE_STORAGE_PATH / {client_slug} / {year} / with either:
+- {files|documents} for year-root artifacts such as Fact Find
+- {workflow_slug} / {files|documents} for workflow-specific artifacts
 """
 
 from __future__ import annotations
@@ -17,13 +18,23 @@ FILE_BUCKET = "files"
 GENERAL_WORKFLOW = "general"
 INCOME_PROTECTION_WORKFLOW = "income-protection"
 PENSIONS_WORKFLOW = "pensions"
+SAVINGS_WORKFLOW = "savings"
+INVESTMENTS_WORKFLOW = "investments"
+DEFAULT_CLIENT_WORKFLOWS = (
+    INCOME_PROTECTION_WORKFLOW,
+    PENSIONS_WORKFLOW,
+    SAVINGS_WORKFLOW,
+    INVESTMENTS_WORKFLOW,
+)
 
 
 def normalize_workflow_slug(value: str | None) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
     if not normalized:
         return GENERAL_WORKFLOW
-    if normalized in {"fact-find", "fact-find-update", "income-protection", "files-docs"}:
+    if normalized in {"fact-find", "fact-find-update", "terms-of-business", GENERAL_WORKFLOW}:
+        return GENERAL_WORKFLOW
+    if normalized in {"income-protection", "files-docs"}:
         return INCOME_PROTECTION_WORKFLOW
     if normalized in {"pensions", "pension"}:
         return PENSIONS_WORKFLOW
@@ -38,11 +49,21 @@ def workflow_slug_for_document_type(document_type: str | None) -> str:
         "fact find",
         "fact find update",
         "terms of business",
+    }:
+        return GENERAL_WORKFLOW
+    if normalized in {
         "statement of suitability",
         "quote",
     }:
         return INCOME_PROTECTION_WORKFLOW
     return GENERAL_WORKFLOW
+
+
+def _workflow_folder(year_folder: Path, workflow_slug: str) -> Path:
+    normalized = normalize_workflow_slug(workflow_slug)
+    if normalized == GENERAL_WORKFLOW:
+        return year_folder
+    return year_folder / normalized
 
 
 def _safe_filename(original: str) -> str:
@@ -86,9 +107,27 @@ class ClientStorage:
         return folder
 
     def ensure_client_workflow_folder(self, client_slug: str, year: int, workflow_slug: str, bucket: str) -> Path:
-        folder = self.ensure_client_folder(client_slug) / str(year) / normalize_workflow_slug(workflow_slug) / bucket
+        year_folder = self.ensure_client_folder(client_slug) / str(year)
+        folder = _workflow_folder(year_folder, workflow_slug) / bucket
         folder.mkdir(parents=True, exist_ok=True)
         return folder
+
+    def ensure_client_year_contract(
+        self,
+        client_slug: str,
+        year: int,
+        *,
+        workflow_slugs: tuple[str, ...] = DEFAULT_CLIENT_WORKFLOWS,
+        buckets: tuple[str, str] = (FILE_BUCKET, DOCUMENT_BUCKET),
+    ) -> Path:
+        year_folder = self.ensure_client_folder(client_slug) / str(year)
+        year_folder.mkdir(parents=True, exist_ok=True)
+        for bucket in buckets:
+            (year_folder / bucket).mkdir(parents=True, exist_ok=True)
+        for workflow_slug in workflow_slugs:
+            for bucket in buckets:
+                self.ensure_client_workflow_folder(client_slug, year, workflow_slug, bucket)
+        return year_folder
 
     def save_file(
         self,

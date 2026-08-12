@@ -21,14 +21,18 @@ services:
       context: ../../apps/api
     env_file:
       - ../../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      FILE_STORAGE_PATH: /data/clients
+      BACKUP_PATH: /data/backups
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ../../storage/clients:/data/clients
-      - ../../storage/backups:/data/backups
+      - ${CLIENT_FILES_HOST_PATH}:/data/clients
+      - ${BACKUPS_HOST_PATH}:/data/backups
       - ../../templates/docx:/app/templates/docx
     restart: unless-stopped
     healthcheck:
@@ -41,10 +45,6 @@ services:
   frontend:
     build:
       context: ../../apps/frontend
-    env_file:
-      - ../../.env
-    environment:
-      VITE_API_PROXY_TARGET: http://api:8000
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

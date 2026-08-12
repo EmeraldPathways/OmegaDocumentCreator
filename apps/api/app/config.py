@@ -6,9 +6,22 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+def _resolve_project_root(config_path: Path | None = None) -> Path:
+    config_path = config_path or Path(__file__).resolve()
+    for candidate in config_path.parents:
+        if (candidate / ".env").exists():
+            return candidate
+    for candidate in config_path.parents:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return config_path.parents[1]
+
+
+_PROJECT_ROOT = _resolve_project_root()
+_DOTENV_PATH = _PROJECT_ROOT / ".env"
+if _DOTENV_PATH.exists():
+    load_dotenv(_DOTENV_PATH)
 
 
 @dataclass(slots=True)

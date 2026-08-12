@@ -15,6 +15,9 @@ The office PC must not be used as a live production install until all stages are
 - Do not develop directly on the office PC.
 - Do not install from `main` or from a feature branch.
 - Do not start a later stage until the current stage exit criteria are met and its completion markdown file has been written.
+- Do not assume OneDrive or SharePoint sync is the app's live storage layer.
+- Treat SharePoint as a separate upload or archive destination only if and when that process is later defined.
+- Treat Omega upload as the primary supported intake path for advisor PDFs and documents.
 
 ## Stage Structure
 Every stage follows the same pattern:
@@ -68,10 +71,10 @@ Close the application-level blockers that currently make the office-PC deploymen
 ### Completion File
 `STAGE_1_PRODUCTION_BLOCKERS_COMPLETE.md`
 
-## Stage 2: Production Runtime and Config Contract
+## Stage 2: Production Runtime and Local Storage Contract
 
 ### Goal
-Make the Docker and environment shape deterministic for the office-PC deployment.
+Make the Docker and environment shape deterministic for the office-PC deployment, using local office-PC storage as the live storage layer and Omega upload as the primary file-intake path.
 
 ### Scope
 - Replace the frontend Docker runtime shape so it serves a production build, not a Vite development workflow
@@ -82,8 +85,10 @@ Make the Docker and environment shape deterministic for the office-PC deployment
   - `BACKUPS_HOST_PATH`
   - `FILE_STORAGE_PATH`
   - `BACKUP_PATH`
-- Keep PostgreSQL data outside OneDrive
-- Keep client files in an explicit OneDrive-backed host path
+- Keep PostgreSQL data outside synced folders
+- Keep client files in an explicit local office-PC host path
+- Keep backups in an explicit local office-PC host path
+- Lock the client storage taxonomy so year-root artifacts and workflow-folder artifacts are stored in the intended locations
 - Verify production env behavior for:
   - `APP_URL`
   - `ENVIRONMENT`
@@ -99,6 +104,9 @@ Make the Docker and environment shape deterministic for the office-PC deployment
 - updated `.env.example`
 - any required frontend/backend runtime changes
 - clear statement of the final supported office-PC runtime contract
+- explicit statement that live storage is local and not dependent on SharePoint or OneDrive pull-down sync
+- explicit statement that advisors add files through Omega upload, not direct synced-folder writes
+- explicit statement of the supported folder layout under each client year
 
 ### Exit Criteria
 - Compose no longer depends on repo-local storage mounts for office deployment
@@ -106,14 +114,16 @@ Make the Docker and environment shape deterministic for the office-PC deployment
 - backend `/ready` passes with the intended production env contract
 - backend and PostgreSQL remain private to loopback/internal network only
 - storage contract is documented and matches the code
+- advisor intake model is documented and matches the supported workflow
+- folder taxonomy is documented and matches the supported workflow routing
 
 ### Completion File
 `STAGE_2_RUNTIME_AND_CONFIG_COMPLETE.md`
 
-## Stage 3: Remote Access and Windows Operations Model
+## Stage 3: Remote Access, Backups, and SharePoint Upload Model
 
 ### Goal
-Define the real supported operating model for the office PC and its remote-access setup.
+Define the real supported operating model for the office PC, including remote access, restart expectations, backups, advisor file intake, and the non-sync SharePoint upload position.
 
 ### Scope
 - Decide whether the supported recovery model is:
@@ -122,20 +132,30 @@ Define the real supported operating model for the office PC and its remote-acces
 - Define the exact Cloudflare topology
 - Keep one public frontend hostname only
 - Do not expose a public API hostname
-- Confirm how Docker Desktop, OneDrive, and Cloudflare Tunnel are expected to recover after reboot
+- Confirm how Docker Desktop and Cloudflare Tunnel are expected to recover after reboot
 - Define the supported backup set and operator responsibilities
 - Define the supported restore approach for production use
+- Define the supported advisor file-intake rule for PDFs and other documents
+- Define whether SharePoint upload is:
+  - manual operator upload
+  - scheduled copy/export task
+  - deferred future work
+- Explicitly forbid using a two-way sync client for the live working folder
 
 ### Required Outputs
 - final operating model decision
 - final Cloudflare access and tunnel design
 - final backup and restore operating procedure
+- final advisor document-intake position
+- final SharePoint upload position
 - documented limitations if unattended recovery is not supported
 
 ### Exit Criteria
 - restart expectations are explicit and truthful
 - remote-access design matches the actual runtime contract
 - backup contents and restore procedure are fully specified
+- advisor document intake is explicitly defined as Omega upload
+- SharePoint is defined as upload-only or explicitly deferred
 - the plan no longer implies server behavior that the office-PC stack cannot actually provide
 
 ### Completion File
@@ -152,6 +172,7 @@ Rewrite the office-PC installation documentation so it matches the code exactly,
 - Replace outdated hostnames, ports, paths, or tunnel targets
 - Ensure the runbook uses the final single-public-hostname model
 - Ensure install instructions use a tagged release only
+- Ensure the runbook describes local live storage plus the final approved advisor-upload and backup or SharePoint-archive process
 - Align runbook, `.env.example`, and Compose in the same release-prep pass
 - Create the release candidate from approved code, not from an unstable branch
 
@@ -165,6 +186,8 @@ Rewrite the office-PC installation documentation so it matches the code exactly,
 - the runbook matches the code and deployment contract exactly
 - no step depends on feature-branch quirks
 - no step relies on mixed local-dev and Docker assumptions
+- no step implies a two-way sync working folder
+- no step implies that staff add working files through SharePoint or OneDrive sync
 - the release candidate is ready for clean-machine installation testing
 
 ### Completion File
@@ -180,21 +203,28 @@ Prove that the documented office-PC deployment works end to end before go-live.
 - verification of first login and admin bootstrap
 - verification of persistence flows
 - verification of private network exposure only
-- verification of OneDrive-backed file behavior
+- verification of local file behavior
+- verification of advisor file upload through Omega
+- verification of the expected year-root and workflow-folder layout
 - verification of backup creation
 - verification of restore on a separate machine or offline-safe path, following the supported procedure
+- verification of the approved SharePoint upload process, if Stage 3 defines one
 - final release approval and tag creation
 
 ### Required Outputs
 - clean install test record
 - smoke test results
 - backup and restore proof record
+- advisor upload proof record
+- SharePoint upload proof record, if applicable
 - final approved tag and commit SHA
 
 ### Exit Criteria
 - the documented install works on a clean Windows machine
 - the smoke test passes
 - backup and restore procedure is proven
+- advisor document intake through Omega is proven
+- any approved SharePoint upload process is proven without pull-down sync into live folders
 - the final production tag is approved for office installation
 
 ### Completion File

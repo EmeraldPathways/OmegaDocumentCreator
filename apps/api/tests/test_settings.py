@@ -2,12 +2,38 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from app.config import AppSettings, ensure_storage_directories
+from app.config import AppSettings, ensure_storage_directories, _resolve_project_root
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class SettingsTests(unittest.TestCase):
+    def test_resolve_project_root_falls_back_to_pyproject_when_dotenv_missing(self) -> None:
+        root = Path(tempfile.mkdtemp(prefix="omega-config-root-"))
+        package_root = root / "app"
+        package_root.mkdir()
+        (root / "pyproject.toml").write_text("[project]\nname='omega-api'\n", encoding="utf-8")
+        config_path = package_root / "config.py"
+        config_path.write_text("# test\n", encoding="utf-8")
+
+        resolved = _resolve_project_root(config_path)
+
+        self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_prefers_repo_dotenv(self) -> None:
+        root = Path(tempfile.mkdtemp(prefix="omega-config-root-"))
+        repo_root = root / "repo"
+        api_root = repo_root / "apps" / "api" / "app"
+        api_root.mkdir(parents=True)
+        (repo_root / ".env").write_text("APP_URL=http://example.test\n", encoding="utf-8")
+        (repo_root / "apps" / "api" / "pyproject.toml").write_text("[project]\nname='omega-api'\n", encoding="utf-8")
+        config_path = api_root / "config.py"
+        config_path.write_text("# test\n", encoding="utf-8")
+
+        resolved = _resolve_project_root(config_path)
+
+        self.assertEqual(resolved, repo_root)
+
     def test_environment_values_are_loaded_and_normalized(self) -> None:
         settings = AppSettings(
             database_url="postgresql://db",
