@@ -8,6 +8,31 @@ function cloneProfile(clientReference: string) {
 }
 
 describe("buildWorkflowDocument", () => {
+  it("puts only the client first and last name above the address in every shared letter header", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.fullName = "Jamie Olivia Murphy";
+    profile.firstName = "Jamie";
+    profile.surname = "Murphy";
+
+    const documentTypes = [
+      "Fact Find",
+      "Fact Find Update",
+      "Quote",
+      "Statement of Suitability",
+    ] as const;
+
+    documentTypes.forEach((documentType) => {
+      const renderedHtml = buildWorkflowDocument(profile, documentType).html;
+      const editorHtml = buildWorkflowEditorDocument(profile, documentType).html;
+      const expectedHeaderName = '<p class="statement-client-name">Jamie Murphy</p><div class="statement-address-block">';
+
+      expect(renderedHtml).toContain(expectedHeaderName);
+      expect(editorHtml).toContain(expectedHeaderName);
+      expect(renderedHtml).not.toContain('<p class="statement-client-name">Jamie Olivia Murphy</p>');
+      expect(editorHtml).not.toContain('<p class="statement-client-name">Jamie Olivia Murphy</p>');
+    });
+  });
+
   it("returns composed statement html as a letter/document view merging saved draft narrative sections with workflow values", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.documentDrafts["Statement of Suitability"].lastGeneratedSections = [

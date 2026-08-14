@@ -63,6 +63,21 @@ function addressSummary(...lines: Array<string | undefined>) {
   return lines.map((line) => line?.trim() ?? "").filter(Boolean).join(", ");
 }
 
+function clientFirstAndLastName(profile: SeededClientProfile) {
+  const firstName = profile.firstName.trim();
+  const surname = profile.surname.trim();
+  const explicitName = [firstName, surname].filter(Boolean).join(" ");
+
+  if (explicitName) {
+    return explicitName;
+  }
+
+  const fullNameParts = profile.fullName.trim().split(/\s+/).filter(Boolean);
+  return fullNameParts.length > 1
+    ? `${fullNameParts[0]} ${fullNameParts[fullNameParts.length - 1]}`
+    : fullNameParts[0] ?? "";
+}
+
 function formatDocumentDate(value: string | undefined) {
   const trimmedValue = value?.trim() ?? "";
   if (!trimmedValue) {
@@ -1925,6 +1940,7 @@ function buildStatementLetterHeaderHtml(profile: SeededClientProfile) {
     '<div class="statement-letter-header">',
     '<img class="statement-logo" src="' + escapeHtml(OMEGA_LOGO_DATA_URI) + '" alt="Omega Financial Management" />',
     '<div class="statement-client-details">',
+    `<p class="statement-client-name">${escapeHtml(clientFirstAndLastName(profile))}</p>`,
     '<div class="statement-address-block">',
     ...addressLines.map((line) => `<div class="statement-address-line">${escapeHtml(line)}</div>`),
     "</div>",
