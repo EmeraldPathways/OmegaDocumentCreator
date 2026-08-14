@@ -105,6 +105,15 @@ describe("quote table layout", () => {
     expect(styles).toContain("grid-template-columns: 1.4fr 1fr 1fr 1fr;");
     expect(styledHtml).toContain("grid-template-columns:1.4fr 1fr 1fr 1fr");
   });
+
+  it("removes the quote title rule and adds five pixels above rate headings", () => {
+    const styledHtml = buildPdfStyledHtml(
+      '<article class="workflow-document workflow-document-quote"><div class="statement-section statement-quote-block"><h2>Income Protection Quote Comparison</h2><h3>Reviewable Rates</h3></div></article>',
+    );
+
+    expect(styledHtml).toContain("border-bottom:0");
+    expect(styledHtml).toContain("margin-top:5px");
+  });
 });
 
 describe("buildStandaloneDocumentPreviewHtml", () => {

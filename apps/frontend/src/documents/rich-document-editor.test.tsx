@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RichDocumentEditor } from "./rich-document-editor";
+
+afterEach(cleanup);
 
 describe("RichDocumentEditor", () => {
   it("preserves workflow document classes after a minimal edit", async () => {
@@ -69,5 +71,94 @@ describe("RichDocumentEditor", () => {
     expect(latestHtml).toContain('class="grid-items"');
     expect(latestHtml).toContain('class="grid-item"');
     expect(latestHtml).toContain('class="grid-label"');
+  });
+
+  it("preserves the compact Quote summary class when rendering", async () => {
+    Object.defineProperty(Text.prototype, "getClientRects", {
+      configurable: true,
+      value: () => [],
+    });
+    Object.defineProperty(Text.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value: () =>
+        ({
+          bottom: 0,
+          height: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+          width: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    });
+
+    const onContentChange = vi.fn();
+
+    render(
+      <RichDocumentEditor
+        content={[
+          '<article class="workflow-document workflow-document-quote">',
+          '<div class="statement-quote-block"><h2>Income Protection Quote Comparison</h2>',
+          '<div class="client-summary-grid statement-quote-summary-grid"><div class="grid-items">',
+          '<div class="grid-item"><span class="grid-label">Cover amount</span><strong>60000.00</strong></div>',
+          "</div></div></div>",
+          "</article>",
+        ].join("")}
+        fontSize="16px"
+        onContentChange={onContentChange}
+        onFontSizeChange={() => {}}
+      />,
+    );
+
+    const editor = document.querySelector(".ProseMirror");
+    expect(editor).not.toBeNull();
+    expect(editor?.innerHTML).toContain('class="client-summary-grid statement-quote-summary-grid"');
+  });
+
+  it("preserves Fact Find section wrappers when rendering", async () => {
+    Object.defineProperty(Text.prototype, "getClientRects", {
+      configurable: true,
+      value: () => [],
+    });
+    Object.defineProperty(Text.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value: () =>
+        ({
+          bottom: 0,
+          height: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+          width: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    });
+
+    render(
+      <RichDocumentEditor
+        content={[
+          '<article class="workflow-document workflow-document-fact-find">',
+          '<section class="document-grid fact-find-life-insurance-section"><h2>Life Insurance &amp; Serious Illness</h2>',
+          '<div class="fact-find-life-insurance-card"><div class="statement-quote-table fact-find-life-insurance-summary-table"></div></div>',
+          "</section>",
+          '<section class="document-grid fact-find-declarations-section"><h2>Declarations and Confirmations</h2>',
+          '<div class="grid-items"><div class="grid-item"><span class="grid-label">Execution only</span><strong>Yes</strong></div></div>',
+          "</section>",
+          "</article>",
+        ].join("")}
+        fontSize="16px"
+        onContentChange={() => {}}
+        onFontSizeChange={() => {}}
+      />,
+    );
+
+    const editor = document.querySelector(".ProseMirror");
+    expect(editor).not.toBeNull();
+    expect(editor?.innerHTML).toContain('class="document-grid fact-find-life-insurance-section"');
+    expect(editor?.innerHTML).toContain('class="document-grid fact-find-declarations-section"');
   });
 });

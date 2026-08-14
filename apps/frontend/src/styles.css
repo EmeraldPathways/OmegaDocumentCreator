@@ -4937,6 +4937,115 @@ button {
   line-height: 1.05;
 }
 
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-section h2 {
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: #5b2230;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary-grid .grid-item {
+  line-height: 1.1;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-section,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-declarations-section,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-section,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-declarations-section {
+  padding: 8px 10px;
+  margin-bottom: 0;
+  border-radius: 12px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-section > h2,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-declarations-section > h2,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-section > h2,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-declarations-section > h2 {
+  margin-bottom: 6px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-declarations-section .grid-items,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-declarations-section .grid-items {
+  gap: 5px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-declarations-section .grid-item,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-declarations-section .grid-item {
+  padding: 4px 7px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-card,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-card {
+  gap: 2px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-summary-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-policy-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-summary-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-policy-label,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-value {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-value {
+  font-size: 11px;
+  line-height: 1.05;
+  flex: 0 0 min(156px, 34%);
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-block,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-block {
+  gap: 1px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-block h3,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-block h3 {
+  margin: 0 0 4px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-summary-table .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-policy-table .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-summary-table .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-compare-table .statement-quote-cell,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-policy-table .statement-quote-cell {
+  padding: 2px 5px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-summary-table .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-policy-table .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-summary-table .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-compare-table .statement-quote-cell p,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-policy-table .statement-quote-cell p {
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-summary-table .statement-quote-cell p.fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-compare-table .statement-quote-cell p.fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find .fact-find-life-insurance-policy-table .statement-quote-cell p.fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-summary-table .statement-quote-cell p.fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-compare-table .statement-quote-cell p.fact-find-life-insurance-value,
+.generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-life-insurance-policy-table .statement-quote-cell p.fact-find-life-insurance-value {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.05;
+}
+
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-summary p,
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-quote-cell p,
 .generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-summary p,
@@ -5012,6 +5121,30 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-statement-of-suitability .statement-footer-contact p {
   margin: 0 0 3px;
   line-height: 1.5;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-table {
+  margin-bottom: 6px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell {
+  padding: 2px 5px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-cell p {
+  margin: 0 0 10px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-row-header .statement-quote-cell p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.generated-output-editor.ProseMirror .workflow-document-quote .statement-quote-block > h3,
+.generated-output-pdf-page-body .workflow-document-quote .statement-quote-block > h3 {
+  margin-top: 5px;
 }
 
 /* ============================================================
@@ -5281,6 +5414,7 @@ button {
 .generated-output-pdf-page-body .workflow-document-quote .statement-section h2 {
   margin-bottom: 6px;
   padding-bottom: 4px;
+  border-bottom: 0;
   font-size: 15px;
 }
 

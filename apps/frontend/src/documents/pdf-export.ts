@@ -265,9 +265,18 @@ function elementStyles(sourceElement: Element) {
     return `display:block;margin:0 0 ${isQuoteDoc ? "10px" : "24px"};page-break-inside:avoid`;
   }
 
-  // Statement section headings: black, bold, underlined, serif
+  // Statement section headings: black, bold, serif
+  if (
+    isStmt
+    && tagName === "h3"
+    && isQuoteDoc
+    && sourceElement.parentElement?.classList.contains("statement-quote-block")
+  ) {
+    return "margin-top:5px";
+  }
+
   if (isStmt && tagName === "h2") {
-    return `margin:0 0 ${isQuoteDoc ? "6px" : "10px"};padding-bottom:${isQuoteDoc ? "4px" : "6px"};border-bottom:1px solid #e5e7eb;font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteDoc ? "15px" : "16px"};font-weight:700;letter-spacing:0.02em;color:#5b2230`;
+    return `margin:0 0 ${isQuoteDoc ? "6px" : "10px"};padding-bottom:${isQuoteDoc ? "4px" : "6px"};border-bottom:${isQuoteDoc ? "0" : "1px solid #e5e7eb"};font-family:Helvetica,Arial,sans-serif;font-size:${isQuoteDoc ? "15px" : "16px"};font-weight:700;letter-spacing:0.02em;color:#5b2230`;
   }
 
   if (classList.contains("statement-important-notice")) {
