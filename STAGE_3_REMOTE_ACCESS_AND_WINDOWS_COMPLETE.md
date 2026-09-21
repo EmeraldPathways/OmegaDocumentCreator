@@ -3,7 +3,7 @@
 - Date started: 2026-09-21
 - Branch used: `office-pc-stage-3`
 - Status: in progress
-- Checkpoint commit SHA: 52f6069 (client-reference fix; Stage 3 follow-up remains in progress)
+- Checkpoint commit SHA: 2970eff (backup/restore verification and PostgreSQL client compatibility fix)
 - Next decision: continue Stage 3; do not proceed to Stage 4 yet
 
 ## Purpose
