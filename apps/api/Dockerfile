@@ -1,4 +1,13 @@
+FROM postgres:16 AS postgres-client
+
 FROM python:3.13-slim
+
+# Keep backup/restore tooling on the same PostgreSQL major version as the
+# production database service.  The generic Debian client package can move
+# ahead of the pinned postgres:16 server and emit restore commands that the
+# server does not understand.
+COPY --from=postgres-client /usr/lib/postgresql/16 /usr/lib/postgresql/16
+ENV PATH="/usr/lib/postgresql/16/bin:${PATH}"
 
 WORKDIR /app
 

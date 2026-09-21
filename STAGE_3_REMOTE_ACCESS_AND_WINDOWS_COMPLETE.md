@@ -3,7 +3,7 @@
 - Date started: 2026-09-21
 - Branch used: `office-pc-stage-3`
 - Status: in progress
-- Checkpoint commit SHA: pending initial Stage 3 commit
+- Checkpoint commit SHA: 52f6069 (client-reference fix; Stage 3 follow-up remains in progress)
 - Next decision: continue Stage 3; do not proceed to Stage 4 yet
 
 ## Purpose
@@ -54,22 +54,41 @@ This file is not a Stage 3 completion approval. Stage 3 remains open until resta
 
 ### Restart model
 
+Current evidence:
+
+- The three Docker services use `restart: unless-stopped`.
+- PostgreSQL and the API are healthy; the frontend is running.
+- The `cloudflared` Windows service is `Running` with `StartType=Automatic`.
+- Docker Desktop is currently running as a user-level application.
+- The `com.docker.service` Windows service is `Stopped` with `StartType=Manual`.
+- No Docker Desktop scheduled task or populated per-user Run entry was found in the current inspection.
+
+This is not a reboot proof. A Windows restart has not been performed in this checkpoint, so the supported classification is currently **attended restart**. The application may recover automatically after Docker Desktop is started, but unattended recovery without an interactive user session is not proven. The limitation is that Docker Desktop startup/session behavior remains an operator responsibility until a controlled reboot test proves otherwise.
+
 Still required:
 
 - Verify Docker Desktop recovery after Windows restart.
 - Verify the `cloudflared` Windows service recovery after Windows restart.
 - Verify whether the application returns automatically without an interactive user session.
-- Classify the supported model as unattended recovery or attended restart.
-- Document the limitation truthfully if Docker Desktop requires an operator sign-in or action.
+- Reclassify as unattended only if the controlled reboot test proves it.
 
 ### Backup and restore
+
+Verified in this checkpoint:
+
+- A full backup was created under the configured local `BACKUP_PATH` and returned `status=success`.
+- The manifest included a PostgreSQL custom-format dump, a files archive, a documents archive, and the JSON manifest.
+- Manifest validation returned `valid=true` with no warnings.
+- `pg_restore --list` completed without error.
+- The PostgreSQL client tools were aligned with the pinned PostgreSQL 16 server after a restore compatibility defect was found: the API image now uses `pg_dump/pg_restore 16.14` rather than the generic Debian 17 client.
+- An isolated restore was executed into a uniquely named temporary PostgreSQL database and temporary storage root, then both were removed. It restored successfully and preserved the expected clean-state counts (`0` clients, `9` users); the empty files/documents archives restored with `0` files each.
+- Production destructive restore remains disabled by the application outside development. The supported production approach is an operator-approved offline restore into a replacement/isolated PostgreSQL instance, followed by file/document archive restoration and a controlled cutover.
 
 Still required:
 
 - Define the complete backup set, including PostgreSQL data, client files, generated documents, and backup manifests.
 - Define retention, encryption, off-machine storage, and operator ownership.
-- Define the supported production restore approach.
-- Prove restore on a separate machine or through the approved offline-safe path.
+- Prove the documented restore procedure on a separate machine, not only the temporary local database proof.
 
 ### Advisor document intake
 
@@ -81,13 +100,21 @@ The supported intake position remains:
 
 The end-to-end upload proof still needs to be recorded as part of the Stage 3 operating-model verification.
 
+The current checkpoint intentionally did not create a temporary live client or document merely to produce that proof, because the live data reset is meant to remain empty. Service-level storage and the clean host storage roots are verified; a real authenticated upload proof remains outstanding.
+
 ### SharePoint position
+
+Decision for this stage: **deferred future work**. Omega upload remains the only supported live intake path. If SharePoint is used later, it will be a manual operator export/copy destination only after the document is already stored in Omega.
+
+Verified boundary:
+
+- The live runtime has no SharePoint/OneDrive dependency or live working-folder mount.
+- The application health/readiness checks remain independent of SharePoint availability.
+- SharePoint is not the backup system for PostgreSQL, client files, generated documents, or manifests.
 
 Still required:
 
-- Decide whether SharePoint is manual operator upload, a scheduled copy/export task, or deferred future work.
-- Document that SharePoint is not the backup system for the complete Omega working state.
-- Verify that the live application continues to function if SharePoint is unavailable.
+- If the deferred work is later reopened, define a manual or scheduled export procedure with an owner and audit trail.
 
 ## Known documentation follow-up
 
@@ -98,5 +125,6 @@ Still required:
 ## Go / No-Go
 
 - Current decision: **No-go for Stage 4**.
-- Stage 3 can proceed with restart testing, backup/restore definition and proof, and the final SharePoint operating-model decision.
+- Backup generation, validation, and offline-safe restore proof are now complete for this checkpoint.
+- Stage 3 remains open for controlled Windows restart proof, retention/encryption/off-machine backup ownership, separate-machine restore proof, and real authenticated upload proof.
 - The office PC must not be treated as the final live production installation until Stages 1 through 5 and the final tagged release gate are complete.
