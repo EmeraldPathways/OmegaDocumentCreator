@@ -39,7 +39,7 @@ Architectural choices reflected in the current codebase.
 
 ## Client storage naming is office-friendly
 
-- Decision: external references stay `CLI-YYYY-NNNN`, while disk folders use `Last, First - omega-00000`.
+- Decision: external references use `Omega-YYYY-NNNNNN`, while disk folders use `Last, First - omega-00000`.
 - Why: office users need readable references and stable client folders.
 
 ## Local run ports are pinned

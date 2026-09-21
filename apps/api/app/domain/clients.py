@@ -22,7 +22,7 @@ class ClientRecord:
 
 
 def build_client_reference(year: int, sequence: int) -> str:
-    return f"CLI-{year}-{sequence:04d}"
+    return f"Omega-{year}-{sequence:06d}"
 
 
 def build_client_storage_slug(client_reference: str, client: ClientRecord) -> str:

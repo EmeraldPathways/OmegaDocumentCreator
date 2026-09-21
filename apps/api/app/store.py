@@ -31,7 +31,7 @@ USER_TEMPLATES = {
 
 CLIENT_TEMPLATES = [
     {
-        "client_reference": "CLI-2026-0001",
+        "client_reference": "Omega-2026-000001",
         "first_name": "Test",
         "surname": "Client",
         "full_name": "Test Client",
@@ -57,7 +57,7 @@ CLIENT_TEMPLATES = [
         "dependants": [],
     },
     {
-        "client_reference": "CLI-2026-0002",
+        "client_reference": "Omega-2026-000002",
         "first_name": "Jamie",
         "surname": "Murphy",
         "full_name": "Jamie Murphy",
@@ -94,7 +94,7 @@ AUDIT_LOG_TEMPLATES = [
         "entity_type": "document",
         "entity_id": "DOC-0002",
         "user_email": "staff@omega.local",
-        "client_reference": "CLI-2026-0002",
+        "client_reference": "Omega-2026-000002",
         "details": "Statement of Suitability PDF",
         "created_at": "2026-06-06T14:10:00+00:00",
     },
@@ -104,7 +104,7 @@ AUDIT_LOG_TEMPLATES = [
         "entity_type": "file",
         "entity_id": "FILE-0002",
         "user_email": "staff@omega.local",
-        "client_reference": "CLI-2026-0002",
+        "client_reference": "Omega-2026-000002",
         "details": "jamie-murphy-passport.pdf",
         "created_at": "2026-06-06T13:55:00+00:00",
     },
@@ -112,9 +112,9 @@ AUDIT_LOG_TEMPLATES = [
         "id": "AUD-0001",
         "action": "client_created",
         "entity_type": "client",
-        "entity_id": "CLI-2026-0002",
+        "entity_id": "Omega-2026-000002",
         "user_email": "staff@omega.local",
-        "client_reference": "CLI-2026-0002",
+        "client_reference": "Omega-2026-000002",
         "details": "Jamie Murphy",
         "created_at": "2026-01-12T10:30:00+00:00",
     },
@@ -450,7 +450,7 @@ def create_client(
     dependants: list[dict[str, str]],
     created_by: str,
 ) -> dict[str, object]:
-    client_reference = f"CLI-2026-{len(SEEDED_CLIENTS) + 1:04d}"
+    client_reference = f"Omega-2026-{len(SEEDED_CLIENTS) + 1:06d}"
     item = {
         "client_reference": client_reference,
         "first_name": first_name,

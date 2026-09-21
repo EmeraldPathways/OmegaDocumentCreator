@@ -23,7 +23,7 @@ await fetch("/auth/me");
 
 ## Client identifiers and storage
 
-- External client references use `CLI-YYYY-NNNN`.
+- External client references use `Omega-YYYY-NNNNNN`.
 - Storage folders use `Last, First - omega-00000`.
 - Live artifact tree is:
 
@@ -41,7 +41,7 @@ storage/clients/{Last, First - omega-00000}/{year}/{workflow}/{files|documents}/
 
 ```json
 {
-  "client_reference": "CLI-2026-0002",
+  "client_reference": "Omega-2026-0002",
   "document_type": "Statement of Suitability",
   "template_id": "default",
   "workflow_snapshot": {}

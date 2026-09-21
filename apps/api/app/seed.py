@@ -15,7 +15,7 @@ DEFAULT_USERS = (
 )
 
 DEFAULT_CLIENT = {
-    "client_reference": "CLI-2026-0001",
+    "client_reference": "Omega-2026-000001",
     "first_name": "Test",
     "surname": "Client",
     "status": "draft",

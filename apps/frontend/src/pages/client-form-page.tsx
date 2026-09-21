@@ -54,7 +54,7 @@ function resolveActorLabel(role: string | null | undefined) {
 export function ClientFormPage() {
   const { clientReference } = useParams();
   const navigate = useNavigate();
-  const { getClient, listClients, saveClient, refreshClients } = useClientData();
+  const { getClient, saveClient, refreshClients } = useClientData();
   const { user } = useAuth();
   const { addToast } = useToast();
   const isEdit = Boolean(clientReference);
@@ -68,8 +68,10 @@ export function ClientFormPage() {
       return existingClient;
     }
 
-    const nextReference = `CLI-2026-${String(listClients().length + 1).padStart(4, "0")}`;
-    return createBlankClient(nextReference, actorLabel);
+    // New records must not guess a reference from the currently loaded list.
+    // The list can still be rehydrating after login, which could make this
+    // form look like an edit of an existing record when auto-save runs.
+    return createBlankClient("", actorLabel);
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
