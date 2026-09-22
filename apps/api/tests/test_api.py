@@ -1144,6 +1144,22 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(item["phiOccupationalClass"], "2")
         self.assertEqual(item["phiIndexation"], "Y")
 
+    def test_workflow_save_with_blank_terms_version_uses_default(self) -> None:
+        from app.models import Client, TermsOfBusiness
+        from app.repositories.workflows import WorkflowRepository
+
+        assert _test_engine is not None
+        db = db_test_helpers.new_test_session(_test_engine)
+        try:
+            client = db.query(Client).filter_by(client_reference="CLI-2026-0002").one()
+            WorkflowRepository(db).save(client.id, {"termsVersion": ""})
+            db.flush()
+            terms = db.query(TermsOfBusiness).filter_by(client_id=client.id).one()
+            self.assertEqual(terms.version, "January 2026")
+        finally:
+            db.rollback()
+            db.close()
+
     def test_workflow_clearing_previously_saved_values(self) -> None:
         self._login_as_admin()
         self.client.put(

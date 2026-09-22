@@ -453,6 +453,10 @@ class WorkflowRepository:
                         setattr(tob, "issued_date", date.fromisoformat(str(raw)[:10]))
                     except (ValueError, TypeError):
                         setattr(tob, "issued_date", None)
+                elif db_col == "version":
+                    version = str(raw).strip()
+                    if version:
+                        tob.version = version
                 else:
                     setattr(tob, db_col, str(raw).strip() or None)
 

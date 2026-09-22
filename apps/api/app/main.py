@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import tempfile
 import uuid
@@ -56,6 +57,7 @@ from app.services.storage import (
 )
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 RESTORE_APPROVAL_WINDOW_MINUTES = 10
 
@@ -1032,6 +1034,7 @@ def save_workflow(client_reference: str, payload: dict[str, object], request: Re
             db.commit()
         except Exception:
             db.rollback()
+            logger.exception("Workflow save failed for client %s", client_reference)
             raise HTTPException(status_code=500, detail="Workflow save failed")
         return {"item": {"client_reference": client_reference, "saved": "ok"}}
     finally:
