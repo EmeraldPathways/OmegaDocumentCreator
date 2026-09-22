@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { fetchWorkflow, saveWorkflow } from "../data/workflow-api";
+import { mergeGeneratedDraftIntoProfile } from "../data/generated-draft-persistence";
 import { deleteFile, downloadFile, listFiles, uploadFile, type BackendFile } from "../data/file-api";
 import { createDocument, deleteDocument, downloadDocument, downloadDocumentPack, listDocuments, type BackendGeneratedDocument } from "../documents/generated-document-api";
 import { useAuth } from "../auth/auth-context";
@@ -690,17 +691,18 @@ export function IncomeProtectionPage({
         return currentDraft;
       }
 
-      return {
-        ...currentDraft,
-        documentDrafts: {
-          ...currentDraft.documentDrafts,
-          [documentType]: {
-            ...currentDraft.documentDrafts[documentType],
-            ...nextDraft,
-          },
-        },
-      };
+      return mergeGeneratedDraftIntoProfile(currentDraft, documentType, nextDraft);
     });
+  }
+
+  async function persistGeneratedDraft(
+    documentType: SupportedDocumentType,
+    nextDraft: Partial<Omit<GeneratedDocumentDraft, "selectedTemplateId">>,
+  ) {
+    const currentDraft = latestDraftRef.current ?? resolvedDraft;
+    const nextProfile = mergeGeneratedDraftIntoProfile(currentDraft, documentType, nextDraft);
+    syncLocalGeneratedDraft(documentType, nextDraft);
+    await persistDraft(nextProfile, { silent: true });
   }
 
   useEffect(() => {
@@ -1774,7 +1776,7 @@ export function IncomeProtectionPage({
     setShowFactFindValidation(false);
     await saveFactFindDraft();
     setFactFindGenerationStatus("Generation: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", { generationStatus: "generating" });
+    syncLocalGeneratedDraft("Fact Find", { generationStatus: "generating" });
     try {
       const generatedDocument = await generateDocument({
         clientReference: resolvedDraft.clientReference,
@@ -1782,7 +1784,7 @@ export function IncomeProtectionPage({
         templateId: getDocumentDraft("Fact Find").selectedTemplateId,
         workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
       });
-      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", {
+      await persistGeneratedDraft("Fact Find", {
         generationStatus: "completed",
         backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
@@ -1793,7 +1795,7 @@ export function IncomeProtectionPage({
       setFactFindGenerationStatus("Generation: Draft generated");
       addToast("Fact Find draft generated", "success");
     } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find", { generationStatus: "failed" });
+      await persistGeneratedDraft("Fact Find", { generationStatus: "failed" });
       setFactFindGenerationStatus("Generation: Draft generation failed");
       addToast("Failed to generate Fact Find draft", "error");
     }
@@ -2019,7 +2021,7 @@ export function IncomeProtectionPage({
     }
     await saveFactFindUpdateDraft();
     setFactFindUpdateGenerationStatus("Generation: Generating");
-    saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "generating" });
+    syncLocalGeneratedDraft("Fact Find Update", { generationStatus: "generating" });
     try {
       const generatedDocument = await generateDocument({
         clientReference: resolvedDraft.clientReference,
@@ -2027,7 +2029,7 @@ export function IncomeProtectionPage({
         templateId: getDocumentDraft("Fact Find Update").selectedTemplateId,
         workflowSnapshot: resolvedDraft as unknown as Record<string, unknown>,
       });
-      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", {
+      await persistGeneratedDraft("Fact Find Update", {
         generationStatus: "completed",
         backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
@@ -2038,7 +2040,7 @@ export function IncomeProtectionPage({
       setFactFindUpdateGenerationStatus("Generation: Draft generated");
       addToast("Fact Find Update draft generated", "success");
     } catch {
-      saveGeneratedDraft(resolvedDraft.clientReference, "Fact Find Update", { generationStatus: "failed" });
+      await persistGeneratedDraft("Fact Find Update", { generationStatus: "failed" });
       setFactFindUpdateGenerationStatus("Generation: Draft generation failed");
       addToast("Failed to generate Fact Find Update draft", "error");
     }
@@ -2067,7 +2069,7 @@ export function IncomeProtectionPage({
         getDocumentDraft(quoteDocumentType).integrationRequests,
         generatedDocument.integrationRequests,
       );
-      syncLocalGeneratedDraft(statementDocumentType, {
+      await persistGeneratedDraft(statementDocumentType, {
         generationStatus: "completed",
         backendDocumentId: generatedDocument.documentId,
         lastGeneratedHtml: generatedDocument.generatedHtml,
@@ -2081,7 +2083,7 @@ export function IncomeProtectionPage({
       setStatementDocumentStatus("Document: Draft generated");
       addToast(`${statementDocumentType} draft generated`, "success");
     } catch {
-      syncLocalGeneratedDraft(statementDocumentType, { generationStatus: "failed" });
+      await persistGeneratedDraft(statementDocumentType, { generationStatus: "failed" });
       setStatementDocumentStatus("Document: Draft generation failed");
       addToast(`Failed to generate ${statementDocumentType} draft`, "error");
     }
@@ -2111,7 +2113,7 @@ export function IncomeProtectionPage({
         integrationRequests,
       };
 
-      syncLocalGeneratedDraft(quoteDocumentType, {
+      await persistGeneratedDraft(quoteDocumentType, {
         generationStatus: "completed",
         lastGeneratedHtml: generatedDocument.generatedHtml,
         lastGeneratedSections: generatedDocument.sections,
@@ -2121,7 +2123,7 @@ export function IncomeProtectionPage({
       setQuoteDocumentStatus("Document: Draft generated");
       addToast(`${quoteDocumentType} draft generated`, "success");
     } catch {
-      syncLocalGeneratedDraft(quoteDocumentType, { generationStatus: "failed" });
+      await persistGeneratedDraft(quoteDocumentType, { generationStatus: "failed" });
       setQuoteDocumentStatus("Document: Draft generation failed");
       addToast(`Failed to generate ${quoteDocumentType} draft`, "error");
     }

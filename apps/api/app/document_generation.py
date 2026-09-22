@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from html import escape
+import re
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -59,6 +60,19 @@ def _normalize_phi_deferred_period(value: str) -> str:
     if value.startswith("52"):
         return "52"
     return value
+
+
+def _iter_phi_quote_companies(root: ET.Element):
+    grouped_quotes = root.findall("./Outputs/Quotes/Type")
+    if grouped_quotes:
+        for quote_type in grouped_quotes:
+            policy_type = (quote_type.findtext("Desc") or "").strip()
+            for company in quote_type.findall("./Company"):
+                yield company, policy_type
+        return
+
+    for company in root.findall("./Outputs/Quotes/Company"):
+        yield company, (company.findtext("Type") or "").strip()
 
 
 def _is_pensions_workflow_snapshot(workflow_snapshot: dict[str, Any]) -> bool:
@@ -216,14 +230,25 @@ def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any])
     errors_text = (root.findtext("Errors") or "").strip()
     quote_results: list[dict[str, str]] = []
 
-    for company in root.findall("./Outputs/Quotes/Company"):
+    for company, policy_type in _iter_phi_quote_companies(root):
         quote_results.append(
             {
                 "provider_name": (company.findtext("Name") or "").strip(),
-                "policy_type": (company.findtext("Type") or "").strip(),
-                "level_premium": (company.findtext("Level") or "").strip(),
-                "escalation_3_premium": (company.findtext("Esc3") or "").strip(),
-                "escalation_5_premium": (company.findtext("Esc5") or "").strip(),
+                "policy_type": policy_type,
+                "level_premium": _first_numeric_text(
+                    company,
+                    "Level",
+                    "Premium",
+                    "MonthlyPremium",
+                    "SMortgage",
+                    "SLevel",
+                    "JLevel",
+                    "DLevel",
+                    "JMortgage",
+                    "DMortgage",
+                ),
+                "escalation_3_premium": _first_numeric_text(company, "Esc3", "Escalation3", "SEsc3", "JEsc3"),
+                "escalation_5_premium": _first_numeric_text(company, "Esc5", "Escalation5", "SEsc5", "JEsc5"),
             }
         )
 
@@ -242,6 +267,15 @@ def _first_present_text(node: ET.Element, *paths: str) -> str:
     for path in paths:
         value = (node.findtext(path) or "").strip()
         if value:
+            return value
+    return ""
+
+
+def _first_numeric_text(node: ET.Element, *paths: str) -> str:
+    for path in paths:
+        value = (node.findtext(path) or "").strip()
+        normalized = value.replace(",", "")
+        if re.fullmatch(r"[€£$]?\s*-?\d+(?:\.\d+)?", normalized):
             return value
     return ""
 
