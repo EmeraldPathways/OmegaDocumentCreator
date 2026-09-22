@@ -1151,6 +1151,14 @@ function formatEuroValue(value: number | null) {
   return value === null ? "Not available" : `€${formatEuroAmount(value)}`;
 }
 
+function resolveQuotePremium(quote: IntegrationQuoteResult) {
+  return (
+    parseNumber(quote.levelPremium)
+    ?? parseNumber(quote.escalation3Premium)
+    ?? parseNumber(quote.escalation5Premium)
+  );
+}
+
 function formatDiscountPercentage(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
@@ -1520,7 +1528,7 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile, documentT
 
   const headers = ["Provider", "Quote", "Discount", "After Tax Discount"];
   const rows = quoteResults.map((quote) => {
-    const grossPremium = parseNumber(quote.levelPremium);
+    const grossPremium = resolveQuotePremium(quote);
     const taxReliefPercentage = resolveTaxReliefPercentage(statementProfile, grossPremium, null);
     const discountApplied = resolveQuoteDiscountPercentage(statementProfile, quote);
     const discountAmount = resolveDiscountAmount(grossPremium, discountApplied);

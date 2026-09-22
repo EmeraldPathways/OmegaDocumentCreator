@@ -35,7 +35,11 @@ import type {
   SeededSavingsInvestmentRow,
 } from "../data/seeded-clients";
 import { fetchStatementQuoteRequests, generateDocument } from "../documents/document-api";
-import { buildExportDocumentArtifact, exportGeneratedDocument } from "../documents/export-generated-document";
+import {
+  buildExportDocumentArtifact,
+  buildGeneratedDocumentBlob,
+  exportGeneratedDocument,
+} from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { buildStatementQuoteOptions } from "../documents/statement-quote-selection";
 import { resolveWorkspaceDocumentDraft } from "../documents/statement-draft";
@@ -1700,13 +1704,21 @@ export function IncomeProtectionPage({
     const versionNumber = reserveGeneratedDocumentVersion(documentType);
     const nextDocument = buildGeneratedDocumentRecord(documentType, extension, previewArtifact, versionNumber);
     try {
-      const artifactBlob = await exportGeneratedDocument(
-        sourceProfile,
-        documentType,
-        extension,
-        nextDocument.documentName,
-        previewArtifact,
-      );
+      const artifactBlob = canUseBackend
+        ? await buildGeneratedDocumentBlob(
+            sourceProfile,
+            documentType,
+            extension,
+            nextDocument.documentName,
+            previewArtifact,
+          )
+        : await exportGeneratedDocument(
+            sourceProfile,
+            documentType,
+            extension,
+            nextDocument.documentName,
+            previewArtifact,
+          );
 
       if (!canUseBackend) {
         upsertGeneratedDocument(resolvedDraft.clientReference, nextDocument);
