@@ -206,27 +206,10 @@ button {
   font-size: var(--font-size-large);
 }
 
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.brand-title {
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-large);
-  color: var(--color-text);
-}
-
-.brand-subtitle {
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
-}
-
 .top-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   flex: 1;
   justify-content: center;
 }
@@ -241,6 +224,7 @@ button {
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
   text-decoration: none;
+  white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -5588,10 +5572,6 @@ button {
 
   .app-header {
     padding: var(--space-2) var(--space-3);
-  }
-
-  .brand-subtitle {
-    display: none;
   }
 
   .header-search {

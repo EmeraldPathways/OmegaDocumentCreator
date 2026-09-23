@@ -49,12 +49,8 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className="app-shell">
       <header className="app-header">
         <div className="header-row">
-          <NavLink className="brand" to="/">
+          <NavLink aria-label="Omega Document Creator" className="brand" to="/">
             <span className="brand-mark">Ω</span>
-            <span className="brand-text">
-              <span className="brand-title">Omega</span>
-              <span className="brand-subtitle">Document Creator</span>
-            </span>
           </NavLink>
 
           <nav className="top-nav">
