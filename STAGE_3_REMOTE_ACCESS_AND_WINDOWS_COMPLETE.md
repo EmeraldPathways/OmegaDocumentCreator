@@ -128,3 +128,12 @@ Still required:
 - Backup generation, validation, and offline-safe restore proof are now complete for this checkpoint.
 - Stage 3 remains open for controlled Windows restart proof, retention/encryption/off-machine backup ownership, separate-machine restore proof, and real authenticated upload proof.
 - The office PC must not be treated as the final live production installation until Stages 1 through 5 and the final tagged release gate are complete.
+
+## End note: generated-output controls and Docker redeploy (2026-09-24)
+
+- On branch `remove-docx`, the visible Copy Text and Export DOCX controls were removed from the shared generated-output workspace; PDF export remains visible and functional, and the DOCX export wiring remains available for future use.
+- The generated-output template selector was hidden across Fact Find, Fact Find Update, Quote, and Statement output panels while the underlying template-picker data remains wired for future use.
+- The frontend production build passed during the Docker image build.
+- The frontend was redeployed with `docker compose --env-file .env -f infra/docker/compose.yaml up -d --build frontend`.
+- Post-deploy verification passed: `docker-frontend-1` and `docker-api-1` were running, the API was healthy, and `http://127.0.0.1:8000/ready`, `http://127.0.0.1:3000`, and the cache-busted public hostname `https://app.omegafinancial.ie/?remove-docx=20260924` returned HTTP 200.
+- Served-bundle verification confirmed Copy Text, Export DOCX, and `generated-output-template-picker` are absent while Export PDF remains present.

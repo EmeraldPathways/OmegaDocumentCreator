@@ -43,7 +43,6 @@ export function resolveDraftPreviewHtml(draft: GeneratedDocumentDraft) {
 export function DocumentPreview({
   draft,
   emptyMessage = "No generated preview yet.",
-  onExportDocx,
   onExportPdf,
   statusLabel,
   templateLabel,
@@ -56,9 +55,6 @@ export function DocumentPreview({
         <h3>Generated preview</h3>
         {previewHtml ? (
           <div className="action-toolbar">
-            <button className="primary-action secondary-action icon-btn" onClick={onExportDocx} type="button">
-              Export DOCX
-            </button>
             <button className="primary-action icon-btn" onClick={onExportPdf} type="button">
               Export PDF
             </button>

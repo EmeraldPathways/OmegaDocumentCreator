@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { CheckCircle2, Copy, Edit2, Eye, FileDown, FileText, RefreshCw } from "lucide-react";
+import { CheckCircle2, Edit2, Eye, FileDown, RefreshCw } from "lucide-react";
 
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
@@ -162,26 +162,16 @@ export function GeneratedOutputWorkspace({
   generateDisabled = false,
   generateLabel = "Generate Draft",
   onContentChange,
-  onExportDocx,
   onExportPdf,
   onGenerate,
   statusDotClass,
   statusDotTestId,
   statusLabel,
-  templatePicker,
 }: GeneratedOutputWorkspaceProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [copied, setCopied] = useState(false);
   const [fontSize, setFontSize] = useState("16px");
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
   const previewHtml = resolveDraftPreviewHtml(draft);
-
-  function handleCopy() {
-    const plainText = previewHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    void navigator.clipboard.writeText(plainText);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
-  }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -244,14 +234,6 @@ export function GeneratedOutputWorkspace({
             </div>
           </div>
           <div className="generated-output-actions">
-            <Button onClick={handleCopy} variant="secondary">
-              <Copy size={16} />
-              {copied ? "Copied" : "Copy Text"}
-            </Button>
-            <Button disabled={!previewHtml} onClick={onExportDocx} variant="secondary">
-              <FileText size={16} />
-              Export DOCX
-            </Button>
             <Button disabled={!previewHtml} onClick={onExportPdf} variant="secondary">
               <FileDown size={16} />
               Export PDF
@@ -265,13 +247,12 @@ export function GeneratedOutputWorkspace({
 
         <div className="generated-output-meta">
           <div className="generated-output-meta-copy">
-            <p className="generated-output-subtitle">Edit the generated draft, preview the Omega layout, and export the final file.</p>
+            <p className="generated-output-subtitle">Edit the generated draft, preview the Omega layout, and export the final PDF.</p>
           </div>
           <div className="generated-output-status">
             {statusDotClass ? <span className={`status-dot ${statusDotClass}`} data-testid={statusDotTestId} /> : null}
             <Badge variant={draft.generationStatus === "completed" ? "saved" : "draft"}>{statusLabel}</Badge>
           </div>
-          <div className="generated-output-template-picker">{templatePicker}</div>
         </div>
       </div>
 
