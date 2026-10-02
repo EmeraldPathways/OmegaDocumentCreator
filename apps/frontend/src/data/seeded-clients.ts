@@ -72,6 +72,18 @@ export type SavedQuoteSnapshot = {
   zurichDiscountActive: string;
 };
 
+export type SavedStatementSnapshot = {
+  id: string;
+  name: string;
+  documentType: "Statement of Suitability" | "Pensions Statement";
+  selectedTemplateId: string;
+  createdAt: string;
+  updatedAt: string;
+  policyPickerLabel: string;
+  statementFields: Record<string, string>;
+  documentDraft: GeneratedDocumentDraft;
+};
+
 export type SeededClientProfile = {
   clientReference: string;
   factFindType: string;
@@ -287,6 +299,7 @@ export type SeededClientProfile = {
   requestPolicies: string;
   requestLetterDate: string;
   savedQuotes: SavedQuoteSnapshot[];
+  savedStatements: SavedStatementSnapshot[];
   documentDrafts: Record<SupportedDocumentType, GeneratedDocumentDraft>;
   files: SeededClientFile[];
   generatedDocuments: SeededGeneratedDocument[];
@@ -330,6 +343,7 @@ export function createEmptyClientProfile(
     dependants: overrides.dependants ?? [],
     savingsInvestmentRows: overrides.savingsInvestmentRows ?? createDefaultSavingsInvestmentRows(),
     savedQuotes: overrides.savedQuotes ?? [],
+    savedStatements: overrides.savedStatements ?? [],
     documentDrafts: overrides.documentDrafts ?? createDefaultDocumentDrafts(),
     files: overrides.files ?? [],
     generatedDocuments: overrides.generatedDocuments ?? [],
@@ -552,6 +566,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-01-15",
     savedQuotes: [],
+    savedStatements: [],
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Fact Find": {
@@ -799,6 +814,7 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     requestPolicies: "Income Protection",
     requestLetterDate: "2026-06-06",
     savedQuotes: [],
+    savedStatements: [],
     documentDrafts: {
       ...createDefaultDocumentDrafts(),
       "Terms of Business": {

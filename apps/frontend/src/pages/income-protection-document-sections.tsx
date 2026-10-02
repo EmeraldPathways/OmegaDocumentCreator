@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 
 import { Save } from "lucide-react";
 
-import type { SavedQuoteSnapshot, SeededClientProfile } from "../data/seeded-clients";
+import type { SavedQuoteSnapshot, SavedStatementSnapshot, SeededClientProfile } from "../data/seeded-clients";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft } from "../documents/document-types";
 import { Accordion, AccordionItem, Button, Input, Select, Textarea, Toggle } from "../components/ui";
+import { formatSavedStatementPolicyLabel } from "./saved-statement-snapshots";
 
 import {
   coverAgeOptions,
@@ -48,8 +49,10 @@ type StatementWorkflowSectionProps = {
   renderGenerationRequirements: RenderGenerationRequirements;
   requiredLabel: RequiredLabel;
   saveLabel: string;
+  savedStatements: SavedStatementSnapshot[];
   selectedPolicyPickerValue: string;
   showStatementValidation: boolean;
+  statementSaveStatus: string;
   statementDocumentStatus: string;
   statementDocumentType: "Statement of Suitability" | "Pensions Statement";
   statementGenerationRequirements: WorkflowRequirement[];
@@ -60,10 +63,12 @@ type StatementWorkflowSectionProps = {
   onExportDocx: () => void;
   onExportPdf: () => void;
   onGenerate: () => void;
+  onLoadSavedStatement: (savedStatement: SavedStatementSnapshot) => void;
   onSave: () => void;
   onTemplateChange: (templateId: string) => void;
   onUpdateField: (field: keyof SeededClientProfile, value: string) => void;
   onUpdateGeneratedOutput: (html: string) => void;
+  onDeleteSavedStatement: (savedStatement: SavedStatementSnapshot) => void;
 };
 
 type QuoteWorkflowSectionProps = {
@@ -134,8 +139,10 @@ export function StatementWorkflowSection({
   renderGenerationRequirements,
   requiredLabel,
   saveLabel,
+  savedStatements,
   selectedPolicyPickerValue,
   showStatementValidation,
+  statementSaveStatus,
   statementDocumentStatus,
   statementDocumentType,
   statementGenerationRequirements,
@@ -146,10 +153,12 @@ export function StatementWorkflowSection({
   onExportDocx,
   onExportPdf,
   onGenerate,
+  onLoadSavedStatement,
   onSave,
   onTemplateChange,
   onUpdateField,
   onUpdateGeneratedOutput,
+  onDeleteSavedStatement,
 }: StatementWorkflowSectionProps) {
   return (
     <div className="page-stack">
@@ -265,6 +274,44 @@ export function StatementWorkflowSection({
               Save Statement
             </Button>
           </div>
+          <div className="form-action-row-status" style={{ marginTop: "var(--space-3)" }}>
+            {statementSaveStatus}
+          </div>
+          {savedStatements.length > 0 ? (
+            <div style={{ display: "grid", gap: "12px", marginTop: "var(--space-4)" }}>
+              {savedStatements.map((savedStatement) => (
+                <div
+                  key={savedStatement.id}
+                  style={{
+                    border: "1px solid var(--color-border, #dbe3ee)",
+                    borderRadius: "12px",
+                    padding: "12px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    background: "#fff",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{savedStatement.name}</div>
+                    <div style={{ color: "var(--color-text-muted, #64748b)", fontSize: "0.95rem" }}>
+                      {formatSavedStatementPolicyLabel(savedStatement)}
+                      {savedStatement.updatedAt ? ` · ${savedStatement.updatedAt.slice(0, 10)}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Button onClick={() => onLoadSavedStatement(savedStatement)} variant="secondary">
+                      Load Statement
+                    </Button>
+                    <Button onClick={() => onDeleteSavedStatement(savedStatement)} variant="ghost">
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </AccordionItem>
         <AccordionItem
           indicator={getGeneratedDraftStatusLabel(documentDraft.generationStatus)}

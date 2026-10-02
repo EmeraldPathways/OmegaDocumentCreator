@@ -101,6 +101,12 @@ export function normalizeClient(client: SeededClientProfile): SeededClientProfil
     dependants: client.dependants ?? fallbackClient.dependants,
     savingsInvestmentRows: client.savingsInvestmentRows ?? fallbackClient.savingsInvestmentRows,
     savedQuotes: Array.isArray(client.savedQuotes) ? client.savedQuotes : [],
+    savedStatements: Array.isArray(client.savedStatements)
+      ? client.savedStatements.map((savedStatement) => ({
+          ...savedStatement,
+          policyPickerLabel: savedStatement.policyPickerLabel ?? "",
+        }))
+      : [],
     files: client.files ?? [],
     generatedDocuments: client.generatedDocuments ?? [],
     documentDrafts: normalizedDocumentDrafts,

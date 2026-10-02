@@ -113,6 +113,8 @@ _WORKFLOW_META_MARKER = "_omega_workflow_meta"
 _KNOWN_FRONTEND_KEYS = {
     "factFindStatus",
     "statementStatus",
+    "savedQuotes",
+    "savedStatements",
     *(front_key for _, front_key in _FACT_FIND_MAP),
     *(front_key for _, front_key in _TERMS_MAP),
     *(front_key for _, front_key in _STATEMENT_MAP),
@@ -296,6 +298,60 @@ def _normalize_saved_quotes(value: object) -> list[dict[str, object]]:
     return snapshots
 
 
+def _normalize_saved_statement_fields(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+
+    fields: dict[str, str] = {}
+    for key, raw_value in value.items():
+        if not isinstance(key, str) or not key.strip():
+            continue
+        fields[key] = _as_clean_string(raw_value)
+    return fields
+
+
+def _normalize_saved_document_draft(value: object) -> dict[str, object]:
+    raw_draft = value if isinstance(value, dict) else {}
+    generation_status = _as_clean_string(raw_draft.get("generationStatus")).lower()
+    return {
+        "selectedTemplateId": _as_clean_string(raw_draft.get("selectedTemplateId")),
+        "generationStatus": generation_status
+        if generation_status in {"idle", "generating", "completed", "failed"}
+        else "idle",
+        "backendDocumentId": _as_clean_string(raw_draft.get("backendDocumentId")) or None,
+        "lastGeneratedHtml": _as_clean_string(raw_draft.get("lastGeneratedHtml")),
+        "lastGeneratedSections": _normalize_saved_quote_sections(raw_draft.get("lastGeneratedSections")),
+        "integrationRequests": _normalize_saved_quote_requests(raw_draft.get("integrationRequests")),
+        "editedHtml": _as_clean_string(raw_draft.get("editedHtml")),
+    }
+
+
+def _normalize_saved_statements(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+
+    snapshots: list[dict[str, object]] = []
+    for raw_snapshot in value[:5]:
+        if not isinstance(raw_snapshot, dict):
+            continue
+
+        document_type = _as_clean_string(raw_snapshot.get("documentType"))
+        snapshots.append(
+            {
+                "id": _as_clean_string(raw_snapshot.get("id")),
+                "name": _as_clean_string(raw_snapshot.get("name")),
+                "documentType": "Pensions Statement" if document_type == "Pensions Statement" else "Statement of Suitability",
+                "selectedTemplateId": _as_clean_string(raw_snapshot.get("selectedTemplateId")),
+                "createdAt": _as_clean_string(raw_snapshot.get("createdAt")),
+                "updatedAt": _as_clean_string(raw_snapshot.get("updatedAt")),
+                "policyPickerLabel": _as_clean_string(raw_snapshot.get("policyPickerLabel")),
+                "statementFields": _normalize_saved_statement_fields(raw_snapshot.get("statementFields")),
+                "documentDraft": _normalize_saved_document_draft(raw_snapshot.get("documentDraft")),
+            }
+        )
+    return snapshots
+
+
 def _normalize_meta_workflow_fields(value: object) -> dict[str, object]:
     if not isinstance(value, dict):
         return {}
@@ -308,7 +364,9 @@ def _normalize_meta_workflow_fields(value: object) -> dict[str, object]:
     return normalized
 
 
-def _extract_workflow_meta(value: object) -> tuple[list[dict[str, object]], dict[str, object]]:
+def _extract_workflow_meta(
+    value: object,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, object]]:
     if isinstance(value, list):
         for entry in value:
             if not isinstance(entry, dict):
@@ -318,24 +376,32 @@ def _extract_workflow_meta(value: object) -> tuple[list[dict[str, object]], dict
                 continue
             return (
                 _normalize_saved_quotes(meta_payload.get("savedQuotes")),
+                _normalize_saved_statements(meta_payload.get("savedStatements")),
                 _normalize_meta_workflow_fields(meta_payload.get("workflowFields")),
             )
-        return (_normalize_saved_quotes(value), {})
+        return (_normalize_saved_quotes(value), [], {})
 
     if isinstance(value, dict):
         return (
             _normalize_saved_quotes(value.get("savedQuotes")),
+            _normalize_saved_statements(value.get("savedStatements")),
             _normalize_meta_workflow_fields(value.get("workflowFields")),
         )
 
-    return ([], {})
+    return ([], [], {})
 
 
-def _build_workflow_meta_payload(*, saved_quotes: list[dict[str, object]], workflow_fields: dict[str, object]) -> list[dict[str, object]]:
+def _build_workflow_meta_payload(
+    *,
+    saved_quotes: list[dict[str, object]],
+    saved_statements: list[dict[str, object]],
+    workflow_fields: dict[str, object],
+) -> list[dict[str, object]]:
     return [
         {
             _WORKFLOW_META_MARKER: {
                 "savedQuotes": _normalize_saved_quotes(saved_quotes),
+                "savedStatements": _normalize_saved_statements(saved_statements),
                 "workflowFields": _normalize_meta_workflow_fields(workflow_fields),
             }
         }
@@ -376,8 +442,9 @@ class WorkflowRepository:
         if sos is not None:
             result.update(_model_to_dict(sos, _STATEMENT_MAP))
             result["statementStatus"] = sos.status
-            saved_quotes, workflow_fields = _extract_workflow_meta(sos.recommendation_reasons)
+            saved_quotes, saved_statements, workflow_fields = _extract_workflow_meta(sos.recommendation_reasons)
             result["savedQuotes"] = saved_quotes
+            result["savedStatements"] = saved_statements
             result.update(workflow_fields)
 
         emp = self._db.query(EmploymentDetail).filter(EmploymentDetail.client_id == client_id).first()
@@ -491,11 +558,18 @@ class WorkflowRepository:
                     setattr(sos, db_col, _coerce_decimal(raw) or None)
                 else:
                     setattr(sos, db_col, str(raw).strip() or None)
-        existing_saved_quotes, existing_workflow_fields = _extract_workflow_meta(sos.recommendation_reasons)
+        existing_saved_quotes, existing_saved_statements, existing_workflow_fields = _extract_workflow_meta(
+            sos.recommendation_reasons
+        )
         saved_quotes = (
             _normalize_saved_quotes(data["savedQuotes"])
             if "savedQuotes" in data
             else existing_saved_quotes
+        )
+        saved_statements = (
+            _normalize_saved_statements(data["savedStatements"])
+            if "savedStatements" in data
+            else existing_saved_statements
         )
         workflow_fields = {
             **existing_workflow_fields,
@@ -503,6 +577,7 @@ class WorkflowRepository:
         }
         sos.recommendation_reasons = _build_workflow_meta_payload(
             saved_quotes=saved_quotes,
+            saved_statements=saved_statements,
             workflow_fields=workflow_fields,
         )
 

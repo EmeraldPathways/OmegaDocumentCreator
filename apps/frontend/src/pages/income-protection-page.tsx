@@ -29,6 +29,7 @@ import { useClientData } from "../data/client-data-context";
 import { createSeededClientProfiles } from "../data/seeded-clients";
 import type {
   SavedQuoteSnapshot,
+  SavedStatementSnapshot,
   SeededClientFile,
   SeededClientProfile,
   SeededGeneratedDocument,
@@ -110,6 +111,7 @@ import {
 import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
 import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
 import { QuoteWorkflowSection, StatementWorkflowSection } from "./income-protection-document-sections";
+import { appendSavedStatementSnapshot } from "./saved-statement-snapshots";
 import { WorkflowDocumentSections } from "./workflow-document-sections";
 import { WorkflowPageLayout } from "./workflow-page-layout";
 
@@ -123,6 +125,44 @@ type IncomeProtectionPageProps = {
 
 type WorkflowSaveState = "saved" | "saving" | "dirty" | "session" | "error";
 type DraftPersistenceOutcome = "saved" | "session" | "error";
+
+const SAVED_STATEMENT_FIELD_KEYS = [
+  "letterDate",
+  "statementType",
+  "statementSelectedQuoteKey",
+  "productType",
+  "provider",
+  "recommendedCover",
+  "premium",
+  "deferredPeriod",
+  "coverAge",
+  "phiOccupationalClass",
+  "phiIndexation",
+  "smokerStatus",
+  "advisorName",
+  "discountApplied",
+  "taxReliefPercentage",
+  "netMonthlyCost",
+  "coverSummary",
+  "personalCircumstances",
+  "financialSituation",
+  "needsObjectives",
+  "factFindUpdatePersonalCircumstances",
+  "factFindUpdateFinancialSituation",
+  "factFindUpdateNeedsAndObjectives",
+  "paidBy",
+  "affordabilityDiscussed",
+  "clientHappyToProceed",
+  "clientDeclarationAccepted",
+  "clientSignatureDate",
+] as const;
+
+function buildSavedStatementFields(draft: SeededClientProfile) {
+  const draftFields = draft as unknown as Record<string, string | undefined>;
+  return Object.fromEntries(
+    SAVED_STATEMENT_FIELD_KEYS.map((field) => [field, draftFields[field] ?? ""]),
+  ) as Record<string, string>;
+}
 
 function hasGeneratedDraftArtifacts(draft?: Partial<GeneratedDocumentDraft>) {
   if (!draft) {
@@ -324,7 +364,7 @@ export function IncomeProtectionPage({
   const [showFactFindValidation, setShowFactFindValidation] = useState(false);
   const [factFindUpdateSavedLabel, setFactFindUpdateSavedLabel] = useState("Not saved yet");
   const [factFindUpdateGenerationStatus, setFactFindUpdateGenerationStatus] = useState("Generation: Draft");
-  const [statementSaveStatus, setStatementSaveStatus] = useState("Not saved yet");
+  const [statementSaveStatus, setStatementSaveStatus] = useState("No saved statements yet");
   const [statementDocumentStatus, setStatementDocumentStatus] = useState("Document: Draft");
   const [showStatementValidation, setShowStatementValidation] = useState(false);
   const [quoteSaveStatus, setQuoteSaveStatus] = useState("No saved quotes yet");
@@ -824,6 +864,14 @@ export function IncomeProtectionPage({
     [quoteDocumentType, resolvedDraft.savedQuotes],
   );
 
+  const savedStatementsForCurrentDocument = useMemo(
+    () =>
+      (resolvedDraft.savedStatements ?? []).filter(
+        (savedStatement) => savedStatement.documentType === statementDocumentType,
+      ),
+    [resolvedDraft.savedStatements, statementDocumentType],
+  );
+
   useEffect(() => {
     if (savedQuotesForCurrentDocument.length === 0) {
       setQuoteSaveStatus("No saved quotes yet");
@@ -833,6 +881,16 @@ export function IncomeProtectionPage({
     const quoteCount = savedQuotesForCurrentDocument.length;
     setQuoteSaveStatus(`${quoteCount} saved quote${quoteCount === 1 ? "" : "s"}`);
   }, [savedQuotesForCurrentDocument]);
+
+  useEffect(() => {
+    if (savedStatementsForCurrentDocument.length === 0) {
+      setStatementSaveStatus("No saved statements yet");
+      return;
+    }
+
+    const statementCount = savedStatementsForCurrentDocument.length;
+    setStatementSaveStatus(`${statementCount} saved statement${statementCount === 1 ? "" : "s"}`);
+  }, [savedStatementsForCurrentDocument]);
 
   const quoteWorkflowSnapshot = useMemo(
     () =>
@@ -1813,15 +1871,60 @@ export function IncomeProtectionPage({
     }
   }
 
-  async function saveStatementDraft() {
+  function buildSavedStatementName() {
+    const date = new Date();
+    const dateLabel = date.toISOString().slice(0, 10);
+    const timeLabel = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }).replace(":", "");
+    const policyPickerLabel = statementQuoteOptions.find(
+      (option) => option.key === resolvedDraft.statementSelectedQuoteKey,
+    )?.label;
+    return [resolvedDraft.fullName || resolvedDraft.clientReference, statementDocumentType, policyPickerLabel, dateLabel, timeLabel]
+      .filter(Boolean)
+      .join(" - ");
+  }
+
+  async function saveStatementDraft(options?: { recordSnapshot?: boolean }) {
     const statementDraft = isIncomeProtectionDocumentFlow ? effectiveIncomeProtectionDraft : resolvedDraft;
-    if (!canUseBackend) {
-      const { outcome } = await persistDraft(statementDraft, { showToast: true });
-      setStatementSaveStatus(outcome === "session" ? "Saved in current session only" : "Save failed");
-      return;
+    const recordSnapshot = options?.recordSnapshot ?? true;
+    let draftToPersist = statementDraft;
+    let snapshotName = "";
+
+    if (recordSnapshot) {
+      const now = new Date().toISOString();
+      snapshotName = buildSavedStatementName();
+      const policyPickerLabel = statementQuoteOptions.find(
+        (option) => option.key === statementDraft.statementSelectedQuoteKey,
+      )?.label ?? "";
+      const nextSnapshot: SavedStatementSnapshot = {
+        id: `saved-statement-${Date.now()}`,
+        name: snapshotName,
+        documentType: statementDocumentType,
+        selectedTemplateId: getWorkspaceDocumentDraft(statementDocumentType).selectedTemplateId,
+        createdAt: now,
+        updatedAt: now,
+        policyPickerLabel,
+        statementFields: buildSavedStatementFields(statementDraft),
+        documentDraft: getWorkspaceDocumentDraft(statementDocumentType),
+      };
+      draftToPersist = {
+        ...statementDraft,
+        savedStatements: appendSavedStatementSnapshot(resolvedDraft.savedStatements ?? [], nextSnapshot),
+      };
     }
-    const { outcome } = await persistDraft(statementDraft, { showToast: true });
+
+    const { outcome } = await persistDraft(draftToPersist, { showToast: true });
     setStatementSaveStatus(outcome === "saved" ? "Saved just now" : "Save failed - server unavailable");
+    if (outcome === "session") {
+      setStatementSaveStatus("Saved in current session only");
+    }
+    if (recordSnapshot && outcome !== "error") {
+      addToast(
+        outcome === "session"
+          ? `Saved statement as ${snapshotName} in the current session`
+          : `Saved statement as ${snapshotName}`,
+        "success",
+      );
+    }
   }
 
   function buildSavedQuoteName(integrationRequests: GeneratedDocumentDraft["integrationRequests"]) {
@@ -2026,6 +2129,64 @@ export function IncomeProtectionPage({
     addToast(outcome === "error" ? `Deleted ${savedQuote.name} locally only` : `Deleted ${savedQuote.name}`, outcome === "error" ? "error" : "success");
   }
 
+  async function loadSavedStatementSnapshot(savedStatement: SavedStatementSnapshot) {
+    const statementFields = savedStatement.statementFields as Partial<SeededClientProfile>;
+    const nextDraft: SeededClientProfile = {
+      ...resolvedDraft,
+      ...statementFields,
+      savedQuotes: resolvedDraft.savedQuotes,
+      savedStatements: resolvedDraft.savedStatements,
+    };
+    const currentDocumentDraft = nextDraft.documentDrafts[statementDocumentType];
+    const loadedDocumentDraft: GeneratedDocumentDraft = {
+      ...currentDocumentDraft,
+      ...savedStatement.documentDraft,
+      selectedTemplateId: savedStatement.selectedTemplateId || currentDocumentDraft.selectedTemplateId,
+      lastGeneratedSections: savedStatement.documentDraft.lastGeneratedSections ?? [],
+      integrationRequests: savedStatement.documentDraft.integrationRequests ?? [],
+    };
+    const editorProfile: SeededClientProfile = {
+      ...nextDraft,
+      documentDrafts: {
+        ...nextDraft.documentDrafts,
+        [statementDocumentType]: loadedDocumentDraft,
+      },
+    };
+    const { outcome } = await persistDraft(editorProfile, { showToast: false });
+    setStatementDocumentStatus("Document: Draft loaded");
+    setStatementSaveStatus(
+      outcome === "saved"
+        ? "Loaded saved statement"
+        : outcome === "session"
+          ? "Loaded saved statement in current session"
+          : "Loaded saved statement - changes not persisted",
+    );
+    addToast(`Loaded ${savedStatement.name}`, "success");
+  }
+
+  async function deleteSavedStatementSnapshot(savedStatement: SavedStatementSnapshot) {
+    const nextSavedStatements = (resolvedDraft.savedStatements ?? []).filter(
+      (entry) => entry.id !== savedStatement.id,
+    );
+    const { outcome } = await persistDraft(
+      { ...resolvedDraft, savedStatements: nextSavedStatements },
+      { showToast: false },
+    );
+    setStatementSaveStatus(
+      nextSavedStatements.filter((entry) => entry.documentType === statementDocumentType).length === 0
+        ? "No saved statements yet"
+        : outcome === "saved"
+          ? "Saved just now"
+          : outcome === "session"
+            ? "Saved in current session only"
+            : "Save failed - changes not persisted",
+    );
+    addToast(
+      outcome === "error" ? `Deleted ${savedStatement.name} locally only` : `Deleted ${savedStatement.name}`,
+      outcome === "error" ? "error" : "success",
+    );
+  }
+
   async function handleFactFindUpdateGenerate() {
     if (factFindUpdateGenerationRequirements.some((item) => !item.complete)) {
       surfaceRequirementErrors(factFindUpdateGenerationRequirements);
@@ -2067,7 +2228,7 @@ export function IncomeProtectionPage({
       return;
     }
     setShowStatementValidation(false);
-    await saveStatementDraft();
+    await saveStatementDraft({ recordSnapshot: false });
     setStatementDocumentStatus("Document: Generating");
     syncLocalGeneratedDraft(statementDocumentType, { generationStatus: "generating" });
     try {
@@ -3514,6 +3675,8 @@ export function IncomeProtectionPage({
           onExportDocx={() => void handleGeneratedOutputExport(statementDocumentType, "docx")}
           onExportPdf={() => void handleGeneratedOutputExport(statementDocumentType, "pdf")}
           onGenerate={() => void handleStatementGenerate()}
+          onDeleteSavedStatement={(savedStatement) => void deleteSavedStatementSnapshot(savedStatement)}
+          onLoadSavedStatement={(savedStatement) => void loadSavedStatementSnapshot(savedStatement)}
           onSave={() => void saveStatementDraft()}
           onTemplateChange={(templateId) =>
             updateSelectedTemplate(resolvedDraft.clientReference, statementDocumentType, templateId)
@@ -3523,8 +3686,10 @@ export function IncomeProtectionPage({
           renderGenerationRequirements={renderGenerationRequirements}
           requiredLabel={requiredLabel}
           saveLabel={workflowSaveLabel}
+          savedStatements={savedStatementsForCurrentDocument}
           selectedPolicyPickerValue={selectedPolicyPickerValue}
           showStatementValidation={showStatementValidation}
+          statementSaveStatus={statementSaveStatus}
           statementDocumentStatus={statementDocumentStatus}
           statementDocumentType={statementDocumentType}
           statementGenerationRequirements={statementGenerationRequirements}
