@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
@@ -584,6 +587,13 @@ describe("buildWorkflowDocument", () => {
     expect(callouts.every((callout) => callout.style.padding === "10px 14px")).toBe(true);
     expect(callouts.every((callout) => callout.style.marginBottom === "8px")).toBe(true);
     expect(callouts.every((callout) => callout.querySelector("h2")?.getAttribute("style")?.includes("margin:0 0 5px"))).toBe(true);
+  });
+
+  it("adds spacing before the Fact Find Business Source section", () => {
+    const styles = readFileSync(path.resolve(process.cwd(), "src/styles.css"), "utf8");
+
+    expect(styles).toContain(".workflow-section-accordion .fact-find-business-source-section");
+    expect(styles).toContain("margin-top: var(--space-4);");
   });
 
   it("uses shorter signature lines and longer date lines in both Fact Find PDF variants", () => {

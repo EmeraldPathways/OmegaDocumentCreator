@@ -3626,6 +3626,10 @@ button {
   margin-bottom: var(--space-6);
 }
 
+.workflow-section-accordion .fact-find-business-source-section {
+  margin-top: var(--space-4);
+}
+
 .form-section:last-child {
   margin-bottom: 0;
 }

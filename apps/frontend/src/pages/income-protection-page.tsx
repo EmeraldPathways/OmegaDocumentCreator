@@ -3126,7 +3126,7 @@ export function IncomeProtectionPage({
                       value={resolvedDraft.needsObjectives}
                     />
                   </div>
-                  <div className="form-section">
+                  <div className="form-section fact-find-business-source-section">
                     <h3 className="form-section-title">Business Source</h3>
                     <div className="form-grid">
                       <Input
