@@ -110,7 +110,7 @@ describe("paginatePdfContent", () => {
     });
   });
 
-  it("keeps the Fact Find Update final signatures on the current page when they fit", () => {
+  it("starts the Fact Find Update final group on a fresh page", () => {
     mockPdfHeights();
 
     const html = `
@@ -129,11 +129,12 @@ describe("paginatePdfContent", () => {
       return;
     }
 
-    expect(pagination.pages).toHaveLength(1);
-    expect(pagination.pages[0]).toContain("Signatures and Record");
+    expect(pagination.pages).toHaveLength(2);
+    expect(pagination.pages[0]).not.toContain("Signatures and Record");
+    expect(pagination.pages[1]).toContain("Signatures and Record");
   });
 
-  it("splits the Fact Find Update final group before warnings when signatures fit in the remaining space", () => {
+  it("keeps Fact Find Update signatures and warnings together on the fresh page", () => {
     mockPdfHeights();
 
     const html = `
@@ -154,12 +155,13 @@ describe("paginatePdfContent", () => {
     }
 
     expect(pagination.pages).toHaveLength(2);
-    expect(pagination.pages[0]).toContain("Signatures and Record");
+    expect(pagination.pages[0]).not.toContain("Signatures and Record");
     expect(pagination.pages[0]).not.toContain("Warnings and Disclaimers");
+    expect(pagination.pages[1]).toContain("Signatures and Record");
     expect(pagination.pages[1]).toContain("Warnings and Disclaimers");
   });
 
-  it("uses the full rendered content area for a compact Fact Find Update warning", () => {
+  it("keeps a compact Fact Find Update warning with the final group", () => {
     mockPdfHeights();
 
     const html = `
@@ -179,8 +181,10 @@ describe("paginatePdfContent", () => {
       return;
     }
 
-    expect(pagination.pages).toHaveLength(1);
-    expect(pagination.pages[0]).toContain("Warnings and Disclaimers");
+    expect(pagination.pages).toHaveLength(2);
+    expect(pagination.pages[0]).not.toContain("Warnings and Disclaimers");
+    expect(pagination.pages[1]).toContain("Signatures and Record");
+    expect(pagination.pages[1]).toContain("Warnings and Disclaimers");
   });
 });
 
@@ -245,12 +249,12 @@ describe("Fact Find signature layout", () => {
     const factFindRows = signatureRows.filter((row) => row.closest(".workflow-document-fact-find"));
     const factFindUpdateRows = signatureRows.filter((row) => row.closest(".workflow-document-fact-find-update"));
     expect(factFindRows.every((row) => row.style.marginBottom === "18px")).toBe(true);
-    expect(factFindUpdateRows.every((row) => row.style.marginBottom === "10px")).toBe(true);
+    expect(factFindUpdateRows.every((row) => row.style.marginBottom === "18px")).toBe(true);
     expect(container.querySelector<HTMLElement>(".workflow-document-fact-find .fact-find-signing-intro")?.style.marginBottom).toBe("12px");
     expect(container.querySelector<HTMLElement>(".workflow-document-fact-find .fact-find-signing-subheading")?.style.marginTop).toBe("18px");
-    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-intro")?.style.marginBottom).toBe("8px");
-    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginTop).toBe("10px");
-    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginBottom).toBe("8px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-intro")?.style.marginBottom).toBe("12px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginTop).toBe("18px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginBottom).toBe("12px");
   });
 });
 describe("buildStandaloneDocumentPreviewHtml", () => {
