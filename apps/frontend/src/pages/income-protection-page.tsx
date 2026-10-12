@@ -2644,7 +2644,7 @@ export function IncomeProtectionPage({
 
   function renderTabPanel(tabId: (typeof moduleTabs)[number]["id"] = activeTab.id) {
     if (tabId === "fact-find") {
-      const factFindDraft = getDocumentDraft("Fact Find");
+      const factFindDraft = getWorkspaceDocumentDraft("Fact Find");
 
       return (
         <div className="page-stack">
@@ -3409,7 +3409,7 @@ export function IncomeProtectionPage({
     }
 
     if (tabId === "fact-find-update") {
-      const factFindUpdateDraft = getDocumentDraft("Fact Find Update");
+      const factFindUpdateDraft = getWorkspaceDocumentDraft("Fact Find Update");
 
       return (
         <div className="page-stack">

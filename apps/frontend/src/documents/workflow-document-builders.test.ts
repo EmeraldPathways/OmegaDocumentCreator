@@ -884,6 +884,26 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("Pension Arrangements - Partner");
   });
 
+  it("renders one or two client signature rows from the partner details setting", () => {
+    (["Fact Find", "Fact Find Update"] as const).forEach((documentType) => {
+      const singleClientProfile = cloneProfile("CLI-2026-0002");
+      singleClientProfile.factFindShowPartnerDetails = "";
+      const singleClientDocument = buildWorkflowDocument(singleClientProfile, documentType);
+      const singleClientEditorDocument = buildWorkflowEditorDocument(singleClientProfile, documentType);
+
+      expect(singleClientDocument.html).not.toContain("Signature (2)");
+      expect(singleClientEditorDocument.html).not.toContain("Signature (2)");
+
+      const partnerProfile = cloneProfile("CLI-2026-0002");
+      partnerProfile.factFindShowPartnerDetails = "Yes";
+      const partnerDocument = buildWorkflowDocument(partnerProfile, documentType);
+      const partnerEditorDocument = buildWorkflowEditorDocument(partnerProfile, documentType);
+
+      expect(partnerDocument.html.match(/Signature \(2\)/g)).toHaveLength(1);
+      expect(partnerEditorDocument.html.match(/Signature \(2\)/g)).toHaveLength(1);
+    });
+  });
+
   it("omits whole empty fact find detail sections from output", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.assetHomeSelf = "";

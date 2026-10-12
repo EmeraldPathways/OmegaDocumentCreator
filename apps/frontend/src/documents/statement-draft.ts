@@ -76,6 +76,15 @@ function hasCurrentFactFindSigningLayout(editedHtml: string) {
   return signatureValues.length > 0 && signatureValues.every((value) => value === "&nbsp;");
 }
 
+function hasExpectedFactFindSignatureRows(editedHtml: string, factFindShowPartnerDetails: string | undefined) {
+  const clientSignatureRows = Array.from(
+    editedHtml.matchAll(/<p class="fact-find-signature-label">Signature \(\d+\)<\/p>/g),
+  );
+  const expectedClientSignatureRows = factFindShowPartnerDetails?.trim() === "Yes" ? 2 : 1;
+
+  return clientSignatureRows.length === expectedClientSignatureRows;
+}
+
 function hasCurrentFactFindRequestLayout(editedHtml: string) {
   const requestRows = Array.from(
     editedHtml.matchAll(/<div class="fact-find-request-row">([\s\S]*?)<\/div>\s*<\/div>/g),
@@ -431,6 +440,7 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
       !hasMatchingFactFindVariant(editedHtml, profile.factFindType) ||
       !hasCurrentFactFindExportSectionGrouping(profile, editedHtml) ||
       !hasCurrentFactFindSigningLayout(editedHtml) ||
+      !hasExpectedFactFindSignatureRows(editedHtml, profile.factFindShowPartnerDetails) ||
       !hasCurrentFactFindRequestLayout(editedHtml) ||
       !hasCurrentFactFindServicesLayout(editedHtml) ||
       !hasCurrentFactFindDeclarationsLayout(editedHtml) ||
@@ -468,7 +478,8 @@ export function resolveFactFindUpdateDraft(profile: SeededClientProfile): Genera
     hasComposedFactFindUpdateHtml(editedHtml) &&
     (
       !hasCurrentClientSummaryLayout(editedHtml) ||
-      !hasCurrentFactFindSigningLayout(editedHtml)
+      !hasCurrentFactFindSigningLayout(editedHtml) ||
+      !hasExpectedFactFindSignatureRows(editedHtml, profile.factFindShowPartnerDetails)
     );
 
   if (!isLegacyFactFindUpdateDraft(factFindUpdateDraft) && !shouldRebuildComposedHtml) {

@@ -993,7 +993,9 @@ function buildFactFindSignaturesHtml(profile: SeededClientProfile) {
     '<div class="fact-find-signing-block">',
     "<p class=\"fact-find-signing-intro\">I/We understood the recommendation is based on the information disclosed and that the actions agreed are to my / our satisfaction</p>",
     buildFactFindSignatureRowHtml("Signature (1)", "", ""),
-    buildFactFindSignatureRowHtml("Signature (2)", "", ""),
+    ...(isAffirmative(profile.factFindShowPartnerDetails)
+      ? [buildFactFindSignatureRowHtml("Signature (2)", "", "")]
+      : []),
     "<p class=\"fact-find-signing-subheading\">FINANCIAL ADVISOR'S SIGNATURE</p>",
     buildFactFindSignatureRowHtml("Signature", "", ""),
     "</div>",

@@ -66,6 +66,19 @@ describe("resolveQuoteDraft", () => {
 });
 
 describe("resolveFactFindDraft", () => {
+  it("rebuilds the saved fact find layout when its client signature rows do not match partner details", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindShowPartnerDetails = "";
+    profile.documentDrafts["Fact Find"].editedHtml = buildWorkflowEditorDocument(
+      { ...profile, factFindShowPartnerDetails: "Yes" },
+      "Fact Find",
+    ).html;
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).not.toContain("Signature (2)");
+  });
+
   it("rebuilds composed fact find html when fact find small is selected", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.factFindType = "small";
@@ -263,6 +276,19 @@ describe("resolveFactFindDraft", () => {
 });
 
 describe("resolveFactFindUpdateDraft", () => {
+  it("rebuilds the saved update layout when its client signature rows do not match partner details", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.factFindShowPartnerDetails = "";
+    profile.documentDrafts["Fact Find Update"].editedHtml = buildWorkflowEditorDocument(
+      { ...profile, factFindShowPartnerDetails: "Yes" },
+      "Fact Find Update",
+    ).html;
+
+    const draft = resolveFactFindUpdateDraft(profile);
+
+    expect(draft.editedHtml).not.toContain("Signature (2)");
+  });
+
   it("rebuilds composed fact find update html when the new signing layout is missing", () => {
     const profile = cloneProfile("CLI-2026-0002");
     profile.documentDrafts["Fact Find Update"].editedHtml =
