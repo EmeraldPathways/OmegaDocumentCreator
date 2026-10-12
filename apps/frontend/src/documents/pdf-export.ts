@@ -882,7 +882,11 @@ function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: n
     element.classList.contains("fact-find-pension-panel") ||
     element.classList.contains("fact-find-pension-detail-list");
 
-  const splitOversizedStatementBlock = (element: Element, measuredHeight: number): Array<{ height: number; html: string }> | null => {
+  const splitOversizedStatementBlock = (
+    element: Element,
+    measuredHeight: number,
+    firstPageHeight = pageContentHeight,
+  ): Array<{ height: number; html: string }> | null => {
     if (!canSplitPdfElement(element)) {
       return null;
     }
@@ -918,15 +922,21 @@ function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: n
     const fragments: Array<{ height: number; html: string }> = [];
     let fragmentChildren: string[] = [];
     let fragmentHeight = wrapperHeight;
+    let fragmentPageHeight = firstPageHeight;
 
     for (const childItem of childItems) {
-      if (fragmentChildren.length > 0 && fragmentHeight + childItem.height > pageContentHeight) {
+      if (fragmentChildren.length === 0 && fragmentHeight + childItem.height > fragmentPageHeight) {
+        return null;
+      }
+
+      if (fragmentChildren.length > 0 && fragmentHeight + childItem.height > fragmentPageHeight) {
         fragments.push({
           height: fragmentHeight,
           html: createWrappedFragmentHtml(element, fragmentChildren.join("")),
         });
         fragmentChildren = [];
         fragmentHeight = wrapperHeight;
+        fragmentPageHeight = pageContentHeight;
       }
 
       fragmentChildren.push(childItem.html);
@@ -962,6 +972,24 @@ function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: n
       pages.push(wrapPageHtml(currentPageElements.join("")));
       currentPageElements = [];
       currentPageHeight = 0;
+    }
+
+    if (
+      nextItem.element?.classList.contains("fact-find-final-section-group") &&
+      currentPageElements.length > 0 &&
+      currentPageHeight + nextHeight > pageContentHeight
+    ) {
+      const splitFragments = splitOversizedStatementBlock(
+        nextItem.element,
+        nextHeight,
+        pageContentHeight - currentPageHeight,
+      );
+      if (splitFragments) {
+        pendingItems.unshift(
+          ...splitFragments.map((fragment) => ({ height: fragment.height, html: fragment.html })),
+        );
+        continue;
+      }
     }
 
     if (nextHeight > pageContentHeight) {
