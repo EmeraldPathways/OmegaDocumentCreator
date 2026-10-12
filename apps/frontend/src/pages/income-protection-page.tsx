@@ -401,6 +401,7 @@ export function IncomeProtectionPage({
   const quoteGenerateRef = useRef<(() => Promise<void>) | null>(null);
   const lastPersistedSnapshotRef = useRef("");
   const latestDraftRef = useRef<SeededClientProfile | null>(null);
+  const generatedOutputEditClientRef = useRef<Partial<Record<SupportedDocumentType, string>>>({});
   const pendingWorkflowFieldsRef = useRef<Partial<SeededClientProfile> | null>(null);
   const workflowSaveStateRef = useRef<WorkflowSaveState>("saved");
   const canUseBackendRef = useRef(canUseBackend);
@@ -593,6 +594,9 @@ export function IncomeProtectionPage({
     }
 
     const documentType = "Fact Find" satisfies SupportedDocumentType;
+    if (generatedOutputEditClientRef.current[documentType] === draft.clientReference) {
+      return;
+    }
     const currentFactFindDraft = draft.documentDrafts[documentType];
     const resolvedFactFindDraft = resolveWorkspaceDocumentDraft(draft, documentType);
 
@@ -636,6 +640,9 @@ export function IncomeProtectionPage({
     }
 
     const documentType = "Fact Find Update" satisfies SupportedDocumentType;
+    if (generatedOutputEditClientRef.current[documentType] === draft.clientReference) {
+      return;
+    }
     const currentFactFindUpdateDraft = draft.documentDrafts[documentType];
     const resolvedFactFindUpdateDraft = resolveWorkspaceDocumentDraft(draft, documentType);
 
@@ -1710,6 +1717,7 @@ export function IncomeProtectionPage({
 
   function updateGeneratedOutput(documentType: SupportedDocumentType, html: string) {
     const nextHtml = html.trim();
+    generatedOutputEditClientRef.current[documentType] = resolvedDraft.clientReference;
     syncLocalGeneratedDraft(documentType, { editedHtml: nextHtml });
   }
 
