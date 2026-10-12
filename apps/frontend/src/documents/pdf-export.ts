@@ -214,6 +214,7 @@ function elementStyles(sourceElement: Element) {
   const isStmt = elementIsStatement(sourceElement);
   const workflowRoot = sourceElement.closest(".workflow-document");
   const isQuoteDoc = Boolean(workflowRoot?.classList.contains("workflow-document-quote"));
+  const isFactFindUpdateDoc = Boolean(workflowRoot?.classList.contains("workflow-document-fact-find-update"));
   const isFactFindDoc = Boolean(
     workflowRoot?.classList.contains("workflow-document-fact-find")
     || workflowRoot?.classList.contains("workflow-document-fact-find-update"),
@@ -360,7 +361,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:grid;grid-template-columns:76px 280px 28px 156px;align-items:center;column-gap:6px;margin:0 0 18px";
+    return `display:grid;grid-template-columns:76px 280px 28px 156px;align-items:center;column-gap:6px;margin:0 0 ${isFactFindUpdateDoc ? "10px" : "18px"}`;
   }
 
   if (classList.contains("fact-find-signature-field-date")) {
@@ -416,11 +417,11 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signing-intro")) {
-    return "margin:0 0 12px;font-weight:600";
+    return `margin:0 0 ${isFactFindUpdateDoc ? "8px" : "12px"};font-weight:600`;
   }
 
   if (classList.contains("fact-find-signing-subheading")) {
-    return "margin:18px 0 12px;font-weight:700";
+    return `margin:${isFactFindUpdateDoc ? "10px 0 8px" : "18px 0 12px"};font-weight:700`;
   }
 
   if (classList.contains("fact-find-signature-label")) {
@@ -604,7 +605,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-final-section-group")) {
-    return "display:flex;flex-direction:column;gap:5px;margin:0 0 6px;page-break-inside:avoid";
+    return `display:flex;flex-direction:column;gap:${isFactFindUpdateDoc ? "2px" : "5px"};margin:0 0 6px;page-break-inside:avoid`;
   }
 
   if ((tagName === "section" || tagName === "div") && classList.contains("fact-find-signatures-section")) {
@@ -1651,6 +1652,16 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
     margin-bottom: 20px;
   }
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-intro {
+    margin-bottom: 8px;
+  }
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-subheading {
+    margin: 10px 0 8px;
+  }
+  .preview-page .workflow-document-fact-find-update .fact-find-signature-row,
+  .preview-page .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
+    margin-bottom: 10px;
+  }
   .preview-page .workflow-document-fact-find .fact-find-signature-label,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-label {
     margin: 0;
@@ -1972,6 +1983,9 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     flex-direction: column;
     gap: 5px;
     margin-bottom: 6px;
+  }
+  .preview-page .workflow-document-fact-find-update .fact-find-final-section-group {
+    gap: 2px;
   }
   .preview-page .workflow-document-fact-find .fact-find-life-insurance-section,
   .preview-page .workflow-document-fact-find .fact-find-savings-section,

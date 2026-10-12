@@ -223,10 +223,12 @@ describe("Fact Find signature layout", () => {
           <div class="fact-find-signing-block">
             <p class="fact-find-signing-intro">Signing introduction</p>
             <div class="fact-find-signature-row"><p class="fact-find-signature-label">Signature (1)</p></div>
+            <p class="fact-find-signing-subheading">FINANCIAL ADVISOR'S SIGNATURE</p>
           </div>
         </article>
         <article class="workflow-document workflow-document-fact-find-update">
           <div class="fact-find-signing-block">
+            <p class="fact-find-signing-intro">Signing introduction</p>
             <p class="fact-find-signing-subheading">FINANCIAL ADVISOR'S SIGNATURE</p>
             <div class="fact-find-signature-row"><p class="fact-find-signature-label">Signature</p></div>
           </div>
@@ -240,9 +242,15 @@ describe("Fact Find signature layout", () => {
 
     const signatureRows = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-row"));
     expect(signatureRows).toHaveLength(2);
-    expect(signatureRows.every((row) => row.style.marginBottom === "18px")).toBe(true);
-    expect(container.querySelector<HTMLElement>(".fact-find-signing-intro")?.style.marginBottom).toBe("12px");
-    expect(container.querySelector<HTMLElement>(".fact-find-signing-subheading")?.style.marginTop).toBe("18px");
+    const factFindRows = signatureRows.filter((row) => row.closest(".workflow-document-fact-find"));
+    const factFindUpdateRows = signatureRows.filter((row) => row.closest(".workflow-document-fact-find-update"));
+    expect(factFindRows.every((row) => row.style.marginBottom === "18px")).toBe(true);
+    expect(factFindUpdateRows.every((row) => row.style.marginBottom === "10px")).toBe(true);
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find .fact-find-signing-intro")?.style.marginBottom).toBe("12px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find .fact-find-signing-subheading")?.style.marginTop).toBe("18px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-intro")?.style.marginBottom).toBe("8px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginTop).toBe("10px");
+    expect(container.querySelector<HTMLElement>(".workflow-document-fact-find-update .fact-find-signing-subheading")?.style.marginBottom).toBe("8px");
   });
 });
 describe("buildStandaloneDocumentPreviewHtml", () => {
