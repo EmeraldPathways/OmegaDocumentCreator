@@ -553,9 +553,11 @@ describe("buildWorkflowDocument", () => {
       const container = window.document.createElement("div");
       container.innerHTML = document.html;
       const group = container.querySelector<HTMLElement>(".fact-find-final-section-group");
+      const signatures = group?.querySelector<HTMLElement>(".fact-find-signatures-section");
 
       expect(group).not.toBeNull();
       expect(group?.querySelector(".document-callout-warning")).not.toBeNull();
+      expect(signatures?.nextElementSibling?.classList.contains("document-callout-warning")).toBe(true);
     });
   });
 

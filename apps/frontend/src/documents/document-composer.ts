@@ -1895,12 +1895,12 @@ function buildFactFindFinalSectionGroupHtml(profile: SeededClientProfile, warnin
       buildFactFindSignaturesHtml(profile),
       "document-section fact-find-signatures-section",
     ),
+    buildWarningCalloutHtml(warningHtml),
     buildNamedSectionHtml(
       "Request for Information",
       buildFactFindRequestInfoHtml(profile),
       "document-section fact-find-request-section",
     ),
-    buildWarningCalloutHtml(warningHtml),
   ].join("");
 }
 
