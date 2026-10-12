@@ -637,7 +637,8 @@ function elementStyles(sourceElement: Element) {
   }
 
   if ((tagName === "aside" || tagName === "div") && classList.contains("document-callout")) {
-    return "display:block;background:#fff6e6;border-left:6px solid #c68b2c;border-radius:12px;padding:16px 18px;margin:0 0 16px;page-break-inside:avoid";
+    const isCompactFactFindWarning = isFactFindDoc && classList.contains("document-callout-warning");
+    return `display:block;background:#fff6e6;border-left:6px solid #c68b2c;border-radius:12px;padding:${isCompactFactFindWarning ? "10px 14px" : "16px 18px"};margin:0 0 ${isCompactFactFindWarning ? "8px" : "16px"};page-break-inside:avoid`;
   }
 
   if ((tagName === "footer" || tagName === "div") && classList.contains("signatures-footer")) {
@@ -677,6 +678,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (!isStmt && tagName === "h2") {
+    const inCompactFactFindWarning = isFactFindDoc && Boolean(sourceElement.closest(".document-callout-warning"));
     const inTightFactFindGroup = Boolean(
       sourceElement.closest(".fact-find-life-insurance-section")
       || sourceElement.closest(".fact-find-savings-section")
@@ -684,7 +686,7 @@ function elementStyles(sourceElement: Element) {
       || sourceElement.closest(".fact-find-signatures-section")
       || sourceElement.closest(".fact-find-request-section")
     );
-    return `margin:0 0 ${inTightFactFindGroup ? "6px" : "10px"};font-family:Helvetica,Arial,sans-serif;font-size:${inTightFactFindGroup ? "17px" : "18px"};font-weight:700;line-height:${inTightFactFindGroup ? "1.15" : "1.25"};color:#5b2230`;
+    return `margin:0 0 ${inCompactFactFindWarning ? "5px" : inTightFactFindGroup ? "6px" : "10px"};font-family:Helvetica,Arial,sans-serif;font-size:${inCompactFactFindWarning ? "16px" : inTightFactFindGroup ? "17px" : "18px"};font-weight:700;line-height:${inCompactFactFindWarning || inTightFactFindGroup ? "1.15" : "1.25"};color:#5b2230`;
   }
 
   if (!isStmt && tagName === "h3") {
@@ -693,6 +695,9 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (!isStmt && tagName === "p") {
+    if (isFactFindDoc && sourceElement.closest(".document-callout-warning")) {
+      return "margin:0 0 4px;line-height:1.35;white-space:pre-wrap";
+    }
     return "margin:0 0 10px;line-height:1.6;white-space:pre-wrap";
   }
 
@@ -1842,6 +1847,22 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     background: #fff6e6;
     padding: 16px 18px;
     margin-bottom: 18px;
+  }
+  .preview-page .workflow-document-fact-find .document-callout-warning,
+  .preview-page .workflow-document-fact-find-update .document-callout-warning {
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .preview-page .workflow-document-fact-find .document-callout-warning > h2,
+  .preview-page .workflow-document-fact-find-update .document-callout-warning > h2 {
+    margin: 0 0 5px;
+    font-size: 16px;
+    line-height: 1.15;
+  }
+  .preview-page .workflow-document-fact-find .document-callout-warning > p,
+  .preview-page .workflow-document-fact-find-update .document-callout-warning > p {
+    margin: 0 0 4px;
+    line-height: 1.35;
   }
   .preview-page .signatures-footer {
     margin-top: 24px;

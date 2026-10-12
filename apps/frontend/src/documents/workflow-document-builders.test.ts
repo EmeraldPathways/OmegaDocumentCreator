@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
+import { buildPdfStyledHtml } from "./pdf-export";
 import { buildWorkflowDocument, buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 function cloneProfile(clientReference: string) {
@@ -554,11 +555,35 @@ describe("buildWorkflowDocument", () => {
       container.innerHTML = document.html;
       const group = container.querySelector<HTMLElement>(".fact-find-final-section-group");
       const signatures = group?.querySelector<HTMLElement>(".fact-find-signatures-section");
+      const request = group?.querySelector<HTMLElement>(".fact-find-request-section") ?? null;
+      const warning = group?.querySelector<HTMLElement>(".document-callout-warning") ?? null;
 
       expect(group).not.toBeNull();
-      expect(group?.querySelector(".document-callout-warning")).not.toBeNull();
-      expect(signatures?.nextElementSibling?.classList.contains("document-callout-warning")).toBe(true);
+      expect(warning).not.toBeNull();
+      expect(warning?.previousElementSibling).toBe(documentType === "Fact Find" ? request : signatures ?? null);
     });
+  });
+
+  it("uses compact warning spacing in Fact Find PDF styling", () => {
+    const styledHtml = buildPdfStyledHtml(
+      `
+        <article class="workflow-document workflow-document-fact-find">
+          <aside class="document-callout document-callout-warning"><h2>Warnings and Disclaimers</h2><p>Warning copy</p></aside>
+        </article>
+        <article class="workflow-document workflow-document-fact-find-update">
+          <aside class="document-callout document-callout-warning"><h2>Warnings and Disclaimers</h2><p>Warning copy</p></aside>
+        </article>
+      `,
+      true,
+    );
+    const container = window.document.createElement("div");
+    container.innerHTML = styledHtml;
+
+    const callouts = Array.from(container.querySelectorAll<HTMLElement>(".document-callout-warning"));
+    expect(callouts).toHaveLength(2);
+    expect(callouts.every((callout) => callout.style.padding === "10px 14px")).toBe(true);
+    expect(callouts.every((callout) => callout.style.marginBottom === "8px")).toBe(true);
+    expect(callouts.every((callout) => callout.querySelector("h2")?.getAttribute("style")?.includes("margin:0 0 5px"))).toBe(true);
   });
 
   it("hides income protection arrangements when dedicated arrangement fields are blank", () => {
