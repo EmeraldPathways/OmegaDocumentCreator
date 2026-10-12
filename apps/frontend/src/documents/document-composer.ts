@@ -114,6 +114,10 @@ function buildNamedSectionHtml(title: string, bodyHtml: string, className?: stri
   return `<section class="${escapeHtml(className ?? "document-section")}"><h2>${escapeHtml(title)}</h2>${bodyHtml}</section>`;
 }
 
+function buildWarningCalloutHtml(bodyHtml: string) {
+  return `<aside class="document-callout document-callout-warning"><h2>Warnings and Disclaimers</h2>${bodyHtml}</aside>`;
+}
+
 function buildGridSectionHtml(
   title: string,
   items: Array<{ label: string; value: string }>,
@@ -1661,6 +1665,7 @@ function buildFactFindUpdateBlocks(
   personalCircumstancesHtml: string,
   financialSituationHtml: string,
   needsHtml: string,
+  warningHtml: string,
 ): ComposedBlock[] {
   return [
     buildInlineLetterHeaderBlock(profile),
@@ -1707,8 +1712,16 @@ function buildFactFindUpdateBlocks(
     ]),
     {
       kind: "section",
-      title: "Signatures and Record",
-      bodyHtml: buildFactFindSignaturesHtml(profile),
+      title: "",
+      className: "document-section fact-find-final-section-group",
+      bodyHtml: [
+        buildNamedSectionHtml(
+          "Signatures and Record",
+          buildFactFindSignaturesHtml(profile),
+          "document-section fact-find-signatures-section",
+        ),
+        buildWarningCalloutHtml(warningHtml),
+      ].join(""),
     },
   ];
 }
@@ -1831,13 +1844,7 @@ function buildFactFindBlocks(
       kind: "section",
       title: "",
       className: "document-section fact-find-final-section-group",
-      bodyHtml: buildFactFindFinalSectionGroupHtml(profile),
-    },
-    {
-      kind: "callout",
-      tone: "warning",
-      title: "Warnings and Disclaimers",
-      bodyHtml: warningHtml,
+      bodyHtml: buildFactFindFinalSectionGroupHtml(profile, warningHtml),
     },
   ];
 }
@@ -1869,7 +1876,7 @@ function buildFactFindLifeSavingsGroupHtml(profile: SeededClientProfile) {
   return sections.join("");
 }
 
-function buildFactFindFinalSectionGroupHtml(profile: SeededClientProfile) {
+function buildFactFindFinalSectionGroupHtml(profile: SeededClientProfile, warningHtml: string) {
   return [
     buildGridSectionHtml(
       "Declarations and Confirmations",
@@ -1893,6 +1900,7 @@ function buildFactFindFinalSectionGroupHtml(profile: SeededClientProfile) {
       buildFactFindRequestInfoHtml(profile),
       "document-section fact-find-request-section",
     ),
+    buildWarningCalloutHtml(warningHtml),
   ].join("");
 }
 
@@ -2135,6 +2143,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
             buildFactFindPersonalCircumstancesHtml(profile, documentType),
             buildFactFindFinancialSituationHtml(profile, documentType),
             buildNeedsNarrativeHtml(profile, documentType),
+            warningHtml,
           )
         : documentType === "Terms of Business"
           ? buildTermsBlocks(profile, requiredRecommendationHtml, needsHtml, warningHtml)

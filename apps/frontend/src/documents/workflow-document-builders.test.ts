@@ -545,6 +545,20 @@ describe("buildWorkflowDocument", () => {
     expect(document.html.indexOf("Signatures and Record")).toBeLessThan(document.html.indexOf("Request for Information"));
   });
 
+  it("keeps warnings and disclaimers inside the final signature-page group", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+
+    (["Fact Find", "Fact Find Update"] as const).forEach((documentType) => {
+      const document = buildWorkflowDocument(profile, documentType);
+      const container = window.document.createElement("div");
+      container.innerHTML = document.html;
+      const group = container.querySelector<HTMLElement>(".fact-find-final-section-group");
+
+      expect(group).not.toBeNull();
+      expect(group?.querySelector(".document-callout-warning")).not.toBeNull();
+    });
+  });
+
   it("hides income protection arrangements when dedicated arrangement fields are blank", () => {
     const profile = cloneProfile("CLI-2026-0001");
     profile.documentDrafts["Fact Find"].lastGeneratedSections = [];
