@@ -2658,7 +2658,7 @@ button {
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-row,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-row {
   display: grid;
-  grid-template-columns: 84px 232px 34px 156px;
+  grid-template-columns: 84px 280px 34px 156px;
   align-items: center;
   column-gap: 8px;
   margin-bottom: 12px;

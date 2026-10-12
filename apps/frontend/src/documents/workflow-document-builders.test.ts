@@ -614,7 +614,7 @@ describe("buildWorkflowDocument", () => {
     const rows = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-row"));
     const dateFields = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-field-date"));
     expect(rows).toHaveLength(2);
-    expect(rows.every((row) => row.style.gridTemplateColumns === "76px 232px 28px 156px")).toBe(true);
+    expect(rows.every((row) => row.style.gridTemplateColumns === "76px 280px 28px 156px")).toBe(true);
     expect(dateFields).toHaveLength(2);
     expect(dateFields.every((field) => field.style.width === "156px")).toBe(true);
   });

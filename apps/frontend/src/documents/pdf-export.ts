@@ -361,7 +361,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:grid;grid-template-columns:76px 232px 28px 156px;align-items:center;column-gap:6px;margin:0 0 18px";
+    return "display:grid;grid-template-columns:76px 280px 28px 156px;align-items:center;column-gap:6px;margin:0 0 18px";
   }
 
   if (classList.contains("fact-find-signature-field-date")) {
@@ -1594,7 +1594,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find .fact-find-signature-row,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-row {
     display: grid;
-    grid-template-columns: 76px 232px 28px 156px;
+    grid-template-columns: 76px 280px 28px 156px;
     align-items: center;
     column-gap: 6px;
     margin-bottom: 18px;
