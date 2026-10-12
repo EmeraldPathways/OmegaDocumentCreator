@@ -586,6 +586,39 @@ describe("buildWorkflowDocument", () => {
     expect(callouts.every((callout) => callout.querySelector("h2")?.getAttribute("style")?.includes("margin:0 0 5px"))).toBe(true);
   });
 
+  it("uses shorter signature lines and longer date lines in both Fact Find PDF variants", () => {
+    const styledHtml = buildPdfStyledHtml(
+      `
+        <article class="workflow-document workflow-document-fact-find">
+          <div class="fact-find-signature-row">
+            <p class="fact-find-signature-label">Signature (1)</p>
+            <div class="fact-find-signature-field"><p class="fact-find-signature-value">&nbsp;</p></div>
+            <p class="fact-find-signature-label fact-find-signature-label-date">Date</p>
+            <div class="fact-find-signature-field fact-find-signature-field-date"><p class="fact-find-signature-value">&nbsp;</p></div>
+          </div>
+        </article>
+        <article class="workflow-document workflow-document-fact-find-update">
+          <div class="fact-find-signature-row">
+            <p class="fact-find-signature-label">Signature</p>
+            <div class="fact-find-signature-field"><p class="fact-find-signature-value">&nbsp;</p></div>
+            <p class="fact-find-signature-label fact-find-signature-label-date">Date</p>
+            <div class="fact-find-signature-field fact-find-signature-field-date"><p class="fact-find-signature-value">&nbsp;</p></div>
+          </div>
+        </article>
+      `,
+      true,
+    );
+    const container = window.document.createElement("div");
+    container.innerHTML = styledHtml;
+
+    const rows = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-row"));
+    const dateFields = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-field-date"));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.style.gridTemplateColumns === "76px 232px 28px 156px")).toBe(true);
+    expect(dateFields).toHaveLength(2);
+    expect(dateFields.every((field) => field.style.width === "156px")).toBe(true);
+  });
+
   it("hides income protection arrangements when dedicated arrangement fields are blank", () => {
     const profile = cloneProfile("CLI-2026-0001");
     profile.documentDrafts["Fact Find"].lastGeneratedSections = [];

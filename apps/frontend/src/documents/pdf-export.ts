@@ -361,15 +361,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:grid;grid-template-columns:76px minmax(200px,1fr) 28px 88px;align-items:center;column-gap:6px;margin:0 0 18px";
+    return "display:grid;grid-template-columns:76px 232px 28px 156px;align-items:center;column-gap:6px;margin:0 0 18px";
+  }
+
+  if (classList.contains("fact-find-signature-field-date")) {
+    return "display:flex;align-items:center;min-width:0;align-self:center;width:156px;padding-bottom:1px;border-bottom:1px solid #6b7280";
   }
 
   if (classList.contains("fact-find-signature-field")) {
     return "display:flex;align-items:center;min-width:0;align-self:center;padding-bottom:1px;border-bottom:1px solid #6b7280";
-  }
-
-  if (classList.contains("fact-find-signature-field-date")) {
-    return "display:flex;align-items:center;min-width:0;align-self:center;width:88px;padding-bottom:1px;border-bottom:1px solid #6b7280";
   }
 
   if (classList.contains("fact-find-request-copy")) {
@@ -1594,7 +1594,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   .preview-page .workflow-document-fact-find .fact-find-signature-row,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-row {
     display: grid;
-    grid-template-columns: 76px minmax(200px, 1fr) 28px 88px;
+    grid-template-columns: 76px 232px 28px 156px;
     align-items: center;
     column-gap: 6px;
     margin-bottom: 18px;
@@ -1628,7 +1628,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-field-date,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-field-date {
-    width: 88px;
+    width: 156px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-value,
   .preview-page .workflow-document-fact-find-update .fact-find-signature-value {

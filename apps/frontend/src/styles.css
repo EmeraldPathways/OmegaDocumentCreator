@@ -2658,7 +2658,7 @@ button {
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-row,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-row {
   display: grid;
-  grid-template-columns: 84px minmax(220px, 1fr) 34px 104px;
+  grid-template-columns: 84px 232px 34px 156px;
   align-items: center;
   column-gap: 8px;
   margin-bottom: 12px;
@@ -2717,7 +2717,7 @@ button {
 .generated-output-editor.ProseMirror .workflow-document-fact-find-update .fact-find-signature-field-date,
 .generated-output-pdf-page-body .workflow-document-fact-find .fact-find-signature-field-date,
 .generated-output-pdf-page-body .workflow-document-fact-find-update .fact-find-signature-field-date {
-  width: 104px;
+  width: 156px;
 }
 
 .workflow-document-fact-find .fact-find-signature-value,
