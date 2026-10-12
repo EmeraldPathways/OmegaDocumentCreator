@@ -78,7 +78,7 @@ function hasCurrentFactFindSigningLayout(editedHtml: string) {
 
 function hasCurrentFactFindRequestLayout(editedHtml: string) {
   const requestRows = Array.from(
-    editedHtml.matchAll(/<div class="fact-find-request-row">([\s\S]*?)<\/div>/g),
+    editedHtml.matchAll(/<div class="fact-find-request-row">([\s\S]*?)<\/div>\s*<\/div>/g),
     (match) => match[1],
   );
 
@@ -121,7 +121,7 @@ function hasCurrentFactFindServicesLayout(editedHtml: string) {
 
 function hasCurrentClientSummaryLayout(editedHtml: string) {
   const clientSummaryMatch = editedHtml.match(
-    /<div class="client-summary-grid"><h2>Client Summary<\/h2>([\s\S]*?)<\/div>/i,
+    /<div class="client-summary-grid"><h2>Client Summary<\/h2>([\s\S]*?)<\/div>\s*<\/div>/i,
   );
   const clientSummaryHtml = clientSummaryMatch?.[1] ?? "";
 
@@ -295,13 +295,9 @@ function buildFactFindLiabilityProbe(profile: SeededClientProfile) {
 }
 
 function buildFactFindSavingsProbe(profile: SeededClientProfile) {
-  return profile.savingsInvestmentRows.flatMap((row, index) => [
-    `Savings ${index + 1}`,
-    row.financialInstitution,
-    row.value,
-    row.startDate,
-    row.term,
-  ]).filter((value) => hasNonDefaultFactFindValue(value));
+  return profile.savingsInvestmentRows
+    .flatMap((row) => [row.financialInstitution, row.value, row.startDate, row.term])
+    .filter((value) => hasNonDefaultFactFindValue(value));
 }
 
 function hasUnexpectedFactFindRecommendationSection(draft: GeneratedDocumentDraft) {
@@ -444,7 +440,7 @@ export function resolveFactFindDraft(profile: SeededClientProfile): GeneratedDoc
       hasUnexpectedFactFindRecommendationSection(factFindDraft)
     );
 
-  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !isLegacyFactFindDraft(factFindDraft) && !shouldRebuildComposedHtml && !hasComposedHtml) {
+  if (!hasLegacyFactFindHeaderHtml(editedHtml) && !isLegacyFactFindDraft(factFindDraft) && !shouldRebuildComposedHtml) {
     return factFindDraft;
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
+import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 import { resolveFactFindDraft, resolveFactFindUpdateDraft, resolveQuoteDraft, resolveStatementDraft } from "./statement-draft";
 
 function cloneProfile(clientReference: string) {
@@ -246,6 +247,19 @@ describe("resolveFactFindDraft", () => {
     expect(draft.editedHtml).toContain("fact-find-declarations-section");
     expect(draft.editedHtml).toContain('<span class="grid-label">Execution only</span>');
   });
+
+  it("preserves edits in the current composed fact find layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    const currentHtml = buildWorkflowEditorDocument(profile, "Fact Find").html;
+    profile.documentDrafts["Fact Find"].editedHtml = currentHtml.replace(
+      "No personal circumstances recorded.",
+      "Edited personal circumstances.",
+    );
+
+    const draft = resolveFactFindDraft(profile);
+
+    expect(draft.editedHtml).toContain("Edited personal circumstances.");
+  });
 });
 
 describe("resolveFactFindUpdateDraft", () => {
@@ -284,5 +298,18 @@ describe("resolveFactFindUpdateDraft", () => {
     expect(draft.editedHtml).toContain('<span class="grid-label">Advisor</span>');
     expect(draft.editedHtml).not.toContain("Date of birth");
     expect(draft.editedHtml).not.toContain("Occupation");
+  });
+
+  it("preserves edits in the current composed fact find update layout", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    const currentHtml = buildWorkflowEditorDocument(profile, "Fact Find Update").html;
+    profile.documentDrafts["Fact Find Update"].editedHtml = currentHtml.replace(
+      "No personal circumstances recorded.",
+      "Edited personal circumstances.",
+    );
+
+    const draft = resolveFactFindUpdateDraft(profile);
+
+    expect(draft.editedHtml).toContain("Edited personal circumstances.");
   });
 });
