@@ -116,6 +116,36 @@ describe("quote table layout", () => {
   });
 });
 
+describe("Fact Find signature layout", () => {
+  it("keeps usable vertical signing space in both Fact Find PDF variants", () => {
+    const styledHtml = buildPdfStyledHtml(
+      `
+        <article class="workflow-document workflow-document-fact-find">
+          <div class="fact-find-signing-block">
+            <p class="fact-find-signing-intro">Signing introduction</p>
+            <div class="fact-find-signature-row"><p class="fact-find-signature-label">Signature (1)</p></div>
+          </div>
+        </article>
+        <article class="workflow-document workflow-document-fact-find-update">
+          <div class="fact-find-signing-block">
+            <p class="fact-find-signing-subheading">FINANCIAL ADVISOR'S SIGNATURE</p>
+            <div class="fact-find-signature-row"><p class="fact-find-signature-label">Signature</p></div>
+          </div>
+        </article>
+      `,
+      true,
+    );
+
+    const container = document.createElement("div");
+    container.innerHTML = styledHtml;
+
+    const signatureRows = Array.from(container.querySelectorAll<HTMLElement>(".fact-find-signature-row"));
+    expect(signatureRows).toHaveLength(2);
+    expect(signatureRows.every((row) => row.style.marginBottom === "18px")).toBe(true);
+    expect(container.querySelector<HTMLElement>(".fact-find-signing-intro")?.style.marginBottom).toBe("12px");
+    expect(container.querySelector<HTMLElement>(".fact-find-signing-subheading")?.style.marginTop).toBe("18px");
+  });
+});
 describe("buildStandaloneDocumentPreviewHtml", () => {
   it("strips executable markup from preview html", () => {
     const previewHtml = buildStandaloneDocumentPreviewHtml(

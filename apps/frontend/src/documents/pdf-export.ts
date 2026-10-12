@@ -361,7 +361,7 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signature-row")) {
-    return "display:grid;grid-template-columns:76px minmax(200px,1fr) 28px 88px;align-items:center;column-gap:6px;margin:0 0 10px";
+    return "display:grid;grid-template-columns:76px minmax(200px,1fr) 28px 88px;align-items:center;column-gap:6px;margin:0 0 18px";
   }
 
   if (classList.contains("fact-find-signature-field")) {
@@ -417,11 +417,11 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("fact-find-signing-intro")) {
-    return "margin:0 0 6px;font-weight:600";
+    return "margin:0 0 12px;font-weight:600";
   }
 
   if (classList.contains("fact-find-signing-subheading")) {
-    return "margin:8px 0 6px;font-weight:700";
+    return "margin:18px 0 12px;font-weight:700";
   }
 
   if (classList.contains("fact-find-signature-label")) {
@@ -1578,12 +1578,12 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-intro,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-intro {
-    margin: 0 0 6px;
+    margin: 0 0 12px;
     font-weight: 600;
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-subheading,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-subheading {
-    margin: 8px 0 6px;
+    margin: 18px 0 12px;
     font-weight: 700;
   }
   .preview-page .workflow-document-fact-find .fact-find-signature-row,
@@ -1592,7 +1592,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     grid-template-columns: 76px minmax(200px, 1fr) 28px 88px;
     align-items: center;
     column-gap: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 18px;
   }
   .preview-page .workflow-document-fact-find .fact-find-signing-block > .fact-find-signature-row:first-of-type,
   .preview-page .workflow-document-fact-find-update .fact-find-signing-block > .fact-find-signature-row:first-of-type {
