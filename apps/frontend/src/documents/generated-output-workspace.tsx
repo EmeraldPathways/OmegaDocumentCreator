@@ -4,7 +4,7 @@ import { CheckCircle2, Edit2, Eye, FileDown, RefreshCw } from "lucide-react";
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
-import { buildPdfStyledHtml, paginatePdfContent, A4_WIDTH_PX, A4_HEIGHT_PX, HEADER_HEIGHT, FOOTER_HEIGHT, OMEGA_FOOTER_LINES } from "./pdf-export";
+import { buildPdfPreviewPages, buildPdfStyledHtml, A4_WIDTH_PX, A4_HEIGHT_PX, FOOTER_HEIGHT, OMEGA_FOOTER_LINES } from "./pdf-export";
 import { resolveDraftPreviewHtml } from "./document-preview";
 import { RichDocumentEditor } from "./rich-document-editor";
 
@@ -26,15 +26,17 @@ type GeneratedOutputWorkspaceProps = {
 type ViewMode = "edit" | "preview";
 
 function PreviewPage({
-  bodyPadding,
   children,
+  headerHtml,
+  headerHeight,
   pageNumber,
   totalPages,
   showShellHeader,
   showShellFooter,
 }: {
-  bodyPadding: string;
   children: string;
+  headerHtml: string;
+  headerHeight: number;
   pageNumber: number;
   totalPages: number;
   showShellHeader: boolean;
@@ -44,14 +46,15 @@ function PreviewPage({
     (line) => `<div style="font-size:7.5px;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:3px;">${line}</div>`,
   ).join("");
   const pageNumberHtml = totalPages > 1 ? `<div style="font-size:7.5px;color:#888;margin-top:5px;">Page ${pageNumber} of ${totalPages}</div>` : "";
+  const contentTop = headerHtml ? 20 + headerHeight + 10 : 28;
 
   return (
     <div
       className="generated-output-pdf-page"
       style={{
         width: A4_WIDTH_PX,
+        height: A4_HEIGHT_PX,
         minHeight: A4_HEIGHT_PX,
-        height: "auto",
         background: "#fff",
         border: "1px solid #dbe3ee",
         boxShadow: "0 4px 16px rgba(15,23,42,0.08)",
@@ -60,11 +63,20 @@ function PreviewPage({
         boxSizing: "border-box",
       }}
     >
-      {showShellHeader ? (
+      {headerHtml ? (
+        <div
+          style={{ position: "absolute", top: 20, left: 50, right: 50 }}
+          dangerouslySetInnerHTML={{ __html: headerHtml }}
+        />
+      ) : showShellHeader ? (
         <div
           style={{
+            position: "absolute",
+            top: 20,
+            left: 50,
+            right: 50,
             textAlign: "center",
-            padding: "20px 42px 12px",
+            paddingBottom: 12,
             borderBottom: "1px solid #e5e7eb",
           }}
         >
@@ -78,17 +90,25 @@ function PreviewPage({
       <div
         className="generated-output-pdf-page-body"
         style={{
-          padding: bodyPadding,
-          minHeight: showShellFooter ? A4_HEIGHT_PX - HEADER_HEIGHT - FOOTER_HEIGHT - 40 : A4_HEIGHT_PX - 80,
+          position: "absolute",
+          top: contentTop,
+          left: 50,
+          right: 50,
+          bottom: FOOTER_HEIGHT,
+          overflow: "hidden",
+          boxSizing: "border-box",
         }}
         dangerouslySetInnerHTML={{ __html: children }}
       />
       {showShellFooter ? (
         <div
           style={{
-            margin: "0 42px",
-            padding: "12px 0 8px",
+            position: "absolute",
+            bottom: 18,
+            left: 42,
+            right: 42,
             borderTop: "1px solid #000",
+            paddingTop: 6,
             textAlign: "center",
           }}
           dangerouslySetInnerHTML={{ __html: footerLines + pageNumberHtml }}
@@ -99,57 +119,25 @@ function PreviewPage({
 }
 
 function PdfPreview({ html }: { html: string }) {
-  const editorDocumentPadding = "72px 80px 80px";
   const styledHtml = useMemo(
     () => buildPdfStyledHtml(html, true, { stripFactFindLogosForPreview: true }),
     [html],
   );
-  const isStatement = styledHtml.includes("workflow-document-statement-of-suitability");
-  const showShellFooter = isStatement;
-  const previewBodyPadding = editorDocumentPadding;
-
-  if (!isStatement) {
-    return (
-      <PreviewPage
-        bodyPadding={previewBodyPadding}
-        pageNumber={1}
-        showShellFooter={false}
-        showShellHeader={false}
-        totalPages={1}
-      >
-        {styledHtml}
-      </PreviewPage>
-    );
-  }
-
-  const pagination = paginatePdfContent(styledHtml);
-
-  if (pagination.mode === "continuous") {
-    return (
-      <PreviewPage
-        bodyPadding={previewBodyPadding}
-        pageNumber={1}
-        showShellFooter={showShellFooter}
-        showShellHeader={false}
-        totalPages={1}
-      >
-        {pagination.html}
-      </PreviewPage>
-    );
-  }
+  const previewPages = useMemo(() => buildPdfPreviewPages(styledHtml), [styledHtml]);
 
   return (
     <>
-      {pagination.pages.map((pageHtml, index) => (
+      {previewPages.map((page, index) => (
         <PreviewPage
-          bodyPadding={previewBodyPadding}
+          headerHtml={page.headerHtml}
+          headerHeight={page.headerHeight}
           key={`generated-output-page-${index + 1}`}
           pageNumber={index + 1}
-          showShellFooter={showShellFooter}
-          showShellHeader={false}
-          totalPages={pagination.pages.length}
+          showShellFooter
+          showShellHeader={!page.headerHtml}
+          totalPages={previewPages.length}
         >
-          {pageHtml}
+          {page.contentHtml}
         </PreviewPage>
       ))}
     </>

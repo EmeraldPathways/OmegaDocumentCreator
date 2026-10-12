@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildPdfStyledHtml, buildStandaloneDocumentPreviewHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
+import { buildPdfPreviewPages, buildPdfStyledHtml, buildStandaloneDocumentPreviewHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
 
 const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
@@ -82,6 +82,32 @@ describe("paginatePdfContent", () => {
     expect(pagination.pages[0]).toContain("Paragraph 1");
     expect(pagination.pages[0]).toContain("Paragraph 2");
     expect(pagination.pages[1]).toContain("Paragraph 3");
+  });
+  it("repeats the shared letter header across pages for every workflow preview", () => {
+    mockPdfHeights();
+
+    ([
+      "workflow-document-fact-find",
+      "workflow-document-fact-find-update",
+      "workflow-document-quote",
+      "workflow-document-statement-of-suitability",
+    ] as const).forEach((workflowClass) => {
+      const html = `
+        <article class="workflow-document ${workflowClass}">
+          <div class="statement-letter-header pdf-block">
+            <img class="statement-logo" alt="Omega Financial Management" />
+            <div class="statement-client-details"><p class="statement-client-name">Jamie Murphy</p></div>
+          </div>
+          <div class="statement-section pdf-block" data-test-height="600"><p>Page one</p></div>
+          <div class="statement-section pdf-block" data-test-height="600"><p>Page two</p></div>
+        </article>
+      `;
+
+      const previewPages = buildPdfPreviewPages(html);
+
+      expect(previewPages).toHaveLength(2);
+      expect(previewPages.every((page) => page.headerHtml.includes("statement-letter-header"))).toBe(true);
+    });
   });
 });
 

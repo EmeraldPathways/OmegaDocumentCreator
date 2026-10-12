@@ -1000,7 +1000,28 @@ function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: n
 }
 
 export function paginatePdfContent(htmlContent: string) {
-  return splitContentIntoPages(htmlContent);
+  const headerExtraction = extractRepeatingHeaderHtml(htmlContent);
+  const headerHeight = headerExtraction.headerHtml
+    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml)
+    : HEADER_HEIGHT;
+  const pagination = splitContentIntoPages(headerExtraction.contentHtml, { headerHeight });
+
+  return {
+    ...pagination,
+    headerHtml: headerExtraction.headerHtml,
+    headerHeight,
+  };
+}
+
+export function buildPdfPreviewPages(htmlContent: string) {
+  const pagination = paginatePdfContent(htmlContent);
+  const pageHtml = pagination.mode === "paged" ? pagination.pages : [pagination.html];
+
+  return pageHtml.map((contentHtml) => ({
+    contentHtml,
+    headerHtml: pagination.headerHtml,
+    headerHeight: pagination.headerHeight,
+  }));
 }
 
 function downloadBlob(blob: Blob, filename: string) {
