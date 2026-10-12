@@ -9,7 +9,7 @@ const REPEATING_HEADER_TOP_OFFSET = 20;
 const REPEATING_HEADER_BOTTOM_GAP = 10;
 const PAGE_TOP_PADDING_WITH_REPEATING_HEADER =
   REPEATING_HEADER_TOP_OFFSET + HEADER_HEIGHT + REPEATING_HEADER_BOTTOM_GAP;
-export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_TOP_PADDING_WITH_REPEATING_HEADER - FOOTER_HEIGHT - 20;
+export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_TOP_PADDING_WITH_REPEATING_HEADER - FOOTER_HEIGHT;
 const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
@@ -20,7 +20,7 @@ function resolvePageTopPaddingWithHeader(headerHeight = HEADER_HEIGHT) {
 }
 
 function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
-  return A4_HEIGHT_PX - resolvePageTopPaddingWithHeader(headerHeight) - FOOTER_HEIGHT - 20;
+  return A4_HEIGHT_PX - resolvePageTopPaddingWithHeader(headerHeight) - FOOTER_HEIGHT;
 }
 
 function shouldStartOnFreshPdfPage(element: Element) {

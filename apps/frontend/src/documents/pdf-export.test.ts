@@ -158,6 +158,30 @@ describe("paginatePdfContent", () => {
     expect(pagination.pages[0]).not.toContain("Warnings and Disclaimers");
     expect(pagination.pages[1]).toContain("Warnings and Disclaimers");
   });
+
+  it("uses the full rendered content area for a compact Fact Find Update warning", () => {
+    mockPdfHeights();
+
+    const html = `
+      <article class="workflow-document workflow-document-fact-find-update">
+        <div class="statement-section pdf-block" data-test-height="650"><p>Existing page content</p></div>
+        <div class="document-section fact-find-final-section-group pdf-block">
+          <div class="document-section fact-find-signatures-section pdf-block" data-test-height="120"><h2>Signatures and Record</h2></div>
+          <aside class="document-callout document-callout-warning pdf-block" data-test-height="70"><h2>Warnings and Disclaimers</h2></aside>
+        </div>
+      </article>
+    `;
+
+    const pagination = paginatePdfContent(html);
+
+    expect(pagination.mode).toBe("paged");
+    if (pagination.mode !== "paged") {
+      return;
+    }
+
+    expect(pagination.pages).toHaveLength(1);
+    expect(pagination.pages[0]).toContain("Warnings and Disclaimers");
+  });
 });
 
 describe("shouldShowPdfShellHeader", () => {
