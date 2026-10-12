@@ -109,6 +109,29 @@ describe("paginatePdfContent", () => {
       expect(previewPages.every((page) => page.headerHtml.includes("statement-letter-header"))).toBe(true);
     });
   });
+
+  it("keeps the Fact Find Update final signatures on the current page when they fit", () => {
+    mockPdfHeights();
+
+    const html = `
+      <article class="workflow-document workflow-document-fact-find-update">
+        <div class="statement-section pdf-block" data-test-height="500"><p>Existing page content</p></div>
+        <div class="document-section fact-find-final-section-group pdf-block" data-test-height="200">
+          <div class="document-section fact-find-signatures-section pdf-block"><h2>Signatures and Record</h2></div>
+        </div>
+      </article>
+    `;
+
+    const pagination = paginatePdfContent(html);
+
+    expect(pagination.mode).toBe("paged");
+    if (pagination.mode !== "paged") {
+      return;
+    }
+
+    expect(pagination.pages).toHaveLength(1);
+    expect(pagination.pages[0]).toContain("Signatures and Record");
+  });
 });
 
 describe("shouldShowPdfShellHeader", () => {

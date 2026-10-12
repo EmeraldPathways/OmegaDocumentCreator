@@ -26,7 +26,6 @@ function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
 function shouldStartOnFreshPdfPage(element: Element) {
   return (
     element.classList.contains("fact-find-life-savings-group") ||
-    element.classList.contains("fact-find-final-section-group") ||
     element.classList.contains("fact-find-asset-liability-section") ||
     element.classList.contains("fact-find-pension-self-section") ||
     element.classList.contains("fact-find-pension-partner-section")
