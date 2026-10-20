@@ -4,7 +4,7 @@ import { CheckCircle2, Edit2, Eye, FileDown, RefreshCw } from "lucide-react";
 import { Badge, Button } from "../components/ui";
 import type { GeneratedDocumentDraft } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
-import { buildPdfPreviewPages, buildPdfStyledHtml, A4_WIDTH_PX, A4_HEIGHT_PX, FOOTER_HEIGHT, OMEGA_FOOTER_LINES } from "./pdf-export";
+import { buildPdfPreviewPages, buildPdfStyledHtml, FOOTER_HEIGHT, OMEGA_FOOTER_LINES, type PdfPageLayout } from "./pdf-export";
 import { resolveDraftPreviewHtml } from "./document-preview";
 import { RichDocumentEditor } from "./rich-document-editor";
 
@@ -29,6 +29,7 @@ function PreviewPage({
   children,
   headerHtml,
   headerHeight,
+  pageLayout,
   pageNumber,
   totalPages,
   showShellHeader,
@@ -37,6 +38,7 @@ function PreviewPage({
   children: string;
   headerHtml: string;
   headerHeight: number;
+  pageLayout: PdfPageLayout;
   pageNumber: number;
   totalPages: number;
   showShellHeader: boolean;
@@ -52,9 +54,9 @@ function PreviewPage({
     <div
       className="generated-output-pdf-page"
       style={{
-        width: A4_WIDTH_PX,
-        height: A4_HEIGHT_PX,
-        minHeight: A4_HEIGHT_PX,
+        width: pageLayout.widthPx,
+        height: pageLayout.heightPx,
+        minHeight: pageLayout.heightPx,
         background: "#fff",
         border: "1px solid #dbe3ee",
         boxShadow: "0 4px 16px rgba(15,23,42,0.08)",
@@ -132,6 +134,7 @@ function PdfPreview({ html }: { html: string }) {
           headerHtml={page.headerHtml}
           headerHeight={page.headerHeight}
           key={`generated-output-page-${index + 1}`}
+          pageLayout={page.pageLayout}
           pageNumber={index + 1}
           showShellFooter
           showShellHeader={!page.headerHtml}
@@ -251,6 +254,7 @@ export function GeneratedOutputWorkspace({
           <RichDocumentEditor
             content={previewHtml}
             fontSize={fontSize}
+            isLandscape={previewHtml.includes("workflow-document-quote-picker")}
             onAddImage={() => fileInputRef.current?.click()}
             onContentChange={onContentChange}
             onFontSizeChange={setFontSize}

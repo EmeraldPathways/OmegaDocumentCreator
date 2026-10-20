@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildPdfPreviewPages, buildPdfStyledHtml, buildStandaloneDocumentPreviewHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, shouldShowPdfShellHeader } from "./pdf-export";
+import { A4_HEIGHT_PX, A4_WIDTH_PX, buildPdfPreviewPages, buildPdfStyledHtml, buildStandaloneDocumentPreviewHtml, PAGE_CONTENT_HEIGHT, paginatePdfContent, resolvePdfPageLayout, shouldShowPdfShellHeader } from "./pdf-export";
 
 const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
@@ -193,6 +193,36 @@ describe("shouldShowPdfShellHeader", () => {
     expect(shouldShowPdfShellHeader(true, 0)).toBe(true);
     expect(shouldShowPdfShellHeader(true, 1)).toBe(true);
     expect(shouldShowPdfShellHeader(false, 0)).toBe(true);
+  });
+});
+
+describe("PDF page layout", () => {
+  it("uses A4 landscape dimensions for Quote Picker documents", () => {
+    const layout = resolvePdfPageLayout('<article class="workflow-document workflow-document-quote-picker"></article>');
+
+    expect(layout.orientation).toBe("landscape");
+    expect(layout.widthPx).toBe(A4_HEIGHT_PX);
+    expect(layout.heightPx).toBe(A4_WIDTH_PX);
+  });
+
+  it("keeps standard documents in portrait layout", () => {
+    const layout = resolvePdfPageLayout('<article class="workflow-document workflow-document-quote"></article>');
+
+    expect(layout.orientation).toBe("portrait");
+    expect(layout.widthPx).toBe(A4_WIDTH_PX);
+    expect(layout.heightPx).toBe(A4_HEIGHT_PX);
+  });
+
+  it("exposes landscape dimensions on Quote Picker preview pages", () => {
+    mockPdfHeights();
+
+    const pages = buildPdfPreviewPages(
+      '<article class="workflow-document workflow-document-quote-picker"><div class="statement-section pdf-block" data-test-height="40"><p>Quote Picker</p></div></article>',
+    );
+
+    expect(pages[0]?.pageLayout.orientation).toBe("landscape");
+    expect(pages[0]?.pageLayout.widthPx).toBe(A4_HEIGHT_PX);
+    expect(pages[0]?.pageLayout.heightPx).toBe(A4_WIDTH_PX);
   });
 });
 

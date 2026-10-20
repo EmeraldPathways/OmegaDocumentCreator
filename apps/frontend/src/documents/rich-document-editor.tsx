@@ -9,6 +9,7 @@ import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
 type RichDocumentEditorProps = {
   content: string;
   fontSize: string;
+  isLandscape?: boolean;
   onAddImage?: () => void;
   onContentChange: (html: string) => void;
   onFontSizeChange: (value: string) => void;
@@ -379,6 +380,7 @@ const ResizableImageExtension = Image.extend({
 export function RichDocumentEditor({
   content,
   fontSize,
+  isLandscape = false,
   onAddImage,
   onContentChange,
   onFontSizeChange,
@@ -432,7 +434,7 @@ export function RichDocumentEditor({
   }
 
   return (
-    <div className="generated-output-editor-shell">
+    <div className={`generated-output-editor-shell${isLandscape ? " is-landscape" : ""}`}>
       <div className="generated-output-toolbar">
         <ToolbarButton active={editor.isActive("bold")} label="Bold" onClick={() => editor.chain().focus().toggleBold().run()}>
           <Bold size={16} />

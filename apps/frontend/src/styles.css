@@ -2014,6 +2014,13 @@ button {
   color: #0f172a;
 }
 
+.generated-output-editor-shell.is-landscape .generated-output-editor.ProseMirror {
+  width: 1123px;
+  max-width: none;
+  min-height: 794px;
+  padding: 48px 50px 60px;
+}
+
 .generated-output-preview-shell {
   min-height: 720px;
   padding: 12px;
@@ -2022,6 +2029,7 @@ button {
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
+  overflow-x: auto;
 }
 
 .generated-output-editor.ProseMirror p,

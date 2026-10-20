@@ -16,12 +16,42 @@ const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const PAGE_TOP_PADDING_WITHOUT_HEADER = 28;
 
+export type PdfPageLayout = {
+  orientation: "portrait" | "landscape";
+  widthPx: number;
+  heightPx: number;
+  widthMm: number;
+  heightMm: number;
+};
+
+const PORTRAIT_PAGE_LAYOUT: PdfPageLayout = {
+  orientation: "portrait",
+  widthPx: A4_WIDTH_PX,
+  heightPx: A4_HEIGHT_PX,
+  widthMm: A4_WIDTH_MM,
+  heightMm: A4_HEIGHT_MM,
+};
+
+const LANDSCAPE_PAGE_LAYOUT: PdfPageLayout = {
+  orientation: "landscape",
+  widthPx: A4_HEIGHT_PX,
+  heightPx: A4_WIDTH_PX,
+  widthMm: A4_HEIGHT_MM,
+  heightMm: A4_WIDTH_MM,
+};
+
+export function resolvePdfPageLayout(html: string): PdfPageLayout {
+  return html.includes("workflow-document-quote-picker")
+    ? LANDSCAPE_PAGE_LAYOUT
+    : PORTRAIT_PAGE_LAYOUT;
+}
+
 function resolvePageTopPaddingWithHeader(headerHeight = HEADER_HEIGHT) {
   return REPEATING_HEADER_TOP_OFFSET + headerHeight + REPEATING_HEADER_BOTTOM_GAP;
 }
 
-function resolvePageContentHeight(headerHeight = HEADER_HEIGHT) {
-  return A4_HEIGHT_PX - resolvePageTopPaddingWithHeader(headerHeight) - FOOTER_HEIGHT;
+function resolvePageContentHeight(headerHeight = HEADER_HEIGHT, pageHeightPx = A4_HEIGHT_PX) {
+  return pageHeightPx - resolvePageTopPaddingWithHeader(headerHeight) - FOOTER_HEIGHT;
 }
 
 function shouldStartOnFreshPdfPage(element: Element) {
@@ -815,15 +845,20 @@ export function buildPdfStyledHtml(html: string, addBlockClass = false, options?
   return targetDocument.body.innerHTML.trim();
 }
 
-function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: number }) {
-  const pageContentHeight = resolvePageContentHeight(options?.headerHeight);
+function splitContentIntoPages(
+  htmlContent: string,
+  options?: { headerHeight?: number; pageHeightPx?: number; pageWidthPx?: number },
+) {
+  const pageHeightPx = options?.pageHeightPx ?? A4_HEIGHT_PX;
+  const pageWidthPx = options?.pageWidthPx ?? A4_WIDTH_PX;
+  const pageContentHeight = resolvePageContentHeight(options?.headerHeight, pageHeightPx);
   const pages: string[] = [];
   const tempContainer = document.createElement("div");
   tempContainer.style.cssText = `
     position:absolute;
     left:-9999px;
     top:-9999px;
-    width:${A4_WIDTH_PX - 100}px;
+    width:${pageWidthPx - 100}px;
     visibility:hidden;
     box-sizing:border-box;
   `;
@@ -1041,16 +1076,22 @@ function splitContentIntoPages(htmlContent: string, options?: { headerHeight?: n
 }
 
 export function paginatePdfContent(htmlContent: string) {
+  const pageLayout = resolvePdfPageLayout(htmlContent);
   const headerExtraction = extractRepeatingHeaderHtml(htmlContent);
   const headerHeight = headerExtraction.headerHtml
-    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml)
+    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml, pageLayout.widthPx)
     : HEADER_HEIGHT;
-  const pagination = splitContentIntoPages(headerExtraction.contentHtml, { headerHeight });
+  const pagination = splitContentIntoPages(headerExtraction.contentHtml, {
+    headerHeight,
+    pageHeightPx: pageLayout.heightPx,
+    pageWidthPx: pageLayout.widthPx,
+  });
 
   return {
     ...pagination,
     headerHtml: headerExtraction.headerHtml,
     headerHeight,
+    pageLayout,
   };
 }
 
@@ -1062,6 +1103,7 @@ export function buildPdfPreviewPages(htmlContent: string) {
     contentHtml,
     headerHtml: pagination.headerHtml,
     headerHeight: pagination.headerHeight,
+    pageLayout: pagination.pageLayout,
   }));
 }
 
@@ -1113,7 +1155,7 @@ function extractRepeatingHeaderHtml(html: string) {
   };
 }
 
-function measureRepeatingHeaderHeight(headerHtml: string) {
+function measureRepeatingHeaderHeight(headerHtml: string, pageWidthPx = A4_WIDTH_PX) {
   if (typeof document === "undefined" || !headerHtml) {
     return HEADER_HEIGHT;
   }
@@ -1123,7 +1165,7 @@ function measureRepeatingHeaderHeight(headerHtml: string) {
     position:absolute;
     left:-9999px;
     top:-9999px;
-    width:${A4_WIDTH_PX - 100}px;
+    width:${pageWidthPx - 100}px;
     visibility:hidden;
     box-sizing:border-box;
   `;
@@ -1150,8 +1192,9 @@ function buildPageHtml(
   content: string,
   pageNumber: number,
   totalPages: number,
-  options?: { headerHtml?: string; headerHeight?: number },
+  options?: { headerHtml?: string; headerHeight?: number; pageLayout?: PdfPageLayout },
 ) {
+  const pageLayout = options?.pageLayout ?? PORTRAIT_PAGE_LAYOUT;
   const footerLines = OMEGA_FOOTER_LINES.map(
     (line, index) => `<div style="font-size:7px;line-height:1.2;font-family:Helvetica,Arial,sans-serif;color:#444;margin-top:${index === 0 ? "0" : "2px"};">${line}</div>`,
   ).join("");
@@ -1169,8 +1212,8 @@ function buildPageHtml(
 
   return `
     <div class="pdf-page" style="
-      width:${A4_WIDTH_PX}px;
-      height:${A4_HEIGHT_PX}px;
+      width:${pageLayout.widthPx}px;
+      height:${pageLayout.heightPx}px;
       position:relative;
       box-sizing:border-box;
       background:#ffffff;
@@ -1191,32 +1234,42 @@ function buildPageHtml(
   `;
 }
 
-function drawPdfPageChrome(pdf: JsPdfInstance, pageNumber: number, totalPages: number, options?: { showShellHeader?: boolean }) {
+function drawPdfPageChrome(
+  pdf: JsPdfInstance,
+  pageNumber: number,
+  totalPages: number,
+  options?: { pageLayout?: PdfPageLayout; showShellHeader?: boolean },
+) {
+  const pageLayout = options?.pageLayout ?? PORTRAIT_PAGE_LAYOUT;
+  const centerX = pageLayout.widthMm / 2;
+  const footerLineY = pageLayout.heightMm - 22;
+  const footerMaxWidth = pageLayout.widthMm - 84;
+
   if (options?.showShellHeader) {
-    pdf.addImage(OMEGA_LOGO_DATA_URI, "PNG", 71, 9, 68, 18, undefined, "FAST");
+    pdf.addImage(OMEGA_LOGO_DATA_URI, "PNG", centerX - 34, 9, 68, 18, undefined, "FAST");
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(10);
     pdf.setTextColor(68, 68, 68);
-    pdf.text("Income Protection Workflow", 105, 34, { align: "center" });
+    pdf.text("Income Protection Workflow", centerX, 34, { align: "center" });
   }
 
   pdf.setDrawColor(0, 0, 0);
   pdf.setLineWidth(0.2);
-  pdf.line(42, 275, 168, 275);
+  pdf.line(42, footerLineY, pageLayout.widthMm - 42, footerLineY);
 
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(7);
   pdf.setTextColor(68, 68, 68);
-  let footerY = 279;
+  let footerY = pageLayout.heightMm - 18;
   OMEGA_FOOTER_LINES.forEach((line) => {
-    const wrappedLines = pdf.splitTextToSize(line, 126);
-    pdf.text(wrappedLines, 105, footerY, { align: "center", maxWidth: 126 });
+    const wrappedLines = pdf.splitTextToSize(line, footerMaxWidth);
+    pdf.text(wrappedLines, centerX, footerY, { align: "center", maxWidth: footerMaxWidth });
     footerY += wrappedLines.length * 3.1 + 1;
   });
 
   if (totalPages > 1) {
     pdf.setTextColor(136, 136, 136);
-    pdf.text(`Page ${pageNumber} of ${totalPages}`, 105, footerY + 2, { align: "center" });
+    pdf.text(`Page ${pageNumber} of ${totalPages}`, centerX, footerY + 2, { align: "center" });
   }
 }
 
@@ -1240,11 +1293,12 @@ function canRenderCanvas() {
 
 export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
   const { html2canvas, jsPDF } = await loadPdfDependencies();
+  const pageLayout = resolvePdfPageLayout(html);
 
   if (!canRenderCanvas()) {
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdf = new jsPDF({ orientation: pageLayout.orientation, unit: "mm", format: "a4" });
     const text = stripHtml(html);
-    const lines = pdf.splitTextToSize(text, 170);
+    const lines = pdf.splitTextToSize(text, pageLayout.widthMm - 40);
     pdf.text(lines, 20, 20);
     return pdf.output("blob");
   }
@@ -1255,16 +1309,20 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
   });
   const headerExtraction = extractRepeatingHeaderHtml(parsedContent);
   const headerHeight = headerExtraction.headerHtml
-    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml)
+    ? measureRepeatingHeaderHeight(headerExtraction.headerHtml, pageLayout.widthPx)
     : HEADER_HEIGHT;
-  const pagination = splitContentIntoPages(headerExtraction.contentHtml, { headerHeight });
+  const pagination = splitContentIntoPages(headerExtraction.contentHtml, {
+    headerHeight,
+    pageHeightPx: pageLayout.heightPx,
+    pageWidthPx: pageLayout.widthPx,
+  });
   const container = document.createElement("div");
   container.style.cssText = "position:absolute;left:-9999px;top:-9999px;";
   document.body.appendChild(container);
 
   try {
     const pdf = new jsPDF({
-      orientation: "portrait",
+      orientation: pageLayout.orientation,
       unit: "mm",
       format: "a4",
       compress: false,
@@ -1277,6 +1335,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
         pageDiv.innerHTML = buildPageHtml(pagination.pages[pageIndex], pageIndex + 1, pagination.pages.length, {
           headerHtml: headerExtraction.headerHtml,
           headerHeight,
+          pageLayout,
         });
         container.appendChild(pageDiv);
 
@@ -1290,8 +1349,8 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
           scale: RENDER_SCALE,
           useCORS: true,
           allowTaint: true,
-          width: A4_WIDTH_PX,
-          height: A4_HEIGHT_PX,
+          width: pageLayout.widthPx,
+          height: pageLayout.heightPx,
           backgroundColor: "#ffffff",
           logging: false,
           removeContainer: true,
@@ -1302,12 +1361,12 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
           pdf.addPage();
         }
 
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "SLOW");
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pageLayout.widthMm, pageLayout.heightMm, undefined, "SLOW");
       }
     } else {
       const flowContainer = document.createElement("div");
       flowContainer.style.cssText = `
-        width:${A4_WIDTH_PX - 100}px;
+        width:${pageLayout.widthPx - 100}px;
         box-sizing:border-box;
         background:#ffffff;
         padding:0;
@@ -1330,7 +1389,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
       container.removeChild(flowContainer);
 
       const pageHeightPx = (
-        A4_HEIGHT_PX
+        pageLayout.heightPx
         - (headerExtraction.headerHtml ? resolvePageTopPaddingWithHeader(headerHeight) : PAGE_TOP_PADDING_WITHOUT_HEADER)
         - FOOTER_HEIGHT
       ) * RENDER_SCALE;
@@ -1361,13 +1420,14 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
           pageSliceHeight,
         );
 
-        const contentHeightMm = (pageSliceHeight / pageHeightPx) * (A4_HEIGHT_MM - 58);
+        const contentHeightMm = (pageSliceHeight / pageHeightPx) * (pageLayout.heightMm - 58);
         if (pageIndex > 0) {
           pdf.addPage();
         }
 
-        pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 12, 20, A4_WIDTH_MM - 24, contentHeightMm, undefined, "SLOW");
+        pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", 12, 20, pageLayout.widthMm - 24, contentHeightMm, undefined, "SLOW");
         drawPdfPageChrome(pdf, pageIndex + 1, totalPages, {
+          pageLayout,
           showShellHeader: false,
         });
       }
@@ -1382,6 +1442,7 @@ export async function buildPdfBlobFromHtml(html: string): Promise<Blob> {
 export function buildStandaloneDocumentPreviewHtml(html: string) {
   const styledContent = buildPdfStyledHtml(sanitizeGeneratedHtml(html), true, { stripFactFindLogosForPreview: true });
   const isStatement = styledContent.includes("workflow-document-statement-of-suitability");
+  const pageLayout = resolvePdfPageLayout(styledContent);
 
   const statementPreviewCss = `
   .preview-page .workflow-document-statement-of-suitability {
@@ -1774,6 +1835,7 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4 ${pageLayout.orientation}; margin: 0; }
   body {
     background: #e8edf5;
     display: flex;
@@ -1786,8 +1848,8 @@ export function buildStandaloneDocumentPreviewHtml(html: string) {
     min-height: 100vh;
   }
   .preview-page {
-    width: 794px;
-    min-height: 1123px;
+    width: ${pageLayout.widthPx}px;
+    min-height: ${pageLayout.heightPx}px;
     background: #ffffff;
     border: 1px solid #dbe3ee;
     box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
