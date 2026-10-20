@@ -4,6 +4,7 @@ export type SupportedDocumentType =
   | "Terms of Business"
   | "Statement of Suitability"
   | "Quote"
+  | "Quote Picker"
   | "Pensions Statement"
   | "Pensions Quote";
 

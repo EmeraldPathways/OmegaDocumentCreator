@@ -24,7 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import app.db as app_db
 from app.config import get_settings
 from app.db import get_engine, get_session
-from app.document_generation import build_statement_quote_requests, generate_document
+from app.document_generation import build_quote_picker_requests, build_statement_quote_requests, generate_document
 from app.domain.clients import ClientRecord, ClientStatus, build_client_storage_slug
 from app.domain.users import UserRole, UserStatus
 from app.html_sanitizer import sanitize_preview_html
@@ -1112,6 +1112,32 @@ def generate_statement_quote(
             entity_id=payload.client_reference,
             client_id=client.id if client else None,
             details={"document_type": "Statement of Suitability"},
+        )
+        db.commit()
+        return {"item": {"integration_requests": integration_requests}}
+    finally:
+        db.close()
+
+
+@app.post("/documents/quote-picker")
+def generate_quote_picker(
+    payload: StatementQuoteRequest, request: Request
+) -> dict[str, dict[str, object] | list[dict[str, object]]]:
+    current_user = _current_user(request)
+    db = get_session()
+    try:
+        client = _require_client_access(current_user, db, payload.client_reference)
+        integration_requests = build_quote_picker_requests(
+            settings=settings,
+            workflow_snapshot=payload.workflow_snapshot,
+        )
+        _log_audit(
+            request, db=db,
+            action="quote_picker_generated",
+            entity_type="document",
+            entity_id=payload.client_reference,
+            client_id=client.id if client else None,
+            details={"document_type": "Quote Picker"},
         )
         db.commit()
         return {"item": {"integration_requests": integration_requests}}

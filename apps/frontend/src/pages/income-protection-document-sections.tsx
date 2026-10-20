@@ -6,6 +6,7 @@ import type { SavedQuoteSnapshot, SavedStatementSnapshot, SeededClientProfile } 
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
 import { TemplatePicker } from "../documents/template-picker";
 import type { GeneratedDocumentDraft } from "../documents/document-types";
+import type { QuotePickerOption } from "../documents/quote-picker-selection";
 import { Accordion, AccordionItem, Button, Input, Select, Textarea, Toggle } from "../components/ui";
 import { formatSavedStatementPolicyLabel } from "./saved-statement-snapshots";
 
@@ -18,6 +19,8 @@ import {
   isAffirmative,
   phiIndexationOptions,
   phiOccupationalClassOptions,
+  quotePickerDiscountOptions,
+  quotePickerTaxReliefOptions,
   smokerStatusOptions,
   statementTypeOptions,
 } from "./income-protection-helpers";
@@ -130,6 +133,45 @@ type QuoteWorkflowSectionProps = {
   onToggleZurichDiscount: (checked: boolean) => void;
   onUpdateGeneratedOutput: (html: string) => void;
   tabProgressIndicator: ReactNode;
+};
+
+type QuotePickerWorkflowSectionProps = {
+  draft: SeededClientProfile;
+  documentDraft: GeneratedDocumentDraft;
+  quoteAnnualCoverAmount: string;
+  quoteCoverToAge: string;
+  quoteDocumentStatus: string;
+  quoteGenerationRequirements: WorkflowRequirement[];
+  quoteMissingFields: string[];
+  quoteOccupationClass: string;
+  quotePickerDiscountPercentage: string;
+  quotePickerOptions: QuotePickerOption[];
+  quotePickerRequestMissingFields: string[];
+  quotePickerRequestStatus: string;
+  quotePickerSelectedQuoteKey: string;
+  quotePickerTaxReliefPercentage: string;
+  quotePhiIndexation: string;
+  quoteSmoker: string;
+  quoteYourAge: string;
+  renderGenerationRequirements: RenderGenerationRequirements;
+  requiredLabel: RequiredLabel;
+  showQuoteValidation: boolean;
+  tabProgressIndicator: ReactNode;
+  workspaceAccordion: AccordionState;
+  onExportDocx: () => void;
+  onExportPdf: () => void;
+  onGenerate: () => void;
+  onFetchQuotes: () => void;
+  onQuoteAnnualCoverAmountChange: (value: string) => void;
+  onQuoteCoverToAgeChange: (value: string) => void;
+  onQuoteOccupationClassChange: (value: string) => void;
+  onQuotePickerDiscountChange: (value: string) => void;
+  onQuotePickerSelectedQuoteChange: (value: string) => void;
+  onQuotePickerTaxReliefChange: (value: string) => void;
+  onQuotePhiIndexationChange: (value: string) => void;
+  onQuoteSmokerChange: (value: string) => void;
+  onTemplateChange: (templateId: string) => void;
+  onUpdateGeneratedOutput: (html: string) => void;
 };
 
 export function StatementWorkflowSection({
@@ -515,6 +557,169 @@ export function QuoteWorkflowSection({
             templatePicker={
               <TemplatePicker
                 documentType={quoteDocumentType}
+                onChange={onTemplateChange}
+                selectedTemplateId={documentDraft.selectedTemplateId}
+              />
+            }
+          />
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+}
+
+export function QuotePickerWorkflowSection({
+  draft,
+  documentDraft,
+  quoteAnnualCoverAmount,
+  quoteCoverToAge,
+  quoteDocumentStatus,
+  quoteGenerationRequirements,
+  quoteMissingFields,
+  quoteOccupationClass,
+  quotePickerDiscountPercentage,
+  quotePickerOptions,
+  quotePickerRequestMissingFields,
+  quotePickerRequestStatus,
+  quotePickerSelectedQuoteKey,
+  quotePickerTaxReliefPercentage,
+  quotePhiIndexation,
+  quoteSmoker,
+  quoteYourAge,
+  renderGenerationRequirements,
+  requiredLabel,
+  showQuoteValidation,
+  tabProgressIndicator,
+  workspaceAccordion,
+  onExportDocx,
+  onExportPdf,
+  onGenerate,
+  onFetchQuotes,
+  onQuoteAnnualCoverAmountChange,
+  onQuoteCoverToAgeChange,
+  onQuoteOccupationClassChange,
+  onQuotePickerDiscountChange,
+  onQuotePickerSelectedQuoteChange,
+  onQuotePickerTaxReliefChange,
+  onQuotePhiIndexationChange,
+  onQuoteSmokerChange,
+  onTemplateChange,
+  onUpdateGeneratedOutput,
+}: QuotePickerWorkflowSectionProps) {
+  return (
+    <div className="page-stack">
+      <Accordion flush className="workflow-form-accordion">
+        <AccordionItem
+          indicator={tabProgressIndicator}
+          isOpen={workspaceAccordion.isOpen("quote-picker-output")}
+          onToggle={() => workspaceAccordion.toggle("quote-picker-output")}
+          title="Quote Picker Form"
+        >
+          <div className="form-grid form-grid-desktop-3">
+            <Input id="quote-picker-name" label="Name" type="text" value={draft.fullName} disabled />
+            <Input id="quote-picker-dob" label="Date of Birth" type="date" value={draft.dateOfBirth} disabled />
+            <Input id="quote-picker-age" label="Your Age" type="text" value={quoteYourAge} disabled />
+            <Input
+              id="quote-picker-annualCoverAmount"
+              label={requiredLabel("Annual Cover Amount")}
+              onChange={(event) => onQuoteAnnualCoverAmountChange(event.target.value)}
+              type="text"
+              value={quoteAnnualCoverAmount}
+            />
+            <Select
+              id="quote-picker-coverToAge"
+              label={requiredLabel("Cover to Age")}
+              onChange={(event) => onQuoteCoverToAgeChange(event.target.value)}
+              options={coverAgeOptions}
+              value={quoteCoverToAge}
+            />
+            <Select
+              id="quote-picker-occupationClass"
+              label={requiredLabel("Occupation Class")}
+              onChange={(event) => onQuoteOccupationClassChange(event.target.value)}
+              options={phiOccupationalClassOptions}
+              value={quoteOccupationClass}
+            />
+            <Select
+              id="quote-picker-smoker"
+              label={requiredLabel("Smoker")}
+              onChange={(event) => onQuoteSmokerChange(event.target.value)}
+              options={smokerStatusOptions}
+              value={quoteSmoker}
+            />
+            <Select
+              id="quote-picker-phiIndexation"
+              label="PHI Indexation"
+              onChange={(event) => onQuotePhiIndexationChange(event.target.value)}
+              options={phiIndexationOptions}
+              value={quotePhiIndexation}
+            />
+            <Select
+              id="quote-picker-taxRelief"
+              label={requiredLabel("Tax Relief")}
+              onChange={(event) => onQuotePickerTaxReliefChange(event.target.value)}
+              options={quotePickerTaxReliefOptions}
+              value={quotePickerTaxReliefPercentage}
+            />
+            <Select
+              id="quote-picker-discount"
+              label={requiredLabel("Premium Discount")}
+              onChange={(event) => onQuotePickerDiscountChange(event.target.value)}
+              options={quotePickerDiscountOptions}
+              value={quotePickerDiscountPercentage}
+            />
+          </div>
+          <div className="form-action-row" style={{ marginTop: "var(--space-4)" }}>
+            <span className="form-action-row-status">{quotePickerRequestStatus}</span>
+            <Button
+              disabled={quotePickerRequestMissingFields.length > 0}
+              id="quote-picker-fetch"
+              onClick={onFetchQuotes}
+              variant="secondary"
+            >
+              Get Quote Options
+            </Button>
+          </div>
+          <div className="form-grid" style={{ marginTop: "var(--space-4)" }}>
+            <Select
+              id="quote-picker-selectedQuote"
+              label={requiredLabel("Quote to compare")}
+              onChange={(event) => onQuotePickerSelectedQuoteChange(event.target.value)}
+              options={
+                quotePickerOptions.length > 0
+                  ? quotePickerOptions.map((option) => ({ label: option.label, value: option.key }))
+                  : [{ label: "Get quote options first", value: "" }]
+              }
+              value={quotePickerSelectedQuoteKey}
+            />
+          </div>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            {renderGenerationRequirements(
+              "Quote Picker generation requirements",
+              quoteGenerationRequirements,
+              quoteMissingFields,
+              { explainSharedFields: true, emphasiseMissing: showQuoteValidation },
+            )}
+          </div>
+        </AccordionItem>
+        <AccordionItem
+          indicator={getGeneratedDraftStatusLabel(documentDraft.generationStatus)}
+          isOpen={workspaceAccordion.isOpen("quote-picker-generated-output")}
+          onToggle={() => workspaceAccordion.toggle("quote-picker-generated-output")}
+          title="Generated Output"
+        >
+          <GeneratedOutputWorkspace
+            draft={documentDraft}
+            emptyMessage="Generate the quote picker comparison to open the quote workspace."
+            generateDisabled={quoteMissingFields.length > 0}
+            onContentChange={onUpdateGeneratedOutput}
+            onExportDocx={onExportDocx}
+            onExportPdf={onExportPdf}
+            onGenerate={onGenerate}
+            statusLabel={quoteDocumentStatus.replace("Document: ", "")}
+            templatePicker={
+              <TemplatePicker
+                documentType="Quote Picker"
                 onChange={onTemplateChange}
                 selectedTemplateId={documentDraft.selectedTemplateId}
               />

@@ -4,7 +4,7 @@ import { buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 const FACT_FIND_DOCUMENT_TYPE = "Fact Find" satisfies SupportedDocumentType;
 const FACT_FIND_UPDATE_DOCUMENT_TYPE = "Fact Find Update" satisfies SupportedDocumentType;
-const quoteDocumentTypes = ["Quote", "Pensions Quote"] as const satisfies SupportedDocumentType[];
+const quoteDocumentTypes = ["Quote", "Quote Picker", "Pensions Quote"] as const satisfies SupportedDocumentType[];
 const statementDocumentTypes = ["Statement of Suitability", "Pensions Statement"] as const satisfies SupportedDocumentType[];
 type QuoteDocumentType = (typeof quoteDocumentTypes)[number];
 type StatementDocumentType = (typeof statementDocumentTypes)[number];

@@ -5730,3 +5730,64 @@ button {
     margin-right: 0;
   }
 }
+
+/* Quote Picker comparison table: keep the quote document shell while matching the eight-column output. */
+.workflow-document-quote-picker .quote-picker-client-banner {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-top: 2px solid #5b2230;
+  border-bottom: 1px solid #d6d3d1;
+  background: #f6ede3;
+  color: #5b2230;
+  text-align: center;
+}
+
+.workflow-document-quote-picker .quote-picker-client-banner p {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.workflow-document-quote-picker .quote-picker-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 8px;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 11px;
+}
+
+.workflow-document-quote-picker .quote-picker-meta-row p {
+  margin: 0;
+}
+
+.workflow-document-quote-picker .quote-picker-table .quote-picker-row {
+  grid-template-columns: 0.45fr 1.45fr 0.75fr 1.5fr 1fr 1.35fr 1fr 1fr;
+}
+
+.workflow-document-quote-picker .quote-picker-table .quote-picker-row .statement-quote-cell {
+  min-width: 0;
+  padding: 7px 6px;
+  text-align: center;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.workflow-document-quote-picker .quote-picker-table .quote-picker-row .statement-quote-cell p {
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.workflow-document-quote-picker .quote-picker-table .quote-picker-row-header .statement-quote-cell p {
+  font-size: 9px;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.workflow-document-quote-picker .quote-picker-table .quote-picker-recommended .statement-quote-cell {
+  font-weight: 700;
+}

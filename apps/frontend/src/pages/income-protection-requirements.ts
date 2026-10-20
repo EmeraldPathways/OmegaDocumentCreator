@@ -408,3 +408,46 @@ export function buildFactFindUpdateSectionProgressItems(draft: SeededClientProfi
     },
   ];
 }
+
+type QuotePickerRequirementsArgs = {
+  draft: SeededClientProfile;
+  effectiveIncomeProtectionDraft: SeededClientProfile;
+  quotePickerTaxReliefPercentage: string;
+  quotePickerDiscountPercentage: string;
+  quotePickerHasResults: boolean;
+  quotePickerSelectedQuoteKey: string;
+};
+
+export function buildQuotePickerGenerationRequirements({
+  draft,
+  effectiveIncomeProtectionDraft,
+  quotePickerTaxReliefPercentage,
+  quotePickerDiscountPercentage,
+  quotePickerHasResults,
+  quotePickerSelectedQuoteKey,
+}: QuotePickerRequirementsArgs): WorkflowRequirement[] {
+  return [
+    { key: "quote-picker-client-name", label: "Client name", complete: hasValue(draft.fullName), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-name" } },
+    { key: "quote-picker-date-of-birth", label: "Date of birth", complete: hasValue(draft.dateOfBirth), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-dob" } },
+    { key: "quote-picker-gender", label: "Gender", complete: hasValue(draft.gender), location: "Fact Find", target: { tabId: "fact-find", sectionId: "client-profile", fieldId: "ff-gender" } },
+    { key: "quote-picker-annual-cover", label: "Annual cover amount", complete: hasValue(effectiveIncomeProtectionDraft.recommendedCover), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-annualCoverAmount" } },
+    { key: "quote-picker-cover-age", label: "Cover to age", complete: hasValue(effectiveIncomeProtectionDraft.coverAge), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-coverToAge" } },
+    { key: "quote-picker-occupation-class", label: "Occupation class", complete: hasValue(effectiveIncomeProtectionDraft.phiOccupationalClass), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-occupationClass" } },
+    { key: "quote-picker-smoker", label: "Smoker", complete: hasValue(effectiveIncomeProtectionDraft.smokerStatus), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-smoker" } },
+    { key: "quote-picker-indexation", label: "PHI indexation", complete: hasValue(effectiveIncomeProtectionDraft.phiIndexation), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-phiIndexation" } },
+    { key: "quote-picker-tax-relief", label: "Tax relief", complete: hasValue(quotePickerTaxReliefPercentage), location: "Quote Picker options", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-taxRelief" } },
+    { key: "quote-picker-discount", label: "Premium discount", complete: hasValue(quotePickerDiscountPercentage), location: "Quote Picker options", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-discount" } },
+    { key: "quote-picker-results", label: "Quote options", complete: quotePickerHasResults, location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-fetch" }, helperText: "Fetch all five deferred periods from the quote API" },
+    { key: "quote-picker-selected-quote", label: "Selected quote", complete: hasValue(quotePickerSelectedQuoteKey), location: "Quote Picker form", target: { tabId: "quote-picker", sectionId: "quote-picker-output", fieldId: "quote-picker-selectedQuote" } },
+  ];
+}
+
+export function buildQuotePickerRequestRequirements(args: QuotePickerRequirementsArgs): WorkflowRequirement[] {
+  return buildQuotePickerGenerationRequirements(args).filter(
+    (requirement) => !["quote-picker-tax-relief", "quote-picker-discount", "quote-picker-results", "quote-picker-selected-quote"].includes(requirement.key),
+  );
+}
+
+export function buildQuotePickerMissingFields(requirements: WorkflowRequirement[]) {
+  return requirements.filter((requirement) => !requirement.complete).map((requirement) => requirement.label);
+}

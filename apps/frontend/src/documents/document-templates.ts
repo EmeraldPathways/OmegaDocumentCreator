@@ -37,6 +37,13 @@ export const builtInDocumentTemplates: DocumentTemplateDefinition[] = [
     sectionTitles: ["Quote Summary", "Quote Table"],
   },
   {
+    id: "quote-picker",
+    documentType: "Quote Picker",
+    title: "Income Protection Quote Picker",
+    description: "Selected income protection quote across all deferred periods.",
+    sectionTitles: ["Quote Summary", "Quote Table"],
+  },
+  {
     id: "pensions-statement",
     documentType: "Pensions Statement",
     title: "Pensions Statement",
@@ -63,6 +70,7 @@ export const defaultTemplateIdByDocumentType = builtInDocumentTemplates.reduce<R
     "Terms of Business": "",
     "Statement of Suitability": "",
     "Quote": "",
+    "Quote Picker": "",
     "Pensions Statement": "",
     "Pensions Quote": "",
   },
@@ -108,6 +116,15 @@ export function createDefaultDocumentDrafts(): Record<SupportedDocumentType, Gen
     },
     "Quote": {
       selectedTemplateId: defaultTemplateIdByDocumentType["Quote"],
+      generationStatus: "idle",
+      backendDocumentId: null,
+      lastGeneratedHtml: "",
+      lastGeneratedSections: [],
+      integrationRequests: [],
+      editedHtml: "",
+    },
+    "Quote Picker": {
+      selectedTemplateId: defaultTemplateIdByDocumentType["Quote Picker"],
       generationStatus: "idle",
       backendDocumentId: null,
       lastGeneratedHtml: "",

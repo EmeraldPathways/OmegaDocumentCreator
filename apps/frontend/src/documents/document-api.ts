@@ -284,3 +284,23 @@ export async function fetchStatementQuoteRequests({
   const payload = (await response.json()) as RawStatementQuoteResponse;
   return normalizeIntegrationRequests(payload.item?.integration_requests);
 }
+
+export async function fetchQuotePickerRequests({
+  clientReference,
+  workflowSnapshot,
+}: StatementQuoteRequest): Promise<IntegrationRequestArtifact[]> {
+  const response = await sendAuthenticatedJsonRequest("/documents/quote-picker", {
+    client_reference: clientReference,
+    workflow_snapshot: workflowSnapshot,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Session expired. Please log in again.");
+    }
+    throw new Error(`Quote picker request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as RawStatementQuoteResponse;
+  return normalizeIntegrationRequests(payload.item?.integration_requests);
+}

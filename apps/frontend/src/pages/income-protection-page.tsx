@@ -35,13 +35,14 @@ import type {
   SeededGeneratedDocument,
   SeededSavingsInvestmentRow,
 } from "../data/seeded-clients";
-import { fetchStatementQuoteRequests, generateDocument } from "../documents/document-api";
+import { fetchQuotePickerRequests, fetchStatementQuoteRequests, generateDocument } from "../documents/document-api";
 import {
   buildExportDocumentArtifact,
   buildGeneratedDocumentBlob,
   exportGeneratedDocument,
 } from "../documents/export-generated-document";
 import { GeneratedOutputWorkspace } from "../documents/generated-output-workspace";
+import { buildQuotePickerOptions, type QuotePickerOption } from "../documents/quote-picker-selection";
 import { buildStatementQuoteOptions } from "../documents/statement-quote-selection";
 import { resolveWorkspaceDocumentDraft } from "../documents/statement-draft";
 import { builtInDocumentTemplates } from "../documents/document-templates";
@@ -102,6 +103,9 @@ import {
   buildFactFindUpdateSectionProgressItems,
   buildQuoteGenerationRequirements,
   buildQuoteMissingFields,
+  buildQuotePickerGenerationRequirements,
+  buildQuotePickerMissingFields,
+  buildQuotePickerRequestRequirements,
   buildStatementGenerationRequirements,
   buildValidationMessages,
   type SectionProgressItem,
@@ -110,7 +114,11 @@ import {
 } from "./income-protection-requirements";
 import { IncomeProtectionFilesTab } from "./income-protection-files-tab";
 import { IncomeProtectionGeneratedDocumentsTab } from "./income-protection-generated-documents-tab";
-import { QuoteWorkflowSection, StatementWorkflowSection } from "./income-protection-document-sections";
+import {
+  QuotePickerWorkflowSection,
+  QuoteWorkflowSection,
+  StatementWorkflowSection,
+} from "./income-protection-document-sections";
 import { appendSavedStatementSnapshot } from "./saved-statement-snapshots";
 import { WorkflowDocumentSections } from "./workflow-document-sections";
 import { WorkflowPageLayout } from "./workflow-page-layout";
@@ -259,6 +267,7 @@ function mergeDocumentDrafts(
     "Terms of Business": mergeSingleDocumentDraft(currentDrafts["Terms of Business"], incomingDrafts["Terms of Business"]),
     "Statement of Suitability": mergeSingleDocumentDraft(currentDrafts["Statement of Suitability"], incomingDrafts["Statement of Suitability"]),
     "Quote": mergeSingleDocumentDraft(currentDrafts["Quote"], incomingDrafts["Quote"]),
+    "Quote Picker": mergeSingleDocumentDraft(currentDrafts["Quote Picker"], incomingDrafts["Quote Picker"]),
     "Pensions Statement": mergeSingleDocumentDraft(currentDrafts["Pensions Statement"], incomingDrafts["Pensions Statement"]),
     "Pensions Quote": mergeSingleDocumentDraft(currentDrafts["Pensions Quote"], incomingDrafts["Pensions Quote"]),
   };
@@ -372,6 +381,12 @@ export function IncomeProtectionPage({
   const [quoteDocumentStatus, setQuoteDocumentStatus] = useState("Document: Draft");
   const [showQuoteValidation, setShowQuoteValidation] = useState(false);
   const [lastSubmittedQuoteRequestKey, setLastSubmittedQuoteRequestKey] = useState<string | null>(null);
+  const [quotePickerDocumentStatus, setQuotePickerDocumentStatus] = useState("Document: Draft");
+  const [quotePickerRequestStatus, setQuotePickerRequestStatus] = useState("Quote options: Not fetched");
+  const [showQuotePickerValidation, setShowQuotePickerValidation] = useState(false);
+  const [quotePickerSelectedQuoteKey, setQuotePickerSelectedQuoteKey] = useState("");
+  const [quotePickerTaxReliefPercentage, setQuotePickerTaxReliefPercentage] = useState("40");
+  const [quotePickerDiscountPercentage, setQuotePickerDiscountPercentage] = useState("15");
   const [quoteAnnualCoverAmount, setQuoteAnnualCoverAmount] = useState("");
   const [quoteCoverToAge, setQuoteCoverToAge] = useState("");
   const [quoteOccupationClass, setQuoteOccupationClass] = useState("");
@@ -413,15 +428,21 @@ export function IncomeProtectionPage({
   const factFindUpdateWorkspaceAccordion = useAccordionState(["fact-find-update-form"]);
   const statementWorkspaceAccordion = useAccordionState(["statement-form"]);
   const quoteWorkspaceAccordion = useAccordionState(["quote-output", "generated-output"]);
+  const quotePickerWorkspaceAccordion = useAccordionState(["quote-picker-output", "quote-picker-generated-output"]);
   const emptyClientFallback = useMemo(() => createSeededClientProfiles()["CLI-2026-0001"], []);
   const visibleTabs = useMemo(() => {
-    if (!visibleTabIds || visibleTabIds.length === 0) {
+    const requestedTabIds =
+      workflowKind === "income-protection" && visibleTabIds?.includes("quote") && !visibleTabIds.includes("quote-picker")
+        ? [...visibleTabIds, "quote-picker"]
+        : visibleTabIds;
+
+    if (!requestedTabIds || requestedTabIds.length === 0) {
       return moduleTabs;
     }
 
-    const allowedTabIds = new Set(visibleTabIds);
+    const allowedTabIds = new Set(requestedTabIds);
     return moduleTabs.filter((tab) => allowedTabIds.has(tab.id));
-  }, [visibleTabIds]);
+  }, [visibleTabIds, workflowKind]);
 
   useEffect(() => {
     latestDraftRef.current = draft;
@@ -504,10 +525,22 @@ export function IncomeProtectionPage({
       getGenerationHeaderStatus("Document", client.documentDrafts[statementDocumentType].generationStatus),
     );
     setQuoteDocumentStatus(getGenerationHeaderStatus("Document", client.documentDrafts[quoteDocumentType].generationStatus));
+    setQuotePickerDocumentStatus(
+      getGenerationHeaderStatus("Document", client.documentDrafts["Quote Picker"].generationStatus),
+    );
+    setQuotePickerRequestStatus(
+      client.documentDrafts["Quote Picker"].integrationRequests.some((request) => request.quoteResults.length > 0)
+        ? "Quote options: Fetched"
+        : "Quote options: Not fetched",
+    );
+    setQuotePickerSelectedQuoteKey(client.quotePickerSelectedQuoteKey || "");
+    setQuotePickerTaxReliefPercentage(client.quotePickerTaxReliefPercentage || "40");
+    setQuotePickerDiscountPercentage(client.quotePickerDiscountPercentage || "15");
     setLastSubmittedQuoteRequestKey(null);
     setShowFactFindValidation(false);
     setShowStatementValidation(false);
     setShowQuoteValidation(false);
+    setShowQuotePickerValidation(false);
   }, [client, quoteDocumentType, selectedClientReference, statementDocumentType]);
 
   useEffect(() => {
@@ -866,6 +899,31 @@ export function IncomeProtectionPage({
     quotePensionRetirementAge,
   });
 
+  const quotePickerIntegrationRequests = resolvedDraft.documentDrafts["Quote Picker"]?.integrationRequests ?? [];
+  const quotePickerOptions = useMemo<QuotePickerOption[]>(
+    () => buildQuotePickerOptions(quotePickerIntegrationRequests),
+    [quotePickerIntegrationRequests],
+  );
+  const quotePickerHasResults = quotePickerIntegrationRequests.some((request) => request.quoteResults.length > 0);
+  const quotePickerGenerationRequirements = buildQuotePickerGenerationRequirements({
+    draft: resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    quotePickerTaxReliefPercentage,
+    quotePickerDiscountPercentage,
+    quotePickerHasResults,
+    quotePickerSelectedQuoteKey,
+  });
+  const quotePickerRequestRequirements = buildQuotePickerRequestRequirements({
+    draft: resolvedDraft,
+    effectiveIncomeProtectionDraft,
+    quotePickerTaxReliefPercentage,
+    quotePickerDiscountPercentage,
+    quotePickerHasResults,
+    quotePickerSelectedQuoteKey,
+  });
+  const quotePickerMissingFields = buildQuotePickerMissingFields(quotePickerGenerationRequirements);
+  const quotePickerRequestMissingFields = buildQuotePickerMissingFields(quotePickerRequestRequirements);
+
   const savedQuotesForCurrentDocument = useMemo(
     () => (resolvedDraft.savedQuotes ?? []).filter((savedQuote) => savedQuote.documentType === quoteDocumentType),
     [quoteDocumentType, resolvedDraft.savedQuotes],
@@ -940,6 +998,21 @@ export function IncomeProtectionPage({
       quoteYourAge,
       effectiveIncomeProtectionDraft,
       resolvedDraft,
+    ],
+  );
+
+  const quotePickerWorkflowSnapshot = useMemo(
+    () => ({
+      ...effectiveIncomeProtectionDraft,
+      quotePickerSelectedQuoteKey,
+      quotePickerTaxReliefPercentage,
+      quotePickerDiscountPercentage,
+    }),
+    [
+      effectiveIncomeProtectionDraft,
+      quotePickerDiscountPercentage,
+      quotePickerSelectedQuoteKey,
+      quotePickerTaxReliefPercentage,
     ],
   );
 
@@ -1049,6 +1122,18 @@ export function IncomeProtectionPage({
     },
   ];
 
+  const quotePickerSectionProgressItems: SectionProgressItem[] = [
+    {
+      id: "quote-picker-output",
+      title: "Quote Picker readiness",
+      completeCount: quotePickerGenerationRequirements.filter(
+        (item) => item.location.startsWith("Quote Picker") && item.complete,
+      ).length,
+      requiredCount: quotePickerGenerationRequirements.filter((item) => item.location.startsWith("Quote Picker")).length,
+      complete: quotePickerMissingFields.length === 0,
+    },
+  ];
+
   const workflowProgressItems = activeTab.id === "fact-find"
     ? factFindSectionProgressItems
     : activeTab.id === "fact-find-update"
@@ -1057,6 +1142,8 @@ export function IncomeProtectionPage({
         ? statementSectionProgressItems
         : activeTab.id === "quote"
           ? quoteSectionProgressItems
+          : activeTab.id === "quote-picker"
+            ? quotePickerSectionProgressItems
           : [];
   const activeRequirements = activeTab.id === "fact-find"
     ? factFindGenerationRequirements
@@ -1066,6 +1153,8 @@ export function IncomeProtectionPage({
         ? statementGenerationRequirements
         : activeTab.id === "quote"
           ? quoteGenerationRequirements
+          : activeTab.id === "quote-picker"
+            ? quotePickerGenerationRequirements
           : [];
   const activeMissingCount = activeRequirements.filter((item) => !item.complete).length;
   const workflowSaveLabel =
@@ -1149,6 +1238,10 @@ export function IncomeProtectionPage({
       quoteWorkspaceAccordion.open("quote-output");
     }
 
+    if (target.tabId === "quote-picker") {
+      quotePickerWorkspaceAccordion.open("quote-picker-output");
+    }
+
     window.setTimeout(() => {
       const field = document.getElementById(target.fieldId) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
       if (!field) {
@@ -1177,6 +1270,10 @@ export function IncomeProtectionPage({
 
     if (activeTab.id === "quote") {
       quoteWorkspaceAccordion.open("quote-output");
+    }
+
+    if (activeTab.id === "quote-picker") {
+      quotePickerWorkspaceAccordion.open("quote-picker-output");
     }
 
     window.setTimeout(() => {
@@ -1333,7 +1430,13 @@ export function IncomeProtectionPage({
   }
 
   function getWorkspaceDocumentDraft(documentType: SupportedDocumentType) {
-    return resolveWorkspaceDocumentDraft(documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft, documentType);
+    const sourceProfile =
+      documentType === quoteDocumentType
+        ? quoteWorkflowSnapshot
+        : documentType === "Quote Picker"
+          ? quotePickerWorkflowSnapshot
+          : resolvedDraft;
+    return resolveWorkspaceDocumentDraft(sourceProfile, documentType);
   }
 
   useEffect(() => {
@@ -1755,12 +1858,22 @@ export function IncomeProtectionPage({
       integrationRequests?: GeneratedDocumentDraft["integrationRequests"];
     },
   ) {
-    const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
+    const sourceProfile =
+      documentType === quoteDocumentType
+        ? quoteWorkflowSnapshot
+        : documentType === "Quote Picker"
+          ? quotePickerWorkflowSnapshot
+          : resolvedDraft;
     return buildGeneratedEditorHtmlForProfile(sourceProfile, documentType, generatedDocument);
   }
 
   async function handleGeneratedOutputExport(documentType: SupportedDocumentType, extension: "docx" | "pdf") {
-    const sourceProfile = documentType === quoteDocumentType ? quoteWorkflowSnapshot : resolvedDraft;
+    const sourceProfile =
+      documentType === quoteDocumentType
+        ? quoteWorkflowSnapshot
+        : documentType === "Quote Picker"
+          ? quotePickerWorkflowSnapshot
+          : resolvedDraft;
     const previewArtifact = buildExportDocumentArtifact(sourceProfile, documentType);
     const sourceDraft = getDocumentDraft(documentType);
     if (!previewArtifact.html) {
@@ -2310,6 +2423,96 @@ export function IncomeProtectionPage({
     }
   }
 
+  async function handleQuotePickerFetch() {
+    if (quotePickerRequestMissingFields.length > 0) {
+      setShowQuotePickerValidation(true);
+      setQuotePickerRequestStatus("Quote options: Missing required fields");
+      surfaceRequirementErrors(quotePickerRequestRequirements);
+      return;
+    }
+
+    setShowQuotePickerValidation(false);
+    setQuotePickerRequestStatus("Quote options: Fetching all deferred periods...");
+
+    try {
+      const integrationRequests = await fetchQuotePickerRequests({
+        clientReference: resolvedDraft.clientReference,
+        workflowSnapshot: quotePickerWorkflowSnapshot as unknown as Record<string, unknown>,
+      });
+      const nextOptions = buildQuotePickerOptions(integrationRequests);
+      const nextSelectedQuoteKey = nextOptions.some((option) => option.key === quotePickerSelectedQuoteKey)
+        ? quotePickerSelectedQuoteKey
+        : "";
+      const nextGeneratedDraft = {
+        generationStatus: "completed" as const,
+        lastGeneratedHtml: "",
+        lastGeneratedSections: [],
+        integrationRequests,
+        editedHtml: "",
+      };
+      const currentProfile = latestDraftRef.current ?? resolvedDraft;
+      const nextProfile = mergeGeneratedDraftIntoProfile(
+        {
+          ...currentProfile,
+          quotePickerSelectedQuoteKey: nextSelectedQuoteKey,
+          quotePickerTaxReliefPercentage,
+          quotePickerDiscountPercentage,
+        },
+        "Quote Picker",
+        nextGeneratedDraft,
+      );
+
+      syncLocalGeneratedDraft("Quote Picker", nextGeneratedDraft);
+      await persistDraft(nextProfile, { silent: true });
+      setQuotePickerSelectedQuoteKey(nextSelectedQuoteKey);
+      setQuotePickerRequestStatus(
+        nextOptions.length > 0
+          ? `Quote options: ${nextOptions.length} quote${nextOptions.length === 1 ? "" : "s"} across five deferred periods`
+          : "Quote options: No quote results returned",
+      );
+      setQuotePickerDocumentStatus("Document: Draft");
+      addToast("Quote picker options fetched", "success");
+    } catch {
+      syncLocalGeneratedDraft("Quote Picker", { generationStatus: "failed" });
+      setQuotePickerRequestStatus("Quote options: Fetch failed");
+      addToast("Failed to fetch quote picker options", "error");
+    }
+  }
+
+  async function handleQuotePickerGenerate() {
+    if (quotePickerMissingFields.length > 0) {
+      setShowQuotePickerValidation(true);
+      setQuotePickerDocumentStatus("Document: Blocked by missing required fields");
+      surfaceRequirementErrors(quotePickerGenerationRequirements);
+      return;
+    }
+
+    setShowQuotePickerValidation(false);
+    setQuotePickerDocumentStatus("Document: Generating");
+    syncLocalGeneratedDraft("Quote Picker", { generationStatus: "generating" });
+
+    try {
+      const generatedDocument = {
+        generatedHtml: "",
+        sections: [],
+        integrationRequests: getDocumentDraft("Quote Picker").integrationRequests,
+      };
+      await persistGeneratedDraft("Quote Picker", {
+        generationStatus: "completed",
+        lastGeneratedHtml: generatedDocument.generatedHtml,
+        lastGeneratedSections: generatedDocument.sections,
+        integrationRequests: generatedDocument.integrationRequests,
+        editedHtml: buildGeneratedEditorHtml("Quote Picker", generatedDocument),
+      });
+      setQuotePickerDocumentStatus("Document: Draft generated");
+      addToast("Quote Picker draft generated", "success");
+    } catch {
+      await persistGeneratedDraft("Quote Picker", { generationStatus: "failed" });
+      setQuotePickerDocumentStatus("Document: Draft generation failed");
+      addToast("Failed to generate Quote Picker draft", "error");
+    }
+  }
+
   quoteGenerateRef.current = handleQuoteGenerate;
 
   useEffect(() => {
@@ -2456,6 +2659,8 @@ export function IncomeProtectionPage({
       void handleFactFindUpdateGenerate();
     } else if (type === quoteDocumentType) {
       void handleQuoteGenerate();
+    } else if (type === "Quote Picker") {
+      void handleQuotePickerGenerate();
     } else if (type === statementDocumentType) {
       void handleStatementGenerate();
     }
@@ -2546,11 +2751,22 @@ export function IncomeProtectionPage({
       quote: quoteMissingFields.length === 0
         ? "complete"
         : (quoteGenerationRequirements.some((item) => item.complete) ? "partial" : "incomplete"),
+      "quote-picker": quotePickerMissingFields.length === 0
+        ? "complete"
+        : (quotePickerGenerationRequirements.some((item) => item.complete) ? "partial" : "incomplete"),
       "statement-of-suitability": statementComplete ? "complete" : (statementMissingFields.length < 15 ? "partial" : "incomplete"),
       "files": filesComplete ? "complete" : "incomplete",
       "generated-documents": generatedComplete ? "complete" : "incomplete",
     } as Record<(typeof moduleTabs)[number]["id"], "complete" | "partial" | "incomplete">;
-  }, [quoteGenerationRequirements, quoteMissingFields.length, resolvedDraft, statementMissingFields.length, displayDocuments.length]);
+  }, [
+    displayDocuments.length,
+    quoteGenerationRequirements,
+    quoteMissingFields.length,
+    quotePickerGenerationRequirements,
+    quotePickerMissingFields.length,
+    resolvedDraft,
+    statementMissingFields.length,
+  ]);
 
   if (!hasResolvedClient) {
     return (
@@ -3800,6 +4016,81 @@ export function IncomeProtectionPage({
       );
     }
 
+    if (tabId === "quote-picker") {
+      const quotePickerDraft = getWorkspaceDocumentDraft("Quote Picker");
+
+      return (
+        <QuotePickerWorkflowSection
+          documentDraft={quotePickerDraft}
+          draft={resolvedDraft}
+          onExportDocx={() => void handleGeneratedOutputExport("Quote Picker", "docx")}
+          onExportPdf={() => void handleGeneratedOutputExport("Quote Picker", "pdf")}
+          onFetchQuotes={() => void handleQuotePickerFetch()}
+          onGenerate={() => void handleQuotePickerGenerate()}
+          onQuoteAnnualCoverAmountChange={(value) => {
+            setQuoteAnnualCoverAmount(value);
+            updateField("recommendedCover", value);
+          }}
+          onQuoteCoverToAgeChange={(value) => {
+            setQuoteCoverToAge(value);
+            updateField("coverAge", value);
+          }}
+          onQuoteOccupationClassChange={(value) => {
+            setQuoteOccupationClass(value);
+            updateField("phiOccupationalClass", value);
+          }}
+          onQuotePickerDiscountChange={(value) => {
+            setQuotePickerDiscountPercentage(value);
+            updateField("quotePickerDiscountPercentage", value);
+          }}
+          onQuotePickerSelectedQuoteChange={(value) => {
+            setQuotePickerSelectedQuoteKey(value);
+            updateField("quotePickerSelectedQuoteKey", value);
+          }}
+          onQuotePickerTaxReliefChange={(value) => {
+            setQuotePickerTaxReliefPercentage(value);
+            updateField("quotePickerTaxReliefPercentage", value);
+          }}
+          onQuotePhiIndexationChange={(value) => {
+            setQuotePhiIndexation(value);
+            updateField("phiIndexation", value);
+          }}
+          onQuoteSmokerChange={(value) => {
+            setQuoteSmoker(value);
+            updateField("smokerStatus", value);
+          }}
+          onTemplateChange={(templateId) =>
+            updateSelectedTemplate(resolvedDraft.clientReference, "Quote Picker", templateId)
+          }
+          onUpdateGeneratedOutput={(html) => updateGeneratedOutput("Quote Picker", html)}
+          quoteAnnualCoverAmount={quoteAnnualCoverAmount}
+          quoteCoverToAge={quoteCoverToAge}
+          quoteDocumentStatus={quotePickerDocumentStatus}
+          quoteGenerationRequirements={quotePickerGenerationRequirements}
+          quoteMissingFields={quotePickerMissingFields}
+          quoteOccupationClass={quoteOccupationClass}
+          quotePickerDiscountPercentage={quotePickerDiscountPercentage}
+          quotePickerOptions={quotePickerOptions}
+          quotePickerRequestMissingFields={quotePickerRequestMissingFields}
+          quotePickerRequestStatus={quotePickerRequestStatus}
+          quotePickerSelectedQuoteKey={quotePickerSelectedQuoteKey}
+          quotePickerTaxReliefPercentage={quotePickerTaxReliefPercentage}
+          quotePhiIndexation={quotePhiIndexation}
+          quoteSmoker={quoteSmoker}
+          quoteYourAge={quoteYourAge}
+          renderGenerationRequirements={renderGenerationRequirements}
+          requiredLabel={requiredLabel}
+          showQuoteValidation={showQuotePickerValidation}
+          tabProgressIndicator={getSectionProgress(
+            quotePickerGenerationRequirements
+              .filter((item) => item.location.startsWith("Quote Picker"))
+              .map((item) => (item.complete ? item.label : "")),
+          )}
+          workspaceAccordion={quotePickerWorkspaceAccordion}
+        />
+      );
+    }
+
     if (tabId === "files") {
       return (
         <IncomeProtectionFilesTab
@@ -3854,6 +4145,8 @@ export function IncomeProtectionPage({
         return renderTabPanel("statement-of-suitability");
       case "income-protection-quote":
         return renderTabPanel("quote");
+      case "income-protection-quote-picker":
+        return renderTabPanel("quote-picker");
       case "files":
         return renderTabPanel("files");
       case "generated-documents":

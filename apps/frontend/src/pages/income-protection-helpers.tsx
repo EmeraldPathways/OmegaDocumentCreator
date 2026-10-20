@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ClipboardList,
   FileText,
+  ListChecks,
   Shield,
   FolderOpen,
   Download,
@@ -19,6 +20,7 @@ export const moduleTabs = [
   { id: "fact-find", label: "Fact Find", icon: ClipboardList },
   { id: "fact-find-update", label: "Fact Find Update", icon: FileTextIcon },
   { id: "quote", label: "Quote", icon: FileText },
+  { id: "quote-picker", label: "Quote Picker", icon: ListChecks },
   { id: "statement-of-suitability", label: "Statement of Suitability", icon: Shield },
   { id: "files", label: "Files", icon: FolderOpen },
   { id: "generated-documents", label: "Generated Documents", icon: Download },
@@ -28,6 +30,7 @@ export type WorkflowSectionId =
   | "fact-find"
   | "fact-find-update"
   | "income-protection-quote"
+  | "income-protection-quote-picker"
   | "income-protection-statement"
   | "pensions-quote"
   | "pensions-statement"
@@ -38,7 +41,7 @@ export type WorkflowPageKind = "fact-find" | "income-protection" | "pensions" | 
 
 export const workflowPageSections: Record<WorkflowPageKind, WorkflowSectionId[]> = {
   "fact-find": ["fact-find", "fact-find-update"],
-  "income-protection": ["income-protection-quote", "income-protection-statement"],
+  "income-protection": ["income-protection-quote", "income-protection-quote-picker", "income-protection-statement"],
   pensions: ["pensions-quote", "pensions-statement"],
   "files-docs": ["files", "generated-documents"],
 };
@@ -47,6 +50,7 @@ export const workflowSectionByTabId: Record<(typeof moduleTabs)[number]["id"], W
   "fact-find": "fact-find",
   "fact-find-update": "fact-find-update",
   quote: "income-protection-quote",
+  "quote-picker": "income-protection-quote-picker",
   "statement-of-suitability": "income-protection-statement",
   files: "files",
   "generated-documents": "generated-documents",
@@ -108,6 +112,16 @@ export const phiIndexationOptions = [
   { value: "", label: "Select indexation" },
   { value: "Y", label: "Y" },
   { value: "N", label: "N" },
+];
+
+export const quotePickerTaxReliefOptions = [
+  { value: "40", label: "40%" },
+  { value: "20", label: "20%" },
+];
+
+export const quotePickerDiscountOptions = [
+  { value: "15", label: "15%" },
+  { value: "17.5", label: "17.5%" },
 ];
 
 export const SELECTED_CLIENT_STORAGE_KEY = "omega-selected-income-protection-client";

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { generateDocument } from "./document-api";
+import { fetchQuotePickerRequests, generateDocument } from "./document-api";
 
 describe("generateDocument", () => {
   beforeEach(() => {
@@ -84,5 +84,49 @@ describe("generateDocument", () => {
         errors: [],
       },
     ]);
+  });
+});
+
+describe("fetchQuotePickerRequests", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("returns normalized quote requests from the quote-picker API", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          item: {
+            integration_requests: [
+              {
+                provider: "BestAdvice",
+                request_type: "Phi",
+                status: "sent",
+                requested_at: "2026-10-20T10:00:00+00:00",
+                request_fields: [{ label: "DeferredPeriod", value: "4 weeks" }],
+                quote_results: [{ provider_name: "Aviva", policy_type: "Guaranteed", level_premium: "100.00" }],
+                errors: [],
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const requests = await fetchQuotePickerRequests({ clientReference: "CLI-2026-0002", workflowSnapshot: {} });
+
+    expect(requests[0].requestFields[0].value).toBe("4 weeks");
+    expect(requests[0].quoteResults[0].providerName).toBe("Aviva");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/documents/quote-picker",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 });

@@ -53,6 +53,10 @@ def _calculate_age_from_date_of_birth(value: str) -> str:
 
 
 def _normalize_phi_deferred_period(value: str) -> str:
+    if value.startswith("4"):
+        return "4"
+    if value.startswith("8"):
+        return "8"
     if value.startswith("13"):
         return "13"
     if value.startswith("26"):
@@ -461,6 +465,27 @@ def build_statement_quote_requests(
         workflow_snapshot=workflow_snapshot,
         warnings=warnings,
     )
+
+
+def build_quote_picker_requests(
+    *,
+    settings: AppSettings,
+    workflow_snapshot: dict[str, Any],
+) -> list[dict[str, Any]]:
+    warnings: list[str] = []
+    requests: list[dict[str, Any]] = []
+
+    for deferred_period in ("4 weeks", "8 weeks", "13 weeks", "26 weeks", "52 weeks"):
+        period_snapshot = {**workflow_snapshot, "deferredPeriod": deferred_period}
+        requests.extend(
+            _build_quote_requests_for_snapshot(
+                settings=settings,
+                workflow_snapshot=period_snapshot,
+                warnings=warnings,
+            )
+        )
+
+    return requests
 
 
 def _build_quote_requests_for_snapshot(

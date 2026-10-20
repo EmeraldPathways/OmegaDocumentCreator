@@ -84,6 +84,7 @@ function normalizeDocumentDrafts(
       documentDrafts?.["Statement of Suitability"],
     ),
     Quote: normalizeDraft(defaultDrafts.Quote, documentDrafts?.Quote),
+    "Quote Picker": normalizeDraft(defaultDrafts["Quote Picker"], documentDrafts?.["Quote Picker"]),
     "Pensions Statement": normalizeDraft(defaultDrafts["Pensions Statement"], documentDrafts?.["Pensions Statement"]),
     "Pensions Quote": normalizeDraft(defaultDrafts["Pensions Quote"], documentDrafts?.["Pensions Quote"]),
   };

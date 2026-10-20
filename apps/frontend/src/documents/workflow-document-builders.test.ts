@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { getSeededClientProfile, type SeededClientProfile } from "../data/seeded-clients";
 import { buildPdfStyledHtml } from "./pdf-export";
+import type { SupportedDocumentType } from "./document-types";
 import { buildWorkflowDocument, buildWorkflowEditorDocument } from "./workflow-document-builders";
 
 function cloneProfile(clientReference: string) {
@@ -250,6 +251,56 @@ describe("buildWorkflowDocument", () => {
     expect(document.html).not.toContain("statement-opening");
     expect(document.html).not.toContain("Personal Circumstances");
     expect(document.html).not.toContain("Signatures and Record");
+  });
+
+  it("renders the selected quote across all deferred periods with configured discount and tax relief", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    Object.assign(profile, {
+      dateOfBirth: "1990-06-29",
+      letterDate: "2026-06-29",
+      recommendedCover: "30000",
+      coverAge: "65",
+      smokerStatus: "Non-Smoker",
+      quotePickerSelectedQuoteKey: "aviva::guaranteed",
+      quotePickerTaxReliefPercentage: "40",
+      quotePickerDiscountPercentage: "15",
+    });
+
+    const deferredPeriods = ["4 weeks", "8 weeks", "13 weeks", "26 weeks", "52 weeks"];
+    const quotePickerDrafts = profile.documentDrafts as unknown as Record<string, typeof profile.documentDrafts["Quote"]>;
+    quotePickerDrafts["Quote Picker"] = {
+      ...profile.documentDrafts.Quote,
+      integrationRequests: deferredPeriods.map((deferredPeriod, index) => ({
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "sent" as const,
+        requestedAt: "2026-06-29T10:00:00+00:00",
+        requestFields: [{ label: "DeferredPeriod", value: deferredPeriod }],
+        quoteResults: [
+          { providerName: "Aviva", policyType: "Guaranteed", levelPremium: String(100 - index * 10) },
+          { providerName: "Zurich Life", policyType: "Guaranteed", levelPremium: "200.00" },
+        ],
+        errors: [],
+      })),
+    };
+
+    const document = buildWorkflowDocument(profile, "Quote Picker" as SupportedDocumentType);
+
+    expect(document.html).toContain("quote-picker-table");
+    expect(document.html).toContain("Folio");
+    expect(document.html).toContain("Structure");
+    expect(document.html).toContain("Ceasing Age");
+    expect(document.html).toContain("Income Protection");
+    expect(document.html).toContain("Original premium");
+    expect(document.html).toContain("Premium per month with Discount");
+    expect(document.html).toContain("Tax Relief @40%");
+    expect(document.html).toContain("Net Premium");
+    deferredPeriods.forEach((period) => {
+      expect(document.html).toContain(`${period.replace(" weeks", "")} week deferred period`);
+    });
+    expect(document.html).toContain("€51.00");
+    expect(document.html).toContain("€30.60");
+    expect(document.html).not.toContain("Zurich Life");
   });
 
   it("renders a populated statement recommendation using quote and fact find values", () => {

@@ -240,6 +240,9 @@ export type SeededClientProfile = {
   termsNotes: string;
   statementType: string;
   statementSelectedQuoteKey: string;
+  quotePickerSelectedQuoteKey: string;
+  quotePickerTaxReliefPercentage: string;
+  quotePickerDiscountPercentage: string;
   productType: string;
   letterDate: string;
   zurichDiscountActive: string;
@@ -507,6 +510,9 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "",
     statementSelectedQuoteKey: "",
+    quotePickerSelectedQuoteKey: "",
+    quotePickerTaxReliefPercentage: "40",
+    quotePickerDiscountPercentage: "15",
     productType: "",
     letterDate: "2026-01-15",
     zurichDiscountActive: "",
@@ -755,6 +761,9 @@ export const seededClientProfiles: Record<string, SeededClientProfile> = {
     termsNotes: "Issue with Income Protection recommendation pack.",
     statementType: "Full Advice",
     statementSelectedQuoteKey: "",
+    quotePickerSelectedQuoteKey: "",
+    quotePickerTaxReliefPercentage: "40",
+    quotePickerDiscountPercentage: "15",
     productType: "Income Protection Plan",
     letterDate: "2026-06-06",
     zurichDiscountActive: "",

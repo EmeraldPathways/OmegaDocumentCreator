@@ -8,6 +8,7 @@ import type {
   SupportedDocumentType,
 } from "./document-types";
 import { OMEGA_LOGO_DATA_URI } from "./omega-logo";
+import { findQuotePickerQuote } from "./quote-picker-selection";
 import { findStatementQuoteOption } from "./statement-quote-selection";
 
 type StatementRecommendationProfile = SeededClientProfile &
@@ -900,10 +901,14 @@ function isStatementDocumentType(documentType: SupportedDocumentType) {
 }
 
 function isQuoteDocumentType(documentType: SupportedDocumentType) {
-  return documentType === "Quote" || documentType === "Pensions Quote";
+  return documentType === "Quote" || documentType === "Quote Picker" || documentType === "Pensions Quote";
 }
 
 function resolveQuoteDocumentType(documentType: SupportedDocumentType) {
+  if (documentType === "Quote Picker") {
+    return "Quote Picker";
+  }
+
   return documentType === "Pensions Quote" || documentType === "Pensions Statement" ? "Pensions Quote" : "Quote";
 }
 
@@ -1601,6 +1606,107 @@ export function buildQuoteComparisonHtml(profile: SeededClientProfile, documentT
   ].join("");
 }
 
+function formatQuotePickerDeferredPeriod(request: IntegrationRequestArtifact, fallbackIndex: number) {
+  const rawValue = requestFieldValue(request ? [request] : [], "DeferredPeriod", "Deferred period");
+  const periodMatch = rawValue.match(/(\d+)/);
+  const period = periodMatch?.[1] ?? ["4", "8", "13", "26", "52"][fallbackIndex] ?? "";
+  return period ? `${period} week deferred period` : "Deferred period not available";
+}
+
+function buildQuotePickerComparisonHtml(profile: SeededClientProfile) {
+  const requests = profile.documentDrafts["Quote Picker"]?.integrationRequests ?? [];
+  const selectedQuoteKey = profile.quotePickerSelectedQuoteKey?.trim() ?? "";
+  const taxReliefPercentage = parseNumber(profile.quotePickerTaxReliefPercentage);
+  const discountPercentage = parseNumber(profile.quotePickerDiscountPercentage);
+  const selectedQuotes = requests.map((request) => findQuotePickerQuote(request, selectedQuoteKey));
+
+  if (!selectedQuoteKey || selectedQuotes.every((quote) => !quote)) {
+    return "";
+  }
+
+  const requestedCover = requestFieldValue(requests, "AnnualAmount", "Cover amount") || profile.recommendedCover;
+  const requestedCoverNumber = parseNumber(requestedCover);
+  const requestedCoverLabel = requestedCoverNumber === null
+    ? valueOrFallback(requestedCover)
+    : `€${formatEuroAmount(requestedCoverNumber, 0)}pa`;
+  const headers = [
+    "Folio",
+    "Structure",
+    "Ceasing Age",
+    "Income Protection",
+    "Original premium",
+    "Premium per month with Discount",
+    `Tax Relief @${formatDiscountPercentage(taxReliefPercentage ?? 0)}%`,
+    "Net Premium",
+  ];
+  const rows = requests.map((request, index) => {
+    const selectedQuote = selectedQuotes[index];
+    const grossPremium = resolveQuotePremium(selectedQuote ?? {
+      providerName: "",
+      levelPremium: "",
+    });
+    const discountedPremium = applyDiscount(grossPremium, discountPercentage);
+    const taxReliefAmount = discountedPremium === null || taxReliefPercentage === null
+      ? null
+      : discountedPremium * taxReliefPercentage / 100;
+    const netPremium = discountedPremium === null || taxReliefAmount === null
+      ? null
+      : discountedPremium - taxReliefAmount;
+    const providerName = selectedQuote?.providerName?.trim() || "Selected quote";
+    const structureHtml = [
+      "Income Protection",
+      `(${escapeHtml(providerName)})`,
+    ].join("<br />");
+    const incomeProtectionHtml = [
+      escapeHtml(requestedCoverLabel),
+      escapeHtml(formatQuotePickerDeferredPeriod(request, index)),
+    ].join("<br />");
+    const values = [
+      String(index + 1),
+      structureHtml,
+      escapeHtml(valueOrFallback(profile.coverAge)),
+      incomeProtectionHtml,
+      escapeHtml(formatEuroValue(grossPremium)),
+      escapeHtml(formatEuroValue(discountedPremium)),
+      escapeHtml(formatEuroValue(taxReliefAmount)),
+      escapeHtml(formatEuroValue(netPremium)),
+    ];
+
+    const recommendationClass = selectedQuote ? " quote-picker-recommended" : "";
+    return `<div class="statement-quote-row quote-picker-row${recommendationClass}">${values
+      .map((value) => `<div class="statement-quote-cell"><p>${value}</p></div>`)
+      .join("")}</div>`;
+  });
+
+  const clientHeader = [
+    clientFirstAndLastName(profile) || profile.fullName,
+    formatDocumentDate(profile.dateOfBirth),
+    profile.smokerStatus,
+  ]
+    .map((value) => value?.trim() ?? "")
+    .filter(Boolean)
+    .join("  ");
+  const proposedProtectionDate = formatDocumentDate(profile.letterDate) || "Date not recorded";
+
+  return [
+    '<div class="statement-section statement-quote-block quote-picker-block">',
+    '<div class="quote-picker-client-banner">',
+    `<p>${escapeHtml(clientHeader)}</p>`,
+    "</div>",
+    '<div class="quote-picker-meta-row">',
+    `<p><strong>Proposed Protection ${escapeHtml(proposedProtectionDate)}</strong></p>`,
+    "<p>* In Bold is my recommendation</p>",
+    "</div>",
+    '<div class="statement-quote-table quote-picker-table">',
+    '<div class="statement-quote-row statement-quote-row-header quote-picker-row">',
+    headers.map((header) => `<div class="statement-quote-cell"><p>${escapeHtml(header)}</p></div>`).join(""),
+    "</div>",
+    rows.join(""),
+    "</div>",
+    "</div>",
+  ].join("");
+}
+
 function buildWarningHtml(profile: SeededClientProfile, documentType: SupportedDocumentType) {
   if (documentType === "Fact Find") {
     return "<p>Please confirm that the information captured in this fact find is complete and accurate.</p>";
@@ -2077,7 +2183,9 @@ function buildStatementBlocks(profile: SeededClientProfile, recommendationHtml: 
 }
 
 function buildQuoteBlocks(profile: SeededClientProfile, documentType: SupportedDocumentType): ComposedBlock[] {
-  const quoteHtml = buildQuoteComparisonHtml(profile, documentType);
+  const quoteHtml = documentType === "Quote Picker"
+    ? buildQuotePickerComparisonHtml(profile)
+    : buildQuoteComparisonHtml(profile, documentType);
 
   if (!quoteHtml) {
     return [
@@ -2102,6 +2210,7 @@ export function composeWorkflowDocument(profile: SeededClientProfile, documentTy
   const title =
     documentType === "Fact Find" ? "Fact Find"
       : documentType === "Quote" ? "Income Protection Quote Comparison"
+      : documentType === "Quote Picker" ? "Income Protection Quote Picker"
       : documentType === "Pensions Quote" ? "Pensions Quote Comparison"
       : documentType === "Pensions Statement" ? "Pensions Statement"
       : documentType === "Terms of Business" ? "Terms of Business"
@@ -2313,6 +2422,10 @@ function getWorkflowDocumentClassNames(document: ComposedDocument) {
 
   if (documentType === "Pensions Quote") {
     classes.push("workflow-document-quote");
+  }
+
+  if (documentType === "Quote Picker") {
+    classes.push("workflow-document-quote", "workflow-document-quote-picker");
   }
 
   if (rootClassName) {
