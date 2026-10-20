@@ -5769,6 +5769,11 @@ button {
   grid-template-columns: 0.45fr 1.45fr 0.75fr 1.5fr 1fr 1.35fr 1fr 1fr;
 }
 
+.generated-output-editor.ProseMirror .workflow-document-quote-picker .quote-picker-table .quote-picker-row,
+.generated-output-pdf-page-body .workflow-document-quote-picker .quote-picker-table .quote-picker-row {
+  grid-template-columns: 0.45fr 1.45fr 0.75fr 1.5fr 1fr 1.35fr 1fr 1fr;
+}
+
 .workflow-document-quote-picker .quote-picker-table .quote-picker-row .statement-quote-cell {
   min-width: 0;
   padding: 7px 6px;

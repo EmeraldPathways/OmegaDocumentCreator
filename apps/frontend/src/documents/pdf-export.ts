@@ -10,6 +10,7 @@ const REPEATING_HEADER_BOTTOM_GAP = 10;
 const PAGE_TOP_PADDING_WITH_REPEATING_HEADER =
   REPEATING_HEADER_TOP_OFFSET + HEADER_HEIGHT + REPEATING_HEADER_BOTTOM_GAP;
 export const PAGE_CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_TOP_PADDING_WITH_REPEATING_HEADER - FOOTER_HEIGHT;
+const QUOTE_PICKER_GRID_TEMPLATE = "0.45fr 1.45fr 0.75fr 1.5fr 1fr 1.35fr 1fr 1fr";
 const RENDER_SCALE = 3;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
@@ -165,6 +166,10 @@ function getFactFindQuoteGridTemplate(sourceElement: Element) {
     return null;
   }
 
+  if (rowContainer.closest(".quote-picker-table")) {
+    return QUOTE_PICKER_GRID_TEMPLATE;
+  }
+
   if (rowContainer.closest(".fact-find-assets-table")) {
     return "minmax(160px,1.2fr) repeat(2,minmax(120px,1fr))";
   }
@@ -218,6 +223,7 @@ function elementStyles(sourceElement: Element) {
   const isStmt = elementIsStatement(sourceElement);
   const workflowRoot = sourceElement.closest(".workflow-document");
   const isQuoteDoc = Boolean(workflowRoot?.classList.contains("workflow-document-quote"));
+  const isQuotePickerDoc = Boolean(workflowRoot?.classList.contains("workflow-document-quote-picker"));
   const isFactFindDoc = Boolean(
     workflowRoot?.classList.contains("workflow-document-fact-find")
     || workflowRoot?.classList.contains("workflow-document-fact-find-update"),
@@ -315,13 +321,15 @@ function elementStyles(sourceElement: Element) {
   }
 
   if (classList.contains("statement-quote-cell")) {
-    const baseStyle = `display:block;padding:${
-      isQuoteDoc
-        ? "2px 5px"
-        : isFactFindDoc && isCompactFactFindTableCell(sourceElement)
+    const baseStyle = isQuotePickerDoc
+      ? "display:block;min-width:0;padding:7px 6px;text-align:center;vertical-align:middle;overflow-wrap:anywhere"
+      : `display:block;padding:${
+        isQuoteDoc
           ? "2px 5px"
-          : "10px 12px"
-    }`;
+          : isFactFindDoc && isCompactFactFindTableCell(sourceElement)
+            ? "2px 5px"
+            : "10px 12px"
+      }`;
     return sourceElement.previousElementSibling === null ? baseStyle : `${baseStyle};border-left:1px solid #e5e7eb`;
   }
 
@@ -401,15 +409,17 @@ function elementStyles(sourceElement: Element) {
       sourceElement.parentElement?.classList.contains("statement-quote-cell")
       && sourceElement.parentElement.parentElement?.classList.contains("statement-quote-row-header")
     ) {
-      return `margin:0;line-height:1;white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${
-        isQuoteDoc ? "10px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "9px" : "12px"
-      };font-weight:700;letter-spacing:0.02em;text-transform:uppercase`;
+      return `margin:0;line-height:${isQuotePickerDoc ? "1.2" : "1"};white-space:pre-wrap;color:#5b2230;font-family:Helvetica,Arial,sans-serif;font-size:${
+        isQuotePickerDoc ? "9px" : isQuoteDoc ? "10px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "9px" : "12px"
+      };font-weight:700;letter-spacing:0.02em;text-transform:${isQuotePickerDoc ? "none" : "uppercase"}`;
     }
 
     if (sourceElement.parentElement?.classList.contains("statement-quote-cell")) {
       return `margin:0;line-height:${
-        isQuoteDoc ? "1" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "1" : "1.7"
-      };white-space:pre-wrap;color:#1f2937;font-size:${isQuoteDoc ? "13px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "12px" : "14px"}`;
+        isQuotePickerDoc ? "1.25" : isQuoteDoc ? "1" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "1" : "1.7"
+      };white-space:pre-wrap;color:#1f2937;font-size:${
+        isQuotePickerDoc ? "10px" : isQuoteDoc ? "13px" : isFactFindDoc && isCompactFactFindTableCell(sourceElement) ? "12px" : "14px"
+      }`;
     }
 
     return "margin:0 0 8px;line-height:1.7;white-space:pre-wrap;color:#1f2937";

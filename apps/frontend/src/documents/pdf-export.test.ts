@@ -209,6 +209,26 @@ describe("quote table layout", () => {
     expect(styledHtml).toContain("grid-template-columns:1.4fr 1fr 1fr 1fr");
   });
 
+  it("keeps all eight Quote Picker columns in PDF preview styling", () => {
+    const stylesPath = path.resolve(process.cwd(), "src/styles.css");
+    const styles = readFileSync(stylesPath, "utf8");
+    const styledHtml = buildPdfStyledHtml(
+      `
+        <article class="workflow-document workflow-document-quote workflow-document-quote-picker">
+          <div class="statement-quote-table quote-picker-table">
+            <div class="statement-quote-row statement-quote-row-header quote-picker-row">
+              ${Array.from({ length: 8 }, (_, index) => `<div class="statement-quote-cell"><p>Column ${index + 1}</p></div>`).join("")}
+            </div>
+          </div>
+        </article>
+      `,
+      true,
+    );
+
+    expect(styles).toContain(".generated-output-editor.ProseMirror .workflow-document-quote-picker .quote-picker-table .quote-picker-row");
+    expect(styledHtml).toContain("grid-template-columns:0.45fr 1.45fr 0.75fr 1.5fr 1fr 1.35fr 1fr 1fr");
+  });
+
   it("removes the quote title rule and adds five pixels above rate headings", () => {
     const styledHtml = buildPdfStyledHtml(
       '<article class="workflow-document workflow-document-quote"><div class="statement-section statement-quote-block"><h2>Income Protection Quote Comparison</h2><h3>Reviewable Rates</h3></div></article>',
