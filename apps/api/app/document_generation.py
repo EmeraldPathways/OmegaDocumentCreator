@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from html import escape
+import re
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -58,6 +59,43 @@ def _normalize_phi_deferred_period(value: str) -> str:
     if value.startswith("52"):
         return "52"
     return value
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1].split(":")[-1]
+
+
+def _xml_element_text(element: ET.Element) -> str:
+    return " ".join("".join(element.itertext()).split())
+
+
+def _first_xml_text(node: ET.Element, *names: str) -> str:
+    wanted_names = set(names)
+    for element in node.iter():
+        if _xml_local_name(element.tag) not in wanted_names:
+            continue
+        value = _xml_element_text(element)
+        if value:
+            return value
+    return ""
+
+
+def _xml_children(node: ET.Element, name: str) -> list[ET.Element]:
+    return [child for child in list(node) if _xml_local_name(child.tag) == name]
+
+
+def _iter_phi_quote_companies(root: ET.Element):
+    for quotes in (element for element in root.iter() if _xml_local_name(element.tag) == "Quotes"):
+        grouped_quotes = _xml_children(quotes, "Type")
+        if grouped_quotes:
+            for quote_type in grouped_quotes:
+                policy_type = _first_xml_text(quote_type, "Desc")
+                for company in _xml_children(quote_type, "Company"):
+                    yield company, policy_type
+            continue
+
+        for company in _xml_children(quotes, "Company"):
+            yield company, _first_xml_text(company, "Type")
 
 
 def _is_pensions_workflow_snapshot(workflow_snapshot: dict[str, Any]) -> bool:
@@ -212,28 +250,39 @@ def submit_phi_request(settings: AppSettings, workflow_snapshot: dict[str, Any])
         xml_result = response.read().decode("utf-8")
 
     root = ET.fromstring(xml_result)
-    errors_text = (root.findtext("Errors") or "").strip()
+    errors_text = _first_xml_text(root, "Errors", "Error")
     quote_results: list[dict[str, str]] = []
 
-    for company in root.findall("./Outputs/Quotes/Company"):
+    for company, policy_type in _iter_phi_quote_companies(root):
         quote_results.append(
             {
-                "provider_name": (company.findtext("Name") or "").strip(),
-                "policy_type": (company.findtext("Type") or "").strip(),
-                "level_premium": (company.findtext("Level") or "").strip(),
-                "escalation_3_premium": (company.findtext("Esc3") or "").strip(),
-                "escalation_5_premium": (company.findtext("Esc5") or "").strip(),
+                "provider_name": _first_xml_text(company, "Name"),
+                "policy_type": policy_type,
+                "level_premium": _first_numeric_text(
+                    company,
+                    "Level",
+                    "Premium",
+                    "MonthlyPremium",
+                    "SMortgage",
+                    "SLevel",
+                    "JLevel",
+                    "DLevel",
+                    "JMortgage",
+                    "DMortgage",
+                ),
+                "escalation_3_premium": _first_numeric_text(company, "Esc3", "Escalation3", "SEsc3", "JEsc3"),
+                "escalation_5_premium": _first_numeric_text(company, "Esc5", "Escalation5", "SEsc5", "JEsc5"),
             }
         )
 
     return {
         "provider": "BestAdvice",
         "request_type": "Phi",
-        "status": "failed" if errors_text else "sent",
+        "status": "failed" if errors_text or not quote_results else "sent",
         "requested_at": datetime.now(UTC).isoformat(),
         "request_fields": payload["request_fields"],
         "quote_results": quote_results,
-        "errors": [errors_text] if errors_text else [],
+        "errors": [errors_text] if errors_text else (["PHI provider returned no quote results."] if not quote_results else []),
     }
 
 
@@ -241,6 +290,15 @@ def _first_present_text(node: ET.Element, *paths: str) -> str:
     for path in paths:
         value = (node.findtext(path) or "").strip()
         if value:
+            return value
+    return ""
+
+
+def _first_numeric_text(node: ET.Element, *paths: str) -> str:
+    for path in paths:
+        value = _first_xml_text(node, path.rsplit("/", 1)[-1])
+        normalized = value.replace(",", "")
+        if re.fullmatch(r"[€£$]?\s*-?\d+(?:\.\d+)?", normalized):
             return value
     return ""
 

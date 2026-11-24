@@ -133,6 +133,93 @@ class PhiParsingTests(unittest.TestCase):
         self.assertEqual(result["quote_results"][0]["provider_name"], "Irish Life")
         self.assertEqual(result["quote_results"][1]["escalation_3_premium"], "116.40")
 
+    def test_submit_phi_request_parses_grouped_namespaced_quote_output(self) -> None:
+        from app.config import get_settings
+        from app.document_generation import submit_phi_request
+
+        xml_result = """<?xml version="1.0"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:phi="urn:best-advice">
+  <soap:Body>
+    <phi:Result>
+      <phi:Outputs>
+        <phi:Quotes>
+          <phi:Type>
+            <phi:Desc>Income Protection</phi:Desc>
+            <phi:Company><phi:Name>Irish Life</phi:Name><phi:SMortgage>82.10</phi:SMortgage></phi:Company>
+          </phi:Type>
+        </phi:Quotes>
+      </phi:Outputs>
+    </phi:Result>
+  </soap:Body>
+</soap:Envelope>
+"""
+        mock_response = Mock()
+        mock_response.read.return_value = xml_result.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+
+        with patch("app.document_generation.urlopen", return_value=mock_response):
+            result = submit_phi_request(
+                get_settings(
+                    PHI_ENDPOINT_URL="http://example.test/interface_phi.php",
+                    PHI_USERNAME="user",
+                    PHI_PASSWORD="pass",
+                    PHI_REQUEST_FROM="omega",
+                    PHI_REQUEST_FROM_CODE="code",
+                ),
+                {
+                    "dateOfBirth": "1990-11-08",
+                    "gender": "Female",
+                    "smokerStatus": "Non-Smoker",
+                    "coverAge": "65",
+                    "recommendedCover": "30000",
+                    "deferredPeriod": "13 weeks",
+                    "phiOccupationalClass": "2",
+                    "phiIndexation": "Y",
+                },
+            )
+
+        self.assertEqual(result["status"], "sent")
+        self.assertEqual(result["quote_results"][0]["provider_name"], "Irish Life")
+        self.assertEqual(result["quote_results"][0]["policy_type"], "Income Protection")
+        self.assertEqual(result["quote_results"][0]["level_premium"], "82.10")
+
+    def test_submit_phi_request_reports_empty_quote_response(self) -> None:
+        from app.config import get_settings
+        from app.document_generation import submit_phi_request
+
+        xml_result = """<?xml version="1.0"?>
+<Result><Errors></Errors><Outputs><Quotes /></Outputs></Result>
+"""
+        mock_response = Mock()
+        mock_response.read.return_value = xml_result.encode("utf-8")
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+
+        with patch("app.document_generation.urlopen", return_value=mock_response):
+            result = submit_phi_request(
+                get_settings(
+                    PHI_ENDPOINT_URL="http://example.test/interface_phi.php",
+                    PHI_USERNAME="user",
+                    PHI_PASSWORD="pass",
+                    PHI_REQUEST_FROM="omega",
+                    PHI_REQUEST_FROM_CODE="code",
+                ),
+                {
+                    "dateOfBirth": "1990-11-08",
+                    "gender": "Female",
+                    "smokerStatus": "Non-Smoker",
+                    "coverAge": "65",
+                    "recommendedCover": "30000",
+                    "deferredPeriod": "13 weeks",
+                    "phiOccupationalClass": "2",
+                    "phiIndexation": "Y",
+                },
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["errors"], ["PHI provider returned no quote results."])
+
 if _test_engine is not None:
     app.db._engine = _test_engine
     app.db._SessionLocal = sessionmaker(bind=_test_engine, autoflush=False, autocommit=False)
