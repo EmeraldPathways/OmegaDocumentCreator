@@ -1206,4 +1206,24 @@ describe("buildWorkflowDocument", () => {
     );
     expect(pensionsStatement.html).toContain("<h2>Recommendation</h2>");
   });
+
+  it("shows quote integration errors when the provider returns no rows", () => {
+    const profile = cloneProfile("CLI-2026-0002");
+    profile.documentDrafts["Quote"].integrationRequests = [
+      {
+        provider: "BestAdvice",
+        requestType: "Phi",
+        status: "failed",
+        requestedAt: "2026-11-24T10:00:00+00:00",
+        requestFields: [],
+        quoteResults: [],
+        errors: ["PHI provider returned no quote results."],
+      },
+    ];
+
+    const document = buildWorkflowDocument(profile, "Quote");
+
+    expect(document.html).toContain("No Quote Data");
+    expect(document.html).toContain("PHI provider returned no quote results.");
+  });
 });

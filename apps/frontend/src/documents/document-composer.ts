@@ -2188,12 +2188,20 @@ function buildQuoteBlocks(profile: SeededClientProfile, documentType: SupportedD
     : buildQuoteComparisonHtml(profile, documentType);
 
   if (!quoteHtml) {
+    const quoteErrors = getQuoteRequests(profile, documentType)
+      .flatMap((request) => request.errors)
+      .map((error) => error.trim())
+      .filter(Boolean);
+    const emptyQuoteMessage = quoteErrors.length > 0
+      ? quoteErrors.join(" ")
+      : "Generate the Quote draft to populate quote comparison data, or no quote results were returned.";
+
     return [
       {
         kind: "callout",
         tone: "info",
         title: "No Quote Data",
-        bodyHtml: "<p>Generate the Quote draft to populate quote comparison data, or no quote results were returned.</p>",
+        bodyHtml: `<p>${escapeHtml(emptyQuoteMessage)}</p>`,
       },
     ];
   }
